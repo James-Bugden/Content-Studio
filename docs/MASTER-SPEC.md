@@ -47,6 +47,8 @@ Non-goals for MVP:
 
 The app may keep request-local data, encrypted session data and bounded cache entries. It must not persist content records in another database. Cache keys include source revision/fingerprint; writes always re-read and compare the authoritative record.
 
+Canonical Drive references consulted for this baseline are `AI-WORKFLOWS-INDEX.md`, `CONTENT-WORKFLOW.md`, `STYLE-GUIDE.md`, `REPRODUCE.md`, `REVIEW.md`, `PLATFORM-PRODUCTION.md` and the workflow-folder `README.md`. The former Google Doc index is superseded; the Markdown index is canonical. Runtime code must discover configured Drive IDs rather than hard-code private file IDs in the public repository.
+
 ## 3. Proposed architecture
 
 Next.js App Router + TypeScript on Vercel, with server-only integration modules:
@@ -213,12 +215,11 @@ Do not dual-write in MVP. The `ContentRepository` interface, stable domain IDs a
 
 ## 12. Recommended execution order
 
-1. Planning/foundation: CS-001 to CS-006.
-2. Core review slice: CS-007 to CS-011.
-3. Visual and handoff: CS-012 and CS-013.
-4. Scheduling/publishing: CS-014 to CS-016.
-5. Hardening/release: CS-017 to CS-019.
-6. Follow-on migration option: CS-020 only after measured need.
+1. Planning/foundation: [CS-001](https://github.com/James-Bugden/Content-Studio/issues/2) -> [CS-002](https://github.com/James-Bugden/Content-Studio/issues/3), then [CS-003](https://github.com/James-Bugden/Content-Studio/issues/4), [CS-004](https://github.com/James-Bugden/Content-Studio/issues/5), [CS-005](https://github.com/James-Bugden/Content-Studio/issues/6) and [CS-006](https://github.com/James-Bugden/Content-Studio/issues/7) behind the shared contracts.
+2. Core review slice: [CS-007](https://github.com/James-Bugden/Content-Studio/issues/8) -> [CS-008](https://github.com/James-Bugden/Content-Studio/issues/9) -> [CS-009](https://github.com/James-Bugden/Content-Studio/issues/10) -> [CS-010](https://github.com/James-Bugden/Content-Studio/issues/11) -> [CS-011](https://github.com/James-Bugden/Content-Studio/issues/12).
+3. Visual and handoff: [CS-012](https://github.com/James-Bugden/Content-Studio/issues/13) -> [CS-013](https://github.com/James-Bugden/Content-Studio/issues/14).
+4. Scheduling/publishing: [CS-014](https://github.com/James-Bugden/Content-Studio/issues/15) -> [CS-015](https://github.com/James-Bugden/Content-Studio/issues/16) -> [CS-016](https://github.com/James-Bugden/Content-Studio/issues/17).
+5. Hardening/release: [CS-017](https://github.com/James-Bugden/Content-Studio/issues/18) -> [CS-018](https://github.com/James-Bugden/Content-Studio/issues/19) -> [CS-019](https://github.com/James-Bugden/Content-Studio/issues/20).
+6. Follow-on migration option: [CS-020](https://github.com/James-Bugden/Content-Studio/issues/21) only after measured need.
 
 Parallel work is safe only behind the shared contracts and fake adapters. The first vertical demo should be: login -> read one synthetic Library row and Markdown section -> review/edit with conflict protection -> approve -> see the derived Ready Queue state. Typefully and live AI are not required for that slice.
-
