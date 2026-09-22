@@ -69,6 +69,12 @@ Use Zod at every boundary. Keep domain types in one package/module. UI component
 
 Recommended modules: `src/domain`, `src/application`, `src/integrations/google`, `src/integrations/typefully`, `src/integrations/ai`, `src/components`, `src/observability`, and `tests/{unit,integration,e2e,fixtures}`.
 
+### Social Replies patterns used selectively
+
+Use [Social Replies implementation contracts](https://github.com/James-Bugden/Social-Replies-/blob/main/docs/implementation/contracts.md) as the reference for one shared typed vocabulary, validated server boundaries, versioned async work and operation-based idempotency. Use its [interaction spec](https://github.com/James-Bugden/Social-Replies-/blob/main/docs/design/interaction-spec.md) for protected-editor behaviour, explicit proposal acceptance, stale-response handling and narrow-screen discipline. Use its [acceptance matrix](https://github.com/James-Bugden/Social-Replies-/blob/main/docs/testing/acceptance-matrix.md) and [agent instructions](https://github.com/James-Bugden/Social-Replies-/blob/main/AGENTS.md) for stable test IDs, synthetic-public/private-real separation and exact handoff evidence.
+
+Do not copy Social Replies' Supabase-first persistence, reply-library schema, reply counters, inbound-engagement UI or retrieval/import architecture. Content Studio has different authorities and must use Sheet/Drive/Typefully adapters until a separately justified migration. Reuse its safety and workflow conventions, not its product layout or storage model.
+
 ### Authentication and permissions
 
 - Auth.js Google OIDC login; no public signup or account chooser after owner binding.
