@@ -490,7 +490,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
               <p className="mt-1 text-xs text-ink-soft">Check it at full size and at both phone widths before approving. Approval belongs to this exact revision only.</p>
               <figure className="mt-4 flex flex-col gap-1">
                 <figcaption className="text-sm font-medium">Full size ({canvas.width} x {canvas.height} px)</figcaption>
-                <div className="max-h-[36rem] max-w-full overflow-auto rounded-md border border-line bg-paper">
+                <div tabIndex={0} role="region" aria-label="Full-size preview (scrolls)" className="max-h-[36rem] max-w-full overflow-auto rounded-md border border-line bg-paper">
                   {/* eslint-disable-next-line @next/next/no-img-element -- private no-store preview; next/image would proxy and cache it */}
                   <img src={previewSrc} alt={item.altText} width={canvas.width} height={canvas.height} className="block max-w-none" />
                 </div>
@@ -498,7 +498,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
                   Open full size in a new tab
                 </a>
               </figure>
-              <div className="mt-4 max-w-full overflow-x-auto" role="group" aria-label="Phone width previews">
+              <div tabIndex={0} className="mt-4 max-w-full overflow-x-auto" role="region" aria-label="Phone width previews (scrolls sideways)">
                 <div className="flex w-max gap-4 pb-2">
                   {[360, 390].map((w) => (
                     <figure key={w} className="flex flex-col gap-1" data-phone-width={w}>

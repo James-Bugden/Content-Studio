@@ -108,7 +108,7 @@ export default async function PromotePage({
                     What will be written to {preview.contentId}
                   </h2>
                   <p className="text-sm text-ink-soft">Only these cells change. Every other cell in the row, and every other row, is left as it is.</p>
-                  <div className="overflow-x-auto rounded-lg border border-line bg-card">
+                  <div tabIndex={0} role="region" aria-label="Cells to write (scrolls sideways)" className="overflow-x-auto rounded-lg border border-line bg-card">
                     <table className="w-full min-w-[36rem] text-left text-sm">
                       <caption className="sr-only">Cells to write</caption>
                       <thead className="bg-paper">
