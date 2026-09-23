@@ -14,41 +14,11 @@ const SLOT_OF: Record<string, Slot> = { MAIN: 'Main', '2ND': '2nd', '3RD': '3rd'
 
 export type ParsedContentId = { isoDate: string; slot: Slot; platform: Platform };
 
-export type ContentPillar = 'Personal story' | 'Expertise' | 'Social proof' | 'Trending' | 'Opinions' | 'Build in public (Soar)';
-
-const X_THREADS_MORNING: readonly ContentPillar[] = [
-  'Opinions', // Sunday
-  'Personal story', // Monday
-  'Social proof', // Tuesday
-  'Personal story', // Wednesday
-  'Trending', // Thursday
-  'Build in public (Soar)', // Friday
-  'Personal story', // Saturday
-];
-const LINKEDIN_DAILY: readonly ContentPillar[] = [
-  'Social proof', // Sunday
-  'Expertise', // Monday
-  'Build in public (Soar)', // Tuesday
-  'Expertise', // Wednesday
-  'Personal story', // Thursday
-  'Trending', // Friday
-  'Opinions', // Saturday
-];
-
 /** Forward-looking scheduling has 5 active rows/day. Third slots remain parseable only for legacy history. */
 export function isActiveScheduleSlot(platform: Platform, slot: Slot): boolean {
   if (slot === '3rd') return false;
   if (platform === 'LinkedIn') return slot === 'Main';
   return slot === 'Main' || slot === '2nd';
-}
-
-/** Expected content pillar for one active slot under the 2026-09-23 operating cadence. */
-export function expectedPillar(isoDate: string, platform: Platform, slot: Slot): ContentPillar | null {
-  if (!isActiveScheduleSlot(platform, slot) || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
-  const dow = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
-  if (platform === 'LinkedIn') return LINKEDIN_DAILY[dow] ?? null;
-  if (slot === '2nd') return 'Expertise';
-  return X_THREADS_MORNING[dow] ?? null;
 }
 
 export function parseContentId(contentId: string): ParsedContentId | null {
