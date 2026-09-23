@@ -94,3 +94,20 @@ test('viewer sees the queue without review actions and cannot transition', async
   });
   expect(res.status()).toBe(403);
 });
+
+test('UX-05: keyboard-only review of a CJK card at 200% zoom, next action in words', async ({ page }) => {
+  await signInAs(page.request, 'owner');
+  await page.setViewportSize({ width: 640, height: 900 });
+  await page.goto('/review');
+  const joint = card(page, 'joint-problem');
+  await expect(joint.getByText('談薪水不是吵架 🙂').first()).toBeVisible();
+  await expect(joint.getByText('Next action')).toBeVisible();
+  // Reach the card's primary action by keyboard only.
+  const approve = joint.getByRole('button', { name: 'Approve only' });
+  await approve.focus();
+  await expect(approve).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(joint.getByText('Approved. The Sheet now holds this approval.')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

@@ -26,7 +26,7 @@ const items = new Map(
 const item = (id: string) => items.get(id)!;
 const codes = (i: LibraryItem, ctx: GateContext) => evaluateLibraryGates(i, ctx).blockers.map((g) => g.code);
 
-describe('READY-01: table-driven hard gates', () => {
+describe('READY-01 / READY-05: table-driven hard gates (incl. image, stale visual and screenshot reuse)', () => {
   const cases: [string, GateContext, GateCode[], 'ready' | 'needs_action' | 'blocked'][] = [
     ['SYN-L001', { purpose: 'review' }, ['REVIEW_PENDING'], 'needs_action'],
     ['SYN-L002', { purpose: 'review' }, ['COPYRIGHT_REWORK', 'REVIEW_PENDING', 'VISUAL_UNDECIDED'], 'blocked'],
@@ -71,7 +71,7 @@ describe('READY-01: table-driven hard gates', () => {
     }
   });
 
-  it('LinkedIn never requires a zh-TW adaptation', () => {
+  it('READY-04: LinkedIn never requires a zh-TW adaptation', () => {
     expect(codes(item('SYN-L005'), { purpose: 'ready', zh: 'missing' })).toEqual([]);
   });
 
