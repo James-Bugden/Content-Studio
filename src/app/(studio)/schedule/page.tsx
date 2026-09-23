@@ -115,7 +115,14 @@ function SlotRow({ cell }: { cell: CalendarCell }) {
           </p>
         ) : null}
       </div>
-      <span className="text-sm">{state}</span>
+      <span className="flex flex-wrap items-baseline gap-x-3 text-sm">
+        <span>{state}</span>
+        {!cell.available ? (
+          <GuardedLink href={`/schedule/${encodeURIComponent(cell.contentId)}`} className="underline" aria-label={`Details for ${cell.contentId}`}>
+            Details
+          </GuardedLink>
+        ) : null}
+      </span>
     </div>
   );
 }

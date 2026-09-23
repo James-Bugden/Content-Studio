@@ -30,3 +30,14 @@ export async function postJson<T>(url: string, body: unknown, signal?: AbortSign
     return { status: 0, body: { ok: false, code: 'PROVIDER_UNAVAILABLE', message: 'No connection. Nothing is confirmed as saved; your text is kept here.' } };
   }
 }
+
+export async function getJson<T>(url: string): Promise<ApiResult<T | { ok: false; code: 'PROVIDER_UNAVAILABLE'; message: string }>> {
+  try {
+    const res = await fetch(url, { method: 'GET', credentials: 'same-origin', cache: 'no-store' });
+    const json = (await res.json().catch(() => null)) as T | null;
+    if (json === null) return { status: res.status, body: { ok: false, code: 'PROVIDER_UNAVAILABLE', message: 'The server did not answer clearly.' } };
+    return { status: res.status, body: json };
+  } catch {
+    return { status: 0, body: { ok: false, code: 'PROVIDER_UNAVAILABLE', message: 'No connection. Nothing was changed.' } };
+  }
+}

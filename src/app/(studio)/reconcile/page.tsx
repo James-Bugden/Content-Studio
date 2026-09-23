@@ -17,8 +17,8 @@ export default async function ReconcilePage() {
   await requireActor('viewer');
   let report: ReconcileReport;
   try {
-    const { repo, drive } = getServices();
-    report = await buildReconcileReport(repo, drive);
+    const { repo, drive, typefully } = getServices();
+    report = await buildReconcileReport(repo, drive, undefined, { typefully });
   } catch (error) {
     return (
       <>

@@ -21,6 +21,7 @@ import {
   toTaipeiIso,
   workingCopy,
 } from '@/domain/typefully';
+import type { CandidateDiscriminators, CopyComparison, RowDiscriminators } from '@/domain/typefully-view';
 import { adaptationState } from '@/domain/zh-state';
 import { emit, targetHash, type TelemetryEvent } from '@/observability/events';
 import type { ContentRepository, TypefullyDraft, TypefullyGateway, TypefullyMetricKey } from './ports';
@@ -94,21 +95,7 @@ async function loadRow(repo: ContentRepository, contentId: string): Promise<Load
 
 // ------------------------------------------------------------------ comparison
 
-export type CopyComparison = {
-  platform: Platform;
-  /** Sheet working copy: `Content`, or `Chinese Content` for Threads. */
-  sheetWorking: string;
-  sheetFinal: string;
-  typefully: string;
-  /** Sheet `Final Content` already equals Typefully's text exactly. */
-  identical: boolean;
-  lastSyncAt: string | null;
-  typefullyUpdatedAt: string;
-  /** Null when there is no sync baseline to compare with. */
-  typefullyEditedSinceSync: boolean | null;
-  sheetFinalEditedSinceSync: boolean | null;
-  newer: 'typefully' | 'sheet' | 'both' | 'same' | 'unknown';
-};
+export type { CopyComparison } from '@/domain/typefully-view';
 
 export function compareCopy(row: ScheduledPost, draft: TypefullyDraft): CopyComparison {
   const platform = platformOf(row) ?? draft.platform;
@@ -145,26 +132,7 @@ export function compareCopy(row: ScheduledPost, draft: TypefullyDraft): CopyComp
 
 // ------------------------------------------------------------------ reconcile (TYPE-01, TYPE-03)
 
-export type RowDiscriminators = { contentId: string; platform: Platform; date: string | null; slot: string; plannedAt: string | null };
-
-export type CandidateDiscriminators = {
-  draftId: string;
-  platform: Platform;
-  platforms: Platform[];
-  status: TypefullyStatus;
-  /** Taipei date and time of the draft's scheduled or planned instant. */
-  date: string | null;
-  time: string | null;
-  /** Slot whose Workflow Settings time equals the draft time, when one does. */
-  slot: string | null;
-  deltaMinutes: number | null;
-  similarity: number;
-  timeMatch: boolean;
-  multiPlatform: boolean;
-  /** Another Schedule row already holds this draft id. */
-  linkedToContentId: string | null;
-  exact: boolean;
-};
+export type { CandidateDiscriminators, RowDiscriminators } from '@/domain/typefully-view';
 
 export type ReconcileCandidate = { draft: TypefullyDraft; discriminators: CandidateDiscriminators };
 
@@ -274,6 +242,11 @@ export async function reconcile(repo: ContentRepository, tf: TypefullyGateway, c
     ...(result.kind === 'provider_error' ? { provider: result.provider } : {}),
   }, result.kind === 'provider_error' ? { code: result.code } : {});
   return result;
+}
+
+/** Reconcile one row from an already-loaded Schedule (reconciliation centre scan). Read only. */
+export async function reconcileRecord(repo: ContentRepository, tf: TypefullyGateway, schedule: ScheduleRecord[], record: ScheduleRecord): Promise<Reconciliation> {
+  return reconcileLoaded(repo, tf, { schedule, record });
 }
 
 // ------------------------------------------------------------------ mutation plumbing
