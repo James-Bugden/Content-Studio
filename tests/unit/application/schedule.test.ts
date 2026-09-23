@@ -3,8 +3,8 @@ import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { loadCalendar, previewPromotion, promote, promotionContext } from '@/application/schedule';
 import { loadReadyQueue } from '@/application/ready';
-import { addDays, expectedPillar, parseContentId, slotAvailability, taipeiToday, weekStart } from '@/domain/schedule';
-import { parseWorkflowSettings } from '@/domain/settings';
+import { addDays, parseContentId, slotAvailability, taipeiToday, weekStart } from '@/domain/schedule';
+import { parseWorkflowSettings, scheduledPillar } from '@/domain/settings';
 import { syntheticSettingsRows } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
 import { generateAdaptation } from '@/application/zh-tw';
@@ -60,7 +60,8 @@ describe('SCHED-01: slot policy from Workflow Settings', () => {
     expect(s.slots.find((x) => x.platform === 'X' && x.slot === '3rd')?.time).toBe('TBD');
   });
 
-  it('maps all seven weekdays to the current pillar cadence', () => {
+  it('maps all seven weekdays from Workflow Settings to the current pillar cadence', () => {
+    const settings = parseWorkflowSettings(syntheticSettingsRows().map((r) => r.values));
     const cases = [
       ['2026-09-21', 'Personal story', 'Expertise'],
       ['2026-09-22', 'Social proof', 'Build in public (Soar)'],
@@ -71,13 +72,13 @@ describe('SCHED-01: slot policy from Workflow Settings', () => {
       ['2026-09-27', 'Opinions', 'Social proof'],
     ] as const;
     for (const [date, morning, linkedin] of cases) {
-      expect(expectedPillar(date, 'X', 'Main')).toBe(morning);
-      expect(expectedPillar(date, 'Threads', 'Main')).toBe(morning);
-      expect(expectedPillar(date, 'X', '2nd')).toBe('Expertise');
-      expect(expectedPillar(date, 'Threads', '2nd')).toBe('Expertise');
-      expect(expectedPillar(date, 'LinkedIn', 'Main')).toBe(linkedin);
+      expect(scheduledPillar(settings, date, 'X', 'Main')).toBe(morning);
+      expect(scheduledPillar(settings, date, 'Threads', 'Main')).toBe(morning);
+      expect(scheduledPillar(settings, date, 'X', '2nd')).toBe('Expertise');
+      expect(scheduledPillar(settings, date, 'Threads', '2nd')).toBe('Expertise');
+      expect(scheduledPillar(settings, date, 'LinkedIn', 'Main')).toBe(linkedin);
     }
-    expect(expectedPillar('2026-09-21', 'X', '3rd')).toBeNull();
+    expect(scheduledPillar(settings, '2026-09-21', 'X', '3rd')).toBeNull();
   });
 
   it('a missing slot setting blocks, never falls back to a guess', () => {
