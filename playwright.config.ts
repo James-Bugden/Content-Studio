@@ -31,6 +31,7 @@ export default defineConfig({
     env: {
       CS_DATA_MODE: 'fake',
       CS_TEST_MODE: 'e2e',
+      CS_FAKE_TODAY: '2026-09-30',
       AI_PROVIDER: 'fake',
       AUTH_SECRET: 'e2e-only-auth-secret-not-a-real-value-000000',
       APP_BASE_URL: `http://127.0.0.1:${PORT}`,
