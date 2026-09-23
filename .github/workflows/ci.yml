@@ -1,0 +1,122 @@
+name: CI
+
+# Synthetic-only CI for a public repository (DEP-02).
+#
+# Default permissions are read-only and no job references a repository secret.
+# `pull_request` (not `pull_request_target`) means fork code runs without secrets,
+# and nothing here needs one: every provider is a fake. Actions are pinned to SHAs.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CS_DATA_MODE: fake
+  AI_PROVIDER: fake
+  APP_TIMEZONE: Asia/Taipei
+
+jobs:
+  verify:
+    name: typecheck, lint, policy, unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Environment check (names only)
+        run: npm run check:env
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Private-path policy
+        run: npm run check:private
+
+      - name: Secret scan (tracked files)
+        run: npm run check:secrets
+
+      - name: Secret scan (full history)
+        run: |
+          git log -p --all --format='commit %H' > "$RUNNER_TEMP/history.txt"
+          node scripts/scan-secrets.mjs "$RUNNER_TEMP/history.txt"
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+  browser:
+    name: deterministic browser journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser journeys
+        run: npm run test:e2e
+
+      # Page text in these reports is synthetic. Only the report directory is uploaded.
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

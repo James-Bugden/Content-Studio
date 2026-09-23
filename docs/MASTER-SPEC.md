@@ -132,6 +132,27 @@ The live workbook is `Content Tracker / X, LinkedIn & Threads`, locale `en_GB`, 
 
 `Posted` is not a workflow state; scheduled future rows may already be true. Use `Content Stage` and `Typefully Status`.
 
+### Live vocabulary (verified 2026-09-23, CS-002)
+
+Values observed in the live workbook, mapped to the canonical enums in `src/domain/enums.ts`. Only vocabulary, never row content, is recorded here.
+
+| Column | Live values | Canonical |
+| --- | --- | --- |
+| Library `State` | `Editing` | Display only; the canonical stage lives in Schedule `Content Stage` |
+| `Copyright QA` | `Cleared`, `REWORK` | `PASS`, `REWORK`; blank = `Unchecked` (blocks) |
+| `Duplicate QA` | `No flag`, `CHECK` | `PASS`, `CHECK`; `DUPLICATE` confirmed; blank = `Unchecked` (blocks) |
+| `Review Status` | `Not Reviewed` | `Pending`; plus `Approved`, `Changes Requested`, `Skipped` |
+| `Source Platform` | `LinkedIn`, `Threads (legacy)` | Platform enum with alias |
+| `Source Markdown` | `Open master` (hyperlink) | Link target read from the cell hyperlink or `HYPERLINK()` formula |
+| `Has Image`, `Next Action`, `Image Next Action` | Display or formula text | Never written when the cell holds a formula |
+| Schedule `Slot` | `Main`, `2nd`, `3rd` | Slot enum |
+| Schedule `Content ID` | `YYYY-MM-DD-<SLOT>-<X/TH/LI>` | Pre-created slot rows; promotion fills an available row |
+| `Workflow Settings` | `Setting / Value / Notes` rows such as `X Main = 08:00`, `Threads 3rd = TBD` | Slot policy |
+
+Unrecognised values are never defaulted: they become an `UNRECOGNISED_VALUE` blocker.
+
+Approval evidence lives in existing cells: an approval stamp `[cs:approved:<hash>]` in `Next Action`, a visual stamp `[cs:visual:<hash>]` in `Image Next Action`, and a zh-TW lineage stamp `[cs:zh-src:<parent Content ID>:<hash>]` in the Threads row `AI Action`. A stamp is written only when its cell is not a formula; an approval without a stamp is treated as a legacy approval with a visible warning.
+
 ### Other tabs
 
 - `Content Queue Summary`: read-only source-level counts and master links.
