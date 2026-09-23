@@ -123,7 +123,9 @@ export type SlotPolicy = { platform: Platform; slot: Slot; time: string | 'TBD' 
 export type WorkflowSettings = {
   timezone: string;
   slots: SlotPolicy[];
-  /** Raw key/value pairs, kept for display. Unknown keys never change behaviour. */
+  /** Raw key/value pairs from Workflow Settings. */
   raw: Record<string, string>;
+  /** Notes column keyed by Setting; cadence uses it for the LinkedIn daily pillar. */
+  rawNotes: Record<string, string>;
   problems: string[];
 };
