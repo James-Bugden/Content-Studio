@@ -14,6 +14,43 @@ const SLOT_OF: Record<string, Slot> = { MAIN: 'Main', '2ND': '2nd', '3RD': '3rd'
 
 export type ParsedContentId = { isoDate: string; slot: Slot; platform: Platform };
 
+export type ContentPillar = 'Personal story' | 'Expertise' | 'Social proof' | 'Trending' | 'Opinions' | 'Build in public (Soar)';
+
+const X_THREADS_MORNING: readonly ContentPillar[] = [
+  'Opinions', // Sunday
+  'Personal story', // Monday
+  'Social proof', // Tuesday
+  'Personal story', // Wednesday
+  'Trending', // Thursday
+  'Build in public (Soar)', // Friday
+  'Personal story', // Saturday
+];
+const LINKEDIN_DAILY: readonly ContentPillar[] = [
+  'Social proof', // Sunday
+  'Expertise', // Monday
+  'Build in public (Soar)', // Tuesday
+  'Expertise', // Wednesday
+  'Personal story', // Thursday
+  'Trending', // Friday
+  'Opinions', // Saturday
+];
+
+/** Forward-looking scheduling has 5 active rows/day. Third slots remain parseable only for legacy history. */
+export function isActiveScheduleSlot(platform: Platform, slot: Slot): boolean {
+  if (slot === '3rd') return false;
+  if (platform === 'LinkedIn') return slot === 'Main';
+  return slot === 'Main' || slot === '2nd';
+}
+
+/** Expected content pillar for one active slot under the 2026-09-23 operating cadence. */
+export function expectedPillar(isoDate: string, platform: Platform, slot: Slot): ContentPillar | null {
+  if (!isActiveScheduleSlot(platform, slot) || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+  const dow = new Date(`${isoDate}T00:00:00Z`).getUTCDay();
+  if (platform === 'LinkedIn') return LINKEDIN_DAILY[dow] ?? null;
+  if (slot === '2nd') return 'Expertise';
+  return X_THREADS_MORNING[dow] ?? null;
+}
+
 export function parseContentId(contentId: string): ParsedContentId | null {
   const m = CONTENT_ID.exec(contentId.trim());
   if (!m) return null;
@@ -46,12 +83,24 @@ export function slotOrder(slot: string): number {
 
 const CONTENT_FIELDS: ScheduleField[] = ['hook', 'content', 'chineseContent', 'finalContent', 'typefullyDraftId', 'postLink', 'publishedAt'];
 
+/** True when a legacy slot contains real work/state and therefore must stay visible/reconcilable. */
+export function hasScheduleActivity(row: ScheduleRecord): boolean {
+  const v = row.value;
+  if (v.posted === true) return true;
+  if (CONTENT_FIELDS.some((f) => Boolean(row.cells[f]?.trim()))) return true;
+  if (v.typefullyStatus.ok && v.typefullyStatus.value !== 'Not Sent') return true;
+  if (!v.typefullyStatus.ok) return true;
+  return v.contentStage !== null;
+}
+
 export type SlotAvailability = { available: true } | { available: false; reason: string };
 
 /** A pre-created slot row is available only when nothing has been placed in it. */
 export function slotAvailability(row: ScheduleRecord): SlotAvailability {
   const v = row.value;
-  if (!parseContentId(v.contentId)) return { available: false, reason: 'This row has no standard Content ID.' };
+  const parsed = parseContentId(v.contentId);
+  if (!parsed) return { available: false, reason: 'This row has no standard Content ID.' };
+  if (!isActiveScheduleSlot(parsed.platform, parsed.slot)) return { available: false, reason: 'Legacy 3rd slots are deprecated and cannot receive new content.' };
   if (v.posted === true) return { available: false, reason: 'Already posted.' };
   for (const f of CONTENT_FIELDS) {
     if (row.cells[f]?.trim()) return { available: false, reason: `Already holds ${SCHEDULE_HEADERS[f]}.` };
