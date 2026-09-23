@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { loadEditor } from '@/application/editor';
 import { ErrorState, GateChip, GuardedLink, NextAction, PageHeader, StatusBadge } from '@/components';
-import { PostEditor } from '@/components/editor/post-editor';
+import { EditorWorkspace } from '@/components/editor/editor-workspace';
 import { isAppError } from '@/domain/errors';
 import { shortHash } from '@/domain/hash';
 import { libraryIdSchema } from '@/domain/mutation';
@@ -44,7 +44,7 @@ export default async function EditorPage({ params }: { params: Promise<{ library
       <PageHeader title={model.slug || model.libraryId} description={`${model.targetPlatform} · ${model.source}`} actions={back} />
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
         <div className="min-w-0">
-          <PostEditor model={model} canEdit={actor.role === 'owner'} ns={ns} />
+          <EditorWorkspace model={model} canEdit={actor.role === 'owner'} ns={ns} />
         </div>
         <aside aria-label="Status and sources" className="flex min-w-0 flex-col gap-4">
           <div className="rounded-lg border border-line bg-card p-4">

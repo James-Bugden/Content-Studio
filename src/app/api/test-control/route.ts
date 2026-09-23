@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
  * E2E-only control surface for deterministic journeys (T1). Exists only when
  * CS_DATA_MODE=fake and CS_TEST_MODE=e2e outside production; everywhere else it
  * is a 404. It can reset the synthetic fakes, inject a provider failure, or make
- * an "external" edit to simulate James changing the Sheet or Drive directly.
+ * an "external" edit to simulate James changing the Sheet or Drive directly, or make
+ * the fake AI fail or return malformed output.
  */
 const bodySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('reset') }),
@@ -30,6 +31,7 @@ const bodySchema = z.discriminatedUnion('kind', [
     value: z.string().max(5000),
   }),
   z.object({ kind: z.literal('drive_replace'), fileId: z.string().max(200), find: z.string().max(2000), replace: z.string().max(2000) }),
+  z.object({ kind: z.literal('ai_fail'), code: z.enum(ERROR_CODES).optional(), malformed: z.number().int().min(1).max(10).optional() }),
 ]);
 
 export async function POST(request: Request) {
@@ -47,6 +49,12 @@ export async function POST(request: Request) {
   if (body.kind === 'fail') {
     if (body.provider === 'sheet' && body.op !== 'meta') fakes.sheet.failNext({ op: body.op, code: body.code, ...(body.tab ? { tab: body.tab } : {}), times: body.times ?? 1 });
     if (body.provider === 'drive') fakes.drive.failNext({ op: body.op, code: body.code, times: body.times ?? 1 });
+    return json({ ok: true });
+  }
+  if (body.kind === 'ai_fail') {
+    if (!fakes.ai) return new Response('Not found', { status: 404 });
+    if (body.code) fakes.ai.failNext(body.code);
+    if (body.malformed) fakes.ai.malformedNext(body.malformed);
     return json({ ok: true });
   }
   if (body.kind === 'sheet_edit') {
