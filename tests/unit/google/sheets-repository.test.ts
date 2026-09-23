@@ -189,8 +189,11 @@ describe('fixtures: pagination, empty queue, settings', () => {
   it('parses Taipei slot policy including TBD', async () => {
     const s = await repo.workflowSettings();
     expect(s.problems).toEqual([]);
+    expect(s.slots).toContainEqual({ platform: 'X', slot: '3rd', time: 'TBD' });
     expect(s.slots).toContainEqual({ platform: 'Threads', slot: '3rd', time: 'TBD' });
     expect(s.slots).toContainEqual({ platform: 'LinkedIn', slot: 'Main', time: '21:00' });
+    expect(s.raw['X + Threads frequency']).toBe('2 posts/day');
+    expect(s.raw['Tuesday cadence']).toContain('Social proof');
     expect(s.slots).toHaveLength(7);
   });
 
