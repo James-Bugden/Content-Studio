@@ -66,16 +66,15 @@ export function testAuthEnabled(env: ServerEnv = serverEnv()): boolean {
 }
 
 /**
- * Local `npm run dev` without Google credentials: a "Continue as synthetic owner"
- * button. Fake data, development server, no Google client, never production.
+ * "Continue as synthetic owner": local `npm run dev`, or a Vercel preview that
+ * explicitly opts in, with fake data, no Google client, and never production.
  */
 export function syntheticSignInEnabled(env: ServerEnv = serverEnv()): boolean {
-  return (
-    env.CS_DATA_MODE === 'fake' &&
-    !env.AUTH_GOOGLE_ID &&
-    env.VERCEL_ENV !== 'production' &&
-    process.env.NODE_ENV === 'development'
-  );
+  if (env.CS_DATA_MODE !== 'fake' || env.AUTH_GOOGLE_ID || env.VERCEL_ENV === 'production') return false;
+  if (process.env.NODE_ENV === 'development') return true;
+  // Vercel preview demo on synthetic data only. Preview URLs sit behind Vercel's
+  // own deployment protection, and fake mode is refused in production.
+  return env.VERCEL_ENV === 'preview' && process.env.CS_ALLOW_PREVIEW_SYNTHETIC === 'true';
 }
 
 /** Whether the signed test cookie may be honoured at all in this process. */

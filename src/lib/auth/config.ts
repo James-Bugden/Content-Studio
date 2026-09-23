@@ -3,6 +3,7 @@ import NextAuth, { type NextAuthConfig } from 'next-auth';
 import Google from 'next-auth/providers/google';
 import { serverEnv } from '@/lib/env';
 import { jwtCallback, sessionCallback, signInCallback } from './callbacks';
+import { ownerSetupMode, rememberSetupSubject, setupAllowed } from './setup';
 import { SESSION_MAX_AGE_SECONDS } from './test-cookie';
 
 /**
@@ -23,7 +24,15 @@ function buildConfig(): NextAuthConfig {
     ...(secureCookies === undefined ? {} : { useSecureCookies: secureCookies }),
     pages: { signIn: '/login', error: '/login' },
     callbacks: {
-      signIn: ({ account, profile }) => signInCallback({ account, profile }),
+      signIn: async ({ account, profile }) => {
+        // First-run setup: no access is granted; the account is shown its own subject.
+        if (ownerSetupMode(env) && account?.provider === 'google' && typeof profile?.sub === 'string') {
+          const hints = { email: typeof profile.email === 'string' ? profile.email : null, emailVerified: typeof profile.email_verified === 'boolean' ? profile.email_verified : null };
+          if (setupAllowed(hints, env)) await rememberSetupSubject(profile.sub);
+          return '/login?setup=1';
+        }
+        return signInCallback({ account, profile });
+      },
       jwt: ({ token, profile }) => jwtCallback({ token, profile }),
       session: ({ session, token }) => sessionCallback({ session, token }) as typeof session,
     },
