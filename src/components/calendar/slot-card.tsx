@@ -60,7 +60,7 @@ export function WeekSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
         ) : (
           <>
             <span className="block truncate text-[11px] text-ink-soft">
-              <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>
+              <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
             </span>
             <span className="mt-0.5 flex items-start gap-1.5">
               <span className="min-w-0 flex-1">
@@ -106,7 +106,7 @@ function EmptyBody({ slot }: { slot: SlotSummary }) {
   return (
     <span className="flex flex-wrap items-center justify-between gap-x-1 text-ink-soft">
       <span>
-        Open · <span className="tabular-nums">{slot.time}</span>
+        Open · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
       </span>
       {slot.step.kind === 'fill_slot' ? <span className="font-semibold text-green underline">Fill</span> : <span>{slot.step.action}</span>}
     </span>
