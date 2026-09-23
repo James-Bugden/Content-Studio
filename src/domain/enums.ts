@@ -91,6 +91,16 @@ export const REVIEW_ALIASES: Record<string, ReviewStatus> = {
 export const COPYRIGHT_ALIASES: Record<string, CopyrightQa> = { cleared: 'PASS', pass: 'PASS', ok: 'PASS' };
 export const DUPLICATE_ALIASES: Record<string, DuplicateQa> = { 'no flag': 'PASS', pass: 'PASS', unique: 'PASS', duplicate: 'DUPLICATE' };
 
+/**
+ * Values the app writes back, in the live Sheet's own vocabulary, so a cell the
+ * app touches looks the same as one James edited by hand.
+ */
+export const SHEET_WRITE_VALUE = {
+  review: { Pending: 'Not Reviewed', Approved: 'Approved', 'Changes Requested': 'Changes Requested', Skipped: 'Skipped' } satisfies Record<ReviewStatus, string>,
+  copyright: { Unchecked: '', PASS: 'Cleared', REWORK: 'REWORK' } satisfies Record<CopyrightQa, string>,
+  duplicate: { Unchecked: '', PASS: 'No flag', CHECK: 'CHECK', DUPLICATE: 'DUPLICATE' } satisfies Record<DuplicateQa, string>,
+} as const;
+
 /** Schedule slot names as the live Sheet writes them. */
 export const SLOTS = ['Main', '2nd', '3rd'] as const;
 export type Slot = (typeof SLOTS)[number];
