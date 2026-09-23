@@ -4,7 +4,7 @@ import { evaluateLibraryGates } from '@/domain/gates';
 import { libraryNextStep, slotNextStep, thumbFor, URGENCY_ORDER } from '@/domain/next-steps';
 import type { Board, PostSummary, SlotSummary, Task } from '@/domain/board';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { addDays, parseContentId, slotAvailability, slotOrder, weekStart } from '@/domain/schedule';
+import { addDays, parseContentId, shouldDisplaySlot, slotAvailability, slotOrder, weekStart } from '@/domain/schedule';
 import { adaptationState } from '@/domain/zh-state';
 import { serverEnv } from '@/lib/env';
 import type { ContentRepository } from './ports';
@@ -42,7 +42,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
   const slots: SlotSummary[] = [];
   for (const r of schedule ?? []) {
     const parsed = parseContentId(r.value.contentId);
-    if (!parsed || parsed.isoDate < from || parsed.isoDate > to) continue;
+    if (!parsed || parsed.isoDate < from || parsed.isoDate > to || !shouldDisplaySlot(r)) continue;
     slots.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId)));
   }
   const platformOrder: Record<string, number> = { X: 0, Threads: 1, LinkedIn: 2 };
@@ -53,7 +53,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
   const horizon = addDays(day, 13);
   for (const r of schedule ?? []) {
     const parsed = parseContentId(r.value.contentId);
-    if (!parsed || parsed.isoDate < addDays(day, -2) || parsed.isoDate > horizon) continue;
+    if (!parsed || parsed.isoDate < addDays(day, -2) || parsed.isoDate > horizon || !shouldDisplaySlot(r)) continue;
     upcoming.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId)));
   }
   const tasks: Task[] = [];
