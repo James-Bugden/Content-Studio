@@ -28,7 +28,14 @@ export type TelemetryEvent = {
 
 export type TelemetrySink = (event: TelemetryEvent & { at: string }) => void;
 
+/** Keys and event names: short tokens. */
 const SAFE_FACT = /^[A-Za-z0-9 _./:-]{0,64}$/;
+/**
+ * Fact string values are stricter: no ':' or '/', so no URL or path can pass, and
+ * no run of 10+ digits, so no account or subject identifier can pass either.
+ */
+const SAFE_VALUE = /^[A-Za-z0-9 _.-]{0,64}$/;
+const LONG_DIGITS = /\d{10,}/;
 
 function stdoutSink(event: TelemetryEvent & { at: string }): void {
   if (process.env.CS_TEST_MODE === 'unit') return;
@@ -36,7 +43,10 @@ function stdoutSink(event: TelemetryEvent & { at: string }): void {
 }
 
 let sink: TelemetrySink = stdoutSink;
-const recent: (TelemetryEvent & { at: string })[] = [];
+// Shared across Next's page and route module graphs (see application/container.ts).
+const RECENT_KEY = Symbol.for('content-studio.recent-events');
+const g = globalThis as unknown as Record<symbol, (TelemetryEvent & { at: string })[] | undefined>;
+const recent: (TelemetryEvent & { at: string })[] = (g[RECENT_KEY] ??= []);
 const RECENT_MAX = 500;
 
 export function setTelemetrySink(next: TelemetrySink | null): void {
@@ -58,7 +68,7 @@ export function redactFacts(facts: TelemetryEvent['facts']): TelemetryEvent['fac
   const out: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(facts)) {
     if (!SAFE_FACT.test(key)) continue;
-    if (typeof value === 'string') out[key] = SAFE_FACT.test(value) ? value : '[redacted]';
+    if (typeof value === 'string') out[key] = SAFE_VALUE.test(value) && !LONG_DIGITS.test(value) ? value : '[redacted]';
     else if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;
     else if (typeof value === 'boolean') out[key] = value;
   }

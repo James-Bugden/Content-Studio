@@ -89,3 +89,13 @@ test.describe('in a browser in Los Angeles', () => {
     await expect(page.getByText('Threads: out of date')).toBeVisible();
   });
 });
+
+test('CS-017: the reconciliation centre lists stale items with their next step', async ({ page }) => {
+  await page.goto('/reconcile');
+  await expect(page.getByRole('heading', { name: 'SYN-L006: approval no longer matches the copy' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '2026-10-02-MAIN-X: Threads adaptation is out of date' })).toBeVisible();
+  const item = page.getByRole('article').filter({ hasText: 'SYN-L006: approval no longer matches' });
+  await item.getByRole('button', { name: 'Dismiss as reviewed' }).click();
+  await expect(page.getByRole('heading', { name: 'SYN-L006: approval no longer matches the copy' })).toHaveCount(0);
+  await expect(page.getByText(/reviewed item is hidden in this tab/)).toBeVisible();
+});
