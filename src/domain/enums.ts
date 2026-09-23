@@ -101,9 +101,18 @@ export const SHEET_WRITE_VALUE = {
   duplicate: { Unchecked: '', PASS: 'No flag', CHECK: 'CHECK', DUPLICATE: 'DUPLICATE' } satisfies Record<DuplicateQa, string>,
 } as const;
 
-/** Schedule slot names as the live Sheet writes them. */
+/** Schedule slot names that may exist in the live Sheet, including legacy rows. */
 export const SLOTS = ['Main', '2nd', '3rd'] as const;
 export type Slot = (typeof SLOTS)[number];
+
+/**
+ * Forward-looking publishing cadence: X/Threads use Main + 2nd; LinkedIn uses Main.
+ * The 3rd slot remains parseable for historical/already-scheduled rows only.
+ */
+export function isActiveSlot(platform: Platform, slot: Slot): boolean {
+  if (platform === 'LinkedIn') return slot === 'Main';
+  return slot === 'Main' || slot === '2nd';
+}
 
 /** Sheets checkboxes arrive as TRUE/FALSE booleans or strings depending on render option. */
 export function parseBoolean(raw: unknown): boolean | null {
