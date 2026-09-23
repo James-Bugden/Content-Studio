@@ -23,7 +23,8 @@ describe('DEP-02 public and fork CI cannot reach secrets', () => {
     expect(ci).toContain('pull_request:');
     expect(ci).not.toContain('pull_request_target');
     expect(ci).toMatch(/^permissions:\n\s+contents: read/m);
-    expect(ci).not.toMatch(/secrets\./);
+    // A real secret reference looks like `${{ secrets.NAME }}`; the scanner's file name does not count.
+    expect(ci).not.toMatch(/\$\{\{\s*secrets\./);
     expect(ci).toContain('CS_DATA_MODE: fake');
   });
 
