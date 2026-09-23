@@ -11,6 +11,7 @@ import { TypefullyPanel } from '../typefully/typefully-panel';
 import { OpenPanelLink } from './open-panel-link';
 import { PlatformPreview } from './platform-preview';
 import { PostThumb } from './post-thumb';
+import { ZhInline } from './zh-inline';
 
 /**
  * Schedule slot side panel (UX redesign). An open slot offers the Ready posts
@@ -78,11 +79,7 @@ export function SlotPanel({ contentId }: { contentId: string }) {
           <span className="text-ink-soft">: {step.why}</span>
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {(step.kind === 'translate' || step.kind === 'update_chinese' || step.kind === 'review_chinese') && (
-            <GuardedLink href={`/schedule/${encodeURIComponent(slot.platform === 'Threads' && slot.parentContentId ? slot.parentContentId : contentId)}/adapt`} className={buttonClass('primary')}>
-              Open the Threads version
-            </GuardedLink>
-          )}
+
           {slot.libraryId ? (
             <OpenPanelLink target={{ post: slot.libraryId }} className={buttonClass()}>
               Open the post
@@ -95,6 +92,15 @@ export function SlotPanel({ contentId }: { contentId: string }) {
           ) : null}
         </div>
       </section>
+
+      {step.kind === 'translate' || step.kind === 'update_chinese' || step.kind === 'review_chinese' ? (
+        <section aria-labelledby="zh-h" className="rounded-lg border border-line bg-card p-3">
+          <h3 id="zh-h" className="mb-2 font-semibold">
+            Threads version (zh-TW)
+          </h3>
+          <ZhInline xContentId={slot.platform === 'Threads' && slot.parentContentId ? slot.parentContentId : contentId} canEdit={canEdit} />
+        </section>
+      ) : null}
 
       {slot.empty && slot.platform !== 'Threads' ? (
         <section aria-labelledby="fill-h" className="rounded-lg border border-line bg-card p-3">

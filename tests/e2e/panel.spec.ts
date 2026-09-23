@@ -74,3 +74,11 @@ test('a viewer sees the panel without actions', async ({ page }) => {
   await expect(panel.getByText('Read-only access.')).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Approve and queue' })).toHaveCount(0);
 });
+
+test('ZHTW-04: the Threads version is updated inside the slot panel, no extra page', async ({ page }) => {
+  await page.goto('/schedule?week=2026-10-01&slot=2026-10-02-MAIN-X');
+  const panel = page.getByRole('dialog');
+  await expect(panel.getByRole('heading', { name: 'Threads version (zh-TW)' })).toBeVisible();
+  await expect(panel.getByText(/X copy changed after/i).first()).toBeVisible();
+  await expect(page).toHaveURL(/slot=2026-10-02-MAIN-X/);
+});
