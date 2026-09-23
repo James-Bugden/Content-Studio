@@ -42,7 +42,11 @@ test.describe('desktop, 1280 px', () => {
     await expect(page.getByTestId('day-list')).toBeHidden();
     // Technical Content IDs stay out of the visible text.
     await expect(grid).not.toContainText('2026-10-01-MAIN-X');
-    await expect(page.getByRole('group', { name: 'X, Thursday 1 October' })).toContainText('Your first offer is a draft.');
+    const xDay = page.getByRole('group', { name: 'X, Thursday 1 October' });
+    await expect(xDay).toContainText('Your first offer is a draft.');
+    await expect(xDay).toContainText('Trending');
+    await expect(xDay).toContainText('Expertise');
+    await expect(visibleCard(page, '2026-10-01-3RD-X')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -77,8 +81,8 @@ test.describe('desktop, 1280 px', () => {
     await page.goto('/schedule?view=month&month=2026-10');
     const grid = page.getByTestId('month-grid');
     const oct1 = grid.locator('[data-date="2026-10-01"]');
-    await expect(oct1).toContainText('X 1/3', { useInnerText: true });
-    await expect(oct1).toContainText('Threads 1/3', { useInnerText: true });
+    await expect(oct1).toContainText('X 1/2', { useInnerText: true });
+    await expect(oct1).toContainText('Threads 1/2', { useInnerText: true });
     await expect(oct1).toContainText('LinkedIn 0/1', { useInnerText: true });
     const oct2 = grid.locator('[data-date="2026-10-02"]');
     await expect(oct2).toContainText('! 2', { useInnerText: true });
@@ -129,7 +133,7 @@ test.describe('phone, 375 px', () => {
     await expect(run.locator('a')).toHaveCount(3);
     await expect(run.locator('a').first()).toBeHidden();
     await summary.click();
-    await expect(run.getByRole('link', { name: /^Fill/ })).toHaveCount(3);
+    await expect(run.getByRole('link', { name: /^Fill/ })).toHaveCount(2);
     await expect(run.getByRole('link', { name: /^Fill/ }).first()).toBeVisible();
     const box = await summary.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
