@@ -3,7 +3,7 @@ import { AppError, type ErrorCode } from '@/domain/errors';
 import type { Gate } from '@/domain/gates';
 import type { Actor } from '@/domain/mutation';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { addDays, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
+import { addDays, parseContentId, planPromotion, shouldDisplaySlot, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
 import { adaptationState } from '@/domain/zh-state';
 import { emit, targetHash } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
@@ -77,6 +77,7 @@ export async function loadCalendar(repo: ContentRepository, week?: string): Prom
   const days = Array.from({ length: 7 }, (_, i) => ({ isoDate: addDays(start, i), cells: [] as CalendarCell[] }));
   let unparsed = 0;
   for (const r of schedule) {
+    if (!shouldDisplaySlot(r)) continue;
     const cell = toCell(r, schedule);
     if (!cell) {
       if (r.value.contentId) unparsed += 1;
