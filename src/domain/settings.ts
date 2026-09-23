@@ -2,10 +2,11 @@ import { PLATFORMS, SLOTS, type Platform, type Slot } from './enums';
 import type { QueueSummaryRow, SlotPolicy, WorkflowSettings } from './records';
 
 /**
- * Workflow Settings parsing (SCHED-01). The live tab is `Setting | Value | Notes`
- * rows such as `X Main = 08:00` and `Threads 3rd = TBD`. Only slot keys change
- * behaviour. A missing or malformed slot never falls back to a guessed time: it is
- * recorded as a problem and the affected slot cannot be auto-scheduled.
+ * Workflow Settings parsing (SCHED-01). The live tab is `Setting | Value | Notes`.
+ * Active forward-looking slots are X/Threads Main + 2nd and LinkedIn Main.
+ * Legacy X/Threads 3rd settings are still parsed so historical rows remain readable,
+ * but schedule-domain rules prevent them from receiving new content.
+ * A missing or malformed slot never falls back to a guessed time.
  */
 const SLOT_KEY = /^(X|Threads|LinkedIn)\s+(Main|2nd|3rd)$/i;
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
