@@ -337,3 +337,59 @@ export const SYNTH_MARKDOWN: Record<string, string> = {
     '',
   ].join('\n'),
 };
+
+// ---------------------------------------------------------------- Typefully (CS-015/016)
+
+/**
+ * Synthetic Typefully drafts matching the Schedule rows above. Ids start with
+ * `SYNTH-TF-`. Times are UTC instants, as the provider returns them.
+ *
+ * - SYNTH-TF-1001: the published X post, exact Sheet text, URL and X metrics
+ *   (no follower metric: Typefully does not attribute followers to a post).
+ * - SYNTH-TF-1002: the published Threads adaptation; no metrics (X only via API).
+ * - SYNTH-TF-1003: the scheduled X post, edited in Typefully after the Sheet copy
+ *   was written, so Typefully holds newer text than the Sheet.
+ */
+export type SyntheticTypefullyDraft = {
+  id: string;
+  platform: 'X' | 'Threads' | 'LinkedIn';
+  text: string;
+  status: 'Typefully Draft' | 'Planned' | 'Scheduled' | 'Published' | 'Error';
+  scheduledAt?: string;
+  updatedAt: string;
+  publishedAt?: string;
+  url?: string;
+  metrics?: Partial<Record<'views' | 'likes' | 'reposts' | 'replies' | 'bookmarks' | 'newFollowers', number>>;
+};
+
+export const SYNTH_TYPEFULLY_DRAFTS: SyntheticTypefullyDraft[] = [
+  {
+    id: 'SYNTH-TF-1001',
+    platform: 'X',
+    text: 'Your first offer is a draft.\n\nTreat it like one.',
+    status: 'Published',
+    scheduledAt: '2026-10-01T00:00:00Z',
+    updatedAt: '2026-10-01T00:00:04Z',
+    publishedAt: '2026-10-01T00:00:04Z',
+    url: 'https://x.com/example/status/1000000000000000001',
+    metrics: { views: 1520, likes: 48, reposts: 6, replies: 0, bookmarks: 11 },
+  },
+  {
+    id: 'SYNTH-TF-1002',
+    platform: 'Threads',
+    text: '第一份 offer 只是草稿。\n\n把它當草稿看待。',
+    status: 'Published',
+    scheduledAt: '2026-10-01T00:15:00Z',
+    updatedAt: '2026-10-01T00:15:02Z',
+    publishedAt: '2026-10-01T00:15:02Z',
+    url: 'https://www.threads.net/@example/post/SYNTHpost1002',
+  },
+  {
+    id: 'SYNTH-TF-1003',
+    platform: 'X',
+    text: 'Ask for the band.\n\nThen ask where you sit in it, before you name a number.',
+    status: 'Scheduled',
+    scheduledAt: '2026-10-02T00:00:00Z',
+    updatedAt: '2026-10-01T12:00:00Z',
+  },
+];

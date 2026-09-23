@@ -6,6 +6,7 @@ import type { LibraryPatch, SchedulePatch } from '@/domain/mapping';
 import type { MutationEnvelope, MutationResult } from '@/domain/mutation';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import type { SchemaProblem } from '@/domain/sheet-schema';
+import type { Platform, TypefullyStatus } from '@/domain/enums';
 
 /**
  * Integration ports (MASTER-SPEC section 3). UI and services depend on these
@@ -112,4 +113,69 @@ export type AiResult<T> = { ok: true; value: T; meta: AiMeta } | { ok: false; co
 export interface AiGateway {
   capability(): Capability;
   run<T, I>(task: AiTask<T, I>, input: I, opts?: { signal?: AbortSignal }): Promise<AiResult<T>>;
+}
+
+// ------------------------------------------------------------ Typefully (CS-015/016)
+
+/**
+ * One Typefully draft as the app sees it (docs/implementation/typefully-api.md).
+ * A Typefully draft can enable several platforms; Content Studio creates one
+ * draft per Schedule row and platform, and `platforms` exposes any other enabled
+ * platform so a combined draft is never silently treated as single (PUB-01).
+ */
+export type TypefullyPlatformView = { text: string; url?: string; publishedAt?: string };
+
+export type TypefullyDraft = {
+  id: string;
+  /** The only enabled platform, or the first of X, LinkedIn, Threads when several are enabled. */
+  platform: Platform;
+  /** Every enabled platform among X, LinkedIn and Threads. */
+  platforms: Platform[];
+  /** Exact text for `platform`. Multi-post threads are joined with a blank-line-pair separator. */
+  text: string;
+  status: TypefullyStatus;
+  scheduledAt?: string;
+  updatedAt: string;
+  publishedAt?: string;
+  url?: string;
+  /** Per enabled platform, for combined drafts. */
+  perPlatform: Partial<Record<Platform, TypefullyPlatformView>>;
+  /** Idempotency marker recovered from the draft notes, when present. */
+  idempotencyKey?: string;
+};
+
+export type TypefullyMetricKey = 'views' | 'likes' | 'reposts' | 'replies' | 'bookmarks' | 'newFollowers';
+
+export type TypefullyPublication = {
+  status: TypefullyStatus;
+  publishedAt?: string;
+  url?: string;
+  finalText?: string;
+  /** Only provider-supported metrics; an absent key means unavailable, not zero (PUB-02). */
+  metrics?: Partial<Record<TypefullyMetricKey, number>>;
+};
+
+export type TypefullyCreateInput = {
+  platform: Platform;
+  text: string;
+  /** ISO 8601 with `+08:00`. */
+  scheduleAt?: string;
+  /** `plan` stores a dated but inert draft; `publish` schedules it to publish. Default `plan`. */
+  timing?: 'plan' | 'publish';
+  /** Derived from the operation id and Content ID, never from content text. */
+  idempotencyKey: string;
+};
+
+export interface TypefullyGateway {
+  capability(): Capability;
+  getDraft(id: string): Promise<TypefullyDraft>;
+  /** Drafts enabling `platform` with a scheduled or planned time in `[from, to]`. */
+  listDrafts(q: { platform: Platform; from: string; to: string }): Promise<TypefullyDraft[]>;
+  /** Recent draft carrying this idempotency marker, or null. Lookup only: the API has no idempotency key. */
+  findByIdempotencyKey(key: string): Promise<TypefullyDraft | null>;
+  createDraft(input: TypefullyCreateInput): Promise<TypefullyDraft>;
+  /** Refuses with CONFLICT when the draft's `updatedAt` is no longer `expectedUpdatedAt`. */
+  updateDraft(id: string, patch: { text: string; expectedUpdatedAt: string }): Promise<TypefullyDraft>;
+  /** Status, URL, exact final text and supported metrics for `platform` (default: the draft's platform). */
+  getPublication(id: string, platform?: Platform): Promise<TypefullyPublication>;
 }
