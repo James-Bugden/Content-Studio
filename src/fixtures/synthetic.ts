@@ -2,7 +2,7 @@
  * Synthetic workbook, Markdown and assets (CS-001/CS-002 fixtures).
  *
  * Everything here is invented. Vocabulary mirrors the live Sheet (for example
- * `Cleared`, `No flag`, `Not Reviewed`, slots `Main/2nd/3rd`, Content IDs like
+ * `Cleared`, `No flag`, `Not Reviewed`, active slots `Main/2nd` plus legacy `3rd`, Content IDs like
  * `2026-10-01-MAIN-X`) so tests exercise the real parsing paths, but no private copy,
  * Drive identifier or account value appears. Synthetic Drive ids start with `SYNTH`.
  *
@@ -296,8 +296,18 @@ export function syntheticSettingsRows(): RawRow[] {
     ['X 2nd', '20:00', 'Taipei time'],
     ['Threads 2nd', '20:15', 'Taipei time; adaptation of X 2nd'],
     ['LinkedIn Main', '21:00', 'Taipei time'],
-    ['X 3rd', '23:00', 'Taipei time'],
-    ['Threads 3rd', 'TBD', 'Do not invent or auto-schedule'],
+    ['X 3rd', 'TBD', 'DEPRECATED. Do not use or auto-schedule. New cadence is 2 X posts/day.'],
+    ['Threads 3rd', 'TBD', 'DEPRECATED. Do not use or auto-schedule. New cadence is 2 Threads posts/day.'],
+    ['X + Threads frequency', '2 posts/day', 'Main = morning; 2nd = evening. No third daily post.'],
+    ['LinkedIn frequency', '1 post/day', 'One Main post per day.'],
+    ['Content pillar model', 'PESTO + Build in public (Soar)', 'PESTO remains the core framework; Build in public (Soar) is an explicit operational pillar.'],
+    ['Monday cadence', 'X/Threads AM: Personal story | PM: Expertise', 'LinkedIn: Expertise'],
+    ['Tuesday cadence', 'X/Threads AM: Social proof | PM: Expertise', 'LinkedIn: Build in public (Soar)'],
+    ['Wednesday cadence', 'X/Threads AM: Personal story | PM: Expertise', 'LinkedIn: Expertise'],
+    ['Thursday cadence', 'X/Threads AM: Trending | PM: Expertise', 'LinkedIn: Personal story'],
+    ['Friday cadence', 'X/Threads AM: Build in public (Soar) | PM: Expertise', 'LinkedIn: Trending'],
+    ['Saturday cadence', 'X/Threads AM: Personal story | PM: Expertise', 'LinkedIn: Opinions'],
+    ['Sunday cadence', 'X/Threads AM: Opinions | PM: Expertise', 'LinkedIn: Social proof'],
   ];
   return [{ values: ['Content Workflow Settings'] }, { values: [] }, ...rows.map((values) => ({ values }))];
 }
