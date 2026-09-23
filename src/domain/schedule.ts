@@ -48,6 +48,22 @@ const CONTENT_FIELDS: ScheduleField[] = ['hook', 'content', 'chineseContent', 'f
 
 export type SlotAvailability = { available: true } | { available: false; reason: string };
 
+/** True when a row contains real historical/planned state worth retaining in calendar views. */
+export function hasScheduleState(row: ScheduleRecord): boolean {
+  const v = row.value;
+  if (v.posted === true) return true;
+  if (CONTENT_FIELDS.some((f) => Boolean(row.cells[f]?.trim()))) return true;
+  if (!v.typefullyStatus.ok || v.typefullyStatus.value !== 'Not Sent') return true;
+  return v.contentStage !== null;
+}
+
+/** Active rows always display; deprecated legacy slots display only when they contain real state. */
+export function shouldDisplaySlot(row: ScheduleRecord): boolean {
+  const parsed = parseContentId(row.value.contentId);
+  if (!parsed) return false;
+  return isActiveSlot(parsed.platform, parsed.slot) || hasScheduleState(row);
+}
+
 /** A pre-created slot row is available only when nothing has been placed in it. */
 export function slotAvailability(row: ScheduleRecord): SlotAvailability {
   const v = row.value;
