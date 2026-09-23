@@ -2,7 +2,7 @@
 
 This file is the canonical tool-neutral engineering policy for Content Studio.
 Claude, Codex, Orca, or another capable coding agent may drive the workflow.
-The process must not depend on First Mate.
+The process must not depend on a specific orchestrator.
 
 ## Read before editing
 
