@@ -51,6 +51,8 @@ test('UX-01: a task button opens the panel on the post or the slot', async ({ pa
   const now = page.getByRole('region', { name: /Do these now/ });
   await now.getByRole('link', { name: /^Rework copy/ }).click();
   await expect(page).toHaveURL(/\/\?post=SYN-L002$/);
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+  await expect(page).not.toHaveURL(/post=/);
   await now.getByRole('link', { name: /^Update Chinese/ }).first().click();
   await expect(page).toHaveURL(/\/\?slot=2026-10-02-MAIN-X$/);
   expect(new URL(page.url()).searchParams.has('post')).toBe(false);

@@ -21,10 +21,12 @@ export function PanelHost() {
   const ref = useRef<HTMLDialogElement>(null);
   const { guard, dialog } = useLeaveConfirmation();
 
+  // The promote page already uses `?slot=` to pick a target slot, so the panel stays shut there.
+  const ownsSlotParam = /^\/ready\/[^/]+\/promote$/.test(pathname);
   const postParam = params.get('post');
   const slotParam = params.get('slot');
   const post = postParam && libraryIdSchema.safeParse(postParam).success ? postParam : null;
-  const slot = !post && slotParam && contentIdSchema.safeParse(slotParam).success ? slotParam : null;
+  const slot = !post && !ownsSlotParam && slotParam && contentIdSchema.safeParse(slotParam).success ? slotParam : null;
   const open = Boolean(post || slot);
 
   const close = useCallback(() => {
