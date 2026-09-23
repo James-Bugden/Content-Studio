@@ -1,4 +1,4 @@
-import { SLOTS, type Platform, type Slot } from './enums';
+import { isActiveSlot, SLOTS, type Platform, type Slot } from './enums';
 import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from './records';
 import { SCHEDULE_HEADERS, type ScheduleField } from './sheet-schema';
 import type { SchedulePatch } from './mapping';
@@ -51,7 +51,11 @@ export type SlotAvailability = { available: true } | { available: false; reason:
 /** A pre-created slot row is available only when nothing has been placed in it. */
 export function slotAvailability(row: ScheduleRecord): SlotAvailability {
   const v = row.value;
-  if (!parseContentId(v.contentId)) return { available: false, reason: 'This row has no standard Content ID.' };
+  const parsed = parseContentId(v.contentId);
+  if (!parsed) return { available: false, reason: 'This row has no standard Content ID.' };
+  if (!isActiveSlot(parsed.platform, parsed.slot)) {
+    return { available: false, reason: 'Legacy 3rd slot is deprecated for new content.' };
+  }
   if (v.posted === true) return { available: false, reason: 'Already posted.' };
   for (const f of CONTENT_FIELDS) {
     if (row.cells[f]?.trim()) return { available: false, reason: `Already holds ${SCHEDULE_HEADERS[f]}.` };
