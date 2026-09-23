@@ -21,7 +21,8 @@ describe('DEP-02 public and fork CI cannot reach secrets', () => {
   it('uses pull_request (not pull_request_target), read-only permissions and no secrets', () => {
     expect(ci).toMatch(/^on:\n\s+push:/m);
     expect(ci).toContain('pull_request:');
-    expect(ci).not.toContain('pull_request_target');
+    // As a trigger key; the header comment is allowed to explain why it is not used.
+    expect(ci).not.toMatch(/^\s*pull_request_target\s*:/m);
     expect(ci).toMatch(/^permissions:\n\s+contents: read/m);
     // A real secret reference looks like `${{ secrets.NAME }}`; the scanner's file name does not count.
     expect(ci).not.toMatch(/\$\{\{\s*secrets\./);
