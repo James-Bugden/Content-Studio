@@ -128,9 +128,9 @@ test.describe('phone, 375 px', () => {
     const run = day.locator('details[data-empty-run]');
     await expect(run).toHaveCount(1);
     const summary = run.locator('summary');
-    await expect(summary).toHaveText(/3 open slots, 2 waiting for X/);
+    await expect(summary).toHaveText(/2 open slots, 1 waiting for X/);
     // Closed disclosure: the Fill links exist but are not shown until it opens.
-    await expect(run.locator('a')).toHaveCount(3);
+    await expect(run.locator('a')).toHaveCount(2);
     await expect(run.locator('a').first()).toBeHidden();
     await summary.click();
     await expect(run.getByRole('link', { name: /^Fill/ })).toHaveCount(2);
