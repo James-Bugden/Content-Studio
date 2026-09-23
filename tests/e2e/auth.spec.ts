@@ -65,7 +65,7 @@ test('SEC-07: session cookie is httpOnly and the secret never reaches the browse
     if (res.request().resourceType() === 'script') scripts.push(await res.text().catch(() => ''));
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Content Studio' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review queue' })).toBeVisible();
 
   const cookies = await page.context().cookies();
   const session = cookies.find((c) => c.name === 'cs-test-auth');
