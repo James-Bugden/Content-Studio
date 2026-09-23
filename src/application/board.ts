@@ -3,8 +3,9 @@ import { backlogPills, postTab } from '@/domain/backlog';
 import { evaluateLibraryGates } from '@/domain/gates';
 import { libraryNextStep, slotNextStep, thumbFor, URGENCY_ORDER } from '@/domain/next-steps';
 import type { Board, PostSummary, SlotSummary, Task } from '@/domain/board';
-import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { addDays, expectedPillar, hasScheduleActivity, isActiveScheduleSlot, parseContentId, slotAvailability, slotOrder, weekStart } from '@/domain/schedule';
+import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from '@/domain/records';
+import { addDays, hasScheduleActivity, isActiveScheduleSlot, parseContentId, slotAvailability, slotOrder, weekStart } from '@/domain/schedule';
+import { scheduledPillar } from '@/domain/settings';
 import { adaptationState } from '@/domain/zh-state';
 import { serverEnv } from '@/lib/env';
 import type { ContentRepository } from './ports';
@@ -28,7 +29,7 @@ function taipeiNow(): string {
 }
 
 export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number } = {}): Promise<Board> {
-  const [library, schedule] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null)]);
+  const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null), repo.workflowSettings()]);
   const day = today();
   const now = taipeiNow();
   const from = opts.from ?? weekStart(day);
@@ -44,7 +45,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
     const parsed = parseContentId(r.value.contentId);
     if (!parsed || parsed.isoDate < from || parsed.isoDate > to) continue;
     if (!isActiveScheduleSlot(parsed.platform, parsed.slot) && !hasScheduleActivity(r)) continue;
-    slots.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId)));
+    slots.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId), settings));
   }
   const platformOrder: Record<string, number> = { X: 0, Threads: 1, LinkedIn: 2 };
   slots.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (platformOrder[a.platform] ?? 9) - (platformOrder[b.platform] ?? 9) || slotOrder(a.slot) - slotOrder(b.slot));
@@ -56,7 +57,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
     const parsed = parseContentId(r.value.contentId);
     if (!parsed || parsed.isoDate < addDays(day, -2) || parsed.isoDate > horizon) continue;
     if (!isActiveScheduleSlot(parsed.platform, parsed.slot) && !hasScheduleActivity(r)) continue;
-    upcoming.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId)));
+    upcoming.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId), settings));
   }
   const tasks: Task[] = [];
   for (const s of upcoming) {
@@ -134,6 +135,7 @@ function summariseSlot(
   day: string,
   now: string,
   staleSync: boolean,
+  settings: WorkflowSettings,
 ): SlotSummary {
   const v = r.value;
   const time = v.publishTime.trim();
@@ -153,7 +155,7 @@ function summariseSlot(
     slot: parsed.slot,
     platform: parsed.platform,
     time: time || 'No time',
-    expectedPillar: expectedPillar(parsed.isoDate, parsed.platform, parsed.slot),
+    expectedPillar: scheduledPillar(settings, parsed.isoDate, parsed.platform, parsed.slot),
     hook: v.hook || v.chineseContent.split('\n')[0] || '',
     statusLabel: !hasCopy ? (slotAvailability(r).available ? 'Open' : 'Empty') : status !== 'Not Sent' ? status : stage ?? 'In progress',
     thumb: lib ? thumbFor(lib.value.libraryId, lib.value) : v.visual.source.kind === 'text_only' ? { src: null, label: 'Text only', tone: 'done' } : null,
