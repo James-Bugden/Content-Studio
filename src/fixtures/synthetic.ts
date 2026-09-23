@@ -301,13 +301,13 @@ export function syntheticSettingsRows(): RawRow[] {
     ['X + Threads frequency', '2 posts/day', 'Main = morning; 2nd = evening. No third daily post.'],
     ['LinkedIn frequency', '1 post/day', 'One Main post per day.'],
     ['Content pillar model', 'PESTO + Build in public (Soar)', 'Build in public is an operational pillar, not a sixth PESTO letter.'],
-    ['Monday cadence', 'X/Threads AM: Personal story | PM: Expertise', 'LinkedIn: Expertise'],
-    ['Tuesday cadence', 'X/Threads AM: Social proof | PM: Expertise', 'LinkedIn: Build in public (Soar)'],
-    ['Wednesday cadence', 'X/Threads AM: Personal story | PM: Expertise', 'LinkedIn: Expertise'],
-    ['Thursday cadence', 'X/Threads AM: Trending | PM: Expertise', 'LinkedIn: Personal story'],
-    ['Friday cadence', 'X/Threads AM: Build in public (Soar) | PM: Expertise', 'LinkedIn: Trending'],
-    ['Saturday cadence', 'X/Threads AM: Personal story | PM: Expertise', 'LinkedIn: Opinions'],
-    ['Sunday cadence', 'X/Threads AM: Opinions | PM: Expertise', 'LinkedIn: Social proof'],
+    ['Monday cadence', 'X/Threads AM: Personal story | PM: Expertise | LinkedIn: Expertise', 'Machine-readable weekly cadence'],
+    ['Tuesday cadence', 'X/Threads AM: Social proof | PM: Expertise | LinkedIn: Build in public (Soar)', 'Machine-readable weekly cadence'],
+    ['Wednesday cadence', 'X/Threads AM: Personal story | PM: Expertise | LinkedIn: Expertise', 'Machine-readable weekly cadence'],
+    ['Thursday cadence', 'X/Threads AM: Trending | PM: Expertise | LinkedIn: Personal story', 'Machine-readable weekly cadence'],
+    ['Friday cadence', 'X/Threads AM: Build in public (Soar) | PM: Expertise | LinkedIn: Trending', 'Machine-readable weekly cadence'],
+    ['Saturday cadence', 'X/Threads AM: Personal story | PM: Expertise | LinkedIn: Opinions', 'Machine-readable weekly cadence'],
+    ['Sunday cadence', 'X/Threads AM: Opinions | PM: Expertise | LinkedIn: Social proof', 'Machine-readable weekly cadence'],
   ];
   return [{ values: ['Content Workflow Settings'] }, { values: [] }, ...rows.map((values) => ({ values }))];
 }
