@@ -230,7 +230,8 @@ describe('fake gateway faults and composition', () => {
   it('chooses fake, Anthropic or unconfigured from the environment', () => {
     const env = (e: Partial<ServerEnv>) => ({ CS_DATA_MODE: 'live', AI_PROVIDER: 'fake', ...e }) as ServerEnv;
     expect(createAiGateway(env({ CS_DATA_MODE: 'fake', AI_PROVIDER: 'anthropic', AI_API_KEY: 'k' }))).toBeInstanceOf(FakeAiGateway);
-    expect(createAiGateway(env({ AI_PROVIDER: 'fake' }))).toBeInstanceOf(FakeAiGateway);
+    // Live data never runs on the fake model, even if AI_PROVIDER says fake.
+    expect(createAiGateway(env({ AI_PROVIDER: 'fake' }))).toBeInstanceOf(UnconfiguredAiGateway);
     expect(createAiGateway(env({ AI_PROVIDER: 'anthropic', AI_API_KEY: 'k' }))).toBeInstanceOf(AnthropicAiGateway);
     const none = createAiGateway(env({ AI_PROVIDER: 'anthropic' }));
     expect(none).toBeInstanceOf(UnconfiguredAiGateway);
