@@ -145,9 +145,9 @@ Values observed in the live workbook, mapped to the canonical enums in `src/doma
 | `Source Platform` | `LinkedIn`, `Threads (legacy)` | Platform enum with alias |
 | `Source Markdown` | `Open master` (hyperlink) | Link target read from the cell hyperlink or `HYPERLINK()` formula |
 | `Has Image`, `Next Action`, `Image Next Action` | Display or formula text | Never written when the cell holds a formula |
-| Schedule `Slot` | `Main`, `2nd`, `3rd` | Slot enum |
-| Schedule `Content ID` | `YYYY-MM-DD-<SLOT>-<X/TH/LI>` | Pre-created slot rows; promotion fills an available row |
-| `Workflow Settings` | `Setting / Value / Notes` rows such as `X Main = 08:00`, `Threads 3rd = TBD` | Slot policy |
+| Schedule `Slot` | Active: `Main`, `2nd`; legacy-only: `3rd` | X/Threads use Main + 2nd; LinkedIn uses Main; 3rd remains readable for history only |
+| Schedule `Content ID` | `YYYY-MM-DD-<SLOT>-<X/TH/LI>` | Legacy `3RD` IDs still parse; blank 3rd rows are never promotion targets |
+| `Workflow Settings` | `Setting / Value / Notes` rows for active times, deprecated 3rd slots and weekday cadence | Runtime slot and cadence policy |
 
 Unrecognised values are never defaulted: they become an `UNRECOGNISED_VALUE` blocker.
 
@@ -191,7 +191,21 @@ Screenshot rule: one source screenshot may be used at most once per platform. Ch
 
 Ready Queue is a live derived handoff. Hard blockers include copyright `REWORK`, unresolved duplicate `CHECK`, non-approved review, missing platform copy, stale Threads adaptation, missing hook decision when required, or an image decision/revision that fails its gate. Promotion creates/updates an available Content Schedule row only after a preview and explicit confirmation. New content never jumps directly into Content Schedule.
 
-Default Taipei slots come from Workflow Settings: X 08:00/20:00/23:00; Threads 08:15/20:15/TBD; LinkedIn 21:00. `TBD` cannot be auto-scheduled. Calendar MVP is a list/week view; drag/drop is follow-on.
+Active Taipei slots come from Workflow Settings: X 08:00/20:00; Threads 08:15/20:15; LinkedIn 21:00. X/Threads `3rd` rows are deprecated legacy compatibility only: existing scheduled/published rows remain visible and reconcilable, while blank legacy rows are hidden from open-slot views and cannot be promoted into.
+
+Current weekly content cadence:
+
+| Day | X + Threads morning (Main) | X + Threads evening (2nd) | LinkedIn Main |
+| --- | --- | --- | --- |
+| Monday | Personal story | Expertise | Expertise |
+| Tuesday | Social proof | Expertise | Build in public (Soar) |
+| Wednesday | Personal story | Expertise | Expertise |
+| Thursday | Trending | Expertise | Personal story |
+| Friday | Build in public (Soar) | Expertise | Trending |
+| Saturday | Personal story | Expertise | Opinions |
+| Sunday | Opinions | Expertise | Social proof |
+
+PESTO remains the core content-pillar framework. `Build in public (Soar)` is an explicit operational pillar, not a sixth PESTO letter. Threads is the Taiwan Traditional Chinese adaptation of its paired X post. Calendar MVP is a list/week view; drag/drop is follow-on.
 
 ### Typefully reconciliation
 
