@@ -10,12 +10,11 @@ import { ToastProvider } from './toaster';
  * module and never leaks into client code from here.
  */
 export const PRIMARY_NAV = [
-  { href: '/review', label: 'Review' },
-  { href: '/visuals', label: 'Visuals' },
-  { href: '/ready', label: 'Ready' },
-  { href: '/schedule', label: 'Schedule' },
+  { href: '/', label: 'Next up' },
+  { href: '/review', label: 'Posts' },
+  { href: '/schedule', label: 'Calendar' },
   { href: '/published', label: 'Published' },
-  { href: '/reconcile', label: 'Reconcile' },
+  { href: '/reconcile', label: 'Fix issues' },
 ] as const;
 
 export type AppShellProps = {

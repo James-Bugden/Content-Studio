@@ -200,3 +200,25 @@ describe('fixtures: pagination, empty queue, settings', () => {
     expect(q[0]!.masterLink).toMatch(/^https:\/\/drive\.google\.com\//);
   });
 });
+
+describe('live read cache', () => {
+  it('shares reads within the TTL, and a write reads fresh and clears it', async () => {
+    const t = new FakeSheetTransport();
+    const cached = new SheetsContentRepository(t, { writable: true, readCacheMs: 60_000 });
+    await cached.listLibrary();
+    const reads = t.reads;
+    await cached.listLibrary();
+    await Promise.all([cached.listLibrary(), cached.listLibrary()]);
+    expect(t.reads).toBe(reads);
+    // An external edit is invisible to cached reads, but a write re-reads fresh and detects it.
+    const lib = await cached.getLibrary('SYN-L001');
+    const col = t.rawTab('Content Library')[0]!.findIndex((c) => c.value === 'Draft Content');
+    t.externalEdit('Content Library', lib.row, col, 'edited elsewhere');
+    const r = await cached.updateLibrary({ operationId: 'op_cache_stale_1', actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: lib.revision, patch: { reviewStatus: 'Approved' } });
+    expect(r).toMatchObject({ ok: false, code: 'STALE_READ' });
+    const fresh = await cached.getLibrary('SYN-L001');
+    const ok = await cached.updateLibrary({ operationId: 'op_cache_ok_1', actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: fresh.revision, patch: { reviewStatus: 'Approved' } });
+    expect(ok.ok).toBe(true);
+    expect((await cached.getLibrary('SYN-L001')).cells.reviewStatus).toBe('Approved');
+  });
+});
