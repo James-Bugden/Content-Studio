@@ -35,6 +35,8 @@ export type SlotSummary = {
   parentContentId: string;
   step: NextStep;
   empty: boolean;
+  /** Expected weekly content pillar from Workflow Settings. */
+  pillar?: string | null;
 };
 
 export type Task = {
