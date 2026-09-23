@@ -58,8 +58,30 @@ export class SheetsContentRepository implements ContentRepository {
 
   constructor(
     private readonly transport: SheetTransport,
-    private readonly options: { writable: boolean } = { writable: true },
+    private readonly options: { writable: boolean; readCacheMs?: number } = { writable: true },
   ) {}
+
+  /**
+   * Read cache (live mode only). One page render asks for the same tab several
+   * times; against the real Sheets API that is several slow round trips and extra
+   * quota. Concurrent identical reads share one request, results live for a few
+   * seconds, and every write reads fresh and clears the cache, so a write never
+   * compares against a cached revision.
+   */
+  private readonly readCache = new Map<string, { at: number; rows: Promise<RawRow[]> }>();
+
+  private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<RawRow[]> {
+    const ttl = this.options.readCacheMs ?? 0;
+    const key = `${tabKey}:${withExtras}`;
+    const hit = this.readCache.get(key);
+    if (!fresh && hit && Date.now() - hit.at <= ttl) return hit.rows;
+    const rows = this.readAll(tabKey, withExtras);
+    if (ttl > 0) {
+      this.readCache.set(key, { at: Date.now(), rows });
+      rows.catch(() => this.readCache.delete(key));
+    }
+    return rows;
+  }
 
   capability(): Capability {
     return { provider: 'sheet', mode: this.transport.mode, state: this.options.writable ? 'ready' : 'read_only' };
@@ -84,9 +106,9 @@ export class SheetsContentRepository implements ContentRepository {
     return rows;
   }
 
-  private async readTab<F extends string>(tabKey: 'library' | 'readyQueue' | 'schedule', headers: Record<F, string>): Promise<TabRead<F>> {
+  private async readTab<F extends string>(tabKey: 'library' | 'readyQueue' | 'schedule', headers: Record<F, string>, fresh = false): Promise<TabRead<F>> {
     const tab = SHEET_TABS[tabKey];
-    const all = await this.readAll(tabKey, true);
+    const all = await this.cachedReadAll(tabKey, true, fresh);
     const headerRow = all[tab.headerRow - 1];
     const found = discoverHeaders(headers, headerRow?.values ?? []);
     if (!found.ok) {
@@ -151,11 +173,11 @@ export class SheetsContentRepository implements ContentRepository {
   }
 
   async queueSummary(): Promise<QueueSummaryRow[]> {
-    return parseQueueSummary(await this.readAll('queueSummary', true));
+    return parseQueueSummary(await this.cachedReadAll('queueSummary', true));
   }
 
   async workflowSettings(): Promise<WorkflowSettings> {
-    const rows = await this.readAll('settings', false);
+    const rows = await this.cachedReadAll('settings', false);
     return parseWorkflowSettings(rows.map((r) => r.values));
   }
 
@@ -207,7 +229,7 @@ export class SheetsContentRepository implements ContentRepository {
     // Re-read and compare.
     let read: TabRead<F>;
     try {
-      read = await this.readTab(tabKey, headers);
+      read = await this.readTab(tabKey, headers, true);
     } catch (error) {
       return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
     }
@@ -250,13 +272,16 @@ export class SheetsContentRepository implements ContentRepository {
         );
       } catch (error) {
         return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
+      } finally {
+        // A write (even a failed or uncertain one) may have changed the Sheet.
+        this.readCache.clear();
       }
     }
 
     // Read back so the caller gets the authoritative new revision.
     let after: R;
     try {
-      const again = await this.readTab(tabKey, headers);
+      const again = await this.readTab(tabKey, headers, true);
       const found = again.rows.map(({ raw, row }) => toRecord(again.index, raw, row)).filter((r) => idOf(r) === id);
       if (found.length !== 1) {
         // The write landed; only the confirmation failed. Report exactly that (review finding 5).

@@ -1,128 +1,97 @@
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
-import { loadCalendar, type CalendarCell, type CalendarWeek } from '@/application/schedule';
-import { ErrorState, GuardedLink, PageHeader, StateView } from '@/components';
+import { loadBoard } from '@/application/board';
+import { today as taipeiTodayForServer } from '@/application/schedule';
+import { ErrorState, PageHeader } from '@/components';
+import { CalendarNav } from '@/components/calendar/calendar-nav';
+import { DayList } from '@/components/calendar/day-list';
+import { MonthGrid } from '@/components/calendar/month-grid';
+import { NeedsStrip } from '@/components/calendar/needs-strip';
+import { WeekGrid } from '@/components/calendar/week-grid';
+import type { Board } from '@/domain/board';
+import {
+  addMonths,
+  formatDayLong,
+  formatMonth,
+  formatWeekRange,
+  monthGrid,
+  monthOf,
+  needsYou,
+  parseIsoDate,
+  parseMonth,
+  parseView,
+} from '@/domain/calendar';
 import { isAppError } from '@/domain/errors';
-import { addDays } from '@/domain/schedule';
+import { addDays, weekStart } from '@/domain/schedule';
 import { requireActor } from '@/lib/auth';
 
-export const metadata: Metadata = { title: 'Schedule | Content Studio' };
+export const metadata: Metadata = { title: 'Calendar | Content Studio' };
 export const dynamic = 'force-dynamic';
 
-const ZH_LABEL: Record<string, string> = {
-  missing: 'Threads: not adapted yet',
-  draft: 'Threads: draft',
-  awaiting_review: 'Threads: awaiting Chinese review',
-  approved: 'Threads: approved',
-  stale: 'Threads: out of date',
-  ambiguous: 'Threads: several rows claim this post',
-  not_required: '',
-};
-
-function formatDay(isoDate: string): string {
-  const [y, m, d] = isoDate.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-}
-
 /**
- * Schedule week view (CS-014). A list per day in Taipei time, built from Content
- * IDs so a browser in another timezone sees the same days. Status is words and
- * shapes, never colour alone (UX-07). Drag and drop is out of MVP.
+ * Calendar (UX redesign). Week, month and list views over the board read model,
+ * with "Needs you this week" on top so the next thing to do is obvious. Every date
+ * is Taipei and comes from Content IDs, never from the browser's timezone (UX-07).
+ * Cards open the slot panel (`?slot=<Content ID>`).
  */
 export default async function SchedulePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireActor('viewer');
   const sp = await searchParams;
-  const week = typeof sp.week === 'string' ? sp.week : undefined;
-  let cal: CalendarWeek;
+  const view = parseView(sp.view);
+  const day = taipeiTodayForServer();
+  const thisWeek = weekStart(day);
+  const week = weekStart(parseIsoDate(sp.week) ?? day);
+  const month = parseMonth(sp.month) ?? monthOf(parseIsoDate(sp.week) ?? day);
+  const grid = monthGrid(month);
+  const repo = getServices().repo;
+
+  let board: Board;
+  let stripBoard: Board;
   try {
-    cal = await loadCalendar(getServices().repo, week);
+    if (view === 'month') {
+      const covers = thisWeek >= grid.first && addDays(thisWeek, 6) <= grid.days[grid.days.length - 1]!;
+      board = await loadBoard(repo, { from: grid.first, days: grid.days.length });
+      stripBoard = covers ? board : await loadBoard(repo, { from: thisWeek, days: 7 });
+    } else {
+      board = await loadBoard(repo, { from: week, days: 7 });
+      stripBoard = board;
+    }
   } catch (error) {
     return (
       <>
-        <PageHeader title="Schedule" description="Planned slots by platform, in Taipei time." />
+        <PageHeader title="Calendar" description="Your posts by day and platform, in Taipei time." />
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
   }
-  const total = cal.days.reduce((n, d) => n + d.cells.length, 0);
+
+  const stripWeek = view === 'month' ? thisWeek : week;
+  const isThisWeek = stripWeek === thisWeek;
+  const needs = needsYou(stripBoard.slots, stripWeek, addDays(stripWeek, 6));
+  const period =
+    view === 'month'
+      ? { label: formatMonth(month), unit: 'month' as const, prev: addMonths(month, -1), next: addMonths(month, 1) }
+      : { label: formatWeekRange(week), unit: 'week' as const, prev: addDays(week, -7), next: addDays(week, 7) };
 
   return (
     <>
-      <PageHeader title="Schedule" description={`Week of ${formatDay(cal.start)}. All times are Taipei.`} />
-      <nav aria-label="Weeks" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-        <GuardedLink href={`/schedule?week=${addDays(cal.start, -7)}`} className="underline">
-          Previous week
-        </GuardedLink>
-        <GuardedLink href="/schedule" className="underline">
-          This week
-        </GuardedLink>
-        <GuardedLink href={`/schedule?week=${addDays(cal.start, 7)}`} className="underline">
-          Next week
-        </GuardedLink>
-      </nav>
-      <div className="mt-4 flex flex-col gap-5">
-        {cal.unparsed > 0 ? (
-          <StateView kind="blocked" title="Some rows have non-standard Content IDs" detail={`${cal.unparsed} rows are not shown because their Content ID does not follow YYYY-MM-DD-SLOT-PLATFORM.`} nextStep="Fix the Content IDs in the Sheet." />
-        ) : null}
-        {total === 0 ? (
-          <StateView kind="empty" title="No slot rows this week" detail="The Sheet has no Content Schedule rows for these dates." nextStep={null} />
+      <PageHeader title="Calendar" description="Your posts by day and platform. All times are Taipei." />
+      <NeedsStrip
+        heading={isThisWeek ? 'Needs you this week' : `Needs you in the week of ${formatDayLong(stripWeek)}`}
+        emptyText={isThisWeek ? 'Nothing needs you this week.' : 'Nothing needs you that week.'}
+        items={needs}
+      />
+      <CalendarNav view={view} period={period} week={week} month={month} />
+      <div className="mt-4">
+        {view === 'month' ? (
+          <MonthGrid grid={grid} today={board.today} slots={board.slots} />
         ) : (
-          cal.days.map((d) => (
-            <section key={d.isoDate} aria-labelledby={`d-${d.isoDate}`}>
-              <h2 id={`d-${d.isoDate}`} className="text-base font-semibold">
-                {formatDay(d.isoDate)}
-              </h2>
-              {d.cells.length === 0 ? (
-                <p className="text-sm text-ink-soft">No slots.</p>
-              ) : (
-                <ul className="mt-2 flex flex-col gap-2">
-                  {d.cells.map((c) => (
-                    <li key={c.contentId}>
-                      <SlotRow cell={c} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))
+          <>
+            {view === 'week' ? <WeekGrid className="hidden md:grid" start={week} today={board.today} slots={board.slots} /> : null}
+            <DayList className={view === 'week' ? 'flex md:hidden' : 'flex'} start={week} today={board.today} slots={board.slots} />
+          </>
         )}
       </div>
     </>
-  );
-}
-
-function SlotRow({ cell }: { cell: CalendarCell }) {
-  const state = cell.typefullyStatus === 'Published' ? '● Published' : cell.available ? '○ Open slot' : cell.typefullyStatus !== 'Not Sent' ? `◐ ${cell.typefullyStatus}` : `◑ ${cell.stage}`;
-  return (
-    <div className={`grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-[5rem_7rem_minmax(0,1fr)_auto] ${cell.available ? 'border-dashed border-line bg-paper' : 'border-line bg-card'}`}>
-      <span className="font-semibold tabular-nums">{cell.time}</span>
-      <span>
-        {cell.platform} {cell.slot}
-      </span>
-      <div className="min-w-0">
-        {cell.hook ? <p className="copy truncate font-medium">{cell.hook}</p> : <p className="text-ink-soft">Empty</p>}
-        <p className="text-xs text-ink-soft">
-          <span className="font-mono">{cell.contentId}</span>
-          {cell.parentContentId ? ` · from ${cell.parentContentId}` : ''}
-          {cell.libraryId ? ` · Library ${cell.libraryId}` : ''}
-        </p>
-        {cell.zh && ZH_LABEL[cell.zh] ? (
-          <p className="text-xs">
-            {ZH_LABEL[cell.zh]} ·{' '}
-            <GuardedLink href={`/schedule/${encodeURIComponent(cell.contentId)}/adapt`} className="underline">
-              Threads adaptation
-            </GuardedLink>
-          </p>
-        ) : null}
-      </div>
-      <span className="flex flex-wrap items-baseline gap-x-3 text-sm">
-        <span>{state}</span>
-        {!cell.available ? (
-          <GuardedLink href={`/schedule/${encodeURIComponent(cell.contentId)}`} className="underline" aria-label={`Details for ${cell.contentId}`}>
-            Details
-          </GuardedLink>
-        ) : null}
-      </span>
-    </div>
   );
 }

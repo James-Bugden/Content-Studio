@@ -7,6 +7,7 @@ import { newOperationId, postJson } from '@/lib/client/api';
 import { clearRecovery, readRecovery, writeRecovery } from '@/lib/client/recovery';
 import { buttonClass } from '../button-styles';
 import { ConflictDialog } from '../conflict-dialog';
+import { FormatToolbar } from './format-toolbar';
 import { InlineResult } from '../inline-result';
 import { RecoveryPanel } from '../recovery-panel';
 import { useDirtyGuard } from '../use-dirty-guard';
@@ -55,6 +56,7 @@ export type PostEditorProps = {
 
 export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot }: PostEditorProps) {
   const textId = useId();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialBase = initialEditorText(model);
   const [base, setBase] = useState(initialBase);
   const [innerText, setInnerText] = useState(initialBase);
@@ -245,7 +247,18 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       <label htmlFor={textId} className="text-sm font-medium">
         Post copy <span className="font-normal text-ink-soft">(exact text; line breaks and spacing are kept as typed)</span>
       </label>
+      <FormatToolbar
+        textarea={textareaRef}
+        text={text}
+        platform={model.targetPlatform}
+        disabled={!canEdit}
+        onChange={(next) => {
+          setText(next);
+          if (status.kind === 'saved') setStatus({ kind: 'idle' });
+        }}
+      />
       <textarea
+        ref={textareaRef}
         id={textId}
         value={text}
         onChange={(e) => {
@@ -259,7 +272,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         className="copy w-full rounded-md border border-line bg-card p-3 font-sans text-base leading-relaxed"
       />
       <p className="text-xs text-ink-soft" aria-live="polite">
-        {text.length.toLocaleString('en-GB')} characters{dirty ? ' · unsaved changes, kept in this tab until saved' : ' · matches the saved version'}
+        {dirty ? 'Unsaved changes, kept in this tab until you save' : 'Matches the saved version'}
       </p>
 
       {status.kind === 'saved' ? (

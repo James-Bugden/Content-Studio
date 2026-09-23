@@ -6,6 +6,7 @@ import type { ReadyItem, ReadyQueue } from '@/domain/views';
 
 export type { ReadyItem, ReadyQueue };
 import type { ContentRepository } from './ports';
+import { lineageLibraryId, scheduledRowsFor } from './lineage';
 import { screenshotUses } from './review';
 
 /**
@@ -22,19 +23,10 @@ import { screenshotUses } from './review';
  */
 
 
-const LINEAGE = /#lib=([A-Za-z0-9][A-Za-z0-9._-]{0,63})$/;
-
-export function lineageLibraryId(sourceLink: string): string | null {
-  const m = LINEAGE.exec(sourceLink.trim());
-  return m ? m[1]! : null;
-}
+export { lineageLibraryId, scheduledRowsFor };
 
 export function lineageLink(markdownLink: string, libraryId: string): string {
   return `${markdownLink.replace(/#.*$/, '')}#lib=${libraryId}`;
-}
-
-export function scheduledRowsFor(libraryId: string, schedule: ScheduleRecord[]): ScheduleRecord[] {
-  return schedule.filter((r) => lineageLibraryId(r.value.sourceLink) === libraryId);
 }
 
 export function evaluateReady(record: LibraryRecord, library: LibraryRecord[], schedule: ScheduleRecord[] | null): Omit<ReadyItem, 'viewDrift'> {

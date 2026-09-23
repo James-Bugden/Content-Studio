@@ -22,3 +22,8 @@ export * from './visual-studio';
 export * from './similarity';
 export * from './typefully';
 export * from './analytics';
+export * from './next-steps';
+export * from './board';
+export * from './format';
+export * from './display';
+export * from './backlog';

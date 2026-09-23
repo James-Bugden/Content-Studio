@@ -1,11 +1,18 @@
 import type { GateResult, ZhAdaptationState } from './gates';
+import { BACKLOG_TABS, type BacklogPills, type BacklogTab } from './backlog';
+import type { NextStep, Thumb } from './next-steps';
 
 /**
  * View models shared by server services and client components (CS-006..CS-013).
  * Types only: services build these from authoritative reads; components render
  * them. Keeping them in the domain lets client code stay free of server modules.
  */
-export const LANES = ['all', 'clean', 'copyright', 'duplicate', 'blocked', 'approved'] as const;
+/**
+ * Posts lanes: the backlog tabs first, then the earlier review lanes kept as URL
+ * aliases (`clean`, `copyright`, `duplicate`, `approved`) so old links still work.
+ */
+export const LEGACY_LANES = ['clean', 'copyright', 'duplicate', 'approved'] as const;
+export const LANES = [...BACKLOG_TABS, ...LEGACY_LANES] as const;
 export type Lane = (typeof LANES)[number];
 
 export type ReviewCard = {
@@ -27,8 +34,17 @@ export type ReviewCard = {
   visual: string;
   imageStatus: string;
   hasMarkdownLink: boolean;
-  lane: Exclude<Lane, 'all' | 'blocked'> | 'blocked';
+  /** Earlier review lane, kept for the URL aliases. */
+  lane: (typeof LEGACY_LANES)[number] | 'blocked';
   gates: GateResult;
+  /** Post image and its state in words (UX redesign). */
+  thumb: Thumb;
+  /** The single next step, same words as Next up and the panel. */
+  step: NextStep;
+  /** Backlog tab besides All (null: only under All, e.g. skipped). */
+  tab: Exclude<BacklogTab, 'all'> | null;
+  /** One pill per backlog column. */
+  pills: BacklogPills;
 };
 
 export type ReviewQueue = {

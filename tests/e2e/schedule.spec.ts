@@ -1,13 +1,20 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
  * CS-013 / CS-014 journeys (T1): Ready Queue, promotion preview and confirm,
  * schedule week view, bypass attempts and a browser in another timezone.
  * The e2e server pins Taipei "today" to 2026-09-30 (CS_FAKE_TODAY).
+ *
+ * The calendar renders the week grid (>= 768 px) and the day list (phones) and
+ * hides one with CSS, so slot cards are found by `data-content-id` among the
+ * visible elements; both layouts run at w375 and w1280.
  */
 async function signInAs(request: APIRequestContext, as: 'owner' | 'viewer') {
   expect((await request.post('/api/test-auth', { data: { as } })).status()).toBe(200);
 }
+
+const visibleCard = (page: Page, contentId: string) => page.locator(`[data-content-id="${contentId}"]`).filter({ visible: true });
+const visibleDay = (page: Page, isoDate: string) => page.locator(`[data-date="${isoDate}"]`).filter({ visible: true });
 
 test.beforeEach(async ({ page }) => {
   expect((await page.request.post('/api/test-control', { data: { kind: 'reset' } })).status()).toBe(200);
@@ -37,8 +44,8 @@ test('SCHED-02: preview lists every written cell, confirm writes into the slot',
   await expect(page.getByText(/Scheduled into 2026-10-01-MAIN-LI/)).toBeVisible();
 
   await page.goto('/schedule?week=2026-10-01');
-  const day = page.getByRole('region', { name: 'Thursday 1 October' });
-  await expect(day.getByText('A counteroffer is information, not an insult.')).toBeVisible();
+  const card = visibleDay(page, '2026-10-01').locator('[data-content-id="2026-10-01-MAIN-LI"]');
+  await expect(card.getByText('A counteroffer is information, not an insult.')).toBeVisible();
 
   await page.goto('/ready');
   await expect(page.getByRole('region', { name: /Already scheduled/ }).getByRole('heading', { name: 'counteroffer-is-information' })).toBeVisible();
@@ -49,7 +56,7 @@ test('SCHED-03: a double confirm fills one slot only', async ({ page }) => {
   await page.getByRole('button', { name: /Confirm and write/ }).dblclick();
   await expect(page.getByText(/Scheduled into 2026-10-01-MAIN-LI/)).toBeVisible();
   await page.goto('/schedule?week=2026-10-01');
-  await expect(page.getByText('A counteroffer is information, not an insult.')).toHaveCount(1);
+  await expect(page.locator('[data-content-id]').filter({ visible: true, hasText: 'A counteroffer is information, not an insult.' })).toHaveCount(1);
   await page.goto('/ready/SYN-L005/promote');
   await expect(page.getByText('Already scheduled').first()).toBeVisible();
 });
@@ -83,10 +90,13 @@ test.describe('in a browser in Los Angeles', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
   test('UX-07: days and times are Taipei, status is text not colour', async ({ page }) => {
     await page.goto('/schedule?week=2026-10-01');
-    const day = page.getByRole('region', { name: 'Thursday 1 October' });
-    await expect(day.getByText('08:00').first()).toBeVisible();
-    await expect(day.getByText('● Published').first()).toBeVisible();
-    await expect(page.getByText('Threads: out of date')).toBeVisible();
+    // The 08:00 Taipei post sits on Thursday 1 October (it is Wednesday afternoon in LA).
+    const card = visibleDay(page, '2026-10-01').locator('[data-content-id="2026-10-01-MAIN-X"]');
+    await expect(card.getByText('08:00')).toBeVisible();
+    await expect(card.getByText('✓ Published')).toBeVisible();
+    await expect(visibleDay(page, '2026-09-30').locator('[data-content-id="2026-10-01-MAIN-X"]')).toHaveCount(0);
+    // A stale Threads adaptation is a next step in words with a "!" marker, not a colour.
+    await expect(visibleCard(page, '2026-10-02-MAIN-X')).toContainText('! Update Chinese');
   });
 });
 

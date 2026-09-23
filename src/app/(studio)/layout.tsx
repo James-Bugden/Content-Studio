@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { signOutAction } from '@/app/actions/auth';
 import { SignOutButton } from '@/components/auth/sign-out-button';
 import { AppShell } from '@/components/app-shell';
+import { PanelHost } from '@/components/panel/panel-host';
+import { Suspense } from 'react';
 import { getActor } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +26,9 @@ export default async function StudioLayout({ children }: { children: React.React
       }
     >
       {children}
+      <Suspense fallback={null}>
+        <PanelHost />
+      </Suspense>
     </AppShell>
   );
 }

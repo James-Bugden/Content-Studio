@@ -1,31 +1,33 @@
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { capabilities } from '@/application/capabilities';
-import { LANES, loadReviewQueue, parseReviewFilters, type Lane, type ReviewQueue } from '@/application/review';
+import { LEGACY_LANES, loadReviewQueue, parseReviewFilters, type ReviewQueue } from '@/application/review';
 import { CapabilityBanner, ErrorState, FilterBar, GuardedLink, PageHeader, StateView } from '@/components';
+import { BacklogTable } from '@/components/review/backlog-table';
 import { ReviewCard } from '@/components/review/review-card';
+import { BACKLOG_TABS, TAB_LABEL } from '@/domain/backlog';
 import { COPYRIGHT_QA, DUPLICATE_QA, PLATFORMS, REVIEW_STATUSES } from '@/domain/enums';
 import { isAppError } from '@/domain/errors';
 import type { QueueSummaryRow } from '@/domain/records';
 import { requireActor } from '@/lib/auth';
 
-export const metadata: Metadata = { title: 'Review | Content Studio' };
+export const metadata: Metadata = { title: 'Posts | Content Studio' };
 export const dynamic = 'force-dynamic';
 
-const LANE_LABEL: Record<Lane, string> = {
-  all: 'All',
+const LEGACY_LABEL: Record<(typeof LEGACY_LANES)[number], string> = {
   clean: 'Ready to review',
   copyright: 'Copyright rework',
   duplicate: 'Duplicate check',
-  blocked: 'Other blockers',
   approved: 'Approved',
 };
 
 const QA_LABEL: Record<string, string> = { Unchecked: 'Not checked', PASS: 'Cleared / no flag' };
 
 /**
- * Review Queue (CS-007). A fresh, bounded read of Content Library on every
- * request. Empty queue, no filter match and provider failure are three different
+ * Posts (CS-007, UX redesign; nav label "Posts"). A Sheet-like backlog: tabs
+ * with counts, one row per post with a pill per step, and the review cards (with
+ * their per-item actions) one toggle away (`?layout=cards`). A fresh, bounded
+ * read of Content Library on every request. Empty queue, no filter match and provider failure are three different
  * screens (REV-05): a failed read never renders as an empty list.
  */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -40,7 +42,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   } catch (error) {
     return (
       <>
-        <PageHeader title="Review queue" description="Check drafts, hooks and QA flags, then approve or request changes." />
+        <PageHeader title="Posts" description="Check each post, then approve it or ask for changes." />
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
@@ -53,9 +55,12 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   }
 
   const lane = filters.lane ?? 'all';
+  const legacy = (LEGACY_LANES as readonly string[]).includes(lane) ? (lane as (typeof LEGACY_LANES)[number]) : null;
+  const layout = params.layout === 'cards' ? 'cards' : 'table';
+  const activeFilters = (['src', 'target', 'from', 'review', 'copyright', 'duplicate', 'queue'] as const).filter((k) => filters[k] !== undefined).length;
   const hrefWith = (change: Record<string, string | null>) => {
     const next = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) if (typeof v === 'string' && !(k in change)) next.set(k, v);
+    for (const [k, v] of Object.entries(params)) if (typeof v === 'string' && !(k in change) && k !== 'post' && k !== 'slot' && !(k === 'layout' && v !== 'cards')) next.set(k, v);
     for (const [k, v] of Object.entries(change)) if (v) next.set(k, v);
     const q = next.toString();
     return q ? `/review?${q}` : '/review';
@@ -63,16 +68,36 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Review queue" description="Check drafts, hooks and QA flags, then approve or request changes. One item at a time; nothing is approved in bulk." />
+      <PageHeader
+        title="Posts"
+        description="Every post and where it is. Open a post to do its next step; nothing is approved in bulk."
+        actions={
+          <nav aria-label="Layout" className="inline-flex rounded-md border border-line bg-card p-0.5">
+            {(['table', 'cards'] as const).map((l) => (
+              <GuardedLink
+                key={l}
+                href={hrefWith({ layout: l === 'table' ? null : l, page: null })}
+                aria-current={l === layout ? 'page' : undefined}
+                className={`inline-flex min-h-11 items-center rounded px-3 text-sm ${l === layout ? 'bg-focal font-semibold' : 'text-ink-soft hover:text-ink'}`}
+              >
+                {l === 'table' ? 'Table' : 'Cards'}
+              </GuardedLink>
+            ))}
+          </nav>
+        }
+      />
       <div className="mt-4 flex flex-col gap-4">
         <CapabilityBanner capabilities={capabilities()} />
 
         {summary && summary.length > 0 ? (
-          <section aria-labelledby="summary-h" className="rounded-lg border border-line bg-card p-4">
-            <h2 id="summary-h" className="text-sm font-semibold">
-              Sources (from Content Queue Summary)
-            </h2>
-            <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+          <details className="rounded-lg border border-line bg-card px-4">
+            <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-1 py-2 text-sm">
+              <span className="font-semibold">Sources</span>
+              <span className="text-ink-soft">
+                ({summary.length} {summary.length === 1 ? 'source' : 'sources'}, from Content Queue Summary)
+              </span>
+            </summary>
+            <ul className="grid gap-2 pb-3 sm:grid-cols-2">
               {summary.map((s) => (
                 <li key={s.source} className="min-w-0 text-sm">
                   <span className="font-medium">{s.source}</span>
@@ -85,28 +110,41 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 </li>
               ))}
             </ul>
-          </section>
+          </details>
         ) : null}
 
-        <nav aria-label="Review lanes">
-          <ul className="flex flex-wrap gap-2">
-            {LANES.map((l) => (
+        <nav aria-label="Post tabs">
+          <ul className="flex flex-wrap gap-1.5 border-b border-line pb-2">
+            {BACKLOG_TABS.map((l) => (
               <li key={l}>
                 <GuardedLink
                   href={hrefWith({ lane: l === 'all' ? null : l, page: null })}
                   aria-current={l === lane ? 'page' : undefined}
-                  className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm ${
-                    l === lane ? 'border-ink bg-focal font-semibold' : 'border-line bg-card hover:border-ink'
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm ${
+                    l === lane ? 'bg-focal font-semibold text-ink underline decoration-2 underline-offset-4' : 'text-ink-soft hover:bg-card hover:text-ink'
                   }`}
                 >
-                  {LANE_LABEL[l]}
-                  <span className="rounded-full bg-paper px-2 text-xs tabular-nums">{queue.laneCounts[l]}</span>
+                  {TAB_LABEL[l]}
+                  <span className="min-w-6 rounded-full border border-line bg-card px-1.5 text-center text-xs tabular-nums">{queue.laneCounts[l]}</span>
                 </GuardedLink>
               </li>
             ))}
           </ul>
+          {legacy ? (
+            <p className="mt-2 text-sm text-ink-soft">
+              Showing the {LEGACY_LABEL[legacy].toLowerCase()} list ({queue.laneCounts[legacy]}).{' '}
+              <GuardedLink href={hrefWith({ lane: null, page: null })} className="underline">
+                Show all posts
+              </GuardedLink>
+            </p>
+          ) : null}
         </nav>
 
+        <details open={activeFilters > 0} className="rounded-lg border border-line bg-card px-4">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">
+            Filters{activeFilters > 0 ? <span className="ml-1 font-normal text-ink-soft">({activeFilters} on)</span> : null}
+          </summary>
+          <div className="pb-3">
         <FilterBar
           filters={[
             { key: 'src', label: 'Source', options: queue.sources.map((s) => ({ value: s.key, label: s.label })) },
@@ -125,6 +163,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             },
           ]}
         />
+          </div>
+        </details>
 
         {queue.scheduleUnavailable ? (
           <StateView
@@ -142,7 +182,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
             kind="no_match"
             detail={`None of the ${queue.totalUnfiltered} Library rows match these filters.`}
             action={
-              <GuardedLink href="/review" className="text-sm underline">
+              <GuardedLink href={layout === 'cards' ? '/review?layout=cards' : '/review'} className="text-sm underline">
                 Clear all filters
               </GuardedLink>
             }
@@ -153,13 +193,17 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
               Showing {(queue.page - 1) * 25 + 1} to {Math.min(queue.page * 25, queue.total)} of {queue.total}
               {queue.total !== queue.totalUnfiltered ? ` (filtered from ${queue.totalUnfiltered})` : ''}
             </p>
-            <ol className="flex flex-col gap-4">
-              {queue.cards.map((card) => (
-                <li key={`${card.libraryId}-${card.revision}`}>
-                  <ReviewCard initial={card} canEdit={actor.role === 'owner'} />
-                </li>
-              ))}
-            </ol>
+            {layout === 'cards' ? (
+              <ol className="flex flex-col gap-4">
+                {queue.cards.map((card) => (
+                  <li key={`${card.libraryId}-${card.revision}`}>
+                    <ReviewCard initial={card} canEdit={actor.role === 'owner'} />
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <BacklogTable cards={queue.cards} />
+            )}
             {queue.pages > 1 ? (
               <nav aria-label="Pages" className="flex items-center justify-between gap-2 text-sm">
                 {queue.page > 1 ? (

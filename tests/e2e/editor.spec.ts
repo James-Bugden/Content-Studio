@@ -81,7 +81,7 @@ test('UX-06: a dirty draft survives a reload through tab-local recovery and asks
   await page.goto('/review/SYN-L001');
   await editor(page).fill('Unsaved words 未儲存');
   await page.waitForTimeout(600);
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Ready' }).click();
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Calendar' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: /Stay/ }).click();
   await expect(editor(page)).toHaveValue('Unsaved words 未儲存');

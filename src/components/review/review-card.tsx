@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { nextLine, platformName, readableTitle } from '@/domain/display';
 import type { Gate } from '@/domain/gates';
 import type { ReviewCard as Card } from '@/domain/views';
 import { newOperationId, postJson } from '@/lib/client/api';
@@ -8,11 +9,15 @@ import { buttonClass } from '../button-styles';
 import { ConflictDialog } from '../conflict-dialog';
 import { GuardedLink } from '../guarded-link';
 import { InlineResult } from '../inline-result';
-import { GateChip, NextAction, StatusBadge } from '../status';
+import { GateChip, StatusBadge } from '../status';
+import { OpenPanelLink } from '../panel/open-panel-link';
+import { PostThumb } from '../panel/post-thumb';
 
 /**
- * One review card (CS-007). Shows the single next action and every blocker in
- * words, and offers explicit per-item transitions only: there is no bulk approve.
+ * One post card (CS-007, UX redesign). Shows the post image, a readable title and
+ * the single next step in one line, with a primary button that opens the side
+ * panel. Review transitions stay available as secondary, per-item actions only:
+ * there is no bulk approve.
  * Buttons are a convenience; the server re-runs every gate and refuses anything
  * the UI might have shown by mistake (REV-04). A stale row opens a comparison
  * instead of overwriting (REV-06).
@@ -52,10 +57,6 @@ const APPROVAL_BLOCKING = new Set([
   'SCREENSHOT_UNCERTAIN',
 ]);
 
-/** Show the Sheet's own words, not the canonical enum names. */
-const REVIEW_LABEL: Record<string, string> = { Pending: 'Not reviewed' };
-const COPYRIGHT_LABEL: Record<string, string> = { PASS: 'Cleared', Unchecked: 'Not checked' };
-const DUPLICATE_LABEL: Record<string, string> = { PASS: 'No flag', Unchecked: 'Not checked' };
 
 export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boolean }) {
   const [card, setCard] = useState(initial);
@@ -111,57 +112,64 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
   }
 
   const extraBlockers = card.gates.blockers.slice(1);
+  const moreChecks = extraBlockers.length + card.gates.warnings.length;
+  const title = readableTitle(card.slug) || 'Untitled post';
+  const openLabel = card.step.kind === 'done' || card.step.kind === 'wait' ? 'Open' : card.step.action;
 
   return (
-    <article aria-labelledby={`card-${card.libraryId}`} className="rounded-lg border border-line bg-card p-4 shadow-[0_1px_0_rgba(23,32,35,0.04)]">
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 id={`card-${card.libraryId}`} className="text-base font-semibold">
-            <GuardedLink href={`/review/${encodeURIComponent(card.libraryId)}`} className="underline decoration-line underline-offset-4 hover:decoration-ink">
-              {card.slug || card.libraryId}
-            </GuardedLink>
-          </h3>
-          <p className="mt-0.5 text-xs text-ink-soft">
-            <span className="font-mono">{card.libraryId}</span> · {card.targetPlatform}
-            {card.sourcePlatform && card.sourcePlatform !== card.targetPlatform ? ` from ${card.sourcePlatform}` : ''} · {card.source}
-          </p>
+    <article
+      aria-labelledby={`card-${card.libraryId}`}
+      data-library-id={card.libraryId}
+      className="rounded-lg border border-line bg-card p-4 shadow-[0_1px_0_rgba(23,32,35,0.04)]"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="shrink-0 sm:w-28">
+          <PostThumb thumb={card.thumb} size="md" />
         </div>
-        <StatusBadge status={card.gates.status} />
-      </header>
+        <div className="min-w-0 flex-1">
+          <header className="flex flex-wrap items-start justify-between gap-2">
+            <h3 id={`card-${card.libraryId}`} className="min-w-0 text-base font-semibold">
+              <GuardedLink href={`/review/${encodeURIComponent(card.libraryId)}`} className="underline decoration-line underline-offset-4 hover:decoration-ink">
+                {title}
+              </GuardedLink>
+            </h3>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border border-line bg-paper px-2 py-0.5 text-xs font-medium">{platformName(card.targetPlatform)}</span>
+              {card.queued === true ? <span className="rounded-full border border-line bg-paper px-2 py-0.5 text-xs font-medium">Queued</span> : null}
+              <StatusBadge status={card.gates.status} />
+            </div>
+          </header>
 
-      {card.hook ? <p className="copy mt-3 font-semibold">{card.hook}</p> : <p className="mt-3 text-sm text-ink-soft">No hook yet.</p>}
-      {card.preview ? <p className="copy mt-2 line-clamp-5 text-sm text-ink-soft">{card.preview}</p> : null}
+          {card.hook ? <p className="copy mt-2 font-semibold">{card.hook}</p> : <p className="mt-2 text-sm text-ink-soft">No hook yet.</p>}
+          {card.preview ? <p className="copy mt-2 line-clamp-4 text-sm text-ink-soft">{card.preview}</p> : null}
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-5">
-        <Fact label="Review" value={REVIEW_LABEL[card.reviewStatus] ?? card.reviewStatus} />
-        <Fact label="Copyright" value={COPYRIGHT_LABEL[card.copyrightQa] ?? card.copyrightQa} />
-        <Fact label="Duplicate" value={DUPLICATE_LABEL[card.duplicateQa] ?? card.duplicateQa} />
-        <Fact label="Queue" value={card.queued === true ? 'Queued' : card.queued === false ? 'Not queued' : 'Unreadable'} />
-        <Fact label="Visual" value={card.visual} />
-      </dl>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="min-w-0 flex-[1_1_16rem] text-sm font-medium">{nextLine(card.step)}</p>
+            <OpenPanelLink target={{ post: card.libraryId }} className={buttonClass('primary')}>
+              {openLabel}
+              <span className="sr-only"> {title}</span>
+            </OpenPanelLink>
+          </div>
 
-      <div className="mt-3">
-        <NextAction gate={card.gates.next} />
-      </div>
-      {extraBlockers.length > 0 ? (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-sm text-ink-soft">
-            {extraBlockers.length} more {extraBlockers.length === 1 ? 'blocker' : 'blockers'}
-          </summary>
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {extraBlockers.map((g, i) => (
-              <li key={`${g.code}-${i}`}>
-                <GateChip gate={g} />
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-      {card.gates.warnings.map((g, i) => (
-        <div key={`w-${g.code}-${i}`} className="mt-2">
-          <GateChip gate={g} />
-        </div>
-      ))}
+          {moreChecks > 0 ? (
+            <details className="mt-2">
+              <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm text-ink-soft">
+                {moreChecks} more {moreChecks === 1 ? 'thing' : 'things'} to check
+              </summary>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {extraBlockers.map((g, i) => (
+                  <li key={`${g.code}-${i}`}>
+                    <GateChip gate={g} />
+                  </li>
+                ))}
+                {card.gates.warnings.map((g, i) => (
+                  <li key={`w-${g.code}-${i}`}>
+                    <GateChip gate={g} />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
 
       {result ? (
         <div className="mt-3">
@@ -170,10 +178,10 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
       ) : null}
 
       {canEdit ? (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
           {!approved || stale ? (
             <>
-              <button type="button" className={buttonClass('primary')} disabled={busy !== null || approvalBlockers.length > 0} onClick={() => run('approve_and_queue')}>
+              <button type="button" className={buttonClass()} disabled={busy !== null || approvalBlockers.length > 0} onClick={() => run('approve_and_queue')}>
                 {busy === 'approve_and_queue' ? 'Approving…' : 'Approve and queue'}
               </button>
               <button type="button" className={buttonClass()} disabled={busy !== null || approvalBlockers.length > 0} onClick={() => run('approve')}>
@@ -185,7 +193,7 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
               Remove from queue
             </button>
           ) : (
-            <button type="button" className={buttonClass('primary')} disabled={busy !== null} onClick={() => run('queue')}>
+            <button type="button" className={buttonClass()} disabled={busy !== null} onClick={() => run('queue')}>
               Queue for scheduling
             </button>
           )}
@@ -261,17 +269,8 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
           ]}
         />
       ) : null}
+        </div>
+      </div>
     </article>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-ink-soft">{label}</dt>
-      <dd className="truncate font-medium" title={value}>
-        {value}
-      </dd>
-    </div>
   );
 }
