@@ -17,7 +17,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except /login, all API routes, Next internals and static files.
+  // Everything except /login, the fake-mode-only /dev/states gallery (it 404s otherwise), all API routes, Next internals and static files.
   // A path containing a dot is treated as a static file.
-  matcher: ['/((?!login|api/|_next/static|_next/image|.*\\..*).*)'],
+  matcher: ['/((?!login|dev/states|api/|_next/static|_next/image|.*\\..*).*)'],
 };

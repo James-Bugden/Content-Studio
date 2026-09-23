@@ -1,0 +1,28 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+import { GuardedLink } from './guarded-link';
+
+/**
+ * Primary navigation item (CS-006, UX-01, UX-04).
+ *
+ * The active item carries aria-current="page" and the single yellow focal marker,
+ * so the current place is never signalled by colour alone (it is also bold and
+ * underlined). Navigation goes through GuardedLink so a dirty editor is never lost.
+ */
+export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const pathname = usePathname() ?? '';
+  const active = pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    <GuardedLink
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={[
+        'inline-flex min-h-11 items-center rounded-md px-3 text-sm whitespace-nowrap',
+        active ? 'bg-focal font-semibold text-ink underline decoration-2 underline-offset-4' : 'text-ink-soft hover:bg-paper hover:text-ink',
+      ].join(' ')}
+    >
+      {children}
+    </GuardedLink>
+  );
+}
