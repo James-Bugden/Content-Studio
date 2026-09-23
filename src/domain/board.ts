@@ -1,5 +1,7 @@
 import type { GateStatus } from './gates';
 import type { NextStep, Thumb } from './next-steps';
+import type { EditorModel, ReviewCard } from './views';
+import type { TypefullyDetailView } from './typefully-view';
 
 /** Board read model types (UX redesign), shared by server and client. */
 export type PostSummary = {
@@ -48,5 +50,26 @@ export type Board = {
   window: { from: string; to: string };
   tasks: Task[];
   counts: { review: number; images: number; ready: number; openSlotsThisWeek: number; problems: number };
+};
+
+
+/** Side-panel read models (UX redesign). */
+export type PostPanelData = {
+  /** Available slots for a Ready post (owner only). */
+  slotOptions: { contentId: string; isoDate: string; slot: string; time: string }[];
+  model: EditorModel;
+  card: ReviewCard;
+  summary: PostSummary;
+  ns: string;
+  canEdit: boolean;
+};
+
+export type SlotPanelData = {
+  slot: SlotSummary;
+  copy: { hook: string; content: string; chineseContent: string; finalContent: string };
+  typefully: TypefullyDetailView | null;
+  typefullyError: string | null;
+  candidates: PostSummary[];
+  canEdit: boolean;
 };
 

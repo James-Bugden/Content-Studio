@@ -1,7 +1,6 @@
 import 'server-only';
 import type { Actor } from '@/domain/mutation';
-import type { EditorModel, ReviewCard } from '@/domain/views';
-import type { PostSummary, SlotSummary } from '@/domain/board';
+import type { PostPanelData, SlotPanelData } from '@/domain/board';
 import type { TypefullyDetailView } from '@/domain/typefully-view';
 import { shortHash } from '@/domain/hash';
 import { AppError } from '@/domain/errors';
@@ -11,27 +10,13 @@ import { loadEditor } from './editor';
 import { toCard } from './review';
 import { loadTypefullyDetail } from './typefully-view';
 import { parseContentId } from '@/domain/schedule';
+import { promotionContext } from './schedule';
 
 /**
  * Side-panel read models (UX redesign). Everything one panel needs in one
  * request, so a post or a slot can be worked on in place from any page.
  */
-export type PostPanelData = {
-  model: EditorModel;
-  card: ReviewCard;
-  summary: PostSummary;
-  ns: string;
-  canEdit: boolean;
-};
-
-export type SlotPanelData = {
-  slot: SlotSummary;
-  copy: { hook: string; content: string; chineseContent: string; finalContent: string };
-  typefully: TypefullyDetailView | null;
-  typefullyError: string | null;
-  candidates: PostSummary[];
-  canEdit: boolean;
-};
+export type { PostPanelData, SlotPanelData } from '@/domain/board';
 
 export async function loadPostPanel(services: Services, actor: Actor, libraryId: string): Promise<PostPanelData> {
   const { repo, drive } = services;
@@ -44,7 +29,12 @@ export async function loadPostPanel(services: Services, actor: Actor, libraryId:
   const record = library.find((r) => r.value.libraryId === libraryId);
   const summary = board.posts.find((p) => p.libraryId === libraryId);
   if (!record || !summary) throw new AppError('NOT_FOUND');
+  const slotOptions =
+    summary.step.kind === 'schedule' && actor.role === 'owner'
+      ? (await promotionContext(repo, libraryId)).options.filter((o) => o.ok).map((o) => ({ contentId: o.contentId, isoDate: o.isoDate, slot: o.slot, time: o.time }))
+      : [];
   return {
+    slotOptions,
     model,
     card: toCard(record, library, schedule),
     summary,
