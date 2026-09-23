@@ -19,7 +19,9 @@ function parseCadence(value: string, note: string): DayCadence | null {
   const x = /^X\/Threads AM:\s*(.+?)\s*\|\s*PM:\s*(.+)$/.exec(value.trim());
   const li = /^LinkedIn:\s*(.+)$/.exec(note.trim());
   if (!x || !li) return null;
-  const [morning, evening, linkedin] = [x[1]!, x[2]!, li[1]!].map((v) => v.trim());
+  const morning = x[1]!.trim();
+  const evening = x[2]!.trim();
+  const linkedin = li[1]!.trim();
   if (![morning, evening, linkedin].every((v) => (PILLARS as readonly string[]).includes(v))) return null;
   return { morning, evening, linkedin };
 }
