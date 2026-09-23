@@ -83,7 +83,7 @@ export async function loadCalendar(repo: ContentRepository, week?: string): Prom
   for (const r of schedule) {
     const cell = toCell(r, schedule, settings);
     if (!cell) {
-      if (r.value.contentId) unparsed += 1;
+      if (r.value.contentId && !parseContentId(r.value.contentId)) unparsed += 1;
       continue;
     }
     const day = days.find((d) => d.isoDate === cell.isoDate);
