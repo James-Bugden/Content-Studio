@@ -3,7 +3,7 @@ import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { loadCalendar, previewPromotion, promote, promotionContext } from '@/application/schedule';
 import { loadReadyQueue } from '@/application/ready';
-import { addDays, parseContentId, slotAvailability, taipeiToday, weekStart } from '@/domain/schedule';
+import { addDays, parseContentId, shouldDisplaySlot, slotAvailability, taipeiToday, weekStart } from '@/domain/schedule';
 import { parseWorkflowSettings } from '@/domain/settings';
 import { syntheticSettingsRows } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
@@ -61,6 +61,8 @@ describe('SCHED-01: slot policy from Workflow Settings', () => {
     const legacy = await repo.getSchedule('2026-10-03-3RD-X');
     expect(parseContentId(legacy.value.contentId)).toEqual({ isoDate: '2026-10-03', slot: '3rd', platform: 'X' });
     expect(slotAvailability(legacy)).toEqual({ available: false, reason: 'Legacy 3rd slot is deprecated for new content.' });
+    expect(shouldDisplaySlot(legacy)).toBe(false);
+    expect(shouldDisplaySlot({ ...legacy, cells: { ...legacy.cells, content: 'Historical third-slot post' }, value: { ...legacy.value, content: 'Historical third-slot post' } })).toBe(true);
 
     const ctx = await promotionContext(repo, 'SYN-X004');
     expect(ctx.options.some((o) => o.slot === '3rd')).toBe(false);
@@ -215,6 +217,7 @@ describe('calendar', () => {
     expect(cal.start).toBe('2026-09-28');
     const oct1 = cal.days.find((d) => d.isoDate === '2026-10-01')!;
     expect(oct1.cells[0]!.time).toBe('08:00');
+    expect(oct1.cells.some((cell) => cell.slot === '3rd')).toBe(false);
     expect(oct1.cells.find((c) => c.contentId === '2026-10-02-MAIN-X')).toBeUndefined();
     const oct2x = cal.days.find((d) => d.isoDate === '2026-10-02')!.cells.find((c) => c.contentId === '2026-10-02-MAIN-X')!;
     expect(oct2x.zh).toBe('stale');
