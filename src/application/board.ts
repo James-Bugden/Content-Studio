@@ -1,5 +1,6 @@
 import 'server-only';
 import { backlogPills, postTab } from '@/domain/backlog';
+import { expectedPillar } from '@/domain/cadence';
 import { evaluateLibraryGates } from '@/domain/gates';
 import { libraryNextStep, slotNextStep, thumbFor, URGENCY_ORDER } from '@/domain/next-steps';
 import type { Board, PostSummary, SlotSummary, Task } from '@/domain/board';
@@ -28,7 +29,7 @@ function taipeiNow(): string {
 }
 
 export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number } = {}): Promise<Board> {
-  const [library, schedule] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null)]);
+  const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null), repo.workflowSettings()]);
   const day = today();
   const now = taipeiNow();
   const from = opts.from ?? weekStart(day);
@@ -43,7 +44,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
   for (const r of schedule ?? []) {
     const parsed = parseContentId(r.value.contentId);
     if (!parsed || parsed.isoDate < from || parsed.isoDate > to || !shouldDisplaySlot(r)) continue;
-    slots.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId)));
+    slots.push(summariseSlot(r, parsed, allPosts, byId, settings, day, now, stale.has(r.value.contentId)));
   }
   const platformOrder: Record<string, number> = { X: 0, Threads: 1, LinkedIn: 2 };
   slots.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || (platformOrder[a.platform] ?? 9) - (platformOrder[b.platform] ?? 9) || slotOrder(a.slot) - slotOrder(b.slot));
@@ -54,7 +55,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
   for (const r of schedule ?? []) {
     const parsed = parseContentId(r.value.contentId);
     if (!parsed || parsed.isoDate < addDays(day, -2) || parsed.isoDate > horizon || !shouldDisplaySlot(r)) continue;
-    upcoming.push(summariseSlot(r, parsed, allPosts, byId, day, now, stale.has(r.value.contentId)));
+    upcoming.push(summariseSlot(r, parsed, allPosts, byId, settings, day, now, stale.has(r.value.contentId)));
   }
   const tasks: Task[] = [];
   for (const s of upcoming) {
@@ -129,6 +130,7 @@ function summariseSlot(
   parsed: NonNullable<ReturnType<typeof parseContentId>>,
   all: ScheduleRecord['value'][],
   byId: Map<string, LibraryRecord>,
+  settings: Awaited<ReturnType<ContentRepository['workflowSettings']>>,
   day: string,
   now: string,
   staleSync: boolean,
@@ -158,5 +160,6 @@ function summariseSlot(
     parentContentId: v.parentContentId,
     step,
     empty: !hasCopy,
+    pillar: expectedPillar(settings, parsed.isoDate, parsed.platform, parsed.slot),
   };
 }
