@@ -60,7 +60,7 @@ export function WeekSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
         ) : (
           <>
             <span className="block truncate text-[11px] text-ink-soft">
-              <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
+              <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
             </span>
             <span className="mt-0.5 flex items-start gap-1.5">
               <span className="min-w-0 flex-1">
