@@ -53,11 +53,11 @@ test('landmarks and primary navigation are labelled and keyboard reachable', asy
   await expect(page.getByRole('banner')).toHaveCount(1);
   await expect(page.getByRole('main')).toHaveCount(1);
   const nav = page.getByRole('navigation', { name: 'Primary' });
-  await expect(nav.getByRole('link')).toHaveText(['Review', 'Visuals', 'Ready', 'Schedule', 'Published', 'Reconcile']);
+  await expect(nav.getByRole('link')).toHaveText(['Next up', 'Posts', 'Calendar', 'Published', 'Fix issues']);
   // Tab past the skip link lands on the first nav item.
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
-  await expect(page.locator(':focus')).toHaveText('Review');
+  await expect(page.locator(':focus')).toHaveText('Next up');
 });
 
 for (const width of [375, 500, 750, 1280]) {
@@ -99,7 +99,7 @@ test('navigating away from a dirty editor asks first and staying keeps the edit 
   await page.goto(GALLERY);
   const editor = page.getByLabel('Draft (synthetic)');
   await editor.fill('A synthetic unsaved edit');
-  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Ready' }).click();
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Calendar' }).click();
   const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Stay and keep editing' }).click();
