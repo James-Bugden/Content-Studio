@@ -54,7 +54,24 @@ export interface DriveGateway {
    */
   writeText(fileId: string, text: string, expectedRevision: string): Promise<DriveFileMeta>;
   readBytes(fileId: string, maxBytes: number): Promise<{ bytes: Uint8Array; meta: DriveFileMeta }>;
+  /**
+   * Upload a new asset file (CS-012). Always a new file, never an overwrite, so an
+   * approved revision's file is never replaced in place. Write-disabled or no asset
+   * folder is CONFIG_MISSING.
+   */
+  createFile(input: DriveCreateInput): Promise<DriveFileMeta & { webLink: string }>;
 }
+
+export type DriveCreateInput = {
+  /** Plain file name, `[A-Za-z0-9._-]`, at most 200 characters. */
+  name: string;
+  mimeType: 'image/svg+xml' | 'image/png';
+  bytes: Uint8Array;
+  folderId?: string;
+};
+
+export const DRIVE_CREATE_MAX_BYTES = 5 * 1024 * 1024;
+export const DRIVE_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 
 // ------------------------------------------------------------------ AI (CS-009)
 

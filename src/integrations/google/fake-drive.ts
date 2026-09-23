@@ -2,7 +2,7 @@ import 'server-only';
 import type { Capability } from '@/domain/capability';
 import { AppError, type ErrorCode } from '@/domain/errors';
 import { SYNTH_MARKDOWN } from '@/fixtures/synthetic';
-import type { DriveFileMeta, DriveGateway } from '@/application/ports';
+import { DRIVE_CREATE_MAX_BYTES, DRIVE_FILE_NAME, type DriveCreateInput, type DriveFileMeta, type DriveGateway } from '@/application/ports';
 
 /**
  * In-memory Drive with revisions, trashed/moved files and failure injection.
@@ -22,6 +22,8 @@ export class FakeDriveGateway implements DriveGateway {
   private files = new Map<string, FakeFile>();
   private failures: DriveFailure[] = [];
   readonly writes: { fileId: string; text: string }[] = [];
+  readonly created: { id: string; name: string; mimeType: string; folderId?: string }[] = [];
+  private createdCount = 0;
   /** Called between the gateway's pre-write metadata check and the write (race simulation). */
   beforeWrite: ((fileId: string) => void) | null = null;
   private clock = Date.parse('2026-09-23T00:00:00Z');
@@ -107,6 +109,28 @@ export class FakeDriveGateway implements DriveGateway {
     this.files.set(fileId, { ...f, text, version: f.version + 1, modifiedTime: this.tick() });
     this.writes.push({ fileId, text });
     return this.meta(fileId);
+  }
+
+  async createFile(input: DriveCreateInput): Promise<DriveFileMeta & { webLink: string }> {
+    if (!DRIVE_FILE_NAME.test(input.name)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'file_name' });
+    if (input.bytes.length === 0 || input.bytes.length > DRIVE_CREATE_MAX_BYTES) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'size' });
+    this.maybeFail('write', input.name);
+    this.createdCount += 1;
+    const stem = input.name.replace(/\.[A-Za-z0-9]+$/, '').replace(/[^A-Za-z0-9_-]/g, '_');
+    const id = `SYNTH_asset_${stem}_${this.createdCount}`;
+    this.files.set(id, { bytes: input.bytes.slice(), mimeType: input.mimeType, version: 1, modifiedTime: this.tick(), trashed: false });
+    this.created.push({ id, name: input.name, mimeType: input.mimeType, ...(input.folderId ? { folderId: input.folderId } : {}) });
+    return { ...this.meta(id), webLink: `https://drive.google.com/file/d/${id}/view` };
+  }
+
+  bytesOf(fileId: string): Uint8Array | undefined {
+    return this.files.get(fileId)?.bytes;
+  }
+
+  /** Replace a binary file's bytes as if someone edited it in Drive. */
+  externalReplaceBytes(fileId: string, bytes: Uint8Array): void {
+    const f = this.files.get(fileId)!;
+    this.files.set(fileId, { ...f, bytes, version: f.version + 1, modifiedTime: this.tick() });
   }
 
   async readBytes(fileId: string, maxBytes: number): Promise<{ bytes: Uint8Array; meta: DriveFileMeta }> {

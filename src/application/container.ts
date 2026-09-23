@@ -81,7 +81,7 @@ function build(): Services {
   services = {
     mode: 'live',
     repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable }),
-    drive: new GoogleDriveGateway(tokens, writable),
+    drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
   };
   return services;
