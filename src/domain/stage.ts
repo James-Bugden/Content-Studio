@@ -94,6 +94,28 @@ export function visualApprovalState(v: LibraryItem['visual']): VisualApprovalSta
   return match[1] === shortHash(visualMaterial(v)) ? 'approved' : 'stale';
 }
 
+/**
+ * Render stamp (CS-012), written into `Image Next Action` when Content Studio
+ * renders a revision. It fingerprints the brief, version and file together, so a
+ * later brief edit (in the app or in the Sheet) is detectable without reading
+ * Drive, and a preview is never shown for a revision whose brief has moved on.
+ */
+const RENDER_STAMP_RE = /\[cs:render:([0-9a-f]{8})\]/;
+
+export function renderStampFor(brief: string, version: string, imageFile: string): string {
+  return shortHash(JSON.stringify(['render', brief, version, imageFile]));
+}
+
+export function formatRenderNote(brief: string, version: string, imageFile: string): string {
+  return `Review ${version} at full size and at 360 and 390 px [cs:render:${renderStampFor(brief, version, imageFile)}]`;
+}
+
+/** True when the row's brief, version and file are still exactly what Content Studio rendered. */
+export function renderStampMatches(v: LibraryItem['visual']): boolean {
+  const match = RENDER_STAMP_RE.exec(v.imageNextAction);
+  return Boolean(match) && match![1] === renderStampFor(v.brief, v.version, v.imageFile);
+}
+
 /** zh-TW adaptation lineage stamp stored in the Threads row `AI Action` cell. */
 const ZH_STAMP_RE = /\[cs:zh-src:([A-Za-z0-9._-]{1,64}):([0-9a-f]{8})\]/;
 

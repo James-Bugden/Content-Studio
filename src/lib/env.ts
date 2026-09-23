@@ -20,6 +20,8 @@ const schema = z.object({
   GOOGLE_WRITE_ENABLED: z.enum(['true', 'false']).default('false'),
   CS_SHEET_ID: z.string().regex(/^[A-Za-z0-9_-]{20,}$/).optional(),
   CS_DRIVE_ROOT_FOLDER_ID: z.string().regex(/^[A-Za-z0-9_-]{10,}$/).optional(),
+  /** Drive folder that receives rendered visual assets (CS-012). */
+  CS_ASSET_FOLDER_ID: z.string().regex(/^[A-Za-z0-9_-]{10,}$/).optional(),
   CS_HOOK_REFERENCE_FILE_IDS: z.string().optional(),
   TYPEFULLY_API_KEY: z.string().min(1).optional(),
   TYPEFULLY_SOCIAL_SET_ID: z.string().min(1).optional(),

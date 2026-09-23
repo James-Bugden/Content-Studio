@@ -25,7 +25,7 @@ import { useDirtyGuard } from '../use-dirty-guard';
  */
 type SaveResponse =
   | { ok: true; replayed: boolean; steps: StepResult[]; value: { record: { revision: string }; sectionHash: string; driveRevision: string } }
-  | { ok: false; code: string; message?: string; steps?: StepResult[]; conflict?: { provider: 'sheet' | 'drive'; current: string } };
+  | { ok: false; code: string; message?: string; steps?: StepResult[]; conflict?: { provider: 'sheet' | 'drive'; current: string }; details?: { reason?: string } };
 
 type Status =
   | { kind: 'idle' }
@@ -128,6 +128,14 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
     }
     if (body.code === 'PARTIAL_FAILURE' && body.steps) {
       setStatus({ kind: 'partial', steps: body.steps, operationId: op.id });
+      return;
+    }
+    if (body.code === 'VALIDATION_FAILED' && body.details?.reason === 'unsafe_markdown_structure') {
+      setStatus({
+        kind: 'error',
+        code: body.code,
+        message: 'Not saved: the draft has a heading at the section level (for example "## ...") or an unclosed code fence (```). Either would break the other posts in the master file. Remove it and save again.',
+      });
       return;
     }
     setStatus({ kind: 'error', code: body.code, message: body.message ?? 'The save did not complete. Nothing is confirmed as written; your text is kept here.' });

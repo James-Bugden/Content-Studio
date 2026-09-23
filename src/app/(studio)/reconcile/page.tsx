@@ -17,8 +17,8 @@ export default async function ReconcilePage() {
   await requireActor('viewer');
   let report: ReconcileReport;
   try {
-    const { repo, drive } = getServices();
-    report = await buildReconcileReport(repo, drive);
+    const { repo, drive, typefully } = getServices();
+    report = await buildReconcileReport(repo, drive, undefined, { typefully });
   } catch (error) {
     return (
       <>
@@ -81,7 +81,7 @@ export default async function ReconcilePage() {
           {report.events.length === 0 ? (
             <p className="mt-2 text-sm text-ink-soft">No provider calls recorded yet in this instance.</p>
           ) : (
-            <div className="mt-2 overflow-x-auto rounded-lg border border-line bg-card">
+            <div tabIndex={0} role="region" aria-label="Adapter health table (scrolls sideways)" className="mt-2 overflow-x-auto rounded-lg border border-line bg-card">
               <table className="w-full min-w-[32rem] text-left text-sm">
                 <caption className="sr-only">Calls, errors and latency by adapter</caption>
                 <thead className="bg-paper">

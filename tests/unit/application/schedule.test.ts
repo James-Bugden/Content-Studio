@@ -140,7 +140,7 @@ describe('SCHED-03: conflicts are safe', () => {
     expect(sheet.writes).toHaveLength(0);
   });
 
-  it('a stale gate (Library changed after preview) is STALE_READ', async () => {
+  it('READY-06: a stale gate (Library changed after preview) is STALE_READ', async () => {
     const p = await previewPromotion(repo, 'SYN-L005', '2026-10-01-MAIN-LI');
     if (!p.ok) throw new Error('preview');
     const lib = await repo.getLibrary('SYN-L005');

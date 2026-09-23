@@ -32,7 +32,7 @@ async function health() {
 }
 
 describe('OBS-01 health output', () => {
-  it('reports live capabilities without leaking any configured value', async () => {
+  it('OBS-01 / SEC-08: reports read-only capabilities without leaking any configured value', async () => {
     const env = process.env as Record<string, string | undefined>;
     delete env.AI_API_KEY;
     Object.assign(process.env, SENTINELS, { CS_DATA_MODE: 'live', GOOGLE_WRITE_ENABLED: 'false' });

@@ -67,6 +67,10 @@ function writeError(body: Extract<WriteResponse, { ok: false }>, status: number)
   if (body.code === 'STALE_READ') return 'The Threads row changed after this page loaded. Nothing was saved. Reload the page and try again.';
   if (body.code === 'GATE_BLOCKED') return 'This cannot be done in the current state. Nothing was saved. Check the state and blockers on this page.';
   if (body.code === 'VALIDATION_FAILED' && body.details?.reason === 'simplified_characters') return 'The copy contains Simplified Chinese characters. Use Traditional characters, then save again.';
+  if (body.code === 'GATE_BLOCKED' && body.details?.reason === 'threads_row_in_use')
+    return 'This Threads row has already been sent to Typefully, scheduled or published, so it is not overwritten. Reconcile it from the schedule detail page instead.';
+  if (body.code === 'CONFLICT' && body.details?.reason === 'takeover_needs_confirmation')
+    return 'This Threads row already holds copy that is not linked to this X post. Nothing was saved. Use "Use this row anyway" only if that copy can be replaced.';
   if (body.code === 'VALIDATION_FAILED' && body.details?.reason === 'copy_length') return 'The Chinese hook and content cannot be empty. Nothing was saved.';
   return body.message ?? 'Nothing is confirmed as saved. Try again.';
 }
@@ -78,6 +82,7 @@ export function AdaptationWorkspace({ initial, canEdit }: { initial: AdaptationV
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [hook, setHook] = useState('');
   const [content, setContent] = useState('');
+  const [takeover, setTakeover] = useState(false);
   const [write, setWrite] = useState<Write>({ kind: 'idle' });
   const controller = useRef<AbortController | null>(null);
   const seq = useRef(0);
@@ -133,7 +138,7 @@ export function AdaptationWorkspace({ initial, canEdit }: { initial: AdaptationV
     setGen({ kind: 'cancelled' });
   }
 
-  async function save() {
+  async function save(confirmTakeover = false) {
     if (!proposal) return;
     const key = JSON.stringify([proposal.id, hook, content]);
     const op = saveOp.current && saveOp.current.key === key ? saveOp.current : { key, id: newOperationId('zhsave') };
@@ -147,16 +152,19 @@ export function AdaptationWorkspace({ initial, canEdit }: { initial: AdaptationV
       sourceContent: proposal.sourceContent,
       hook,
       content,
+      ...(confirmTakeover ? { confirmTakeover: true } : {}),
     });
     const body = res.body as WriteResponse;
     if (body.ok) {
       saveOp.current = null;
+      setTakeover(false);
       setProposal(null);
       setWrite({ kind: 'done', message: `Saved to ${proposal.threadsContentId} for Chinese review. Read it through, then approve it below.` });
       await reload();
       return;
     }
     if (body.code !== 'PROVIDER_UNAVAILABLE' && body.code !== 'RATE_LIMITED') saveOp.current = null;
+    setTakeover(body.code === 'CONFLICT' && body.details?.reason === 'takeover_needs_confirmation');
     setWrite({ kind: 'error', message: writeError(body, res.status) });
   }
 
@@ -378,6 +386,11 @@ export function AdaptationWorkspace({ initial, canEdit }: { initial: AdaptationV
                 <button type="button" className={buttonClass('primary')} disabled={busy || hook.trim() === '' || content.trim() === ''} onClick={() => void save()}>
                   {write.kind === 'saving' ? 'Saving…' : 'Save for Chinese review'}
                 </button>
+                {takeover ? (
+                  <button type="button" className={buttonClass('danger')} disabled={busy} onClick={() => void save(true)}>
+                    Use this row anyway
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={buttonClass()}

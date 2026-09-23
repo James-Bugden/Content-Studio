@@ -9,7 +9,9 @@ import { ServiceAccountTokens } from '@/integrations/google/service-account';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { AnthropicAiGateway } from '@/integrations/ai/anthropic-gateway';
 import { FakeAiGateway, UnconfiguredAiGateway } from '@/integrations/ai/fake-gateway';
-import type { AiGateway, ContentRepository, DriveGateway } from './ports';
+import { FakeTypefullyGateway, UnconfiguredTypefullyGateway } from '@/integrations/typefully/fake-gateway';
+import { LiveTypefullyGateway } from '@/integrations/typefully/live-gateway';
+import type { AiGateway, ContentRepository, DriveGateway, TypefullyGateway } from './ports';
 
 /**
  * Composition root. One set of adapters per server process: fakes seeded from
@@ -22,8 +24,10 @@ export type Services = {
   drive: DriveGateway;
   /** Optional: when AI is down or unconfigured, manual review keeps working. */
   ai: AiGateway;
+  /** Optional: when Typefully is down or unconfigured, manual scheduling keeps working. */
+  typefully: TypefullyGateway;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
-  fakes?: { sheet: FakeSheetTransport; drive: FakeDriveGateway; ai?: FakeAiGateway };
+  fakes?: { sheet: FakeSheetTransport; drive: FakeDriveGateway; ai?: FakeAiGateway; typefully?: FakeTypefullyGateway };
 };
 
 /**
@@ -38,6 +42,19 @@ export function createAiGateway(env: ReturnType<typeof serverEnv>): AiGateway {
     return new AnthropicAiGateway({ apiKey: env.AI_API_KEY, ...(env.AI_MODEL ? { model: env.AI_MODEL } : {}) });
   }
   return new UnconfiguredAiGateway();
+}
+
+/**
+ * Typefully adapter choice: the synthetic fake only in fake data mode; the live
+ * API when a key and social set are configured; otherwise a gateway that reports
+ * not_configured and returns CONFIG_MISSING. Live data never reaches the fake.
+ */
+export function createTypefullyGateway(env: ReturnType<typeof serverEnv>): TypefullyGateway {
+  if (env.CS_DATA_MODE === 'fake') return new FakeTypefullyGateway();
+  if (env.TYPEFULLY_API_KEY && env.TYPEFULLY_SOCIAL_SET_ID) {
+    return new LiveTypefullyGateway({ apiKey: env.TYPEFULLY_API_KEY, socialSetId: env.TYPEFULLY_SOCIAL_SET_ID });
+  }
+  return new UnconfiguredTypefullyGateway();
 }
 
 /**
@@ -64,12 +81,19 @@ function build(): Services {
     const sheet = new FakeSheetTransport();
     const drive = new FakeDriveGateway();
     const ai = createAiGateway(env);
+    const typefully = createTypefullyGateway(env);
     services = {
       mode: 'fake',
       repo: new SheetsContentRepository(sheet),
       drive,
       ai,
-      fakes: { sheet, drive, ...(ai instanceof FakeAiGateway ? { ai } : {}) },
+      typefully,
+      fakes: {
+        sheet,
+        drive,
+        ...(ai instanceof FakeAiGateway ? { ai } : {}),
+        ...(typefully instanceof FakeTypefullyGateway ? { typefully } : {}),
+      },
     };
     return services;
   }
@@ -81,8 +105,9 @@ function build(): Services {
   services = {
     mode: 'live',
     repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable }),
-    drive: new GoogleDriveGateway(tokens, writable),
+    drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
+    typefully: createTypefullyGateway(env),
   };
   return services;
 }

@@ -1,7 +1,7 @@
 import 'server-only';
 import type { Capability } from '@/domain/capability';
 import { AppError } from '@/domain/errors';
-import type { DriveFileMeta, DriveGateway } from '@/application/ports';
+import { DRIVE_CREATE_MAX_BYTES, DRIVE_FILE_NAME, type DriveCreateInput, type DriveFileMeta, type DriveGateway } from '@/application/ports';
 import { SCOPES, googleError, withReadRetry, type ServiceAccountTokens } from './service-account';
 
 /**
@@ -23,6 +23,8 @@ export class GoogleDriveGateway implements DriveGateway {
     private readonly tokens: ServiceAccountTokens,
     private readonly writeEnabled: boolean,
     private readonly fetchImpl: typeof fetch = fetch,
+    /** Folder new visual assets are uploaded into (`CS_ASSET_FOLDER_ID`). */
+    private readonly assetFolderId?: string,
   ) {}
 
   capability(): Capability {
@@ -73,6 +75,52 @@ export class GoogleDriveGateway implements DriveGateway {
     if (!res.ok) throw googleError(res.status, 'drive');
     const b = (await res.json()) as { id: string; mimeType: string; modifiedTime: string; version: string; size?: string; trashed?: boolean };
     return { id: b.id, mimeType: b.mimeType, modifiedTime: b.modifiedTime, revision: String(b.version), size: Number(b.size ?? 0), trashed: Boolean(b.trashed) };
+  }
+
+  /**
+   * Multipart upload of a new asset into the configured asset folder (CS-012).
+   * The parent folder comes from configuration, never from a Sheet cell. The web
+   * link is built from the returned id, not taken from the provider payload.
+   */
+  async createFile(input: DriveCreateInput): Promise<DriveFileMeta & { webLink: string }> {
+    if (!this.writeEnabled) throw new AppError('CONFIG_MISSING', { provider: 'drive', reason: 'write_disabled' });
+    const folderId = input.folderId ?? this.assetFolderId;
+    if (!folderId) throw new AppError('CONFIG_MISSING', { provider: 'drive', reason: 'asset_folder' });
+    if (!FILE_ID.test(folderId)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'folder_id' });
+    if (!DRIVE_FILE_NAME.test(input.name)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'file_name' });
+    if (input.mimeType !== 'image/svg+xml' && input.mimeType !== 'image/png') throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'mime_type' });
+    if (input.bytes.length === 0 || input.bytes.length > DRIVE_CREATE_MAX_BYTES) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'size' });
+
+    const boundary = `cs_${crypto.randomUUID().replace(/-/g, '')}`;
+    const metadata = JSON.stringify({ name: input.name, mimeType: input.mimeType, parents: [folderId] });
+    const encoder = new TextEncoder();
+    const head = encoder.encode(
+      `--${boundary}\r\ncontent-type: application/json; charset=utf-8\r\n\r\n${metadata}\r\n--${boundary}\r\ncontent-type: ${input.mimeType}\r\n\r\n`,
+    );
+    const tail = encoder.encode(`\r\n--${boundary}--\r\n`);
+    const body = new Uint8Array(head.length + input.bytes.length + tail.length);
+    body.set(head, 0);
+    body.set(input.bytes, head.length);
+    body.set(tail, head.length + input.bytes.length);
+
+    // Not retried: a lost response could otherwise create a second file.
+    const res = await this.fetchImpl(`${UPLOAD}?uploadType=multipart&supportsAllDrives=true&fields=${FIELDS}`, {
+      method: 'POST',
+      headers: { ...(await this.headers()), 'content-type': `multipart/related; boundary=${boundary}` },
+      body: body as unknown as BodyInit,
+    });
+    if (!res.ok) throw googleError(res.status, 'drive');
+    const b = (await res.json()) as { id: string; mimeType: string; modifiedTime: string; version: string; size?: string; trashed?: boolean };
+    if (typeof b.id !== 'string' || !FILE_ID.test(b.id)) throw new AppError('PROVIDER_UNAVAILABLE', { provider: 'drive', reason: 'bad_create_response' });
+    return {
+      id: b.id,
+      mimeType: b.mimeType,
+      modifiedTime: b.modifiedTime,
+      revision: String(b.version),
+      size: Number(b.size ?? input.bytes.length),
+      trashed: Boolean(b.trashed),
+      webLink: `https://drive.google.com/file/d/${b.id}/view`,
+    };
   }
 
   async readBytes(fileId: string, maxBytes: number): Promise<{ bytes: Uint8Array; meta: DriveFileMeta }> {

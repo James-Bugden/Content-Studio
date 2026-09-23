@@ -137,7 +137,7 @@ describe('SEC-03: validation', () => {
     expect(r).toMatchObject({ ok: false, code: 'NOT_FOUND' });
   });
 
-  it('read-only repository refuses every write', async () => {
+  it('SEC-08: read-only repository refuses every write', async () => {
     const ro = new SheetsContentRepository(transport, { writable: false });
     expect(ro.capability().state).toBe('read_only');
     const lib = await ro.getLibrary('SYN-L001');

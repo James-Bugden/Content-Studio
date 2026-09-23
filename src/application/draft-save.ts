@@ -2,7 +2,7 @@ import 'server-only';
 import { SHEET_WRITE_VALUE } from '@/domain/enums';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
-import { findSection, replaceSectionBody } from '@/domain/markdown';
+import { findSection, safeReplaceSectionBody, sectionBodyProblems } from '@/domain/markdown';
 import type { LibraryPatch } from '@/domain/mapping';
 import type { Actor, MutationResult, StepResult } from '@/domain/mutation';
 import type { LibraryRecord } from '@/domain/records';
@@ -98,7 +98,12 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
   } else if (read.section.bodyHash !== input.expectedSectionHash) {
     return fail('STALE_READ', { conflict: { provider: 'drive', current: read.section.body, currentRevision: read.section.bodyHash } });
   } else {
-    const next = replaceSectionBody(read.text, read.section, input.proposed);
+    // Refuse text that would open a new section or leave a code fence open: it
+    // would swallow the sections after it in the shared master file.
+    const next = safeReplaceSectionBody(read.text, read.section, input.proposed);
+    if (next === null) {
+      return fail('VALIDATION_FAILED', { details: { reason: 'unsafe_markdown_structure', problems: sectionBodyProblems(input.proposed, read.section.level) } });
+    }
     try {
       const meta = await drive.writeText(read.fileId, next, read.meta.revision);
       driveRevision = meta.revision;
@@ -116,8 +121,10 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
       const after = await drive.readText(read.fileId);
       const check = findSection(after.text, input.libraryId);
       if (!check.ok || check.section.body !== input.proposed) {
-        steps[steps.length - 1] = { step: 'update Markdown section', provider: 'drive', status: 'failed', errorCode: 'CONFLICT' };
-        return fail('CONFLICT', { details: { reason: 'section_changed_during_write' } });
+        // The upload happened, so the step is done; what followed is unconfirmed.
+        steps.push({ step: 'verify Markdown section', provider: 'drive', status: 'failed', errorCode: 'CONFLICT' });
+        steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: 'pending' });
+        return fail('PARTIAL_FAILURE', { details: { reason: 'section_changed_during_write' } });
       }
     } catch {
       // Unverified but written; the Sheet step still runs and the result stays truthful.

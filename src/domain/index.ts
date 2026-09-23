@@ -17,3 +17,8 @@ export * from './proposals';
 export * from './hook-frameworks';
 export * from './zh-terms';
 export * from './zh-state';
+export * from './visual-render';
+export * from './visual-studio';
+export * from './similarity';
+export * from './typefully';
+export * from './analytics';

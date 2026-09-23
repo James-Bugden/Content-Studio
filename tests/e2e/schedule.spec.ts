@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
   await signInAs(page.request, 'owner');
 });
 
-test('READY-03/04: groups are recomputed from Content Library', async ({ page }) => {
+test('READY-03 / READY-04 / READY-06: groups are recomputed from Content Library', async ({ page }) => {
   await page.goto('/ready');
   const ready = page.getByRole('region', { name: /Ready to schedule/ });
   await expect(ready.getByRole('heading', { name: 'counteroffer-is-information' })).toBeVisible();

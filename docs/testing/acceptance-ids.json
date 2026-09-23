@@ -1,0 +1,517 @@
+{
+ "AI-01": {
+  "issue": 10,
+  "cs": "CS-009",
+  "text": "malformed/duplicate/out-of-range output receives one bounded repair then fails safely; editor remains usable."
+ },
+ "DEP-01": {
+  "issue": 2,
+  "cs": "CS-001",
+  "text": "clean checkout install, typecheck, lint, unit test and production build are deterministic."
+ },
+ "DEP-02": {
+  "issue": 2,
+  "cs": "CS-001",
+  "text": "public/fork CI cannot access production secrets and still runs all synthetic checks."
+ },
+ "DEP-03": {
+  "issue": 20,
+  "cs": "CS-019",
+  "text": "preview cannot access production data/credentials; exact deployed SHA and environment are known."
+ },
+ "DEP-04": {
+  "issue": 20,
+  "cs": "CS-019",
+  "text": "owner works; anonymous/non-owner UI/API/server actions fail; logout and token refresh/revocation behave safely."
+ },
+ "DEP-05": {
+  "issue": 20,
+  "cs": "CS-019",
+  "text": "required T0/T1/T2 and authorised T3 are green; T4 passes on the exact HTTPS candidate."
+ },
+ "DEP-06": {
+  "issue": 20,
+  "cs": "CS-019",
+  "text": "security headers, no-store, TLS, callback allowlist, timezone and provider capabilities are verified, not inferred."
+ },
+ "DEP-07": {
+  "issue": 20,
+  "cs": "CS-019",
+  "text": "rollback/runbook restores the prior app deployment while preserving Sheet/Drive/Typefully content and unrelated infrastructure."
+ },
+ "DRV-01": {
+  "issue": 5,
+  "cs": "CS-004",
+  "text": "exact Unicode/line breaks round-trip in the intended Library-ID section; adjacent sections are byte-equivalent."
+ },
+ "DRV-02": {
+  "issue": 5,
+  "cs": "CS-004",
+  "text": "missing/duplicate Library ID, moved file, stale revision and permission failure make no unsafe write."
+ },
+ "DRV-03": {
+  "issue": 5,
+  "cs": "CS-004",
+  "text": "Sheet-success/Drive-failure and Drive-success/Sheet-failure expose PARTIAL_FAILURE with deterministic retry/reconcile; no false success."
+ },
+ "DRV-04": {
+  "issue": 9,
+  "cs": "CS-008",
+  "text": "each partial-failure permutation has an idempotent recovery path and truthful status."
+ },
+ "ENQA-01": {
+  "issue": 10,
+  "cs": "CS-009",
+  "text": "known British/American spelling, punctuation, banned-word and platform fixtures produce structured, attributable findings."
+ },
+ "ENQA-02": {
+  "issue": 10,
+  "cs": "CS-009",
+  "text": "accepting one finding changes only the selected range; reject/cancel leaves exact draft untouched."
+ },
+ "ENQA-03": {
+  "issue": 10,
+  "cs": "CS-009",
+  "text": "late results against a changed draft are stale and cannot apply."
+ },
+ "HOOK-01": {
+  "issue": 11,
+  "cs": "CS-010",
+  "text": "normal success has exactly three materially distinct alternatives with valid canonical framework names and scores equal to their five dimensions."
+ },
+ "HOOK-02": {
+  "issue": 11,
+  "cs": "CS-010",
+  "text": "original remains selectable and unchanged until confirmation; generation alone writes nothing."
+ },
+ "HOOK-03": {
+  "issue": 11,
+  "cs": "CS-010",
+  "text": "selection updates hook and opening together or not at all from the user's perspective; partial external failure is explicit/recoverable."
+ },
+ "HOOK-04": {
+  "issue": 11,
+  "cs": "CS-010",
+  "text": "LinkedIn alternatives show all LinkedInify checks; X Premium is not incorrectly capped at 280 characters."
+ },
+ "HOOK-05": {
+  "issue": 11,
+  "cs": "CS-010",
+  "text": "stale generation/selection cannot overwrite a newer draft or existing chosen hook."
+ },
+ "MAP-01": {
+  "issue": 3,
+  "cs": "CS-002",
+  "text": "every current Content Library/Ready Queue/Content Schedule header maps once or is explicitly pass-through."
+ },
+ "MAP-02": {
+  "issue": 3,
+  "cs": "CS-002",
+  "text": "missing/duplicate required fields fail safely; unknown extra columns survive round trips."
+ },
+ "MAP-03": {
+  "issue": 4,
+  "cs": "CS-003",
+  "text": "all 33 Library and 44 Schedule headers match the committed mapping."
+ },
+ "MAP-04": {
+  "issue": 4,
+  "cs": "CS-003",
+  "text": "reordered columns and new unknown columns work; renamed/missing required columns produce SCHEMA_DRIFT with no write."
+ },
+ "MIG-01": {
+  "issue": 21,
+  "cs": "CS-020",
+  "text": "approved decision record shows measured trigger, alternatives, cost/risk and rollback."
+ },
+ "MIG-02": {
+  "issue": 21,
+  "cs": "CS-020",
+  "text": "snapshot/replay preserves exact content and stable IDs with reconciled counts/hashes."
+ },
+ "MIG-03": {
+  "issue": 21,
+  "cs": "CS-020",
+  "text": "shadow-read parity covers every mapped field/state and declares exceptions; UI behaviour is adapter-identical."
+ },
+ "MIG-04": {
+  "issue": 21,
+  "cs": "CS-020",
+  "text": "anonymous/non-owner/direct API/RPC access is denied; secrets remain server-only."
+ },
+ "MIG-05": {
+  "issue": 21,
+  "cs": "CS-020",
+  "text": "cutover and rollback are rehearsed on synthetic/copy data; no period has two uncoordinated authorities."
+ },
+ "OBS-01": {
+  "issue": 2,
+  "cs": "CS-001",
+  "text": "health output contains commit/capability status, never content, tokens, account IDs or Drive names."
+ },
+ "OBS-02": {
+  "issue": 4,
+  "cs": "CS-003",
+  "text": "adapter latency, quota/rate-limit and write result are observable with redaction."
+ },
+ "OBS-03": {
+  "issue": 10,
+  "cs": "CS-009",
+  "text": "duration, token use, provider/model/prompt version and redacted error code are recorded."
+ },
+ "OBS-04": {
+  "issue": 16,
+  "cs": "CS-015",
+  "text": "provider status, duration, rate limit and redacted reconciliation outcome are recorded without copy."
+ },
+ "OBS-05": {
+  "issue": 18,
+  "cs": "CS-017",
+  "text": "every typed error has a user message, recovery action and redacted structured event."
+ },
+ "OBS-06": {
+  "issue": 18,
+  "cs": "CS-017",
+  "text": "logs/traces/errors contain no post text, Markdown body, private Drive path/URL, token or owner identifier; synthetic sentinel test proves redaction."
+ },
+ "OBS-07": {
+  "issue": 18,
+  "cs": "CS-017",
+  "text": "retry uses the original operation ID/expected target and cannot duplicate a Sheet/Drive/Typefully mutation."
+ },
+ "OBS-08": {
+  "issue": 18,
+  "cs": "CS-017",
+  "text": "schema drift, repeated auth refresh failure, provider write failure and stale published sync meet documented alert thresholds."
+ },
+ "PUB-01": {
+  "issue": 17,
+  "cs": "CS-016",
+  "text": "published detail matches exact Schedule/Typefully values and retains X/Threads lineage without combining metrics."
+ },
+ "PUB-02": {
+  "issue": 17,
+  "cs": "CS-016",
+  "text": "unavailable metric stays blank; zero remains zero; stale/partial coverage is visible."
+ },
+ "PUB-03": {
+  "issue": 17,
+  "cs": "CS-016",
+  "text": "repeated analytics sync is idempotent and cannot overwrite newer manual/provider final copy."
+ },
+ "PUB-04": {
+  "issue": 17,
+  "cs": "CS-016",
+  "text": "published URL/time/status conflicts require reconciliation rather than inferred correction."
+ },
+ "PUB-05": {
+  "issue": 17,
+  "cs": "CS-016",
+  "text": "aggregates state platform, date range, included rows and last sync; rows with missing data are not silently treated as zero."
+ },
+ "QA-01": {
+  "issue": 19,
+  "cs": "CS-018",
+  "text": "every required acceptance ID has a pass or explicit scoped blocker/owner; none are silently missing."
+ },
+ "QA-02": {
+  "issue": 19,
+  "cs": "CS-018",
+  "text": "data-loss, duplicate-publish, auth/privacy and stale-overwrite tests pass before release."
+ },
+ "QA-03": {
+  "issue": 19,
+  "cs": "CS-018",
+  "text": "accessibility/visual checks pass on supported browsers; emulation is not claimed as physical-device proof."
+ },
+ "QA-04": {
+  "issue": 19,
+  "cs": "CS-018",
+  "text": "private-data scans cover repo, history, CI logs/artifacts and screenshots."
+ },
+ "QA-05": {
+  "issue": 19,
+  "cs": "CS-018",
+  "text": "defects gain regression tests and are retested on the exact candidate environment."
+ },
+ "READY-01": {
+  "issue": 3,
+  "cs": "CS-002",
+  "text": "table-driven tests cover every hard gate and explain the exact blocker/next action."
+ },
+ "READY-02": {
+  "issue": 4,
+  "cs": "CS-003",
+  "text": "Ready Queue is read/derived only and matches approved queued Library rows."
+ },
+ "READY-03": {
+  "issue": 14,
+  "cs": "CS-013",
+  "text": "only Approved + queued items with every applicable hard gate pass show Ready."
+ },
+ "READY-04": {
+  "issue": 14,
+  "cs": "CS-013",
+  "text": "LinkedIn correctly skips translation; X requiring Threads adaptation and stale zh-TW states are handled explicitly."
+ },
+ "READY-05": {
+  "issue": 14,
+  "cs": "CS-013",
+  "text": "image-required/unapproved, stale visual and screenshot reuse cases block; Text only passes when explicitly decided."
+ },
+ "READY-06": {
+  "issue": 14,
+  "cs": "CS-013",
+  "text": "changing any source after load re-evaluates gates and prevents stale promotion."
+ },
+ "READY-07": {
+  "issue": 14,
+  "cs": "CS-013",
+  "text": "no API/UI route can create a Schedule record from an unapproved/non-Library item."
+ },
+ "REV-01": {
+  "issue": 3,
+  "cs": "CS-002",
+  "text": "illegal stage transitions and stale approvals are rejected server-side, not only disabled in UI."
+ },
+ "REV-02": {
+  "issue": 4,
+  "cs": "CS-003",
+  "text": "concurrent row change produces STALE_READ/CONFLICT and preserves both versions."
+ },
+ "REV-03": {
+  "issue": 8,
+  "cs": "CS-007",
+  "text": "filters compose, persist safely in URL enums/IDs and return the same results as bounded repository queries."
+ },
+ "REV-04": {
+  "issue": 8,
+  "cs": "CS-007",
+  "text": "REWORK and CHECK cannot be approved/queued until resolved; the exact blocker is shown."
+ },
+ "REV-05": {
+  "issue": 8,
+  "cs": "CS-007",
+  "text": "empty queue, no filter matches and provider failure are distinct; existing results are not falsely replaced by empty."
+ },
+ "REV-06": {
+  "issue": 8,
+  "cs": "CS-007",
+  "text": "approve/skip/request-change updates only intended Sheet fields and handles stale rows without overwrite."
+ },
+ "REV-07": {
+  "issue": 9,
+  "cs": "CS-008",
+  "text": "exact emoji/CJK/whitespace/line breaks round-trip; no trim or silent rewrite."
+ },
+ "REV-08": {
+  "issue": 9,
+  "cs": "CS-008",
+  "text": "two-tab and external Sheet/Drive edits create a resolvable conflict, not last-write-wins."
+ },
+ "REV-09": {
+  "issue": 18,
+  "cs": "CS-017",
+  "text": "resolving one reconciliation item re-reads all authorities and closes it only when agreement/gates are proven."
+ },
+ "SCHED-01": {
+  "issue": 15,
+  "cs": "CS-014",
+  "text": "correct platform/slot/timezone options come from Workflow Settings; missing/TBD policy blocks automatic scheduling."
+ },
+ "SCHED-02": {
+  "issue": 15,
+  "cs": "CS-014",
+  "text": "preview shows every value to be written and no unrelated column; source link/Library lineage remains traceable."
+ },
+ "SCHED-03": {
+  "issue": 15,
+  "cs": "CS-014",
+  "text": "stale gate, occupied slot, duplicate Content ID, two-tab promotion or external row change conflicts safely."
+ },
+ "SCHED-04": {
+  "issue": 15,
+  "cs": "CS-014",
+  "text": "Threads row links the approved X parent and cannot precede required adaptation/QA."
+ },
+ "SCHED-05": {
+  "issue": 15,
+  "cs": "CS-014",
+  "text": "direct API attempts cannot bypass Ready gates; new content cannot jump into Schedule."
+ },
+ "SEC-01": {
+  "issue": 2,
+  "cs": "CS-001",
+  "text": "tracked files/history and CI artifacts reject a synthetic leak sentinel; no actual private values exist."
+ },
+ "SEC-02": {
+  "issue": 3,
+  "cs": "CS-002",
+  "text": "untrusted Sheet/Markdown/provider values cannot select code paths outside validated enums/contracts."
+ },
+ "SEC-03": {
+  "issue": 4,
+  "cs": "CS-003",
+  "text": "range bounds, IDs and values are validated; logs contain hashes/IDs only, no post copy."
+ },
+ "SEC-04": {
+  "issue": 5,
+  "cs": "CS-004",
+  "text": "executable/injection content and unexpected external links remain inert data."
+ },
+ "SEC-05": {
+  "issue": 6,
+  "cs": "CS-005",
+  "text": "anonymous and authenticated non-owner calls fail for pages, APIs and server actions without disclosing resource existence."
+ },
+ "SEC-06": {
+  "issue": 6,
+  "cs": "CS-005",
+  "text": "forged role/target IDs, cross-origin mutation and expired/revoked sessions fail safely."
+ },
+ "SEC-07": {
+  "issue": 6,
+  "cs": "CS-005",
+  "text": "no provider token appears in browser bundles, cookies readable by JS, URLs, logs or errors."
+ },
+ "SEC-08": {
+  "issue": 6,
+  "cs": "CS-005",
+  "text": "read-only mode works when write scopes/provider credentials are absent; mutation controls and APIs deny consistently."
+ },
+ "SEC-09": {
+  "issue": 6,
+  "cs": "CS-005",
+  "text": "logout clears session and tab-local private recovery; private responses are no-store."
+ },
+ "SEC-10": {
+  "issue": 7,
+  "cs": "CS-006",
+  "text": "URLs/telemetry contain IDs and filter enums only, never post text or private Drive paths."
+ },
+ "SEC-11": {
+  "issue": 9,
+  "cs": "CS-008",
+  "text": "tab recovery is owner/session namespaced, bounded and cleared on logout; no tokens/source archives stored."
+ },
+ "SEC-12": {
+  "issue": 10,
+  "cs": "CS-009",
+  "text": "prompt injection cannot request tools, secrets, external fetches or authority changes; logs contain no copy/provider payload."
+ },
+ "TYPE-01": {
+  "issue": 16,
+  "cs": "CS-015",
+  "text": "existing ID, one match, ambiguous matches, no match and provider failure are distinct states."
+ },
+ "TYPE-02": {
+  "issue": 16,
+  "cs": "CS-015",
+  "text": "double click, timeout-after-create and retry produce at most one provider draft and one linked Sheet record."
+ },
+ "TYPE-03": {
+  "issue": 16,
+  "cs": "CS-015",
+  "text": "ambiguous similarity never auto-links/creates; user sees the discriminating date/slot/platform preview."
+ },
+ "TYPE-04": {
+  "issue": 16,
+  "cs": "CS-015",
+  "text": "exact Unicode/whitespace from Typefully lands in Final Content; working Content is unchanged."
+ },
+ "TYPE-05": {
+  "issue": 16,
+  "cs": "CS-015",
+  "text": "concurrent Typefully/Sheet edits produce comparison/conflict and cannot silently overwrite newer work."
+ },
+ "UX-01": {
+  "issue": 7,
+  "cs": "CS-006",
+  "text": "all routes/navigation work with keyboard, visible focus, landmarks and meaningful labels."
+ },
+ "UX-02": {
+  "issue": 7,
+  "cs": "CS-006",
+  "text": "loading, empty, no-match, not-configured, blocked, conflict, rate-limited and provider-error states are visually/semantically distinct."
+ },
+ "UX-03": {
+  "issue": 7,
+  "cs": "CS-006",
+  "text": "no page overflow at target widths/zoom; long URLs, English and CJK wrap without hiding controls."
+ },
+ "UX-04": {
+  "issue": 7,
+  "cs": "CS-006",
+  "text": "navigation/filter changes never discard a dirty editor without explicit choice."
+ },
+ "UX-05": {
+  "issue": 8,
+  "cs": "CS-007",
+  "text": "keyboard, 200% zoom and CJK/long-copy cards pass; next action is not color-only."
+ },
+ "UX-06": {
+  "issue": 9,
+  "cs": "CS-008",
+  "text": "navigation, refresh, session expiry and delayed proposals never discard/replace a dirty draft."
+ },
+ "UX-07": {
+  "issue": 15,
+  "cs": "CS-014",
+  "text": "calendar/list is keyboard and zoom accessible with status conveyed beyond colour."
+ },
+ "VIS-01": {
+  "issue": 5,
+  "cs": "CS-004",
+  "text": "image previews enforce supported MIME/size and never expose credentials/private stable download URLs."
+ },
+ "VIS-02": {
+  "issue": 13,
+  "cs": "CS-012",
+  "text": "incomplete brief or >4 main ideas cannot enter approved rendering flow; Text only remains a valid complete decision."
+ },
+ "VIS-03": {
+  "issue": 13,
+  "cs": "CS-012",
+  "text": "deterministic fixture renders preserve locked colors/composition rules and readable 360/390 previews."
+ },
+ "VIS-04": {
+  "issue": 13,
+  "cs": "CS-012",
+  "text": "approval belongs to exact file/version/platform/language; replacement or source-copy change invalidates it."
+ },
+ "VIS-05": {
+  "issue": 13,
+  "cs": "CS-012",
+  "text": "reused screenshot on same platform blocks; reuse on another platform and fresh original graphics follow defined rules."
+ },
+ "VIS-06": {
+  "issue": 13,
+  "cs": "CS-012",
+  "text": "alt text, caveat and illustrative reconstruction labels are required/accurate where applicable."
+ },
+ "ZHTW-01": {
+  "issue": 12,
+  "cs": "CS-011",
+  "text": "non-approved/stale X sources cannot generate an approvable Threads version."
+ },
+ "ZHTW-02": {
+  "issue": 12,
+  "cs": "CS-011",
+  "text": "generated copy is Traditional Chinese, uses Taiwan terminology fixtures and preserves meaning without literal calques."
+ },
+ "ZHTW-03": {
+  "issue": 12,
+  "cs": "CS-011",
+  "text": "Parent Content ID/date/slot linkage is deterministic; ambiguous/multiple candidates require review."
+ },
+ "ZHTW-04": {
+  "issue": 12,
+  "cs": "CS-011",
+  "text": "X edit after translation visibly invalidates ZH approval and linked visual revision; late results are discarded."
+ },
+ "ZHTW-05": {
+  "issue": 12,
+  "cs": "CS-011",
+  "text": "Chinese QA approval is explicit; failure leaves manual editing/copy recovery usable."
+ }
+}

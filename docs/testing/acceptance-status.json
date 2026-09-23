@@ -1,0 +1,15 @@
+{
+  "DEP-03": { "status": "blocked", "owner": "James (Vercel and Google setup)", "reason": "Needs the production Vercel project with owner-configured credentials. Preview isolation is designed in docs/ops/deploy.md; the exact deployed SHA is reported by /api/health.", "evidence": "docs/ops/deploy.md" },
+  "DEP-04": { "status": "blocked", "owner": "James (Google OAuth client and first sign-in)", "reason": "Owner sign-in, a second-account refusal and token refresh can only be proven with the real Google OAuth client. Synthetic equivalents pass in tests/e2e/auth.spec.ts.", "evidence": "tests/e2e/auth.spec.ts (synthetic)" },
+  "DEP-05": { "status": "blocked", "owner": "James (copied Sheet/Drive and Typefully test surface)", "reason": "T0/T1/T2-synthetic are green in CI; T3 needs a copied workbook and Drive folder shared with the service account, and T4 needs the HTTPS production candidate.", "evidence": "CI; docs/ops/deploy.md" },
+  "DEP-06": { "status": "blocked", "owner": "Agent after deployment", "reason": "Headers, no-store, TLS, callback allowlist, timezone and provider capabilities must be measured on the deployed URL, not inferred. The header policy itself is tested locally in tests/e2e/smoke.spec.ts.", "evidence": "tests/e2e/smoke.spec.ts (local)" },
+  "DEP-07": { "status": "blocked", "owner": "Agent after deployment", "reason": "Rollback runbook is written; rehearsal needs two production deployments.", "evidence": "docs/ops/deploy.md" },
+  "MIG-01": { "status": "deferred", "owner": "James", "reason": "CS-020 is parked by design until measured Sheet limits justify a migration. No Supabase code exists in the MVP." },
+  "MIG-02": { "status": "deferred", "owner": "James", "reason": "CS-020 parked (see MIG-01)." },
+  "MIG-03": { "status": "deferred", "owner": "James", "reason": "CS-020 parked (see MIG-01)." },
+  "MIG-04": { "status": "deferred", "owner": "James", "reason": "CS-020 parked (see MIG-01)." },
+  "MIG-05": { "status": "deferred", "owner": "James", "reason": "CS-020 parked (see MIG-01)." },
+  "QA-02": { "status": "automated", "reason": "Data-loss (drive-saga, editor), duplicate-publish (typefully, schedule), auth/privacy (auth, security) and stale-overwrite (sheets-repository, review, editor, schedule) suites run on every PR.", "evidence": "tests/unit/google/drive-saga.test.ts, tests/unit/application/schedule.test.ts, tests/e2e/auth.spec.ts, tests/e2e/editor.spec.ts" },
+  "QA-03": { "status": "blocked", "owner": "James (phone)", "reason": "Accessibility and layout pass in emulated Chromium at 375/500/640/750/1280 with axe; emulation is not physical-device proof. A one-time check on James's phone is still needed.", "evidence": "tests/e2e/shell.spec.ts, tests/e2e/zz-screens.spec.ts" },
+  "QA-05": { "status": "manual", "reason": "Every defect found in the campaign gained a regression test: telemetry URL/id redaction (reconcile.test.ts), module-graph service duplication (review.spec.ts journeys), dev signing key (auth), fake AI in live mode (gateway.test.ts). Retest on the exact candidate environment happens at T4.", "evidence": "PR descriptions #28 onward" }
+}

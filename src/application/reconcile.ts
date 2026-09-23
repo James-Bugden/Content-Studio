@@ -9,7 +9,11 @@ import { recentEvents, targetHash } from '@/observability/events';
 import type { Capability } from '@/domain/capability';
 import { capabilities } from './capabilities';
 import { markdownFileId } from './markdown-source';
-import type { ContentRepository, DriveGateway } from './ports';
+import { finalEditedSinceSync } from '@/domain/typefully-view';
+import { addDays, parseContentId } from '@/domain/schedule';
+import type { ContentRepository, DriveGateway, TypefullyGateway } from './ports';
+import { today } from './schedule';
+import { reconcileRecord } from './typefully';
 
 /**
  * Reconciliation centre (CS-017).
@@ -29,6 +33,8 @@ export type ReconcileKind =
   | 'zh_stale'
   | 'zh_ambiguous'
   | 'stale_published_sync'
+  | 'typefully_ambiguous'
+  | 'typefully_sync_conflict'
   | 'partial_mutation';
 
 export type ReconcileItem = {
@@ -67,14 +73,24 @@ export function stalePublishedRows(schedule: ScheduleRecord[], now = Date.now())
   });
 }
 
-export async function buildReconcileReport(repo: ContentRepository, drive: DriveGateway, now = Date.now()): Promise<ReconcileReport> {
+/** How far ahead the Typefully scan looks for Ready rows without a Draft ID. */
+export const TYPEFULLY_SCAN_DAYS = 7;
+
+export async function buildReconcileReport(
+  repo: ContentRepository,
+  drive: DriveGateway,
+  now = Date.now(),
+  options: { typefully?: TypefullyGateway; today?: string } = {},
+): Promise<ReconcileReport> {
   const items: ReconcileItem[] = [];
   const unreadable: string[] = [];
 
   const caps = capabilities();
   for (const c of caps) {
     if (c.state === 'not_configured' || c.state === 'unavailable') {
-      items.push(item('provider_config', c.provider === 'sheet' || c.provider === 'auth' ? 'blocking' : 'attention', `${c.provider} is ${c.state.replace('_', ' ')}`, [c.detail ?? 'Configuration is missing.'], [c.provider], { label: 'Configure' }));
+      const facts = [c.detail ?? 'Configuration is missing.'];
+      if (c.provider === 'typefully') facts.push('Typefully linking, draft creation and sync are off. Review and scheduling keep working.');
+      items.push(item('provider_config', c.provider === 'sheet' || c.provider === 'auth' ? 'blocking' : 'attention', `${c.provider} is ${c.state.replace('_', ' ')}`, facts, [c.provider], { label: 'Configure' }));
     }
   }
 
@@ -164,6 +180,45 @@ export async function buildReconcileReport(repo: ContentRepository, drive: Drive
   const stale = stalePublishedRows(schedule, now);
   for (const r of stale) {
     items.push(item('stale_published_sync', 'attention', `${r.value.contentId}: published but not synced for over 48 hours`, [`Final synced: ${r.value.finalSyncedAt || 'never'}; analytics synced: ${r.value.analyticsSyncedAt || 'never'}.`], [r.value.contentId], { label: 'Retry', href: `/published/${encodeURIComponent(r.value.contentId)}` }));
+  }
+
+  // Typefully: Final Content edited in the Sheet after the last sync (TYPE-05). Pure; no provider call.
+  for (const r of schedule) {
+    const v = r.value;
+    if (!v.typefullyDraftId || finalEditedSinceSync(v) !== true) continue;
+    items.push(
+      item('typefully_sync_conflict', 'attention', `${v.contentId}: Final Content changed in the Sheet after the last Typefully sync`, ['The Sheet and Typefully may now disagree. Nothing is overwritten until you choose a direction.'], [v.contentId], {
+        label: 'Compare',
+        href: `/schedule/${encodeURIComponent(v.contentId)}`,
+      }),
+    );
+  }
+
+  // Typefully: Ready rows with no Draft ID in the next days whose candidates are ambiguous (TYPE-03).
+  const tf = options.typefully;
+  const tfReady = tf ? tf.capability().state : null;
+  if (tf && (tfReady === 'ready' || tfReady === 'read_only' || tfReady === 'degraded')) {
+    const from = options.today ?? today();
+    const until = addDays(from, TYPEFULLY_SCAN_DAYS);
+    const due = schedule.filter((r) => {
+      const v = r.value;
+      const parsed = parseContentId(v.contentId);
+      return !v.typefullyDraftId && v.contentStage?.ok && v.contentStage.value === 'Ready' && parsed && parsed.isoDate >= from && parsed.isoDate <= until;
+    });
+    for (const r of due) {
+      const rec = await reconcileRecord(repo, tf, schedule, r);
+      if (rec.kind === 'provider_error') {
+        unreadable.push('Typefully drafts');
+        break;
+      }
+      if (rec.kind !== 'ambiguous') continue;
+      items.push(
+        item('typefully_ambiguous', 'attention', `${r.value.contentId}: ${rec.candidates.length} Typefully drafts could match`, ['None is linked or created automatically. Pick the right draft by date, slot, platform, planned time and similarity.'], [r.value.contentId], {
+          label: 'Review',
+          href: `/schedule/${encodeURIComponent(r.value.contentId)}`,
+        }),
+      );
+    }
   }
 
   // Partial mutations seen by this server instance, mapped back to ids by hash.
