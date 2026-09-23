@@ -77,12 +77,14 @@ export async function loadCalendar(repo: ContentRepository, week?: string): Prom
   const days = Array.from({ length: 7 }, (_, i) => ({ isoDate: addDays(start, i), cells: [] as CalendarCell[] }));
   let unparsed = 0;
   for (const r of schedule) {
-    if (!shouldDisplaySlot(r)) continue;
-    const cell = toCell(r, schedule);
-    if (!cell) {
+    const parsed = parseContentId(r.value.contentId);
+    if (!parsed) {
       if (r.value.contentId) unparsed += 1;
       continue;
     }
+    if (!shouldDisplaySlot(r)) continue;
+    const cell = toCell(r, schedule);
+    if (!cell) continue;
     const day = days.find((d) => d.isoDate === cell.isoDate);
     if (day) day.cells.push(cell);
   }
