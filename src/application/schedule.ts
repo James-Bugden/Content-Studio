@@ -3,7 +3,7 @@ import { AppError, type ErrorCode } from '@/domain/errors';
 import type { Gate } from '@/domain/gates';
 import type { Actor } from '@/domain/mutation';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { addDays, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
+import { addDays, expectedPillar, hasScheduleActivity, isActiveScheduleSlot, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
 import { adaptationState } from '@/domain/zh-state';
 import { emit, targetHash } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
@@ -35,6 +35,7 @@ export type CalendarCell = {
   platform: string;
   slot: string;
   time: string;
+  expectedPillar: string | null;
   isoDate: string;
   displayDate: string;
   stage: string;
@@ -53,11 +54,13 @@ function toCell(r: ScheduleRecord, all: ScheduleRecord[]): CalendarCell | null {
   const parsed = parseContentId(r.value.contentId);
   if (!parsed) return null;
   const v = r.value;
+  if (!isActiveScheduleSlot(parsed.platform, parsed.slot) && !hasScheduleActivity(r)) return null;
   return {
     contentId: v.contentId,
     platform: parsed.platform,
     slot: parsed.slot,
     time: v.publishTime || 'Not set',
+    expectedPillar: expectedPillar(parsed.isoDate, parsed.platform, parsed.slot),
     isoDate: parsed.isoDate,
     displayDate: v.date,
     stage: v.contentStage ? (v.contentStage.ok ? v.contentStage.value : 'Unrecognised') : 'Empty',
