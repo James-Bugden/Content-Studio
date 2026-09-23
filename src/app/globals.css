@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+
+/*
+ * Content Studio tokens, built from the locked C-light palette so the tool and the
+ * visuals it approves share one vocabulary: near-white paper, ink, one yellow focal
+ * highlight and green used sparingly for primary actions.
+ */
+@theme {
+  --color-paper: #fafbfc;
+  --color-card: #ffffff;
+  --color-ink: #172023;
+  --color-ink-soft: #4a5558;
+  --color-line: #d5dbde;
+  --color-focal: #ffe76b;
+  --color-green: #0a3d26;
+  --color-green-soft: #e3efe8;
+  --color-block: #8a1c1c;
+  --color-block-soft: #fbe9e7;
+  --color-warn: #6b4800;
+  --color-warn-soft: #fff4d6;
+  --color-info: #1d3b66;
+  --color-info-soft: #e8eef7;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--color-focal);
+}
+
+.copy {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
