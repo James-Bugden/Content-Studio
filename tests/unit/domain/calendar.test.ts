@@ -27,6 +27,7 @@ function slot(over: Partial<SlotSummary> & Pick<SlotSummary, 'contentId'>): Slot
     slot: 'Main',
     platform: 'X',
     time: '08:00',
+    expectedPillar: 'Trending',
     hook: '',
     statusLabel: 'Open',
     thumb: null,

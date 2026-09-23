@@ -25,7 +25,7 @@ test('UX-01: signed-in / shows Next up with tiles, counts and the urgent tasks',
   await expect(summary.getByRole('link', { name: /To review/ })).toContainText('3');
   await expect(summary.getByRole('link', { name: /Images to finish/ })).toContainText('3');
   await expect(summary.getByRole('link', { name: /Ready to schedule/ })).toContainText('3');
-  await expect(summary.getByRole('link', { name: /Open slots this week/ })).toContainText('8');
+  await expect(summary.getByRole('link', { name: /Open slots this week/ })).toContainText('5');
   await expect(summary.getByRole('link', { name: /To review/ })).toHaveAttribute('href', '/review?lane=review');
 
   const now = page.getByRole('region', { name: /Do these now/ });

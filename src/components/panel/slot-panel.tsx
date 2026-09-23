@@ -65,7 +65,7 @@ export function SlotPanel({ contentId }: { contentId: string }) {
           {slot.platform} {slot.slot} · {slot.time}
         </h2>
         <p className="text-sm text-ink-soft">
-          {dayLabel(slot.isoDate)} · Taipei time · {slot.statusLabel}
+          {dayLabel(slot.isoDate)} · Taipei time · {slot.statusLabel}{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
         </p>
       </header>
 

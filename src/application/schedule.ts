@@ -3,7 +3,8 @@ import { AppError, type ErrorCode } from '@/domain/errors';
 import type { Gate } from '@/domain/gates';
 import type { Actor } from '@/domain/mutation';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { addDays, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
+import { addDays, hasScheduleActivity, isActiveScheduleSlot, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
+import { scheduledPillar } from '@/domain/settings';
 import { adaptationState } from '@/domain/zh-state';
 import { emit, targetHash } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
@@ -35,6 +36,7 @@ export type CalendarCell = {
   platform: string;
   slot: string;
   time: string;
+  expectedPillar: string | null;
   isoDate: string;
   displayDate: string;
   stage: string;
@@ -49,15 +51,17 @@ export type CalendarCell = {
 
 export type CalendarWeek = { start: string; days: { isoDate: string; cells: CalendarCell[] }[]; unparsed: number };
 
-function toCell(r: ScheduleRecord, all: ScheduleRecord[]): CalendarCell | null {
+function toCell(r: ScheduleRecord, all: ScheduleRecord[], settings: Awaited<ReturnType<ContentRepository['workflowSettings']>>): CalendarCell | null {
   const parsed = parseContentId(r.value.contentId);
   if (!parsed) return null;
   const v = r.value;
+  if (!isActiveScheduleSlot(parsed.platform, parsed.slot) && !hasScheduleActivity(r)) return null;
   return {
     contentId: v.contentId,
     platform: parsed.platform,
     slot: parsed.slot,
     time: v.publishTime || 'Not set',
+    expectedPillar: scheduledPillar(settings, parsed.isoDate, parsed.platform, parsed.slot),
     isoDate: parsed.isoDate,
     displayDate: v.date,
     stage: v.contentStage ? (v.contentStage.ok ? v.contentStage.value : 'Unrecognised') : 'Empty',
@@ -72,14 +76,14 @@ function toCell(r: ScheduleRecord, all: ScheduleRecord[]): CalendarCell | null {
 }
 
 export async function loadCalendar(repo: ContentRepository, week?: string): Promise<CalendarWeek> {
-  const schedule = await repo.listSchedule();
+  const [schedule, settings] = await Promise.all([repo.listSchedule(), repo.workflowSettings()]);
   const start = weekStart(week && /^\d{4}-\d{2}-\d{2}$/.test(week) ? week : today());
   const days = Array.from({ length: 7 }, (_, i) => ({ isoDate: addDays(start, i), cells: [] as CalendarCell[] }));
   let unparsed = 0;
   for (const r of schedule) {
-    const cell = toCell(r, schedule);
+    const cell = toCell(r, schedule, settings);
     if (!cell) {
-      if (r.value.contentId) unparsed += 1;
+      if (r.value.contentId && !parseContentId(r.value.contentId)) unparsed += 1;
       continue;
     }
     const day = days.find((d) => d.isoDate === cell.isoDate);

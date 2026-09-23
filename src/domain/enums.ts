@@ -101,7 +101,7 @@ export const SHEET_WRITE_VALUE = {
   duplicate: { Unchecked: '', PASS: 'No flag', CHECK: 'CHECK', DUPLICATE: 'DUPLICATE' } satisfies Record<DuplicateQa, string>,
 } as const;
 
-/** Schedule slot names as the live Sheet writes them. */
+/** Schedule slot names as the live Sheet writes them. `3rd` is retained only for legacy row/Content-ID compatibility. */
 export const SLOTS = ['Main', '2nd', '3rd'] as const;
 export type Slot = (typeof SLOTS)[number];
 

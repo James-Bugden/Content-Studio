@@ -28,6 +28,7 @@ export type SlotSummary = {
   slot: string;
   platform: 'X' | 'Threads' | 'LinkedIn';
   time: string;
+  expectedPillar: string | null;
   hook: string;
   statusLabel: string;
   thumb: Thumb | null;

@@ -14,6 +14,13 @@ const SLOT_OF: Record<string, Slot> = { MAIN: 'Main', '2ND': '2nd', '3RD': '3rd'
 
 export type ParsedContentId = { isoDate: string; slot: Slot; platform: Platform };
 
+/** Forward-looking scheduling has 5 active rows/day. Third slots remain parseable only for legacy history. */
+export function isActiveScheduleSlot(platform: Platform, slot: Slot): boolean {
+  if (slot === '3rd') return false;
+  if (platform === 'LinkedIn') return slot === 'Main';
+  return slot === 'Main' || slot === '2nd';
+}
+
 export function parseContentId(contentId: string): ParsedContentId | null {
   const m = CONTENT_ID.exec(contentId.trim());
   if (!m) return null;
@@ -46,12 +53,24 @@ export function slotOrder(slot: string): number {
 
 const CONTENT_FIELDS: ScheduleField[] = ['hook', 'content', 'chineseContent', 'finalContent', 'typefullyDraftId', 'postLink', 'publishedAt'];
 
+/** True when a legacy slot contains real work/state and therefore must stay visible/reconcilable. */
+export function hasScheduleActivity(row: ScheduleRecord): boolean {
+  const v = row.value;
+  if (v.posted === true) return true;
+  if (CONTENT_FIELDS.some((f) => Boolean(row.cells[f]?.trim()))) return true;
+  if (v.typefullyStatus.ok && v.typefullyStatus.value !== 'Not Sent') return true;
+  if (!v.typefullyStatus.ok) return true;
+  return v.contentStage !== null;
+}
+
 export type SlotAvailability = { available: true } | { available: false; reason: string };
 
 /** A pre-created slot row is available only when nothing has been placed in it. */
 export function slotAvailability(row: ScheduleRecord): SlotAvailability {
   const v = row.value;
-  if (!parseContentId(v.contentId)) return { available: false, reason: 'This row has no standard Content ID.' };
+  const parsed = parseContentId(v.contentId);
+  if (!parsed) return { available: false, reason: 'This row has no standard Content ID.' };
+  if (!isActiveScheduleSlot(parsed.platform, parsed.slot)) return { available: false, reason: 'Legacy 3rd slots are deprecated and cannot receive new content.' };
   if (v.posted === true) return { available: false, reason: 'Already posted.' };
   for (const f of CONTENT_FIELDS) {
     if (row.cells[f]?.trim()) return { available: false, reason: `Already holds ${SCHEDULE_HEADERS[f]}.` };

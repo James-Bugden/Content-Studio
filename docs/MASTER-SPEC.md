@@ -145,9 +145,9 @@ Values observed in the live workbook, mapped to the canonical enums in `src/doma
 | `Source Platform` | `LinkedIn`, `Threads (legacy)` | Platform enum with alias |
 | `Source Markdown` | `Open master` (hyperlink) | Link target read from the cell hyperlink or `HYPERLINK()` formula |
 | `Has Image`, `Next Action`, `Image Next Action` | Display or formula text | Never written when the cell holds a formula |
-| Schedule `Slot` | `Main`, `2nd`, `3rd` | Slot enum |
+| Schedule `Slot` | `Main`, `2nd`; legacy `3rd` remains readable | `3rd` is never a new promotion target |
 | Schedule `Content ID` | `YYYY-MM-DD-<SLOT>-<X/TH/LI>` | Pre-created slot rows; promotion fills an available row |
-| `Workflow Settings` | `Setting / Value / Notes` rows such as `X Main = 08:00`, `Threads 3rd = TBD` | Slot policy |
+| `Workflow Settings` | `Setting / Value / Notes` rows for active times plus Monday–Sunday cadence; deprecated X/Threads 3rd rows remain `TBD` | Runtime slot + pillar policy |
 
 Unrecognised values are never defaulted: they become an `UNRECOGNISED_VALUE` blocker.
 
@@ -191,7 +191,21 @@ Screenshot rule: one source screenshot may be used at most once per platform. Ch
 
 Ready Queue is a live derived handoff. Hard blockers include copyright `REWORK`, unresolved duplicate `CHECK`, non-approved review, missing platform copy, stale Threads adaptation, missing hook decision when required, or an image decision/revision that fails its gate. Promotion creates/updates an available Content Schedule row only after a preview and explicit confirmation. New content never jumps directly into Content Schedule.
 
-Default Taipei slots come from Workflow Settings: X 08:00/20:00/23:00; Threads 08:15/20:15/TBD; LinkedIn 21:00. `TBD` cannot be auto-scheduled. Calendar MVP is a list/week view; drag/drop is follow-on.
+Active Taipei slots come from Workflow Settings: X 08:00/20:00; Threads 08:15/20:15; LinkedIn 21:00. X/Threads 3rd rows are deprecated legacy compatibility only: blank legacy rows are hidden from the active calendar and can never be promotion targets; already-filled/scheduled/published legacy rows remain visible and reconcilable.
+
+The weekly pillar plan is also read from Workflow Settings:
+
+| Day | X + Threads morning | X + Threads evening | LinkedIn |
+|---|---|---|---|
+| Monday | Personal story | Expertise | Expertise |
+| Tuesday | Social proof | Expertise | Build in public (Soar) |
+| Wednesday | Personal story | Expertise | Expertise |
+| Thursday | Trending | Expertise | Personal story |
+| Friday | Build in public (Soar) | Expertise | Trending |
+| Saturday | Personal story | Expertise | Opinions |
+| Sunday | Opinions | Expertise | Social proof |
+
+PESTO remains the core five-pillar framework; Build in public (Soar) is an additional explicit operational pillar. Calendar cards show the expected pillar for active slots. Calendar MVP is a list/week view; drag/drop is follow-on.
 
 ### Typefully reconciliation
 

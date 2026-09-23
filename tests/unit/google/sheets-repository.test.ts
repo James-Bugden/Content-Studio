@@ -186,12 +186,15 @@ describe('fixtures: pagination, empty queue, settings', () => {
     expect(await empty.listReadyQueue()).toEqual([]);
   });
 
-  it('parses Taipei slot policy including TBD', async () => {
+  it('parses current Taipei slot policy and cadence rows', async () => {
     const s = await repo.workflowSettings();
     expect(s.problems).toEqual([]);
     expect(s.slots).toContainEqual({ platform: 'Threads', slot: '3rd', time: 'TBD' });
+    expect(s.slots).toContainEqual({ platform: 'X', slot: '3rd', time: 'TBD' });
     expect(s.slots).toContainEqual({ platform: 'LinkedIn', slot: 'Main', time: '21:00' });
     expect(s.slots).toHaveLength(7);
+    expect(s.raw['Monday cadence']).toBe('X/Threads AM: Personal story | PM: Expertise');
+    expect(s.raw['Friday cadence']).toBe('X/Threads AM: Build in public (Soar) | PM: Expertise');
   });
 
   it('queue summary counts come from the Sheet', async () => {
