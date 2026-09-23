@@ -3,7 +3,7 @@ import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { loadCalendar, previewPromotion, promote, promotionContext } from '@/application/schedule';
 import { loadReadyQueue } from '@/application/ready';
-import { addDays, parseContentId, taipeiToday, weekStart } from '@/domain/schedule';
+import { addDays, expectedPillar, parseContentId, slotAvailability, taipeiToday, weekStart } from '@/domain/schedule';
 import { parseWorkflowSettings } from '@/domain/settings';
 import { syntheticSettingsRows } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
@@ -51,10 +51,33 @@ describe('dates are Taipei and timezone independent', () => {
 });
 
 describe('SCHED-01: slot policy from Workflow Settings', () => {
-  it('reads the seven live slot times including TBD', () => {
+  it('reads five active times and keeps deprecated third-slot settings for legacy compatibility', () => {
     const s = parseWorkflowSettings(syntheticSettingsRows().map((r) => r.values));
+    expect(s.slots.find((x) => x.platform === 'X' && x.slot === 'Main')?.time).toBe('08:00');
+    expect(s.slots.find((x) => x.platform === 'Threads' && x.slot === '2nd')?.time).toBe('20:15');
+    expect(s.slots.find((x) => x.platform === 'LinkedIn' && x.slot === 'Main')?.time).toBe('21:00');
     expect(s.slots.find((x) => x.platform === 'Threads' && x.slot === '3rd')?.time).toBe('TBD');
-    expect(s.slots.find((x) => x.platform === 'X' && x.slot === '3rd')?.time).toBe('23:00');
+    expect(s.slots.find((x) => x.platform === 'X' && x.slot === '3rd')?.time).toBe('TBD');
+  });
+
+  it('maps all seven weekdays to the current pillar cadence', () => {
+    const cases = [
+      ['2026-09-21', 'Personal story', 'Expertise'],
+      ['2026-09-22', 'Social proof', 'Build in public (Soar)'],
+      ['2026-09-23', 'Personal story', 'Expertise'],
+      ['2026-09-24', 'Trending', 'Personal story'],
+      ['2026-09-25', 'Build in public (Soar)', 'Trending'],
+      ['2026-09-26', 'Personal story', 'Opinions'],
+      ['2026-09-27', 'Opinions', 'Social proof'],
+    ] as const;
+    for (const [date, morning, linkedin] of cases) {
+      expect(expectedPillar(date, 'X', 'Main')).toBe(morning);
+      expect(expectedPillar(date, 'Threads', 'Main')).toBe(morning);
+      expect(expectedPillar(date, 'X', '2nd')).toBe('Expertise');
+      expect(expectedPillar(date, 'Threads', '2nd')).toBe('Expertise');
+      expect(expectedPillar(date, 'LinkedIn', 'Main')).toBe(linkedin);
+    }
+    expect(expectedPillar('2026-09-21', 'X', '3rd')).toBeNull();
   });
 
   it('a missing slot setting blocks, never falls back to a guess', () => {
@@ -179,10 +202,13 @@ describe('SCHED-04 / SCHED-05: no bypass', () => {
     expect((await repo.getSchedule(slot.contentId)).cells.contentStage).toBe('EN Approved');
   });
 
-  it('a TBD slot (Threads 3rd) is never offered as schedulable', async () => {
+  it('blank legacy third slots are neither available nor shown as forward-looking calendar slots', async () => {
+    const row = await repo.getSchedule('2026-10-03-3RD-X');
+    expect(slotAvailability(row)).toEqual({ available: false, reason: 'Legacy 3rd slots are deprecated and cannot receive new content.' });
+    const ctx = await promotionContext(repo, 'SYN-X004');
+    expect(ctx.options.some((o) => o.contentId.includes('-3RD-'))).toBe(false);
     const cal = await loadCalendar(repo, '2026-10-01');
-    const th3 = cal.days.flatMap((d) => d.cells).filter((c) => c.contentId.endsWith('-3RD-TH'));
-    expect(th3.every((c) => c.time === 'Not set')).toBe(true);
+    expect(cal.days.flatMap((d) => d.cells).some((c) => c.contentId.includes('-3RD-'))).toBe(false);
   });
 });
 
