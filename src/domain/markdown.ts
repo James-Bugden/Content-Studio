@@ -102,3 +102,67 @@ export function replaceSectionBody(source: string, section: MarkdownSection, new
   }
   return before + newBody + after;
 }
+
+const FENCE = /^\s{0,3}(```|~~~)/;
+
+/**
+ * Structural safety for a section body (adversarial review finding 1). A body
+ * must not open a new section at or above its own level and must not leave a
+ * code fence open, otherwise saving it would swallow or hide the sections after
+ * it in the shared master file.
+ */
+export function sectionBodyProblems(body: string, level: number): ('heading' | 'fence')[] {
+  const problems = new Set<'heading' | 'fence'>();
+  let inFence = false;
+  for (const line of body.split(/\r\n|\n|\r/)) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const m = HEADING.exec(line);
+    if (m && m[1]!.length <= level) problems.add('heading');
+  }
+  if (inFence) problems.add('fence');
+  return [...problems];
+}
+
+/** Heading lines outside code fences, in order. */
+export function headingOutline(source: string): string[] {
+  const out: string[] = [];
+  let inFence = false;
+  for (const line of source.split(/\r\n|\n|\r/)) {
+    if (FENCE.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && HEADING.test(line)) out.push(line);
+  }
+  return out;
+}
+
+/**
+ * Replace a section body only if the result keeps every other heading exactly
+ * and the section still resolves to the new body. Returns null when unsafe.
+ */
+export function safeReplaceSectionBody(source: string, section: MarkdownSection, newBody: string): string | null {
+  if (sectionBodyProblems(newBody, section.level).length > 0) return null;
+  const next = replaceSectionBody(source, section, newBody);
+  const found = findSection(next, section.libraryId);
+  if (!found.ok || found.section.body !== newBody) return null;
+  const before = headingOutline(source);
+  const bodyHeadings = headingOutline(section.body);
+  const newBodyHeadings = headingOutline(newBody);
+  const expected = [...before];
+  // Our own body's sub-headings may change; every other heading must survive in order.
+  const strip = (list: string[], remove: string[]) => {
+    const copy = [...list];
+    for (const h of remove) {
+      const i = copy.indexOf(h);
+      if (i >= 0) copy.splice(i, 1);
+    }
+    return copy;
+  };
+  const after = strip(headingOutline(next), newBodyHeadings);
+  return JSON.stringify(after) === JSON.stringify(strip(expected, bodyHeadings)) ? next : null;
+}

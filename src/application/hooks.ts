@@ -219,13 +219,19 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
   // already opens with the chosen hook, so only the hook fields may be missing.
   if (chosen && body.startsWith(chosen.text) && record.value.draftContent === body && fingerprint(body) !== input.generationDraftHash) {
     steps.push({ step: 'save draft with new opening', provider: 'drive', status: 'skipped_already_applied', revision: read.meta.revision });
-    const patch = hookPatch(chosen);
-    const pending = Object.entries(patch).filter(([f, v]) => record.cells[f as keyof LibraryPatch] !== v);
-    if (pending.length === 0) {
+    // The hook fields are written in one Sheet write. If Current Hook already holds
+    // the choice, that write landed: this is a replay, and nothing is written, so
+    // any later hand edit to Hook Score or Hook Type is kept (review finding 2).
+    if (record.cells.currentHook === chosen.text) {
       steps.push({ step: 'write hook fields to Sheet', provider: 'sheet', status: 'skipped_already_applied', revision: record.revision });
       return finish({ ok: true, operationId: op, replayed: true, value: { record }, steps: [...steps] });
     }
-    return writeHookFields(patch, record.revision, true);
+    // Otherwise resume only from the exact state the partial run left: the Sheet
+    // still holds the original hook the generation was made against.
+    if (fingerprint(record.cells.currentHook + body.slice(chosen.text.length)) !== input.generationDraftHash) {
+      return fail('STALE_READ', { provider: 'sheet', currentRevision: record.revision });
+    }
+    return writeHookFields(hookPatch(chosen), record.revision, true);
   }
 
   // HOOK-05: a generation or selection made for an older draft or row cannot land.

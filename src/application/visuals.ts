@@ -400,7 +400,7 @@ export async function renderRevision(repo: ContentRepository, drive: DriveGatewa
   const loaded = await begin(repo, actor, input, { checkRevision: true });
   if (isOutcome(loaded)) {
     // Lost response: this operation already uploaded and recorded its file.
-    const prior = uploads().get(input.operationId);
+    const prior = uploads().get(`${input.libraryId}:${input.operationId}`);
     if (!loaded.ok && loaded.code === 'STALE_READ' && prior && loaded.current) {
       const fresh = await load(repo, input.libraryId).catch(() => null);
       if (fresh && fresh.record.value.visual.imageFile === prior.webLink && fresh.record.value.visual.version === prior.version) {
@@ -423,14 +423,16 @@ export async function renderRevision(repo: ContentRepository, drive: DriveGatewa
   const version = formatVisualVersion({ system: 'SOAR-v1.1', revision, platform, language });
 
   const cache = uploads();
-  let upload = cache.get(input.operationId);
+  // Keyed by item and operation so a reused operation id can never attach another item's file.
+  const cacheKey = `${item.libraryId}:${input.operationId}`;
+  let upload = cache.get(cacheKey);
   if (upload && upload.version !== version) upload = undefined;
   const steps: StepResult[] = [];
   if (!upload) {
     try {
       const created = await drive.createFile({ name: assetFileName(item.libraryId, { revision, platform, language }), mimeType: 'image/svg+xml', bytes: new TextEncoder().encode(svg) });
       upload = { webLink: created.webLink, version };
-      cache.set(input.operationId, upload);
+      cache.set(cacheKey, upload);
       if (cache.size > 200) cache.delete(cache.keys().next().value!);
       steps.push({ step: 'upload asset to Drive', provider: 'drive', status: 'done', revision: created.revision });
     } catch (error) {

@@ -16,6 +16,7 @@ const bodySchema = z.object({
   sourceContent: z.string().max(30_000),
   hook: z.string().max(2000),
   content: z.string().max(30_000),
+  confirmTakeover: z.boolean().optional(),
 });
 
 /**

@@ -258,7 +258,19 @@ export class SheetsContentRepository implements ContentRepository {
     try {
       const again = await this.readTab(tabKey, headers);
       const found = again.rows.map(({ raw, row }) => toRecord(again.index, raw, row)).filter((r) => idOf(r) === id);
-      if (found.length !== 1) return fail('CONFLICT', { reason: 'row_moved_after_write' });
+      if (found.length !== 1) {
+        // The write landed; only the confirmation failed. Report exactly that (review finding 5).
+        return {
+          ok: false,
+          operationId: opId,
+          code: 'PARTIAL_FAILURE',
+          steps: [
+            { step: `write ${tabKey} row`, provider: 'sheet', status: 'done' },
+            { step: 'confirm new revision', provider: 'sheet', status: 'failed', errorCode: 'CONFLICT' },
+          ],
+          details: { reason: 'row_moved_after_write' },
+        };
+      }
       after = found[0]!;
     } catch (error) {
       // The write happened but we cannot confirm the new revision.

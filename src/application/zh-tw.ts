@@ -4,6 +4,7 @@ import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
 import type { SchedulePatch } from '@/domain/mapping';
 import { lineageLibraryId } from './ready';
+import { parseZhStamp } from '@/domain/stage';
 import { contentIdSchema, libraryIdSchema, operationIdSchema, revisionSchema, type Actor, type MutationResult } from '@/domain/mutation';
 import type { LibraryItem, ScheduledPost, ScheduleRecord } from '@/domain/records';
 import { approvalState, formatZhStamp } from '@/domain/stage';
@@ -169,6 +170,8 @@ export type SaveAdaptationInput = {
   hook: string;
   content: string;
   libraryId?: string;
+  /** Explicit consent to fill an unlinked Threads row that already holds copy. */
+  confirmTakeover?: boolean;
 };
 
 function report(name: string, op: string, id: string, r: MutationResult<unknown>): void {
@@ -217,6 +220,20 @@ export async function saveAdaptation(repo: ContentRepository, actor: Actor, inpu
   const th = linked.th;
   if (th.value.contentId !== input.threadsContentId) return fail('CONFLICT', { reason: 'threads_row_mismatch', resolved: th.value.contentId });
   if (th.value.parentContentId && th.value.parentContentId !== x.contentId) return fail('CONFLICT', { reason: 'parent_mismatch' });
+  // Never overwrite a Threads row that is already sent, scheduled or published (review finding 3).
+  const t = th.value;
+  const inUse =
+    t.posted === true ||
+    !t.typefullyStatus.ok ||
+    t.typefullyStatus.value !== 'Not Sent' ||
+    t.typefullyDraftId.trim() !== '' ||
+    t.postLink.trim() !== '';
+  if (inUse) return fail('GATE_BLOCKED', { reason: 'threads_row_in_use' });
+  // A row found only by naming convention that already holds unrelated copy needs an explicit takeover.
+  const holdsCopy = t.hook.trim() !== '' || t.chineseContent.trim() !== '';
+  if (!t.parentContentId && holdsCopy && !parseZhStamp(t.aiAction) && input.confirmTakeover !== true) {
+    return fail('CONFLICT', { reason: 'takeover_needs_confirmation' });
+  }
 
   const patch: SchedulePatch = {
     hook,
@@ -286,6 +303,11 @@ export async function approveAdaptation(
   if (resolved.kind !== 'found' || resolved.post.contentId !== input.threadsContentId) return fail('GATE_BLOCKED', { state: 'ambiguous' });
   const state = adaptationState(x.value, all.map((r) => r.value));
   if (state !== 'awaiting_review') return fail('GATE_BLOCKED', { state });
+  // The X parent must still be eligible, including its Library approval (review finding 4).
+  const library = await libraryFor(repo, lineageLibraryId(x.value.sourceLink) ?? undefined);
+  if (library === 'error') return fail('NOT_FOUND', { reason: 'library_not_found' });
+  const eligible = checkEligibility(x.value, library);
+  if (!eligible.ok) return fail('GATE_BLOCKED', { reason: eligible.reason });
   const result = await repo.updateSchedule({
     operationId: op,
     actor,
