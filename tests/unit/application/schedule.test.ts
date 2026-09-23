@@ -7,6 +7,8 @@ import { addDays, parseContentId, taipeiToday, weekStart } from '@/domain/schedu
 import { parseWorkflowSettings } from '@/domain/settings';
 import { syntheticSettingsRows } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
+import { generateAdaptation } from '@/application/zh-tw';
+import { FakeAiGateway } from '@/integrations/ai/fake-gateway';
 
 const owner: Actor = { sub: '100000000000000000001', role: 'owner' };
 let sheet: FakeSheetTransport;
@@ -181,6 +183,20 @@ describe('SCHED-04 / SCHED-05: no bypass', () => {
     const cal = await loadCalendar(repo, '2026-10-01');
     const th3 = cal.days.flatMap((d) => d.cells).filter((c) => c.contentId.endsWith('-3RD-TH'));
     expect(th3.every((c) => c.time === 'Not set')).toBe(true);
+  });
+});
+
+describe('lineage links the scheduled X row back to its Library approval', () => {
+  it('a Library edit after promotion blocks the zh-TW adaptation', async () => {
+    const ctx = await promotionContext(repo, 'SYN-X004');
+    const slot = ctx.options.find((o) => o.ok)!;
+    await doPromote('SYN-X004', slot.contentId);
+    const ai = new FakeAiGateway();
+    expect((await generateAdaptation({ ai, repo, sourceContentId: slot.contentId })).ok).toBe(true);
+    const lib = await repo.getLibrary('SYN-X004');
+    const col = sheet.rawTab('Content Library')[0]!.findIndex((c) => c.value === 'Draft Content');
+    sheet.externalEdit('Content Library', lib.row, col, 'Edited after it was scheduled');
+    expect(await generateAdaptation({ ai, repo, sourceContentId: slot.contentId })).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
   });
 });
 

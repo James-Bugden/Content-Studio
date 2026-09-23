@@ -3,6 +3,7 @@ import { CONTENT_STAGES } from '@/domain/enums';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
 import type { SchedulePatch } from '@/domain/mapping';
+import { lineageLibraryId } from './ready';
 import { contentIdSchema, libraryIdSchema, operationIdSchema, revisionSchema, type Actor, type MutationResult } from '@/domain/mutation';
 import type { LibraryItem, ScheduledPost, ScheduleRecord } from '@/domain/records';
 import { approvalState, formatZhStamp } from '@/domain/stage';
@@ -125,9 +126,10 @@ export async function generateAdaptation(args: {
   if (!contentIdSchema.safeParse(args.sourceContentId).success) return { ok: false, code: 'VALIDATION_FAILED' };
   const found = await locate(args.repo, args.sourceContentId);
   if (!found.ok) return found;
-  const library = await libraryFor(args.repo, args.libraryId);
-  if (library === 'error') return { ok: false, code: 'NOT_FOUND', reason: 'library_not_found' };
   const x = found.x.value;
+  // The Library row comes from the promotion lineage (#lib=) when not given explicitly.
+  const library = await libraryFor(args.repo, args.libraryId ?? lineageLibraryId(x.sourceLink) ?? undefined);
+  if (library === 'error') return { ok: false, code: 'NOT_FOUND', reason: 'library_not_found' };
   const eligible = checkEligibility(x, library);
   if (!eligible.ok) return { ok: false, code: 'GATE_BLOCKED', reason: eligible.reason };
   if (x.hook.length > 2000 || x.content.length > 30_000) return { ok: false, code: 'VALIDATION_FAILED' };
@@ -206,7 +208,7 @@ export async function saveAdaptation(repo: ContentRepository, actor: Actor, inpu
   if (!found.ok) return fail(found.code, { reason: found.reason });
   const x = found.x.value;
   if (x.hook !== input.sourceHook || x.content !== input.sourceContent) return fail('STALE_READ', { reason: 'source_changed' });
-  const library = await libraryFor(repo, input.libraryId);
+  const library = await libraryFor(repo, input.libraryId ?? lineageLibraryId(x.sourceLink) ?? undefined);
   if (library === 'error') return fail('NOT_FOUND', { reason: 'library_not_found' });
   const eligible = checkEligibility(x, library);
   if (!eligible.ok) return fail('GATE_BLOCKED', { reason: eligible.reason });
