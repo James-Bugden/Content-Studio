@@ -51,9 +51,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('TYPE-01: an existing Draft ID shows the linked view with three labelled panes', async ({ page }) => {
+  // The calendar card opens the slot panel; the panel links on to the details page.
   await page.goto('/schedule?week=2026-10-01');
-  await page.getByRole('link', { name: `Details for ${X2}` }).click();
-  await expect(page).toHaveURL(new RegExp(`/schedule/${X2}$`));
+  await page.locator(`[data-content-id="${X2}"]`).filter({ visible: true }).getByRole('link').click();
+  await expect(page).toHaveURL(new RegExp(`[?&]slot=${X2}`));
+  await page.goto(`/schedule/${X2}`);
   await expect(page.getByRole('heading', { name: 'Row facts' })).toBeVisible();
   await expect(page.locator('[data-typefully-state="linked"]')).toBeVisible();
   await expect(pane(page, 'Sheet working copy')).toContainText('(edited)');
