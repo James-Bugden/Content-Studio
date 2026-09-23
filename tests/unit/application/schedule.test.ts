@@ -3,7 +3,7 @@ import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { loadCalendar, previewPromotion, promote, promotionContext } from '@/application/schedule';
 import { loadReadyQueue } from '@/application/ready';
-import { addDays, parseContentId, taipeiToday, weekStart } from '@/domain/schedule';
+import { addDays, parseContentId, slotAvailability, taipeiToday, weekStart } from '@/domain/schedule';
 import { parseWorkflowSettings } from '@/domain/settings';
 import { syntheticSettingsRows } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
@@ -54,7 +54,16 @@ describe('SCHED-01: slot policy from Workflow Settings', () => {
   it('reads the seven live slot times including TBD', () => {
     const s = parseWorkflowSettings(syntheticSettingsRows().map((r) => r.values));
     expect(s.slots.find((x) => x.platform === 'Threads' && x.slot === '3rd')?.time).toBe('TBD');
-    expect(s.slots.find((x) => x.platform === 'X' && x.slot === '3rd')?.time).toBe('23:00');
+    expect(s.slots.find((x) => x.platform === 'X' && x.slot === '3rd')?.time).toBe('TBD');
+  });
+
+  it('keeps legacy 3rd IDs readable but never offers them for new content', async () => {
+    const legacy = await repo.getSchedule('2026-10-03-3RD-X');
+    expect(parseContentId(legacy.value.contentId)).toEqual({ isoDate: '2026-10-03', slot: '3rd', platform: 'X' });
+    expect(slotAvailability(legacy)).toEqual({ available: false, reason: 'Legacy 3rd slot is deprecated for new content.' });
+
+    const ctx = await promotionContext(repo, 'SYN-X004');
+    expect(ctx.options.some((o) => o.slot === '3rd')).toBe(false);
   });
 
   it('a missing slot setting blocks, never falls back to a guess', () => {
