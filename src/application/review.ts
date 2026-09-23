@@ -15,6 +15,7 @@ import type { Actor, MutationResult } from '@/domain/mutation';
 import type { LibraryItem, LibraryRecord, ScheduleRecord } from '@/domain/records';
 import { formatApprovalNote } from '@/domain/stage';
 import { formatVisualSource } from '@/domain/visual';
+import { LANES, type Lane, type ReviewCard, type ReviewQueue } from '@/domain/views';
 import type { ContentRepository } from './ports';
 
 /**
@@ -28,8 +29,7 @@ import type { ContentRepository } from './ports';
 
 export const PAGE_SIZE = 25;
 
-export const LANES = ['all', 'clean', 'copyright', 'duplicate', 'blocked', 'approved'] as const;
-export type Lane = (typeof LANES)[number];
+export { LANES, type Lane, type ReviewCard, type ReviewQueue } from '@/domain/views';
 
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
   z
@@ -69,28 +69,6 @@ export function sourceKey(source: string): string {
   return shortHash(`source:${source.trim()}`);
 }
 
-export type ReviewCard = {
-  libraryId: string;
-  revision: string;
-  row: number;
-  slug: string;
-  source: string;
-  sourceKey: string;
-  sourcePlatform: string;
-  targetPlatform: string;
-  state: string;
-  hook: string;
-  preview: string;
-  reviewStatus: string;
-  copyrightQa: string;
-  duplicateQa: string;
-  queued: boolean | null;
-  visual: string;
-  imageStatus: string;
-  hasMarkdownLink: boolean;
-  lane: Exclude<Lane, 'all' | 'blocked'> | 'blocked';
-  gates: GateResult;
-};
 
 function enumLabel(p: { ok: true; value: string } | { ok: false; raw: string }): string {
   return p.ok ? p.value : `Unrecognised: ${p.raw}`;
@@ -175,17 +153,6 @@ function matches(card: ReviewCard, record: LibraryRecord, f: ReviewFilters): boo
   return true;
 }
 
-export type ReviewQueue = {
-  cards: ReviewCard[];
-  total: number;
-  totalUnfiltered: number;
-  page: number;
-  pages: number;
-  sources: { key: string; label: string }[];
-  laneCounts: Record<Lane, number>;
-  /** True when the Schedule could not be read, so screenshot reuse is uncertain. */
-  scheduleUnavailable: boolean;
-};
 
 export async function loadReviewQueue(repo: ContentRepository, filters: ReviewFilters): Promise<ReviewQueue> {
   const library = await repo.listLibrary();

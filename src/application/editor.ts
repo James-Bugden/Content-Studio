@@ -1,7 +1,10 @@
 import 'server-only';
-import { evaluateLibraryGates, type GateResult } from '@/domain/gates';
+import { evaluateLibraryGates } from '@/domain/gates';
 import type { LibraryRecord } from '@/domain/records';
 import { formatVisualSource } from '@/domain/visual';
+import type { EditorModel } from '@/domain/views';
+
+export type { EditorModel };
 import { readSection } from './markdown-source';
 import type { ContentRepository, DriveGateway } from './ports';
 import { screenshotUses } from './review';
@@ -11,21 +14,6 @@ import { screenshotUses } from './review';
  * Markdown section together, with both revisions, and says plainly when they
  * disagree. The editor never guesses which one is right.
  */
-export type EditorModel = {
-  libraryId: string;
-  slug: string;
-  source: string;
-  targetPlatform: string;
-  reviewStatus: string;
-  sheet: { revision: string; draft: string; hook: string };
-  markdown:
-    | { state: 'ok'; body: string; sectionHash: string; fileRevision: string; modifiedTime: string; headingLine: string }
-    | { state: 'unavailable'; reason: string; code: string };
-  /** Sheet draft and Markdown body differ. */
-  mismatch: boolean;
-  visual: string;
-  gates: GateResult;
-};
 
 export async function loadEditor(repo: ContentRepository, drive: DriveGateway, libraryId: string): Promise<EditorModel> {
   const record: LibraryRecord = await repo.getLibrary(libraryId);

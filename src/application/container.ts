@@ -22,10 +22,25 @@ export type Services = {
   fakes?: { sheet: FakeSheetTransport; drive: FakeDriveGateway };
 };
 
-let services: Services | null = null;
+/**
+ * Held on globalThis, not in a module variable: Next loads pages and route
+ * handlers as separate module graphs, and in fake mode two graphs would each get
+ * their own in-memory Sheet, so a write through an API route would be invisible
+ * to the page that reads it.
+ */
+const KEY = Symbol.for('content-studio.services');
+const store = globalThis as unknown as Record<symbol, Services | null | undefined>;
 
 export function getServices(): Services {
-  if (services) return services;
+  const existing = store[KEY];
+  if (existing) return existing;
+  const services = build();
+  store[KEY] = services;
+  return services;
+}
+
+function build(): Services {
+  let services: Services;
   const env = serverEnv();
   if (env.CS_DATA_MODE === 'fake') {
     const sheet = new FakeSheetTransport();
@@ -48,5 +63,5 @@ export function getServices(): Services {
 
 /** Tests and e2e reset only. */
 export function resetServices(): void {
-  services = null;
+  store[KEY] = null;
 }

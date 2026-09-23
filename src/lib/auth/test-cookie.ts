@@ -19,16 +19,22 @@ export const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
 const ISSUER = 'content-studio/test-auth';
 const AUDIENCE = 'content-studio';
 
-// Local development only: a per-process key when AUTH_SECRET is not set.
-let devKey: Uint8Array | null = null;
+// Local development only: a per-process key when AUTH_SECRET is not set. It lives
+// on globalThis because `next dev` loads pages and route handlers as separate
+// module graphs; a module-level variable gave each graph its own key, so a cookie
+// signed on the sign-in page was rejected by every API route.
+const DEV_KEY = Symbol.for('content-studio.dev-auth-key');
+
+function devKey(): Uint8Array {
+  const g = globalThis as unknown as Record<symbol, Uint8Array | undefined>;
+  g[DEV_KEY] ??= new Uint8Array(randomBytes(32));
+  return g[DEV_KEY];
+}
 
 function signingKey(): Uint8Array | null {
   const env = serverEnv();
   if (env.AUTH_SECRET) return new TextEncoder().encode(env.AUTH_SECRET);
-  if (syntheticSignInEnabled(env)) {
-    devKey ??= new Uint8Array(randomBytes(32));
-    return devKey;
-  }
+  if (syntheticSignInEnabled(env)) return devKey();
   return null;
 }
 

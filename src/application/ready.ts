@@ -1,7 +1,10 @@
 import 'server-only';
-import { evaluateLibraryGates, type Gate, type GateResult } from '@/domain/gates';
+import { evaluateLibraryGates, type Gate } from '@/domain/gates';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
 import { formatVisualSource } from '@/domain/visual';
+import type { ReadyItem, ReadyQueue } from '@/domain/views';
+
+export type { ReadyItem, ReadyQueue };
 import type { ContentRepository } from './ports';
 import { screenshotUses } from './review';
 
@@ -17,30 +20,7 @@ import { screenshotUses } from './review';
  * `Source MD / Drive Link` cell as `<markdown link>#lib=<Library ID>`, so a
  * promoted item is recognised here as already scheduled.
  */
-export type ReadyItem = {
-  libraryId: string;
-  revision: string;
-  slug: string;
-  source: string;
-  targetPlatform: string;
-  hook: string;
-  preview: string;
-  visual: string;
-  gates: GateResult;
-  group: 'ready' | 'needs_action' | 'blocked' | 'scheduled';
-  scheduledAs: { contentId: string; date: string; slot: string }[];
-  /** Downstream requirements that are not Library gates, e.g. the Threads adaptation after scheduling. */
-  notes: string[];
-  /** The Ready Queue tab row disagrees with Content Library (e.g. stale formula view). */
-  viewDrift: boolean;
-};
 
-export type ReadyQueue = {
-  items: ReadyItem[];
-  orphans: string[];
-  counts: Record<ReadyItem['group'], number>;
-  scheduleUnavailable: boolean;
-};
 
 const LINEAGE = /#lib=([A-Za-z0-9][A-Za-z0-9._-]{0,63})$/;
 
