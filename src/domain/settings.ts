@@ -3,8 +3,9 @@ import type { QueueSummaryRow, SlotPolicy, WorkflowSettings } from './records';
 
 /**
  * Workflow Settings parsing (SCHED-01). The live tab is `Setting | Value | Notes`
- * rows such as `X Main = 08:00` and `Threads 3rd = TBD`. Only slot keys change
- * behaviour. A missing or malformed slot never falls back to a guessed time: it is
+ * rows such as `X Main = 08:00` and legacy `Threads 3rd = TBD`. The parser keeps
+ * deprecated 3rd-slot settings readable for old rows, while scheduling eligibility is
+ * decided separately. A missing or malformed slot never falls back to a guessed time: it is
  * recorded as a problem and the affected slot cannot be auto-scheduled.
  */
 const SLOT_KEY = /^(X|Threads|LinkedIn)\s+(Main|2nd|3rd)$/i;
