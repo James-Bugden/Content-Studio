@@ -10,3 +10,5 @@ export * from './visual';
 export * from './stage';
 export * from './gates';
 export * from './markdown';
+export * from './settings';
+export * from './links';
