@@ -15,7 +15,10 @@ import type { Actor, MutationResult } from '@/domain/mutation';
 import type { LibraryItem, LibraryRecord, ScheduleRecord } from '@/domain/records';
 import { formatApprovalNote } from '@/domain/stage';
 import { formatVisualSource } from '@/domain/visual';
-import { LANES, type Lane, type ReviewCard, type ReviewQueue } from '@/domain/views';
+import { libraryNextStep, thumbFor } from '@/domain/next-steps';
+import { backlogPills, postTab } from '@/domain/backlog';
+import { LANES, LEGACY_LANES, type Lane, type ReviewCard, type ReviewQueue } from '@/domain/views';
+import { scheduledFacts } from './lineage';
 import type { ContentRepository } from './ports';
 
 /**
@@ -29,7 +32,7 @@ import type { ContentRepository } from './ports';
 
 export const PAGE_SIZE = 25;
 
-export { LANES, type Lane, type ReviewCard, type ReviewQueue } from '@/domain/views';
+export { LANES, LEGACY_LANES, type Lane, type ReviewCard, type ReviewQueue } from '@/domain/views';
 
 const optionalEnum = <T extends readonly [string, ...string[]]>(values: T) =>
   z
@@ -110,10 +113,14 @@ export function screenshotUses(
 
 export function toCard(record: LibraryRecord, library: LibraryRecord[], schedule: ScheduleRecord[] | null): ReviewCard {
   const item = record.value;
-  const gates = evaluateLibraryGates(item, {
-    purpose: 'review',
-    screenshotUses: schedule === null && item.visual.source.kind === 'screenshot' ? null : screenshotUses(item, library, schedule ?? []),
-  });
+  const uses = schedule === null && item.visual.source.kind === 'screenshot' ? null : screenshotUses(item, library, schedule ?? []);
+  const gates = evaluateLibraryGates(item, { purpose: 'review', screenshotUses: uses });
+  // The next step matches the board read model: an approved post is judged for release.
+  const approvedNow = item.reviewStatus.ok && item.reviewStatus.value === 'Approved';
+  const stepGates = approvedNow ? evaluateLibraryGates(item, { purpose: 'ready', zh: 'not_required', screenshotUses: uses }) : gates;
+  const facts = schedule ? scheduledFacts(item.libraryId, schedule) : [];
+  const step = libraryNextStep(stepGates, facts.length > 0);
+  const thumb = thumbFor(item.libraryId, item);
   const text = item.draftContent;
   return {
     libraryId: item.libraryId,
@@ -136,12 +143,25 @@ export function toCard(record: LibraryRecord, library: LibraryRecord[], schedule
     hasMarkdownLink: Boolean(record.links.sourceMarkdown || record.cells.sourceMarkdown.startsWith('https://')),
     lane: laneOf(item, gates),
     gates,
+    thumb,
+    step,
+    tab: postTab(step, facts, stepGates.status),
+    pills: backlogPills({
+      gates: stepGates,
+      reviewStatus: item.reviewStatus.ok ? item.reviewStatus.value : null,
+      platform: item.targetPlatform.ok ? item.targetPlatform.value : '',
+      thumb,
+      scheduled: facts,
+    }),
   };
 }
 
 function matches(card: ReviewCard, record: LibraryRecord, f: ReviewFilters): boolean {
   const item = record.value;
-  if (f.lane && f.lane !== 'all' && card.lane !== f.lane) return false;
+  if (f.lane && f.lane !== 'all') {
+    const legacy = (LEGACY_LANES as readonly string[]).includes(f.lane);
+    if (legacy ? card.lane !== f.lane : card.tab !== f.lane) return false;
+  }
   if (f.src && card.sourceKey !== f.src) return false;
   if (f.target && !(item.targetPlatform.ok && item.targetPlatform.value === f.target)) return false;
   if (f.from && !(item.sourcePlatform?.ok && item.sourcePlatform.value === f.from)) return false;
@@ -173,7 +193,8 @@ export async function loadReviewQueue(repo: ContentRepository, filters: ReviewFi
   const laneCounts = Object.fromEntries(LANES.map((l) => [l, 0])) as Record<Lane, number>;
   for (const { card } of all) {
     laneCounts.all += 1;
-    laneCounts[card.lane] += 1;
+    if (card.tab) laneCounts[card.tab] += 1;
+    if (card.lane !== 'blocked') laneCounts[card.lane] += 1;
   }
   return {
     cards: filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((x) => x.card),

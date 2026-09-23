@@ -1,4 +1,5 @@
 import 'server-only';
+import { backlogPills, postTab } from '@/domain/backlog';
 import { evaluateLibraryGates } from '@/domain/gates';
 import { libraryNextStep, slotNextStep, thumbFor, URGENCY_ORDER } from '@/domain/next-steps';
 import type { Board, PostSummary, SlotSummary, Task } from '@/domain/board';
@@ -7,7 +8,7 @@ import { addDays, parseContentId, slotAvailability, slotOrder, weekStart } from 
 import { adaptationState } from '@/domain/zh-state';
 import { serverEnv } from '@/lib/env';
 import type { ContentRepository } from './ports';
-import { lineageLibraryId, scheduledRowsFor } from './ready';
+import { lineageLibraryId, scheduledFacts } from './lineage';
 import { stalePublishedRows } from './reconcile';
 import { screenshotUses } from './review';
 import { today } from './schedule';
@@ -95,7 +96,10 @@ function summarisePost(r: LibraryRecord, library: LibraryRecord[], schedule: Sch
     zh: 'not_required',
     screenshotUses: schedule === null && item.visual.source.kind === 'screenshot' ? null : screenshotUses(item, library, schedule ?? []),
   });
-  const scheduled = schedule ? scheduledRowsFor(item.libraryId, schedule).map((s) => s.value.contentId) : [];
+  const facts = schedule ? scheduledFacts(item.libraryId, schedule) : [];
+  const scheduled = facts.map((s) => s.contentId);
+  const step = libraryNextStep(gates, scheduled.length > 0);
+  const thumb = thumbFor(item.libraryId, item);
   const text = item.draftContent;
   return {
     libraryId: item.libraryId,
@@ -104,11 +108,19 @@ function summarisePost(r: LibraryRecord, library: LibraryRecord[], schedule: Sch
     source: item.contentSource,
     hook: item.currentHook,
     preview: text.length > 220 ? `${text.slice(0, 219)}…` : text,
-    thumb: thumbFor(item.libraryId, item),
+    thumb,
     status: scheduled.length ? 'scheduled' : gates.status,
-    step: libraryNextStep(gates, scheduled.length > 0),
+    step,
     scheduledAs: scheduled,
     reviewStatus: item.reviewStatus.ok ? (item.reviewStatus.value === 'Pending' ? 'Not reviewed' : item.reviewStatus.value) : 'Unrecognised',
+    tab: postTab(step, facts, gates.status),
+    pills: backlogPills({
+      gates,
+      reviewStatus: item.reviewStatus.ok ? item.reviewStatus.value : null,
+      platform: item.targetPlatform.ok ? item.targetPlatform.value : '',
+      thumb,
+      scheduled: facts,
+    }),
   };
 }
 

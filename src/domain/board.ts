@@ -1,4 +1,5 @@
 import type { GateStatus } from './gates';
+import type { BacklogPills, BacklogTab } from './backlog';
 import type { NextStep, Thumb } from './next-steps';
 import type { EditorModel, ReviewCard } from './views';
 import type { TypefullyDetailView } from './typefully-view';
@@ -16,6 +17,9 @@ export type PostSummary = {
   step: NextStep;
   scheduledAs: string[];
   reviewStatus: string;
+  /** Posts backlog tab besides All, and one pill per backlog column. */
+  tab: Exclude<BacklogTab, 'all'> | null;
+  pills: BacklogPills;
 };
 
 export type SlotSummary = {

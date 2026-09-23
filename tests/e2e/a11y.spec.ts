@@ -6,7 +6,9 @@ import { expect, test } from '@playwright/test';
  * critical axe violations at the configured widths (UX-01, QA-03 emulated only).
  */
 const PAGES = [
+  '/',
   '/review',
+  '/review?layout=cards',
   '/review/SYN-L008',
   '/visuals',
   '/visuals/SYN-L012',
