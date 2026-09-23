@@ -253,6 +253,11 @@ export function syntheticScheduleRows(): RawRow[] {
     hook: '先問薪資範圍。', chineseContent: '先問薪資範圍。\n\n再問你在範圍的哪裡。', contentStage: 'ZH Review',
     aiAction: formatZhStamp('2026-10-02-MAIN-X', 'Ask for the band.', 'Ask for the band.\n\nThen ask where you sit in it.'),
   });
+  // Final X copy at EN Approved with no Threads adaptation yet (CS-011 eligible source).
+  fill('2026-10-03-MAIN-X', {
+    hook: 'Recruiters read the first line.', content: 'Recruiters read the first line.\n\nMake it about the job seeker, not the salary.',
+    contentStage: 'EN Approved', typefullyStatus: 'Not Sent', visualSource: 'Text only',
+  });
   // Occupied LinkedIn slot that used the screenshot SYN-L009 wants.
   fill('2026-10-02-MAIN-LI', {
     hook: 'Old post using a screenshot.', content: 'Old post using a screenshot.', contentStage: 'Ready',

@@ -22,8 +22,9 @@ export function capabilities(): Capability[] {
     { provider: 'typefully', mode: 'live', state: env.TYPEFULLY_API_KEY && env.TYPEFULLY_SOCIAL_SET_ID ? 'ready' : 'not_configured' },
     {
       provider: 'ai',
-      mode: env.AI_PROVIDER === 'fake' ? 'fake' : 'live',
-      state: env.AI_PROVIDER === 'fake' || env.AI_API_KEY ? 'ready' : 'not_configured',
+      mode: 'live',
+      state: env.AI_PROVIDER === 'anthropic' && env.AI_API_KEY ? 'ready' : 'not_configured',
+      ...(env.AI_PROVIDER === 'anthropic' && env.AI_API_KEY ? {} : { detail: 'AI proposals off; manual review still works' }),
     },
   ];
 }

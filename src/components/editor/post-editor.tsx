@@ -35,11 +35,34 @@ type Status =
   | { kind: 'partial'; steps: StepResult[]; operationId: string }
   | { kind: 'error'; code: string; message: string };
 
-export function PostEditor({ model, canEdit, ns }: { model: EditorModel; canEdit: boolean; ns: string }) {
+/** What the AI panels need to bind proposals to the exact text and revisions in the editor. */
+export type EditorSnapshot = { dirty: boolean; sheetRevision: string; sectionHash: string; markdownOk: boolean };
+
+/** Text the editor opens with: the canonical Markdown section when it loaded, else the Sheet mirror. */
+export function initialEditorText(model: EditorModel): string {
+  return model.markdown.state === 'ok' ? model.markdown.body : model.sheet.draft;
+}
+
+export type PostEditorProps = {
+  model: EditorModel;
+  canEdit: boolean;
+  ns: string;
+  /** Controlled text (optional). When given, `onValueChange` receives every change. */
+  value?: string;
+  onValueChange?: (text: string) => void;
+  onSnapshot?: (snapshot: EditorSnapshot) => void;
+};
+
+export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot }: PostEditorProps) {
   const textId = useId();
-  const initialBase = model.markdown.state === 'ok' ? model.markdown.body : model.sheet.draft;
+  const initialBase = initialEditorText(model);
   const [base, setBase] = useState(initialBase);
-  const [text, setText] = useState(initialBase);
+  const [innerText, setInnerText] = useState(initialBase);
+  const text = value ?? innerText;
+  const setText = (next: string) => {
+    if (onValueChange) onValueChange(next);
+    else setInnerText(next);
+  };
   const [sheetRevision, setSheetRevision] = useState(model.sheet.revision);
   const [sectionHash, setSectionHash] = useState(model.markdown.state === 'ok' ? model.markdown.sectionHash : '');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -66,6 +89,10 @@ export function PostEditor({ model, canEdit, ns }: { model: EditorModel; canEdit
   }, [dirty, text, base, sheetRevision, sectionHash, ns, model.libraryId]);
 
   const markdownOk = model.markdown.state === 'ok';
+
+  useEffect(() => {
+    onSnapshot?.({ dirty, sheetRevision, sectionHash, markdownOk });
+  }, [onSnapshot, dirty, sheetRevision, sectionHash, markdownOk]);
 
   async function save() {
     if (!markdownOk) return;

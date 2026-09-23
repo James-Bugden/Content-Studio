@@ -7,7 +7,9 @@ import { GoogleSheetTransport } from '@/integrations/google/google-sheet';
 import { GoogleDriveGateway } from '@/integrations/google/google-drive';
 import { ServiceAccountTokens } from '@/integrations/google/service-account';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
-import type { ContentRepository, DriveGateway } from './ports';
+import { AnthropicAiGateway } from '@/integrations/ai/anthropic-gateway';
+import { FakeAiGateway, UnconfiguredAiGateway } from '@/integrations/ai/fake-gateway';
+import type { AiGateway, ContentRepository, DriveGateway } from './ports';
 
 /**
  * Composition root. One set of adapters per server process: fakes seeded from
@@ -18,9 +20,25 @@ export type Services = {
   mode: 'fake' | 'live';
   repo: ContentRepository;
   drive: DriveGateway;
+  /** Optional: when AI is down or unconfigured, manual review keeps working. */
+  ai: AiGateway;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
-  fakes?: { sheet: FakeSheetTransport; drive: FakeDriveGateway };
+  fakes?: { sheet: FakeSheetTransport; drive: FakeDriveGateway; ai?: FakeAiGateway };
 };
+
+/**
+ * AI adapter choice: the deterministic fake only in fake data mode; Anthropic
+ * when explicitly selected and keyed; otherwise a gateway that reports
+ * not_configured and returns CONFIG_MISSING. Live data never silently runs on the
+ * fake model, because its proposals would look real.
+ */
+export function createAiGateway(env: ReturnType<typeof serverEnv>): AiGateway {
+  if (env.CS_DATA_MODE === 'fake') return new FakeAiGateway();
+  if (env.AI_PROVIDER === 'anthropic' && env.AI_API_KEY) {
+    return new AnthropicAiGateway({ apiKey: env.AI_API_KEY, ...(env.AI_MODEL ? { model: env.AI_MODEL } : {}) });
+  }
+  return new UnconfiguredAiGateway();
+}
 
 /**
  * Held on globalThis, not in a module variable: Next loads pages and route
@@ -45,7 +63,14 @@ function build(): Services {
   if (env.CS_DATA_MODE === 'fake') {
     const sheet = new FakeSheetTransport();
     const drive = new FakeDriveGateway();
-    services = { mode: 'fake', repo: new SheetsContentRepository(sheet), drive, fakes: { sheet, drive } };
+    const ai = createAiGateway(env);
+    services = {
+      mode: 'fake',
+      repo: new SheetsContentRepository(sheet),
+      drive,
+      ai,
+      fakes: { sheet, drive, ...(ai instanceof FakeAiGateway ? { ai } : {}) },
+    };
     return services;
   }
   if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || !env.CS_SHEET_ID) {
@@ -57,6 +82,7 @@ function build(): Services {
     mode: 'live',
     repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable }),
     drive: new GoogleDriveGateway(tokens, writable),
+    ai: createAiGateway(env),
   };
   return services;
 }

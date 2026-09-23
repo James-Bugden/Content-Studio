@@ -1,4 +1,4 @@
-import type { GateResult } from './gates';
+import type { GateResult, ZhAdaptationState } from './gates';
 
 /**
  * View models shared by server services and client components (CS-006..CS-013).
@@ -82,4 +82,20 @@ export type ReadyQueue = {
   orphans: string[];
   counts: Record<ReadyItem['group'], number>;
   scheduleUnavailable: boolean;
+};
+
+/** X to Threads zh-TW adaptation page (CS-011). Derived on every read; never stored. */
+export type AdaptationBlocker = { code: string; message: string };
+
+export type AdaptationThreads =
+  | { kind: 'found'; contentId: string; revision: string; date: string; slot: string; hook: string; chineseContent: string; stage: string }
+  | { kind: 'none' }
+  | { kind: 'ambiguous'; candidates: { contentId: string; date: string; slot: string }[] };
+
+export type AdaptationView = {
+  source: { contentId: string; revision: string; date: string; slot: string; platform: string; stage: string; hook: string; content: string };
+  /** Empty when the X copy is eligible for adaptation (ZHTW-01). */
+  blockers: AdaptationBlocker[];
+  state: ZhAdaptationState;
+  threads: AdaptationThreads;
 };
