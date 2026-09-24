@@ -18,6 +18,9 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'retain-on-failure',
+    // Pin the render state: the Polished entrance animation is gated on
+    // prefers-reduced-motion, and axe folds animated opacity into contrast.
+    reducedMotion: 'reduce',
   },
   projects: [
     { name: 'w375', use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },

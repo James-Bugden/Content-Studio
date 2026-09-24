@@ -28,7 +28,7 @@ export function StepPill({ pill, column }: { pill: Pill; column?: BacklogColumn 
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1 text-xs whitespace-nowrap ${PILL_TEXT_TONE[pill.tone]} ${
-        badge ? 'rounded-full border border-block bg-block-soft px-2 py-0.5' : ''
+        badge ? 'rounded-full border border-block bg-block-soft px-2 py-0.5 shadow-[0_0_0_3px_rgba(138,28,28,.07)]' : ''
       }`}
     >
       {column ? <span className="font-normal text-ink-soft">{COLUMN_LABEL[column]}</span> : null}

@@ -5,11 +5,16 @@ import type { Thumb } from '@/domain/next-steps';
  * and always says in words what state it is in, so a finished visual is visible
  * on the post and a missing or stale one is obvious without colour alone.
  */
+/*
+ * Placeholder boxes carry a soft 145deg gradient from card white into the tone's
+ * own soft colour, plus a 1px inset white ring (wireframe styles-opt1.css line 87,
+ * with each tone's real token in place of the wireframe's grey).
+ */
 const TONE: Record<Thumb['tone'], string> = {
-  done: 'border-green/40 bg-green-soft text-green',
-  todo: 'border-warn/40 bg-warn-soft text-warn',
-  problem: 'border-block/50 bg-block-soft text-block',
-  none: 'border-line bg-paper text-ink-soft',
+  done: 'border-green/40 bg-linear-145 from-card to-green-soft text-green',
+  todo: 'border-warn/40 bg-linear-145 from-card to-warn-soft text-warn',
+  problem: 'border-block/50 bg-linear-145 from-card to-block-soft text-block',
+  none: 'border-line bg-linear-145 from-card to-[#e9edeb] text-ink-soft',
 };
 const GLYPH: Record<Thumb['tone'], string> = { done: '✓', todo: '○', problem: '!', none: '·' };
 
@@ -18,7 +23,7 @@ export function PostThumb({ thumb, size = 'md', showLabel = true }: { thumb: Thu
   const box = size === 'sm' ? 'size-12' : size === 'lg' ? 'w-full aspect-square max-w-sm' : 'size-20';
   return (
     <figure className="flex min-w-0 flex-col gap-1">
-      <div className={`${box} shrink-0 overflow-hidden rounded-md border ${t.src ? 'border-line bg-card' : TONE[t.tone]} flex items-center justify-center`}>
+      <div className={`${box} shrink-0 overflow-hidden rounded-md border ${t.src ? 'border-line bg-card' : `${TONE[t.tone]} shadow-[inset_0_0_0_1px_#fff]`} flex items-center justify-center`}>
         {t.src ? (
           // eslint-disable-next-line @next/next/no-img-element -- same-origin, auth-gated, sandboxed image route
           <img src={t.src} alt="" loading="lazy" decoding="async" className="size-full object-cover" />

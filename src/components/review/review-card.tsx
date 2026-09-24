@@ -120,7 +120,7 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
     <article
       aria-labelledby={`card-${card.libraryId}`}
       data-library-id={card.libraryId}
-      className="rounded-lg border border-line bg-card p-4 shadow-[0_1px_0_rgba(23,32,35,0.04)]"
+      className="rounded-lg border border-line bg-card p-4"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="shrink-0 sm:w-28">
