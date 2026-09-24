@@ -86,7 +86,7 @@ export function DirtyEditorDemo() {
         <button type="button" className={buttonClass('primary')} disabled={!dirty} onClick={() => setSaved(text)}>
           Save draft
         </button>
-        <GuardedLink href="/review" className="text-info underline">
+        <GuardedLink href="/review" className="text-primary underline">
           Go to the review queue
         </GuardedLink>
       </div>

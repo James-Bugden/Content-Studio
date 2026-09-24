@@ -73,7 +73,7 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
           <li key={i.id}>
             <article aria-labelledby={`rc-${i.id}`} className={`rounded-lg border bg-card p-4 ${i.severity === 'blocking' ? 'border-l-4 border-block' : 'border-line'}`}>
               <p className="text-xs font-semibold tracking-wide text-ink-soft">
-                {i.severity === 'blocking' ? '✕ Blocking' : '! Needs attention'} · {i.kind.replace(/_/g, ' ')}
+                {i.severity === 'blocking' ? '✕ Blocking' : '○ Needs attention'} · {i.kind.replace(/_/g, ' ')}
               </p>
               <h3 id={`rc-${i.id}`} className="mt-1 font-semibold">
                 {i.title}
@@ -86,7 +86,14 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
               {i.operationId ? <p className="mt-1 text-xs text-ink-soft">Operation {i.operationId}</p> : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 {i.action.href ? (
-                  <GuardedLink href={i.action.href} className={buttonClass('primary')}>
+                  <GuardedLink
+                    href={i.action.href}
+                    className={
+                      i.severity === 'blocking'
+                        ? 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border-2 border-block bg-block-soft px-4 py-2 text-sm font-medium text-block hover:bg-block-soft/70'
+                        : buttonClass('primary')
+                    }
+                  >
                     {i.action.label}
                   </GuardedLink>
                 ) : (

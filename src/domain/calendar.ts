@@ -191,9 +191,9 @@ export function slotStatus(s: SlotSummary): SlotStatus {
     case 'Typefully Draft':
       return { glyph: '◐', label: 'Planned', look: 'scheduled' };
     case 'Error':
-      return { glyph: '!', label: 'Typefully error', look: 'problem' };
+      return { glyph: '●', label: 'Typefully error', look: 'problem' };
     case 'Unrecognised':
-      return { glyph: '!', label: 'Check the Sheet', look: 'problem' };
+      return { glyph: '●', label: 'Check the Sheet', look: 'problem' };
     default:
       return { glyph: '◑', label: 'In review', look: 'review' };
   }

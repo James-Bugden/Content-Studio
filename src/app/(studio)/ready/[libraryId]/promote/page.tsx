@@ -80,7 +80,7 @@ export default async function PromotePage({
                         <GuardedLink
                           href={`/ready/${encodeURIComponent(libraryId)}/promote?slot=${encodeURIComponent(o.contentId)}`}
                           aria-current={o.contentId === slot ? 'true' : undefined}
-                          className={`flex min-h-11 flex-col rounded-md border px-3 py-2 text-sm ${o.contentId === slot ? 'border-ink bg-focal' : 'border-line bg-card hover:border-ink'}`}
+                          className={`flex min-h-11 flex-col rounded-md border px-3 py-2 text-sm ${o.contentId === slot ? 'border-primary bg-primary-soft' : 'border-line bg-card hover:border-ink'}`}
                         >
                           <span className="font-semibold">
                             {o.isoDate} · {o.slot} · {o.time}

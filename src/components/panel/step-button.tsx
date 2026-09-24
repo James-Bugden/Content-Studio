@@ -25,7 +25,6 @@ export function StepButton({ step, target, size = 'md' }: { step: NextStep; targ
           : 'border border-line bg-card text-ink hover:bg-paper'
       }`}
     >
-      {urgent ? <span aria-hidden="true">!</span> : null}
       {step.action}
     </OpenPanelLink>
   );

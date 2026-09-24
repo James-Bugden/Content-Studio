@@ -180,7 +180,7 @@ export default async function PublishedPage({ searchParams }: { searchParams: Pr
         </section>
 
         {delayed.length > 0 ? (
-          <section aria-labelledby="delayed-h" className="rounded-lg border border-warn border-l-4 bg-warn-soft p-4 text-sm">
+          <section aria-labelledby="delayed-h" className="rounded-lg border border-line bg-card p-4 text-sm">
             <h2 id="delayed-h" className="font-semibold">
               ◐ Planned time passed, not published yet ({delayed.length})
             </h2>

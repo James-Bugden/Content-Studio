@@ -4,7 +4,7 @@ import { StepButton } from '../panel/step-button';
 
 /**
  * "Needs you this week" (UX redesign): the week's slot steps due now or soon, one
- * line each, urgent first with a visible "!" and the word "Urgent". Open slots to
+ * line each, urgent first with a bordered "Urgent" badge. Open slots to
  * fill are folded into one line so the real problems stay on top.
  */
 function when(s: SlotSummary): string {
@@ -36,7 +36,7 @@ export function NeedsStrip({ heading, emptyText, items }: { heading: string; emp
               <li key={s.contentId} data-task-content-id={s.contentId} data-urgency={s.step.urgency} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
                 {urgent ? (
                   <span className="inline-flex items-center gap-1 rounded border border-block bg-block-soft px-1.5 text-xs font-bold text-block">
-                    <span>!</span> Urgent
+                    Urgent
                   </span>
                 ) : null}
                 <span className="shrink-0 tabular-nums text-ink-soft">{when(s)}</span>

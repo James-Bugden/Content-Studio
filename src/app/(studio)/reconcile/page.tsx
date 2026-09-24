@@ -22,7 +22,7 @@ export default async function ReconcilePage() {
   } catch (error) {
     return (
       <>
-        <PageHeader title="Reconcile" description="Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step." />
+        <PageHeader title="Fix issues" description="Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step." />
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
@@ -31,7 +31,7 @@ export default async function ReconcilePage() {
 
   return (
     <>
-      <PageHeader title="Reconcile" description={`Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step. Checked ${checked} Taipei.`} />
+      <PageHeader title="Fix issues" description={`Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <CapabilityBanner capabilities={report.capabilities} />
 

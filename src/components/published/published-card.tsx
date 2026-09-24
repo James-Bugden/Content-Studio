@@ -41,11 +41,11 @@ export function PublishedCard({ row, canEdit, detailLink = true }: { row: Publis
       </dl>
       <ul className="text-sm" aria-label="Sync freshness">
         <li>
-          {row.finalSync.state === 'fresh' ? '✓ ' : '! '}
+          {row.finalSync.state === 'fresh' ? '✓ ' : '○ '}
           {syncWords('Final copy synced', row.finalSync)}
         </li>
         <li>
-          {row.analyticsSync.state === 'fresh' ? '✓ ' : '! '}
+          {row.analyticsSync.state === 'fresh' ? '✓ ' : '○ '}
           {syncWords('Analytics synced', row.analyticsSync)}
         </li>
       </ul>
@@ -70,7 +70,7 @@ export function PublishedCard({ row, canEdit, detailLink = true }: { row: Publis
         </table>
       </div>
       {row.problems.length > 0 ? (
-        <div role="note" className="rounded-md border border-warn border-l-4 bg-warn-soft px-3 py-2 text-sm">
+        <div role="note" className="rounded-md border border-line border-l-4 bg-paper px-3 py-2 text-sm">
           <p className="font-semibold">⇄ Needs reconciliation. Nothing was corrected automatically.</p>
           <ul className="mt-1 list-disc pl-5">
             {row.problems.map((p) => (

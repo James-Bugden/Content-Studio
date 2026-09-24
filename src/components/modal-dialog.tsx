@@ -69,7 +69,7 @@ export function ModalDialog({ open, onClose, title, description, children, foote
       className={[
         'm-auto w-[calc(100%-2rem)] rounded-lg border bg-card p-0 text-ink shadow-xl backdrop:bg-ink/40',
         wide ? 'max-w-6xl' : 'max-w-lg',
-        tone === 'warning' ? 'border-warn border-t-4' : 'border-line',
+        tone === 'warning' ? 'border-block border-t-4' : 'border-line',
       ].join(' ')}
     >
       {open ? (

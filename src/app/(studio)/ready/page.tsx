@@ -102,7 +102,7 @@ function ReadyCard({ item, canEdit }: { item: ReadyItem; canEdit: boolean }) {
       <p className="copy mt-2 font-semibold">{item.hook}</p>
       <p className="copy mt-1 line-clamp-3 text-sm text-ink-soft">{item.preview}</p>
       {item.viewDrift ? (
-        <p className="mt-2 text-sm text-warn">The Ready Queue tab shows different values from Content Library; the Library row is used.</p>
+        <p className="mt-2 text-sm text-ink-soft">The Ready Queue tab shows different values from Content Library; the Library row is used.</p>
       ) : null}
       {item.group === 'scheduled' ? (
         <p className="mt-2 text-sm">

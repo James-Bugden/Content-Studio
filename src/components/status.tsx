@@ -12,11 +12,11 @@ type Look = { label: string; glyph: string; className: string };
 
 export const STATUS_LOOK: Record<GateStatus, Look> = {
   ready: { label: 'Ready', glyph: '✓', className: 'border-green bg-green-soft text-green rounded-full' },
-  needs_action: { label: 'Needs action', glyph: '→', className: 'border-warn bg-warn-soft text-warn rounded-full' },
+  needs_action: { label: 'Needs action', glyph: '→', className: 'border-line bg-card text-ink rounded-full' },
   blocked: { label: 'Blocked', glyph: '✕', className: 'border-block bg-block-soft text-block rounded-sm border-2' },
 };
 
-const WARNING_LOOK: Look = { label: 'Warning', glyph: '!', className: 'border-info bg-info-soft text-info rounded-full border-dashed' };
+const WARNING_LOOK: Look = { label: 'Warning', glyph: '○', className: 'border-line bg-card text-ink-soft rounded-full border-dashed' };
 
 export function gateLook(gate: Gate): Look {
   if (gate.severity === 'soft') return WARNING_LOOK;
@@ -53,7 +53,7 @@ export function GateChip({ gate }: { gate: Gate }) {
 }
 
 /**
- * The single next action for an item. This is the one place the yellow focal
+ * The single next action for an item. This is the one place the primary
  * highlight is used on a card, because it is the most important thing to do.
  */
 export function NextAction({ gate }: { gate: Gate | null }) {
@@ -68,7 +68,7 @@ export function NextAction({ gate }: { gate: Gate | null }) {
   return (
     <div className="rounded-md border border-line bg-card p-3">
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span className="rounded-sm bg-focal px-1.5 text-sm font-semibold text-ink">Next action</span>
+        <span className="rounded-sm bg-primary-soft px-1.5 text-sm font-semibold text-primary">Next action</span>
         <span className="min-w-0 font-semibold">{gate.nextAction}</span>
       </p>
       <p className="mt-1 text-sm text-ink-soft">

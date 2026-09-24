@@ -4,7 +4,7 @@ import { GuardedLink } from '../guarded-link';
 
 /**
  * Month view (UX redesign): Monday-to-Sunday grid with filled/total slots per
- * platform and a "!" count for urgent steps. Each day opens its week.
+ * platform and a count of urgent steps. Each day opens its week.
  */
 const SHORT: Record<string, string> = { X: 'X', Threads: 'TH', LinkedIn: 'LI' };
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -39,7 +39,7 @@ export function MonthGrid({ grid, today, slots }: { grid: Grid; today: string; s
                 href={`/schedule?view=week&week=${d}`}
                 aria-label={label}
                 className={`flex h-full min-h-20 flex-col gap-0.5 rounded-md border p-1 text-left text-[11px] leading-tight hover:border-ink sm:p-2 sm:text-xs ${
-                  isToday ? 'border-2 border-ink bg-focal' : urgent ? 'border-2 border-block bg-card' : inMonth ? 'border-line bg-card' : 'border-line bg-paper text-ink-soft'
+                  isToday ? 'border-2 border-primary bg-primary-soft' : urgent ? 'border-2 border-block bg-card' : inMonth ? 'border-line bg-card' : 'border-line bg-paper text-ink-soft'
                 }`}
               >
                 <span className="flex flex-wrap items-baseline justify-between gap-x-1">
@@ -48,7 +48,7 @@ export function MonthGrid({ grid, today, slots }: { grid: Grid; today: string; s
                 </span>
                 {urgent ? (
                   <span className="font-bold text-block">
-                    ! {urgent}
+                    {urgent}
                     <span className="hidden sm:inline"> urgent</span>
                   </span>
                 ) : null}

@@ -71,9 +71,8 @@ export function SlotPanel({ contentId }: { contentId: string }) {
 
       <section aria-label="Next step" className={`rounded-lg border p-3 ${step.urgency === 'now' ? 'border-block bg-block-soft' : 'border-line bg-card'}`}>
         <p className="text-sm">
-          <span className="rounded bg-focal px-1.5 py-0.5 text-xs font-semibold">Next</span>{' '}
+          <span className="rounded bg-primary-soft px-1.5 py-0.5 text-xs font-semibold text-primary">Next</span>{' '}
           <strong>
-            {step.urgency === 'now' ? '! ' : ''}
             {step.action}
           </strong>
           <span className="text-ink-soft">: {step.why}</span>

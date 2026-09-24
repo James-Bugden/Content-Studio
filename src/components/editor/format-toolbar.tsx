@@ -74,13 +74,12 @@ export function FormatToolbar({ textarea, text, platform, disabled, onChange }: 
         <span className="ml-auto text-xs tabular-nums text-ink-soft">
           {length.toLocaleString('en-GB')}
           {limit ? ` / ${limit.toLocaleString('en-GB')}` : ''} characters
-          {limit && length > limit ? <strong className="ml-1 text-block">! over the {platform} limit</strong> : null}
+          {limit && length > limit ? <strong className="ml-1 text-block">Over the {platform} limit</strong> : null}
         </span>
       </div>
       {markdown.length > 0 ? (
-        <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-warn bg-warn-soft px-3 py-2 text-sm">
+        <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-paper px-3 py-2 text-sm">
           <span>
-            <span aria-hidden="true">! </span>
             This text contains Markdown ({markdown.map((m) => m.kind).join(', ')}). {platform || 'The platform'} will show those symbols as typed.
           </span>
           <button type="button" className="underline" disabled={disabled} onClick={() => onChange(cleanMarkdown(text))}>
