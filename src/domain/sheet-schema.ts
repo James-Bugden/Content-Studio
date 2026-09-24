@@ -112,6 +112,8 @@ export const LIBRARY_WRITABLE: readonly LibraryField[] = [
   'reviewStatus',
   'queueForSchedule',
   'nextAction',
+  'targetPlatform',
+  'pesto',
   'currentHook',
   'hookTemplate',
   'hookAlternatives',

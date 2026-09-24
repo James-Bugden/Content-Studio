@@ -3,9 +3,11 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { newOperationId, postJson } from '@/lib/client/api';
+import type { Platform } from '@/domain/enums';
 import { buttonClass } from '../button-styles';
 import { OpenPanelLink, panelHref } from '../panel/open-panel-link';
-import { EditableHookCell, type HookSaveOutcome } from './editable-hook-cell';
+import { EditableTextCell, type TextCellSaveOutcome } from './editable-text-cell';
+import { PlatformSelectCell } from './platform-select-cell';
 
 /**
  * One Backlog source group as a dense, directly editable table (spreadsheet-
@@ -28,17 +30,18 @@ export type BacklogRow = {
   hook: string;
   reviewStatus: 'Pending' | 'Approved' | 'Skipped' | 'Changes Requested' | null;
   pesto: string;
-  platform: string | null;
+  platform: Platform | null;
   hookTemplate: string;
 };
 
 type Decision = 'Approved' | 'Skipped';
-type RowState = { revision: string; hook: string; decided: Decision | null; busy: boolean; note: string | null };
+type RowState = { revision: string; hook: string; pesto: string; platform: Platform | null; hookTemplate: string; decided: Decision | null; busy: boolean; note: string | null };
 
 function initialDecision(status: BacklogRow['reviewStatus']): Decision | null {
   return status === 'Approved' || status === 'Skipped' ? status : null;
 }
-type EditOutcome = { ok: true; item: { revision: string; hook: string }; revision: string; replayed: boolean } | { ok: false; code: string; message?: string };
+type EditedFields = { revision: string; hook: string; pesto: string; platform: Platform | null; hookTemplate: string };
+type EditOutcome = { ok: true; item: EditedFields; revision: string; replayed: boolean } | { ok: false; code: string; message?: string };
 
 const STALE_TEXT = 'This idea changed elsewhere. Reload the page to see the latest version; nothing was overwritten.';
 
@@ -48,19 +51,36 @@ function failureText(body: Extract<EditOutcome, { ok: false }>): string {
   return body.message || 'Not saved. Nothing was written.';
 }
 
-export function BacklogGroupTable({ source, items, canEdit }: { source: string; items: BacklogRow[]; canEdit: boolean }) {
+export function BacklogGroupTable({
+  source,
+  items,
+  canEdit,
+  pestoOptions,
+  hookTemplateOptions,
+}: {
+  source: string;
+  items: BacklogRow[];
+  canEdit: boolean;
+  pestoOptions: readonly string[];
+  hookTemplateOptions: readonly string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [rows, setRows] = useState<Record<string, RowState>>(() =>
-    Object.fromEntries(items.map((i) => [i.libraryId, { revision: i.revision, hook: i.hook, decided: initialDecision(i.reviewStatus), busy: false, note: null }])),
+    Object.fromEntries(
+      items.map((i) => [
+        i.libraryId,
+        { revision: i.revision, hook: i.hook, pesto: i.pesto, platform: i.platform, hookTemplate: i.hookTemplate, decided: initialDecision(i.reviewStatus), busy: false, note: null },
+      ]),
+    ),
   );
 
   function patchRow(id: string, patch: Partial<RowState>) {
     setRows((prev) => ({ ...prev, [id]: { ...prev[id]!, ...patch } }));
   }
 
-  async function edit(id: string, patch: { currentHook?: string; reviewStatus?: Decision }): Promise<EditOutcome> {
+  async function edit(id: string, patch: { currentHook?: string; reviewStatus?: Decision; platform?: Platform | ''; pesto?: string; hookTemplate?: string }): Promise<EditOutcome> {
     const res = await postJson<EditOutcome>('/api/backlog/edit', {
       operationId: newOperationId('backlog'),
       libraryId: id,
@@ -68,14 +88,32 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
       patch,
     });
     const body = res.body as EditOutcome;
-    if (body.ok) patchRow(id, { revision: body.revision, hook: body.item.hook });
+    if (body.ok) patchRow(id, { revision: body.revision, hook: body.item.hook, pesto: body.item.pesto, platform: body.item.platform, hookTemplate: body.item.hookTemplate });
     return body;
   }
 
-  async function saveHook(id: string, next: string): Promise<HookSaveOutcome> {
+  async function saveHook(id: string, next: string): Promise<TextCellSaveOutcome> {
     const body = await edit(id, { currentHook: next });
     if (body.ok) return { ok: true, note: body.replayed ? 'Already saved' : undefined };
     return { ok: false, message: failureText(body) };
+  }
+
+  async function savePesto(id: string, next: string): Promise<TextCellSaveOutcome> {
+    const body = await edit(id, { pesto: next });
+    if (body.ok) return { ok: true, note: body.replayed ? 'Already saved' : undefined };
+    return { ok: false, message: failureText(body) };
+  }
+
+  async function saveHookTemplate(id: string, next: string): Promise<TextCellSaveOutcome> {
+    const body = await edit(id, { hookTemplate: next });
+    if (body.ok) return { ok: true, note: body.replayed ? 'Already saved' : undefined };
+    return { ok: false, message: failureText(body) };
+  }
+
+  async function savePlatform(id: string, next: Platform | '') {
+    const body = await edit(id, { platform: next });
+    if (body.ok) return { ok: true as const, note: body.replayed ? 'Already saved' : undefined };
+    return { ok: false as const, message: failureText(body) };
   }
 
   async function decide(id: string, decision: Decision) {
@@ -92,7 +130,7 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
   function onRowClick(e: React.MouseEvent<HTMLElement>, id: string) {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('input, button, a, textarea, [role="status"]')) return;
+    if (target.closest('input, button, a, textarea, select, [role="status"]')) return;
     if (window.getSelection()?.toString()) return;
     openPanel(id);
   }
@@ -174,13 +212,13 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
               <th scope="col" className={`${cell} w-36 font-medium whitespace-nowrap`}>
                 Library ID
               </th>
-              <th scope="col" className={`${cell} w-24 font-medium whitespace-nowrap`}>
+              <th scope="col" className={`${cell} w-28 font-medium whitespace-nowrap`}>
                 Platform
               </th>
-              <th scope="col" className={`${cell} w-28 font-medium whitespace-nowrap`}>
+              <th scope="col" className={`${cell} w-32 font-medium whitespace-nowrap`}>
                 PESTO
               </th>
-              <th scope="col" className={`${cell} w-40 font-medium whitespace-nowrap`}>
+              <th scope="col" className={`${cell} w-44 font-medium whitespace-nowrap`}>
                 Hook template
               </th>
               <th scope="col" className={`${cell} font-medium`}>
@@ -204,13 +242,43 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
               >
                 <td className={`${cell} text-right text-xs text-ink-soft tabular-nums`}>{index + 1}</td>
                 <td className={`${cell} font-mono text-xs text-ink-soft whitespace-nowrap`}>{item.libraryId}</td>
-                <td className={`${cell} text-xs text-ink-soft whitespace-nowrap`}>{item.platform ?? '—'}</td>
-                <td className={`${cell} text-xs text-ink-soft whitespace-nowrap`}>{item.pesto || '—'}</td>
-                <td className={`${cell} max-w-40 truncate text-xs text-ink-soft`} title={item.hookTemplate || undefined}>
-                  {item.hookTemplate || '—'}
+                <td className={`${cell} text-xs`}>
+                  <PlatformSelectCell value={rows[item.libraryId]!.platform} canEdit={canEdit} libraryId={item.libraryId} onSave={(next) => savePlatform(item.libraryId, next)} />
+                </td>
+                <td className={`${cell} max-w-32 text-xs`}>
+                  <EditableTextCell
+                    value={rows[item.libraryId]!.pesto}
+                    canEdit={canEdit}
+                    libraryId={item.libraryId}
+                    fieldLabel="PESTO stage"
+                    placeholder="No PESTO stage"
+                    maxLength={200}
+                    suggestions={pestoOptions}
+                    onSave={(next) => savePesto(item.libraryId, next)}
+                  />
+                </td>
+                <td className={`${cell} max-w-44 text-xs`}>
+                  <EditableTextCell
+                    value={rows[item.libraryId]!.hookTemplate}
+                    canEdit={canEdit}
+                    libraryId={item.libraryId}
+                    fieldLabel="Hook template"
+                    placeholder="No hook template"
+                    maxLength={300}
+                    suggestions={hookTemplateOptions}
+                    onSave={(next) => saveHookTemplate(item.libraryId, next)}
+                  />
                 </td>
                 <td className={`${cell} max-w-0`}>
-                  <EditableHookCell value={rows[item.libraryId]!.hook} canEdit={canEdit} libraryId={item.libraryId} onSave={(next) => saveHook(item.libraryId, next)} />
+                  <EditableTextCell
+                    value={rows[item.libraryId]!.hook}
+                    canEdit={canEdit}
+                    libraryId={item.libraryId}
+                    fieldLabel="Hook"
+                    placeholder="No hook yet"
+                    maxLength={500}
+                    onSave={(next) => saveHook(item.libraryId, next)}
+                  />
                 </td>
                 <td className={`${cell} text-xs whitespace-nowrap`}>{approvedCell(item.libraryId)}</td>
                 <td className={`${cell} w-56`}>{nextAction(item.libraryId)}</td>
@@ -227,10 +295,43 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
             <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-ink-soft">
               <span className="tabular-nums">{index + 1}</span>
               <span className="font-mono">{item.libraryId}</span>
-              {item.platform ? <span>{item.platform}</span> : null}
-              {item.pesto ? <span>{item.pesto}</span> : null}
             </p>
-            <EditableHookCell value={rows[item.libraryId]!.hook} canEdit={canEdit} libraryId={item.libraryId} onSave={(next) => saveHook(item.libraryId, next)} />
+            <div className="flex flex-wrap gap-2">
+              <div className="w-28">
+                <PlatformSelectCell value={rows[item.libraryId]!.platform} canEdit={canEdit} libraryId={item.libraryId} onSave={(next) => savePlatform(item.libraryId, next)} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <EditableTextCell
+                  value={rows[item.libraryId]!.pesto}
+                  canEdit={canEdit}
+                  libraryId={item.libraryId}
+                  fieldLabel="PESTO stage"
+                  placeholder="No PESTO stage"
+                  maxLength={200}
+                  suggestions={pestoOptions}
+                  onSave={(next) => savePesto(item.libraryId, next)}
+                />
+              </div>
+            </div>
+            <EditableTextCell
+              value={rows[item.libraryId]!.hookTemplate}
+              canEdit={canEdit}
+              libraryId={item.libraryId}
+              fieldLabel="Hook template"
+              placeholder="No hook template"
+              maxLength={300}
+              suggestions={hookTemplateOptions}
+              onSave={(next) => saveHookTemplate(item.libraryId, next)}
+            />
+            <EditableTextCell
+              value={rows[item.libraryId]!.hook}
+              canEdit={canEdit}
+              libraryId={item.libraryId}
+              fieldLabel="Hook"
+              placeholder="No hook yet"
+              maxLength={500}
+              onSave={(next) => saveHook(item.libraryId, next)}
+            />
             <p className="text-xs">{approvedCell(item.libraryId)}</p>
             <div>{nextAction(item.libraryId, 'md')}</div>
           </li>
