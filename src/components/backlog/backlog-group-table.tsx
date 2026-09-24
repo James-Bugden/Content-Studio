@@ -22,7 +22,15 @@ import { EditableHookCell, type HookSaveOutcome } from './editable-hook-cell';
  * Same responsive split as the Posts table: a real table from md up, stacked
  * rows on phones. Both carry `data-library-id` so tests can address either.
  */
-export type BacklogRow = { libraryId: string; revision: string; hook: string; reviewStatus: 'Pending' | 'Approved' | 'Skipped' | 'Changes Requested' | null };
+export type BacklogRow = {
+  libraryId: string;
+  revision: string;
+  hook: string;
+  reviewStatus: 'Pending' | 'Approved' | 'Skipped' | 'Changes Requested' | null;
+  pesto: string;
+  platform: string | null;
+  hookTemplate: string;
+};
 
 type Decision = 'Approved' | 'Skipped';
 type RowState = { revision: string; hook: string; decided: Decision | null; busy: boolean; note: string | null };
@@ -144,6 +152,13 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
     );
   }
 
+  function approvedCell(id: string) {
+    const decided = rows[id]!.decided;
+    if (decided === 'Approved') return <span className="font-semibold text-green">✓ Approved</span>;
+    if (decided === 'Skipped') return <span className="text-ink-soft">Skipped</span>;
+    return <span className="text-ink-soft">Not yet</span>;
+  }
+
   const cell = 'border-l border-line px-2 py-1 first:border-l-0';
 
   return (
@@ -159,8 +174,20 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
               <th scope="col" className={`${cell} w-36 font-medium whitespace-nowrap`}>
                 Library ID
               </th>
+              <th scope="col" className={`${cell} w-24 font-medium whitespace-nowrap`}>
+                Platform
+              </th>
+              <th scope="col" className={`${cell} w-28 font-medium whitespace-nowrap`}>
+                PESTO
+              </th>
+              <th scope="col" className={`${cell} w-40 font-medium whitespace-nowrap`}>
+                Hook template
+              </th>
               <th scope="col" className={`${cell} font-medium`}>
                 Hook
+              </th>
+              <th scope="col" className={`${cell} w-28 font-medium whitespace-nowrap`}>
+                Approved
               </th>
               <th scope="col" className={`${cell} w-56 font-medium whitespace-nowrap`}>
                 Next action
@@ -177,9 +204,15 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
               >
                 <td className={`${cell} text-right text-xs text-ink-soft tabular-nums`}>{index + 1}</td>
                 <td className={`${cell} font-mono text-xs text-ink-soft whitespace-nowrap`}>{item.libraryId}</td>
+                <td className={`${cell} text-xs text-ink-soft whitespace-nowrap`}>{item.platform ?? '—'}</td>
+                <td className={`${cell} text-xs text-ink-soft whitespace-nowrap`}>{item.pesto || '—'}</td>
+                <td className={`${cell} max-w-40 truncate text-xs text-ink-soft`} title={item.hookTemplate || undefined}>
+                  {item.hookTemplate || '—'}
+                </td>
                 <td className={`${cell} max-w-0`}>
                   <EditableHookCell value={rows[item.libraryId]!.hook} canEdit={canEdit} libraryId={item.libraryId} onSave={(next) => saveHook(item.libraryId, next)} />
                 </td>
+                <td className={`${cell} text-xs whitespace-nowrap`}>{approvedCell(item.libraryId)}</td>
                 <td className={`${cell} w-56`}>{nextAction(item.libraryId)}</td>
               </tr>
             ))}
@@ -191,11 +224,14 @@ export function BacklogGroupTable({ source, items, canEdit }: { source: string; 
       <ul className="flex flex-col divide-y divide-line border-t border-line md:hidden">
         {items.map((item, index) => (
           <li key={item.libraryId} data-library-id={item.libraryId} onClick={(e) => onRowClick(e, item.libraryId)} className="flex cursor-pointer flex-col gap-1.5 px-3 py-2 even:bg-paper/60">
-            <p className="flex items-baseline gap-2 text-xs text-ink-soft">
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-ink-soft">
               <span className="tabular-nums">{index + 1}</span>
               <span className="font-mono">{item.libraryId}</span>
+              {item.platform ? <span>{item.platform}</span> : null}
+              {item.pesto ? <span>{item.pesto}</span> : null}
             </p>
             <EditableHookCell value={rows[item.libraryId]!.hook} canEdit={canEdit} libraryId={item.libraryId} onSave={(next) => saveHook(item.libraryId, next)} />
+            <p className="text-xs">{approvedCell(item.libraryId)}</p>
             <div>{nextAction(item.libraryId, 'md')}</div>
           </li>
         ))}
