@@ -60,7 +60,7 @@ export function BacklogTable({ cards }: { cards: ReviewCard[] }) {
                 Platform
               </th>
               {BACKLOG_COLUMNS.map((c) => (
-                <th key={c} scope="col" className="px-2 py-2 font-medium">
+                <th key={c} scope="col" className="px-2 py-2 font-medium whitespace-nowrap">
                   {COLUMN_LABEL[c]}
                 </th>
               ))}

@@ -23,6 +23,8 @@ export type BacklogItem = {
   /** So the queue side panel can open straight into an edit without a second, single-item read. */
   draftContent: string;
   thumb: ReturnType<typeof thumbFor>;
+  /** So Approve/Skip persist across a reload instead of resetting to actionable every time. */
+  reviewStatus: 'Pending' | 'Approved' | 'Skipped' | 'Changes Requested' | null;
 };
 
 export type BacklogGroup = { source: string; total: number; items: BacklogItem[] };
@@ -39,6 +41,7 @@ function toBacklogItem(record: LibraryRecord): BacklogItem {
     slug: item.slug,
     draftContent: item.draftContent,
     thumb: thumbFor(item.libraryId, item),
+    reviewStatus: item.reviewStatus.ok ? item.reviewStatus.value : null,
   };
 }
 

@@ -6,7 +6,7 @@ import { WeekSlotCard } from './slot-card';
 /**
  * Week view (UX redesign): one row per platform, one column per day, Monday first.
  * Columns share the width equally (`minmax(0, 1fr)`) and card text is clamped, so
- * the grid never scrolls sideways. Today's column is marked with the focal yellow
+ * the grid never scrolls sideways. Today's column is marked with the soft primary tint
  * and the word "Today", never colour alone.
  */
 export function WeekGrid({ start, today, slots, className = '' }: { start: string; today: string; slots: SlotSummary[]; className?: string }) {
@@ -18,7 +18,7 @@ export function WeekGrid({ start, today, slots, className = '' }: { start: strin
         const { weekday, date } = formatDayShort(d);
         const isToday = d === today;
         return (
-          <div key={d} data-day-header={d} className={`border-b border-l border-line p-2 text-sm ${isToday ? 'bg-focal' : d < today ? 'bg-line/30' : ''}`}>
+          <div key={d} data-day-header={d} className={`border-b border-l border-line p-2 text-sm ${isToday ? 'bg-primary-soft text-primary' : d < today ? 'bg-line/30' : ''}`}>
             <span className="block font-semibold">{weekday}</span>
             <span className="block text-xs">{date}</span>
             {isToday ? <span className="mt-0.5 block text-xs font-bold">Today</span> : null}
@@ -48,7 +48,7 @@ function PlatformRow({ platform, days, today, slots, last }: { platform: string;
             role="group"
             aria-label={`${platform}, ${formatDayLong(d)}`}
             data-date={d}
-            className={`${border} flex min-h-24 min-w-0 flex-col gap-1 border-l border-line p-1 ${d === today ? 'bg-focal/20' : past ? 'bg-line/30' : ''}`}
+            className={`${border} flex min-h-24 min-w-0 flex-col gap-1 border-l border-line p-1 ${d === today ? 'bg-primary-soft/50' : past ? 'bg-line/30' : ''}`}
           >
             {mine.map((s) => (
               <WeekSlotCard key={s.contentId} slot={s} past={past} />

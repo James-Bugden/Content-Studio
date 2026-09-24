@@ -196,7 +196,7 @@ export function HookPanel(props: HookPanelProps) {
         </InlineResult>
       ) : null}
       {sel.kind === 'stale' || (proposal && stale) ? (
-        <div role="status" className="rounded-md border-2 border-warn bg-warn-soft p-3 text-sm">
+        <div role="status" className="rounded-md border-2 border-block bg-block-soft p-3 text-sm">
           <p className="font-semibold">{STALE_HOOK_MESSAGE}</p>
           <p className="mt-1">These suggestions were made for an earlier version of the draft, so they cannot be used. Nothing was written.</p>
         </div>
@@ -261,7 +261,7 @@ export function HookPanel(props: HookPanelProps) {
 
       {proposal && canEdit ? (
         <div className="flex flex-col gap-2">
-          {blockedReason ? <p className="text-sm text-warn">{blockedReason}</p> : null}
+          {blockedReason ? <p className="text-sm text-block">{blockedReason}</p> : null}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={buttonClass('primary')} disabled={picked === 'current' || !!blockedReason || busy || stale} onClick={() => void choose(picked)}>
               {sel.kind === 'saving' && sel.choice !== 'current' ? 'Saving…' : 'Use this hook'}

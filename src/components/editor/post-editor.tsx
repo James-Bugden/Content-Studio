@@ -229,7 +229,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       ) : null}
 
       {mismatch ? (
-        <div className="rounded-md border border-warn bg-warn-soft p-3 text-sm">
+        <div className="rounded-md border border-line bg-paper p-3 text-sm">
           <p className="font-semibold">The Sheet draft and the Markdown section differ.</p>
           <p className="mt-1">The editor loaded the Markdown version, which is canonical. Saving will make the Sheet match it exactly. Compare first if you are unsure.</p>
           <details className="mt-2">

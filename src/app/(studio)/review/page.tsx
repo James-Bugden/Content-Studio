@@ -78,7 +78,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 key={l}
                 href={hrefWith({ layout: l === 'table' ? null : l, page: null })}
                 aria-current={l === layout ? 'page' : undefined}
-                className={`inline-flex min-h-11 items-center rounded px-3 text-sm ${l === layout ? 'bg-focal font-semibold' : 'text-ink-soft hover:text-ink'}`}
+                className={`inline-flex min-h-11 items-center rounded px-3 text-sm ${l === layout ? 'bg-primary-soft font-semibold text-primary' : 'text-ink-soft hover:text-ink'}`}
               >
                 {l === 'table' ? 'Table' : 'Cards'}
               </GuardedLink>
@@ -90,8 +90,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <CapabilityBanner capabilities={capabilities()} />
 
         {summary && summary.length > 0 ? (
-          <details className="rounded-lg border border-line bg-card px-4">
-            <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-1 py-2 text-sm">
+          <details className="group rounded-lg border border-line bg-card px-4">
+            <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-1 py-2 text-sm marker:hidden [&::-webkit-details-marker]:hidden">
+              <span aria-hidden="true" className="inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">
+                ▸
+              </span>
               <span className="font-semibold">Sources</span>
               <span className="text-ink-soft">
                 ({summary.length} {summary.length === 1 ? 'source' : 'sources'}, from Content Queue Summary)
@@ -121,7 +124,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                   href={hrefWith({ lane: l === 'all' ? null : l, page: null })}
                   aria-current={l === lane ? 'page' : undefined}
                   className={`inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm ${
-                    l === lane ? 'bg-focal font-semibold text-ink underline decoration-2 underline-offset-4' : 'text-ink-soft hover:bg-card hover:text-ink'
+                    l === lane ? 'bg-primary-soft font-semibold text-primary underline decoration-2 underline-offset-4' : 'text-ink-soft hover:bg-card hover:text-ink'
                   }`}
                 >
                   {TAB_LABEL[l]}
@@ -140,8 +143,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           ) : null}
         </nav>
 
-        <details open={activeFilters > 0} className="rounded-lg border border-line bg-card px-4">
-          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold">
+        <details open={activeFilters > 0} className="group rounded-lg border border-line bg-card px-4">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold marker:hidden [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="mr-2 inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">
+              ▸
+            </span>
             Filters{activeFilters > 0 ? <span className="ml-1 font-normal text-ink-soft">({activeFilters} on)</span> : null}
           </summary>
           <div className="pb-3">

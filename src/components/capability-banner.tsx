@@ -40,8 +40,8 @@ export function CapabilityBanner({ capabilities }: { capabilities: Capability[] 
   const limited = capabilities.filter((c) => c.state !== 'ready');
   if (limited.length === 0) return null;
   return (
-    <section aria-label="Integration status" className="mb-6 rounded-lg border border-info border-l-4 bg-info-soft px-4 py-3 text-sm">
-      <p className="flex items-center gap-2 font-semibold text-info">
+    <section aria-label="Integration status" className="mb-6 rounded-lg border border-line border-l-4 bg-card px-4 py-3 text-sm">
+      <p className="flex items-center gap-2 font-semibold text-ink">
         <span aria-hidden="true" className="inline-flex size-5 items-center justify-center rounded-full border border-current text-xs">
           i
         </span>

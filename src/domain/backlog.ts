@@ -24,7 +24,7 @@ export const COLUMN_LABEL: Record<BacklogColumn, string> = {
   scheduled: 'Scheduled',
 };
 
-export const PILL_GLYPH: Record<PillTone, string> = { done: '✓', todo: '○', problem: '!', none: '·' };
+export const PILL_GLYPH: Record<PillTone, string> = { done: '✓', todo: '○', problem: '●', none: '·' };
 
 /** A Schedule row that came from this post (lineage `#lib=`), reduced to what the backlog shows. */
 export type ScheduledFact = {

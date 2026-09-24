@@ -10,8 +10,8 @@ import { PostThumb } from '../panel/post-thumb';
  */
 const STATUS_TEXT: Record<SlotLook, string> = {
   published: 'text-green',
-  scheduled: 'text-info',
-  review: 'text-warn',
+  scheduled: 'text-ink',
+  review: 'text-ink-soft',
   open: 'text-ink-soft',
   waiting: 'text-ink-soft',
   missed: 'text-ink-soft',
@@ -35,8 +35,8 @@ function StepLine({ slot }: { slot: SlotSummary }) {
   if (!hasStep(slot) || slot.empty) return null;
   const urgent = slot.step.urgency === 'now';
   return (
-    <span className={`mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${urgent ? 'border border-block bg-block-soft text-block' : 'bg-green-soft text-green'}`}>
-      {urgent ? <span>!</span> : <span aria-hidden="true">→</span>}{' '}
+    <span className={`mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${urgent ? 'border border-block bg-block-soft text-block' : 'border border-line bg-card text-ink'}`}>
+      <span aria-hidden="true">→</span>{' '}
       <span className="truncate">{slot.step.action}</span>
     </span>
   );
@@ -108,7 +108,7 @@ function EmptyBody({ slot }: { slot: SlotSummary }) {
       <span>
         Open · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
       </span>
-      {slot.step.kind === 'fill_slot' ? <span className="font-semibold text-green underline">Fill</span> : <span>{slot.step.action}</span>}
+      {slot.step.kind === 'fill_slot' ? <span className="font-semibold text-primary underline">Fill</span> : <span>{slot.step.action}</span>}
     </span>
   );
 }
@@ -130,7 +130,7 @@ export function ListSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
           {slot.empty ? (
             <span className="mt-1 flex flex-wrap items-center justify-between gap-2">
               <StatusLine slot={slot} />
-              {slot.step.kind === 'fill_slot' ? <span className="font-semibold text-green underline">Fill</span> : null}
+              {slot.step.kind === 'fill_slot' ? <span className="font-semibold text-primary underline">Fill</span> : null}
             </span>
           ) : (
             <>

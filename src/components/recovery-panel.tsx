@@ -32,7 +32,7 @@ export function RecoveryPanel({ operationId, steps, onRetry }: RecoveryPanelProp
   const complete = remaining === 0;
 
   return (
-    <section aria-label="Recovery" className={`rounded-lg border bg-card p-4 ${complete ? 'border-line' : 'border-warn border-l-4'}`}>
+    <section aria-label="Recovery" className={`rounded-lg border bg-card p-4 ${complete ? 'border-line' : 'border-block border-l-4'}`}>
       <h3 className="font-semibold">{complete ? 'All steps finished' : 'Some steps still need to run'}</h3>
       <p className="mt-1 text-sm text-ink-soft">
         {finished} of {steps.length} steps finished

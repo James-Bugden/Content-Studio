@@ -12,11 +12,11 @@ import type { Thumb } from '@/domain/next-steps';
  */
 const TONE: Record<Thumb['tone'], string> = {
   done: 'border-green/40 bg-linear-145 from-card to-green-soft text-green',
-  todo: 'border-warn/40 bg-linear-145 from-card to-warn-soft text-warn',
+  todo: 'border-line bg-linear-145 from-card to-paper text-ink-soft',
   problem: 'border-block/50 bg-linear-145 from-card to-block-soft text-block',
   none: 'border-line bg-linear-145 from-card to-[#e9edeb] text-ink-soft',
 };
-const GLYPH: Record<Thumb['tone'], string> = { done: '✓', todo: '○', problem: '!', none: '·' };
+const GLYPH: Record<Thumb['tone'], string> = { done: '✓', todo: '○', problem: '●', none: '·' };
 
 export function PostThumb({ thumb, size = 'md', showLabel = true }: { thumb: Thumb | null; size?: 'sm' | 'md' | 'lg'; showLabel?: boolean }) {
   const t: Thumb = thumb ?? { src: null, label: 'No image', tone: 'none' };
@@ -34,7 +34,7 @@ export function PostThumb({ thumb, size = 'md', showLabel = true }: { thumb: Thu
         )}
       </div>
       {showLabel ? (
-        <figcaption className={`inline-flex items-center gap-1 text-xs ${t.tone === 'problem' ? 'text-block' : t.tone === 'todo' ? 'text-warn' : 'text-ink-soft'}`}>
+        <figcaption className={`inline-flex items-center gap-1 text-xs ${t.tone === 'problem' ? 'text-block' : 'text-ink-soft'}`}>
           <span aria-hidden="true">{GLYPH[t.tone]}</span>
           {t.label}
         </figcaption>

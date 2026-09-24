@@ -28,7 +28,7 @@ export function SourceLink({ href, label }: { href: string; label: string }) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="[overflow-wrap:anywhere] text-info underline decoration-1 underline-offset-2 hover:decoration-2"
+      className="[overflow-wrap:anywhere] text-primary underline decoration-1 underline-offset-2 hover:decoration-2"
     >
       {label}
       <span aria-hidden="true"> {'↗'}</span>

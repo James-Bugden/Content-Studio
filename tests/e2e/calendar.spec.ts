@@ -56,7 +56,7 @@ test.describe('desktop, 1280 px', () => {
     const first = strip.locator('[data-task-content-id]').first();
     await expect(first).toHaveAttribute('data-task-content-id', '2026-10-02-MAIN-X');
     await expect(first).toHaveAttribute('data-urgency', 'now');
-    await expect(first).toContainText('! Urgent');
+    await expect(first).toContainText('Urgent');
     await expect(first).toContainText('Fri 2 Oct');
     await expect(first.getByRole('link', { name: /^Update Chinese/ })).toBeVisible();
     await expect(strip.getByText(/open slots to fill/)).toBeVisible();
@@ -85,7 +85,7 @@ test.describe('desktop, 1280 px', () => {
     await expect(oct1).toContainText('Threads 1/2', { useInnerText: true });
     await expect(oct1).toContainText('LinkedIn 0/1', { useInnerText: true });
     const oct2 = grid.locator('[data-date="2026-10-02"]');
-    await expect(oct2).toContainText('! 2', { useInnerText: true });
+    await expect(oct2).toContainText('2 urgent');
     await expect(grid.locator('[data-date="2026-09-30"]')).toContainText('Today', { useInnerText: true });
     await oct2.getByRole('link').click();
     await expect(page).toHaveURL(/view=week&week=2026-10-02/);

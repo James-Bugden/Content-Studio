@@ -16,7 +16,7 @@ export function PlatformPreview({ platform, text, thumb }: { platform: string; t
   return (
     <article aria-label={`Preview on ${platform}`} className="rounded-xl border border-line bg-card p-4 shadow-[0_1px_2px_rgba(23,32,35,0.06)]">
       <header className="flex items-center gap-3">
-        <span aria-hidden="true" className="inline-flex size-10 items-center justify-center rounded-full bg-green text-sm font-semibold text-white">
+        <span aria-hidden="true" className="inline-flex size-10 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white">
           J
         </span>
         <div className="leading-tight">

@@ -8,8 +8,8 @@ export type ResultTone = 'success' | 'info' | 'warning' | 'error';
 
 export const TONES: Record<ResultTone, { label: string; glyph: string; box: string }> = {
   success: { label: 'Done', glyph: '✓', box: 'border-green bg-green-soft text-green' },
-  info: { label: 'Note', glyph: 'i', box: 'border-info bg-info-soft text-info' },
-  warning: { label: 'Check', glyph: '!', box: 'border-warn bg-warn-soft text-warn' },
+  info: { label: 'Note', glyph: 'i', box: 'border-line bg-card text-ink' },
+  warning: { label: 'Check', glyph: '●', box: 'border-block bg-block-soft text-block' },
   error: { label: 'Error', glyph: '✕', box: 'border-block bg-block-soft text-block' },
 };
 

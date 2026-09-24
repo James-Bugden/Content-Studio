@@ -536,7 +536,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
               <div>
                 <button
                   type="button"
-                  className={buttonClass('primary')}
+                  className={buttonClass('approve')}
                   disabled={busy !== null || !item.reviewable.ok}
                   aria-describedby={!item.reviewable.ok ? 'approve-why' : undefined}
                   onClick={() => void run('approve', 'approve', { action: 'approve', version: item.version, fileHash: item.fileHash, material: item.material })}

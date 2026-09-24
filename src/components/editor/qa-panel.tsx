@@ -140,7 +140,7 @@ export function QaPanel({ libraryId, text, canEdit, onApply }: { libraryId: stri
       {run.kind === 'error' ? <AiErrorView code={run.code} what="The English check" onRetry={canEdit ? () => void check() : undefined} /> : null}
 
       {proposal && stale ? (
-        <div role="status" className="rounded-md border-2 border-warn bg-warn-soft p-3 text-sm">
+        <div role="status" className="rounded-md border-2 border-block bg-block-soft p-3 text-sm">
           <p className="font-semibold">Out of date: {STALE_QA_MESSAGE}</p>
           <p className="mt-1">These findings were made for an earlier version of the text, so they cannot be applied.</p>
         </div>
@@ -181,7 +181,7 @@ export function QaPanel({ libraryId, text, canEdit, onApply }: { libraryId: stri
                         ) : f.replacement === '' ? (
                           <span className="text-ink-soft">Remove it</span>
                         ) : (
-                          <mark className="copy rounded-sm bg-focal px-1 font-mono text-ink [overflow-wrap:anywhere]" data-role="replacement">
+                          <mark className="copy rounded-sm bg-primary-soft px-1 font-mono text-ink [overflow-wrap:anywhere]" data-role="replacement">
                             {f.replacement}
                           </mark>
                         )}

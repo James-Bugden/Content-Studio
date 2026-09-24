@@ -95,8 +95,8 @@ test.describe('in a browser in Los Angeles', () => {
     await expect(card.getByText('08:00')).toBeVisible();
     await expect(card.getByText('✓ Published')).toBeVisible();
     await expect(visibleDay(page, '2026-09-30').locator('[data-content-id="2026-10-01-MAIN-X"]')).toHaveCount(0);
-    // A stale Threads adaptation is a next step in words with a "!" marker, not a colour.
-    await expect(visibleCard(page, '2026-10-02-MAIN-X')).toContainText('! Update Chinese');
+    // A stale Threads adaptation is a next step in words on a red-outlined button, never colour alone.
+    await expect(visibleCard(page, '2026-10-02-MAIN-X')).toContainText('Update Chinese');
   });
 });
 

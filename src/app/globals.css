@@ -1,9 +1,11 @@
 @import 'tailwindcss';
 
 /*
- * Content Studio tokens, built from the locked C-light palette so the tool and the
- * visuals it approves share one vocabulary: near-white paper, ink, one yellow focal
- * highlight and green used sparingly for primary actions.
+ * Content Studio tokens: near-black ink on white surfaces, one blue primary for
+ * the active tab, links and the one accent action, red reserved for a genuine
+ * blocker, and green kept only for a confirmed / approved / done signal. Nothing
+ * else gets colour. (The yellow focal marker lives on in the rendered visuals'
+ * own palette, src/domain/visual.ts, which is the image style, not the tool's.)
  *
  * The Polished craft layer (type, gradient, shadows, motion) is a straight port of
  * the approved Calm Signal wireframe: wireframe/2409-app-redesign-backlog/styles-opt1.css,
@@ -15,15 +17,15 @@
   --color-ink: #172023;
   --color-ink-soft: #4a5558;
   --color-line: #d5dbde;
-  --color-focal: #ffe76b;
+  /* The one accent: active tab, links, the one primary action, focus. */
+  --color-primary: #1d4ed8;
+  --color-primary-soft: #eff4ff;
+  /* Confirmed / approved / done only. Never expanded past that. */
   --color-green: #0a3d26;
   --color-green-soft: #e3efe8;
+  /* A genuine blocker only. */
   --color-block: #8a1c1c;
   --color-block-soft: #fbe9e7;
-  --color-warn: #6b4800;
-  --color-warn-soft: #fff4d6;
-  --color-info: #1d3b66;
-  --color-info-soft: #e8eef7;
   /* --font-*-polished come from next/font (src/app/fonts.ts) on <html>; the system stack is the fallback. */
   --font-sans: var(--font-sans-polished), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
   --font-serif: var(--font-serif-polished), Georgia, serif;
@@ -46,9 +48,9 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-ink);
+  outline: 3px solid var(--color-primary);
   outline-offset: 2px;
-  box-shadow: 0 0 0 6px var(--color-focal);
+  box-shadow: 0 0 0 6px var(--color-primary-soft);
 }
 
 .copy {

@@ -27,7 +27,7 @@ export function DayList({ start, today, slots, className = '' }: { start: string
                 <h2 id={id} className="text-base font-semibold">
                   {formatDayLong(d.date)}
                 </h2>
-                {d.date === today ? <span className="rounded bg-focal px-1.5 text-xs font-bold">Today</span> : null}
+                {d.date === today ? <span className="rounded bg-primary-soft px-1.5 text-xs font-bold text-primary">Today</span> : null}
                 {past ? <span className="text-xs text-ink-soft">Past</span> : null}
               </div>
               <ul className="mt-2 flex flex-col gap-2">
@@ -74,7 +74,7 @@ function EmptyRun({ slots }: { slots: SlotSummary[] }) {
                 ) : null}
               </span>
               {s.step.kind === 'fill_slot' ? (
-                <OpenPanelLink target={{ slot: s.contentId }} label={`Fill ${s.platform} ${s.time}`} className="inline-flex min-h-11 items-center px-3 font-semibold text-green underline">
+                <OpenPanelLink target={{ slot: s.contentId }} label={`Fill ${s.platform} ${s.time}`} className="inline-flex min-h-11 items-center px-3 font-semibold text-primary underline">
                   Fill
                 </OpenPanelLink>
               ) : null}

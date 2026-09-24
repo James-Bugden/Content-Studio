@@ -22,11 +22,11 @@ import { StateView } from '../state-view';
 export const ZH_STATE_LOOK: Record<ZhAdaptationState, { label: string; glyph: string; className: string }> = {
   not_required: { label: 'Not required', glyph: '–', className: 'border-line text-ink-soft' },
   missing: { label: 'Not adapted yet', glyph: '○', className: 'border-line text-ink' },
-  draft: { label: 'Draft, not sent for review', glyph: '✎', className: 'border-info text-info' },
-  awaiting_review: { label: 'Awaiting Chinese review', glyph: '→', className: 'border-warn text-warn' },
+  draft: { label: 'Draft, not sent for review', glyph: '✎', className: 'border-line text-ink' },
+  awaiting_review: { label: 'Awaiting Chinese review', glyph: '→', className: 'border-line text-ink' },
   approved: { label: 'Chinese copy approved', glyph: '✓', className: 'border-green text-green' },
   stale: { label: 'Stale: the X copy changed', glyph: '✕', className: 'border-block text-block border-2' },
-  ambiguous: { label: 'Threads row unclear', glyph: '?', className: 'border-warn text-warn' },
+  ambiguous: { label: 'Threads row unclear', glyph: '?', className: 'border-block text-block' },
 };
 
 const QA_LABELS: { key: 'meaning' | 'naturalness' | 'terminology' | 'lineBreaks' | 'taiwanUsage'; label: string }[] = [
@@ -352,8 +352,8 @@ export function AdaptationWorkspace({ initial, canEdit }: { initial: AdaptationV
                     return (
                       <li key={q.key} className="flex items-center justify-between gap-3 rounded-md border border-line px-3 py-1.5" data-qa={q.key} data-result={proposal.qa[q.key]}>
                         <span>{q.label}</span>
-                        <span className={`font-semibold ${pass ? 'text-green' : 'text-warn'}`}>
-                          <span aria-hidden="true">{pass ? '✓ ' : '! '}</span>
+                        <span className={`font-semibold ${pass ? 'text-green' : 'text-ink-soft'}`}>
+                          <span aria-hidden="true">{pass ? '✓ ' : '○ '}</span>
                           {pass ? 'Pass' : 'Check'}
                         </span>
                       </li>
@@ -418,7 +418,7 @@ export function AdaptationWorkspace({ initial, canEdit }: { initial: AdaptationV
         {approvalNote ? <p className="text-sm">{approvalNote}</p> : <p className="text-sm">The saved adaptation matches the current X copy and is waiting for your review.</p>}
         {canEdit && view.state === 'awaiting_review' && threads.kind === 'found' ? (
           <div>
-            <button type="button" className={buttonClass('primary')} disabled={busy || !!proposal} onClick={() => void approve()}>
+            <button type="button" className={buttonClass('approve')} disabled={busy || !!proposal} onClick={() => void approve()}>
               {write.kind === 'approving' ? 'Approving…' : 'Approve Chinese copy'}
             </button>
             {proposal ? <p className="mt-1 text-xs text-ink-soft">Save or discard the new adaptation above first.</p> : null}

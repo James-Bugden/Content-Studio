@@ -33,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </p>
       ) : null}
       {setup ? (
-        <section aria-labelledby="setup-h" className="mt-4 rounded border border-warn bg-warn-soft p-3 text-sm">
+        <section aria-labelledby="setup-h" className="mt-4 rounded border border-line bg-card p-3 text-sm">
           <h2 id="setup-h" className="font-semibold">
             First-time setup
           </h2>
@@ -52,7 +52,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="mt-6 flex flex-col gap-3">
         {google ? (
           <form action={signInWithGoogle}>
-            <button type="submit" className="w-full rounded bg-green px-4 py-2 font-medium text-white">
+            <button type="submit" className="w-full rounded bg-primary px-4 py-2 font-medium text-white">
               Sign in with Google
             </button>
           </form>
