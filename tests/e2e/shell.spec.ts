@@ -53,7 +53,7 @@ test('landmarks and primary navigation are labelled and keyboard reachable', asy
   await expect(page.getByRole('banner')).toHaveCount(1);
   await expect(page.getByRole('main')).toHaveCount(1);
   const nav = page.getByRole('navigation', { name: 'Primary' });
-  await expect(nav.getByRole('link')).toHaveText(['Next up', 'Posts', 'Calendar', 'Published', 'Fix issues']);
+  await expect(nav.getByRole('link')).toHaveText(['Next up', 'Posts', 'Backlog', 'Calendar', 'Published', 'Fix issues']);
   // Tab past the skip link lands on the first nav item.
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
