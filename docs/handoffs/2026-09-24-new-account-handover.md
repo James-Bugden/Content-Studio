@@ -249,6 +249,27 @@ from values already used elsewhere in the Sheet, never invented).
 - **Vercel auto-deploys `main` on every merge** — there is no separate
   manual "Deploy" step like some of James's other projects. Don't wait for
   him to promote anything; don't ask.
+- **This repo has no branch-protection CI gate on `main`** — `gh pr merge`
+  will happily merge a PR with a failing check; nothing on GitHub's side
+  stops it. Self-gating on green CI is entirely on you (per `AGENTS.md`'s
+  "No CI, skipped CI, pending CI, blocked CI or unknown CI is not green").
+  **Never pipe `gh pr checks <N> --watch` through `tail` (or anything else)
+  when you're about to `&&` it into a merge command** — the shell's exit
+  code then belongs to `tail`, which is almost always 0, so a failing check
+  silently stops blocking the merge. This actually happened while writing
+  this handover: a docs-only PR merged with a failing secret-scan check
+  because the watch command was piped through `tail -15` for readability.
+  Check `gh pr checks <N>` (no pipe) or `gh pr view <N> --json
+  mergeStateStatus,statusCheckRollup` and read the real result before
+  merging, or accept the noisy full output instead of piping it.
+- **The secret scanner (`npm run check:secrets`,
+  `scripts/scan-secrets.mjs`) flags every email address in tracked files
+  except `@example.com/org/net`, with no per-string allowlist** — this is
+  deliberate (`AGENTS.md`: never commit owner identifiers), not a bug to
+  work around. Don't put a literal email in a doc or comment, including a
+  "harmless" placeholder like a noreply address — describe it in prose
+  instead (see how this file now describes the Co-Authored-By line rather
+  than spelling it out).
 
 ## 8. Quick reference — commands used constantly this week
 
@@ -271,7 +292,7 @@ rm -rf .next && npx playwright test tests/e2e/<spec>.spec.ts --reporter=line
 # ship
 git add <files> && git commit -m "CS-NNN: <summary>
 
-Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+<the Co-Authored-By line your own system reminder specifies>"
 git push -u origin <branch>
 gh pr create --title "..." --body "...Closes #NNN..."
 gh pr checks <N> --watch
