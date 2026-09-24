@@ -141,7 +141,8 @@ test('Platform, PESTO and Hook template save in sequence and survive a reload', 
 
   const templateWrite = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
   await r.getByRole('button', { name: /^Edit hook template for IDEA-BL-0001/ }).click();
-  const template = r.getByRole('textbox', { name: 'Hook template for IDEA-BL-0001' });
+  // A text input with a datalist has the accessibility role `combobox`.
+  const template = r.getByRole('combobox', { name: 'Hook template for IDEA-BL-0001' });
   await expect(template).toHaveAttribute('list', /.+/);
   await template.fill('Story #7 - The day X changed how I Y');
   await template.press('Enter');
@@ -170,7 +171,7 @@ test('new PESTO values become suggestions for another row and Escape does not wr
   g = await openGroup(page, 'Synthetic Backlog Ideas');
   const second = row(g, 'IDEA-BL-0002');
   await second.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0002/ }).click();
-  const secondPesto = second.getByRole('textbox', { name: 'PESTO stage for IDEA-BL-0002' });
+  const secondPesto = second.getByRole('combobox', { name: 'PESTO stage for IDEA-BL-0002' });
   const listId = await secondPesto.getAttribute('list');
   expect(listId).toBeTruthy();
   // Select by the option rather than interpolating React's opaque useId into
