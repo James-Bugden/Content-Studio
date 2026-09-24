@@ -94,10 +94,21 @@ export class SheetsContentRepository implements ContentRepository {
     const rows: RawRow[] = [];
     let start = 1;
     for (;;) {
-      const page = await timed(
-        { name: 'sheet.read', adapter: 'sheet', facts: { tab: tabKey, startRow: start } },
-        () => this.transport.readTab(tab.name, tab.lastColumn, { startRow: start, maxRows: PAGE_ROWS, formulas: withExtras, links: withExtras }),
-      );
+      let page: RawRow[];
+      try {
+        page = await timed(
+          { name: 'sheet.read', adapter: 'sheet', facts: { tab: tabKey, startRow: start } },
+          () => this.transport.readTab(tab.name, tab.lastColumn, { startRow: start, maxRows: PAGE_ROWS, formulas: withExtras, links: withExtras }),
+        );
+      } catch (error) {
+        // A prior page already returned exactly PAGE_ROWS rows, so this request is shaped
+        // exactly like every earlier one. Sheets answers a range that starts past the tab's
+        // actual grid size with 400 "Unable to parse range", which the transport reports as
+        // VALIDATION_FAILED: that is the grid boundary, not bad input, so the previous page
+        // was the last one and reading stops here.
+        if (start > 1 && isAppError(error) && error.code === 'VALIDATION_FAILED') break;
+        throw error;
+      }
       rows.push(...page);
       if (page.length < PAGE_ROWS) break;
       start += PAGE_ROWS;

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AppError } from '@/domain/errors';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { SHEET_TABS, LIBRARY_HEADERS } from '@/domain/sheet-schema';
@@ -178,6 +179,30 @@ describe('fixtures: pagination, empty queue, settings', () => {
     const rows = await big.listLibrary();
     expect(rows).toHaveLength(1600);
     expect(rows.at(-1)!.value.libraryId).toBe('SYN-B1600');
+  });
+
+  it('a tab whose row count lands exactly on a page boundary still reads to the end', async () => {
+    // 1999 data rows + the header row is 2000 total, an exact multiple of PAGE_ROWS (500). The
+    // last full page (rows 1501-2000) ends exactly at the tab's real grid size, so the next
+    // page request starts past it. Google answers that with 400 "Unable to parse range", which
+    // the live transport reports as VALIDATION_FAILED; this must read as end-of-data, not fail
+    // the whole board (a real regression seen against a live Sheet this size).
+    const grid = largeLibraryRows(1999).map((r) => r.values);
+    const boundary = new (class {
+      readonly mode = 'live' as const;
+      async readTab(tab: string, _lastColumn: string, options: { startRow: number; maxRows: number }) {
+        if (tab !== SHEET_TABS.library.name) throw new AppError('SCHEMA_DRIFT', { provider: 'sheet' });
+        if (options.startRow - 1 >= grid.length) throw new AppError('VALIDATION_FAILED', { provider: 'sheet', status: 400 });
+        return grid.slice(options.startRow - 1, options.startRow - 1 + options.maxRows).map((values) => ({ values }));
+      }
+      async writeCells(): Promise<void> {
+        throw new AppError('FORBIDDEN', { provider: 'sheet' });
+      }
+    })();
+    const atBoundary = new SheetsContentRepository(boundary);
+    const rows = await atBoundary.listLibrary();
+    expect(rows).toHaveLength(1999);
+    expect(rows.at(-1)!.value.libraryId).toBe('SYN-B1999');
   });
 
   it('empty Ready Queue is an empty list, not an error', async () => {
