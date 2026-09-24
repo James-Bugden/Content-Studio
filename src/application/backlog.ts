@@ -35,8 +35,14 @@ export type BacklogItem = {
 
 export type BacklogGroup = { source: string; total: number; items: BacklogItem[] };
 
-/** Options for the Backlog filter bar, derived from what is actually in the Content Queue tab. */
-export type BacklogFilterOptions = { sources: string[]; platforms: Platform[] };
+/**
+ * Options for the Backlog filter bar and the PESTO / Hook template edit cells,
+ * all derived from what is actually already in the Content Queue tab (never
+ * invented): the filter bar narrows the list to one of these values, and the
+ * edit cells offer them as suggestions so editing feels like picking from the
+ * sheet's own vocabulary rather than typing blind.
+ */
+export type BacklogOptions = { sources: string[]; platforms: Platform[]; pestoStages: string[]; hookTemplates: string[] };
 
 export type BacklogFilters = { source?: string; platform?: Platform; approved?: boolean };
 
@@ -102,19 +108,31 @@ export async function loadBacklogGroups(repo: ContentRepository, filters: Backlo
   return groups;
 }
 
-/** The full, unfiltered set of sources and platforms, for the filter bar's option lists. */
-export async function loadBacklogFilterOptions(repo: ContentRepository): Promise<BacklogFilterOptions> {
+/**
+ * The full, unfiltered set of sources and platforms for the filter bar, plus the
+ * distinct PESTO and Hook template values already in use, for the edit cells'
+ * suggestion lists.
+ */
+export async function loadBacklogOptions(repo: ContentRepository): Promise<BacklogOptions> {
   const rows = await repo.listQueue();
   const sources = new Set<string>();
   const platforms = new Set<Platform>();
+  const pestoStages = new Set<string>();
+  const hookTemplates = new Set<string>();
   for (const record of rows) {
     const source = record.value.contentSource.trim();
     sources.add(source === '' ? UNCATEGORISED : source);
     if (record.value.targetPlatform.ok) platforms.add(record.value.targetPlatform.value);
+    const pesto = record.value.pesto.trim();
+    if (pesto !== '') pestoStages.add(pesto);
+    const hookTemplate = record.value.hookTemplate.trim();
+    if (hookTemplate !== '') hookTemplates.add(hookTemplate);
   }
   return {
     sources: [...sources].filter((s) => s !== UNCATEGORISED).sort((a, b) => a.localeCompare(b)).concat(sources.has(UNCATEGORISED) ? [UNCATEGORISED] : []),
     platforms: PLATFORMS.filter((p) => platforms.has(p)),
+    pestoStages: [...pestoStages].sort((a, b) => a.localeCompare(b)),
+    hookTemplates: [...hookTemplates].sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -129,6 +147,10 @@ export const backlogEditSchema = z.object({
       currentHook: z.string().max(500).optional(),
       draftContent: z.string().max(50000).optional(),
       reviewStatus: z.enum(['Pending', 'Approved', 'Skipped']).optional(),
+      // Empty string clears the cell; a real value must be one of the closed platforms.
+      platform: z.union([z.enum(PLATFORMS), z.literal('')]).optional(),
+      pesto: z.string().max(200).optional(),
+      hookTemplate: z.string().max(300).optional(),
     })
     .refine((p) => Object.keys(p).length > 0, 'patch must set at least one field'),
 });
@@ -145,6 +167,9 @@ export async function applyBacklogEdit(repo: ContentRepository, actor: Actor, t:
   if (t.patch.currentHook !== undefined) patch.currentHook = t.patch.currentHook;
   if (t.patch.draftContent !== undefined) patch.draftContent = t.patch.draftContent;
   if (t.patch.reviewStatus !== undefined) patch.reviewStatus = SHEET_WRITE_VALUE.review[t.patch.reviewStatus];
+  if (t.patch.platform !== undefined) patch.targetPlatform = t.patch.platform;
+  if (t.patch.pesto !== undefined) patch.pesto = t.patch.pesto;
+  if (t.patch.hookTemplate !== undefined) patch.hookTemplate = t.patch.hookTemplate;
 
   const result = await repo.updateQueue({
     operationId: t.operationId,

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
-import { loadBacklogFilterOptions, loadBacklogGroups, type BacklogFilters } from '@/application/backlog';
+import { loadBacklogOptions, loadBacklogGroups, type BacklogFilters } from '@/application/backlog';
 import { PageHeader, StateView } from '@/components';
 import { BacklogGroupTable } from '@/components/backlog/backlog-group-table';
 import { FilterBar } from '@/components/filter-bar';
@@ -36,7 +36,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
   const { repo } = getServices();
   const params = await searchParams;
   const filters = parseFilters(params);
-  const [groups, options] = await Promise.all([loadBacklogGroups(repo, filters), loadBacklogFilterOptions(repo)]);
+  const [groups, options] = await Promise.all([loadBacklogGroups(repo, filters), loadBacklogOptions(repo)]);
   const total = groups.reduce((sum, g) => sum + g.total, 0);
   const unfiltered = Object.values(filters).every((v) => v === undefined);
 
@@ -78,6 +78,8 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
                 <BacklogGroupTable
                   source={group.source}
                   canEdit={canEdit}
+                  pestoOptions={options.pestoStages}
+                  hookTemplateOptions={options.hookTemplates}
                   items={group.items.map((item) => ({
                     libraryId: item.libraryId,
                     revision: item.revision,

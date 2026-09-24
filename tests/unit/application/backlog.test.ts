@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
-import { applyBacklogEdit, loadBacklogGroups } from '@/application/backlog';
+import { applyBacklogEdit, backlogEditSchema, loadBacklogGroups, loadBacklogOptions } from '@/application/backlog';
 import { SHEET_TABS } from '@/domain/sheet-schema';
 import type { Actor } from '@/domain/mutation';
 
@@ -98,5 +98,79 @@ describe('applyBacklogEdit', () => {
     });
     expect(outcome).toMatchObject({ ok: false, code: 'FORBIDDEN' });
     expect(transport.writes).toHaveLength(0);
+  });
+
+  it('patches platform, pesto and hookTemplate together, all reflected in the returned item and the sheet', async () => {
+    // The synthetic fixture defaults targetPlatform to LinkedIn and hookTemplate to the
+    // "Contrarian #12" catalogue entry (LIBRARY_DEFAULTS): pick different values so this
+    // test actually exercises the write path rather than re-writing the existing defaults.
+    const before = await repo.getQueue('IDEA-BL-0004');
+    const outcome = await applyBacklogEdit(repo, owner, {
+      operationId: op('fields'),
+      libraryId: 'IDEA-BL-0004',
+      expectedRevision: before.revision,
+      patch: { platform: 'X', pesto: 'Opinions', hookTemplate: 'Story #7 - The day X changed how I Y' },
+    });
+    expect(outcome).toMatchObject({ ok: true, replayed: false });
+    if (outcome.ok) {
+      expect(outcome.item.platform).toBe('X');
+      expect(outcome.item.pesto).toBe('Opinions');
+      expect(outcome.item.hookTemplate).toBe('Story #7 - The day X changed how I Y');
+    }
+    const after = await repo.getQueue('IDEA-BL-0004');
+    expect(after.value.targetPlatform).toMatchObject({ ok: true, value: 'X' });
+    expect(after.value.pesto).toBe('Opinions');
+    expect(after.value.hookTemplate).toBe('Story #7 - The day X changed how I Y');
+  });
+
+  it('an empty-string platform clears the cell', async () => {
+    const set = await applyBacklogEdit(repo, owner, {
+      operationId: op('platform-set'),
+      libraryId: 'IDEA-BL-0005',
+      expectedRevision: (await repo.getQueue('IDEA-BL-0005')).revision,
+      patch: { platform: 'X' },
+    });
+    expect(set.ok).toBe(true);
+    if (!set.ok) return;
+    const cleared = await applyBacklogEdit(repo, owner, {
+      operationId: op('platform-clear'),
+      libraryId: 'IDEA-BL-0005',
+      expectedRevision: set.revision,
+      patch: { platform: '' },
+    });
+    expect(cleared).toMatchObject({ ok: true });
+    if (cleared.ok) expect(cleared.item.platform).toBeNull();
+  });
+
+  it('an unrecognised platform value is rejected by the schema before it reaches the repository', () => {
+    const parsed = backlogEditSchema.safeParse({
+      operationId: op('bad-platform'),
+      libraryId: 'IDEA-BL-0001',
+      expectedRevision: '"row-1-abc"',
+      patch: { platform: 'Bluesky' },
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe('loadBacklogOptions', () => {
+  it('collects distinct, sorted PESTO stages and hook templates already present in the sheet', async () => {
+    await applyBacklogEdit(repo, owner, {
+      operationId: op('opts-1'),
+      libraryId: 'IDEA-BL-0001',
+      expectedRevision: (await repo.getQueue('IDEA-BL-0001')).revision,
+      patch: { pesto: 'Story', hookTemplate: 'Story #7 - The day X changed how I Y' },
+    });
+    await applyBacklogEdit(repo, owner, {
+      operationId: op('opts-2'),
+      libraryId: 'IDEA-BL-0002',
+      expectedRevision: (await repo.getQueue('IDEA-BL-0002')).revision,
+      patch: { pesto: 'Opinions' },
+    });
+    const options = await loadBacklogOptions(repo);
+    expect(options.pestoStages).toEqual(['Opinions', 'Story']);
+    // Every other synthetic row still carries the fixture's default hookTemplate
+    // ("Contrarian #12" — LIBRARY_DEFAULTS), so both it and the overridden row's value are present.
+    expect(options.hookTemplates).toEqual(['Contrarian #12 - Everyone says X, but Y', 'Story #7 - The day X changed how I Y']);
   });
 });
