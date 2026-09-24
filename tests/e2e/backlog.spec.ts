@@ -46,10 +46,9 @@ test('the Backlog nav link is visible and opens the Backlog page', async ({ page
 
 test('the page shows the 2 synthetic source groups, closed by default, with idea counts', async ({ page }) => {
   await page.goto('/backlog');
-  await expect(page.getByText('Synthetic Backlog Ideas')).toBeVisible();
-  await expect(page.getByText('(3 ideas)')).toBeVisible();
-  await expect(page.getByText('Synthetic Interview Prep')).toBeVisible();
-  await expect(page.getByText('(2 ideas)')).toBeVisible();
+  // Scoped to the group heading, not the source also present as a Reference filter option.
+  await expect(group(page, 'Synthetic Backlog Ideas').getByText('(3 ideas)')).toBeVisible();
+  await expect(group(page, 'Synthetic Interview Prep').getByText('(2 ideas)')).toBeVisible();
   // Closed by default: rows are not visible until their group is opened.
   await expect(page.locator('[data-library-id="IDEA-BL-0001"]:visible')).toHaveCount(0);
 });
