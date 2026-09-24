@@ -6,21 +6,31 @@ import { PostThumb } from '../panel/post-thumb';
 import { StepButton } from '../panel/step-button';
 
 /**
- * Posts backlog (UX redesign): one row per post with a pill for every step, like
- * the owner's Sheet tabs. A dense table on wide screens and stacked rows on
- * phones. The title and the next step both open the side panel (`?post=`);
- * detail stays in the panel, not the row.
+ * Posts backlog (UX redesign, Calm Signal): one row per post with a marker for
+ * every step, like the owner's Sheet tabs. A dense table on wide screens and
+ * stacked rows on phones. The title and the next step both open the side panel
+ * (`?post=`); detail stays in the panel, not the row.
+ *
+ * Colour is reserved for what genuinely needs action now: only `problem` renders
+ * as a bordered, tinted badge, so it is the one thing that visually pops. Every
+ * other tone (`done`, `todo`, `none`) is plain text, no border or background, no
+ * pill shape, so the routine and pending states stay quiet.
  */
-const PILL_TONE: Record<Pill['tone'], string> = {
-  done: 'border-green/30 bg-green-soft text-green',
-  todo: 'border-warn/40 bg-warn-soft text-warn',
-  problem: 'border-block bg-block-soft text-block font-semibold',
-  none: 'border-line bg-paper text-ink-soft',
+const PILL_TEXT_TONE: Record<Pill['tone'], string> = {
+  done: 'text-green',
+  todo: 'text-ink-soft',
+  problem: 'text-block font-semibold',
+  none: 'text-ink-soft',
 };
 
 export function StepPill({ pill, column }: { pill: Pill; column?: BacklogColumn }) {
+  const badge = pill.tone === 'problem';
   return (
-    <span className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap ${PILL_TONE[pill.tone]}`}>
+    <span
+      className={`inline-flex max-w-full items-center gap-1 text-xs whitespace-nowrap ${PILL_TEXT_TONE[pill.tone]} ${
+        badge ? 'rounded-full border border-block bg-block-soft px-2 py-0.5' : ''
+      }`}
+    >
       {column ? <span className="font-normal text-ink-soft">{COLUMN_LABEL[column]}</span> : null}
       <span aria-hidden="true">{PILL_GLYPH[pill.tone]}</span>
       <span className="truncate">{pill.label}</span>

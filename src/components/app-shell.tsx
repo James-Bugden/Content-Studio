@@ -12,6 +12,7 @@ import { ToastProvider } from './toaster';
 export const PRIMARY_NAV = [
   { href: '/', label: 'Next up' },
   { href: '/review', label: 'Posts' },
+  { href: '/backlog', label: 'Backlog' },
   { href: '/schedule', label: 'Calendar' },
   { href: '/published', label: 'Published' },
   { href: '/reconcile', label: 'Fix issues' },

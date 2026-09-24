@@ -5,14 +5,16 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { contentIdSchema, libraryIdSchema } from '@/domain/mutation';
 import { useLeaveConfirmation } from '../leave-confirm';
 import { PostPanel } from './post-panel';
+import { QueuePanel } from './queue-panel';
 import { SlotPanel } from './slot-panel';
 
 /**
  * Side-panel host (UX redesign). Mounted once in the studio layout. When the URL
- * carries `?post=<Library ID>` or `?slot=<Content ID>`, a panel slides in from
- * the right (full screen on a phone) so a post can be read, edited, approved
- * and scheduled without leaving the page. Native <dialog>: focus is trapped,
- * Escape closes, and unsaved edits are guarded before closing.
+ * carries `?post=<Library ID>`, `?slot=<Content ID>` or `?queue=<Library ID>`, a
+ * panel slides in from the right (full screen on a phone) so a post, a
+ * schedule slot or a backlog idea can be read, edited and (for a post or slot)
+ * approved and scheduled without leaving the page. Native <dialog>: focus is
+ * trapped, Escape closes, and unsaved edits are guarded before closing.
  */
 export function PanelHost() {
   const params = useSearchParams();
@@ -25,15 +27,18 @@ export function PanelHost() {
   const ownsSlotParam = /^\/ready\/[^/]+\/promote$/.test(pathname);
   const postParam = params.get('post');
   const slotParam = params.get('slot');
+  const queueParam = params.get('queue');
   const post = postParam && libraryIdSchema.safeParse(postParam).success ? postParam : null;
   const slot = !post && !ownsSlotParam && slotParam && contentIdSchema.safeParse(slotParam).success ? slotParam : null;
-  const open = Boolean(post || slot);
+  const queue = !post && !slot && queueParam && libraryIdSchema.safeParse(queueParam).success ? queueParam : null;
+  const open = Boolean(post || slot || queue);
 
   const close = useCallback(() => {
     guard(() => {
       const next = new URLSearchParams(params.toString());
       next.delete('post');
       next.delete('slot');
+      next.delete('queue');
       const q = next.toString();
       router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
       router.refresh();
@@ -64,7 +69,7 @@ export function PanelHost() {
         {open ? (
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between gap-2 border-b border-line bg-card px-4 py-2">
-              <p className="text-xs font-semibold tracking-wide text-ink-soft">{post ? 'Post' : 'Schedule slot'}</p>
+              <p className="text-xs font-semibold tracking-wide text-ink-soft">{post ? 'Post' : slot ? 'Schedule slot' : 'Backlog idea'}</p>
               <button type="button" onClick={close} className="inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-sm hover:bg-paper">
                 <span aria-hidden="true">✕</span> Close
               </button>
@@ -72,6 +77,7 @@ export function PanelHost() {
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {post ? <PostPanel key={post} libraryId={post} /> : null}
               {slot ? <SlotPanel key={slot} contentId={slot} /> : null}
+              {queue ? <QueuePanel key={queue} libraryId={queue} /> : null}
             </div>
           </div>
         ) : null}

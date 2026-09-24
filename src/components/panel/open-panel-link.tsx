@@ -3,16 +3,19 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 /**
- * Opens the side panel for a post (`?post=<Library ID>`) or a schedule slot
- * (`?slot=<Content ID>`) on the current page, without navigating away. The URL
- * carries ids only, never copy (SEC-10), so a panel can be linked and reloaded.
+ * Opens the side panel for a post (`?post=<Library ID>`), a schedule slot
+ * (`?slot=<Content ID>`) or a backlog idea (`?queue=<Library ID>`) on the
+ * current page, without navigating away. The URL carries ids only, never copy
+ * (SEC-10), so a panel can be linked and reloaded.
  */
-export function panelHref(pathname: string, params: URLSearchParams, target: { post: string } | { slot: string }): string {
+export function panelHref(pathname: string, params: URLSearchParams, target: { post: string } | { slot: string } | { queue: string }): string {
   const next = new URLSearchParams(params.toString());
   next.delete('post');
   next.delete('slot');
+  next.delete('queue');
   if ('post' in target) next.set('post', target.post);
-  else next.set('slot', target.slot);
+  else if ('slot' in target) next.set('slot', target.slot);
+  else next.set('queue', target.queue);
   return `${pathname}?${next.toString()}`;
 }
 
@@ -22,7 +25,7 @@ export function OpenPanelLink({
   children,
   label,
 }: {
-  target: { post: string } | { slot: string };
+  target: { post: string } | { slot: string } | { queue: string };
   className?: string;
   children: React.ReactNode;
   /** Accessible name when children are not text. */
