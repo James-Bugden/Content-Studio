@@ -1,4 +1,5 @@
 import type { NextStep } from '@/domain/next-steps';
+import { buttonCraft } from '../button-styles';
 import { OpenPanelLink } from './open-panel-link';
 
 /**
@@ -18,7 +19,7 @@ export function StepButton({ step, target, size = 'md' }: { step: NextStep; targ
     <OpenPanelLink
       target={target}
       label={`${step.action}: ${step.why}`}
-      className={`inline-flex items-center gap-1.5 rounded-md font-medium ${pad} ${
+      className={`inline-flex items-center gap-1.5 rounded-md font-medium ${buttonCraft} ${pad} ${
         urgent
           ? 'border-2 border-block bg-block-soft text-block hover:bg-block-soft/70'
           : 'border border-line bg-card text-ink hover:bg-paper'

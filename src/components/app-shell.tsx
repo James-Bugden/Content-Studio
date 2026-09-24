@@ -35,7 +35,7 @@ export function AppShell({ children, accountSlot }: AppShellProps) {
       </a>
       <header className="border-b border-line bg-card">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <p className="text-base font-semibold tracking-tight">Content Studio</p>
+          <p className="font-serif text-[15px] font-semibold tracking-[-0.01em]">Content Studio</p>
           {accountSlot ? <div className="flex min-w-0 items-center gap-2 text-sm">{accountSlot}</div> : null}
         </div>
         <nav aria-label="Primary" className="mx-auto max-w-6xl px-2 pb-2">

@@ -4,6 +4,10 @@
  * Content Studio tokens, built from the locked C-light palette so the tool and the
  * visuals it approves share one vocabulary: near-white paper, ink, one yellow focal
  * highlight and green used sparingly for primary actions.
+ *
+ * The Polished craft layer (type, gradient, shadows, motion) is a straight port of
+ * the approved Calm Signal wireframe: wireframe/2409-app-redesign-backlog/styles-opt1.css,
+ * "Polished" block (lines 69-124). Values are copied, not re-derived.
  */
 @theme {
   --color-paper: #fafbfc;
@@ -20,8 +24,12 @@
   --color-warn-soft: #fff4d6;
   --color-info: #1d3b66;
   --color-info-soft: #e8eef7;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
+  /* --font-*-polished come from next/font (src/app/fonts.ts) on <html>; the system stack is the fallback. */
+  --font-sans: var(--font-sans-polished), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
+  --font-serif: var(--font-serif-polished), Georgia, serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* Card corner from the wireframe (line 81); rounded-lg is the only card radius in use. */
+  --radius-lg: 6px;
 }
 
 html {
@@ -30,6 +38,8 @@ html {
 }
 
 body {
+  /* Wireframe line 76: paper at the top settling into a slightly cooler grey. */
+  background: linear-gradient(180deg, var(--color-paper) 0%, #f1f4f2 100%);
   font-family: var(--font-sans);
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -44,4 +54,74 @@ body {
 .copy {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+@layer base {
+  /* Wireframe lines 71-73: page title, wordmark and accordion group names in the serif. */
+  h1,
+  details.rounded-lg > summary > .font-semibold {
+    font-family: var(--font-serif);
+    letter-spacing: -0.01em;
+  }
+
+  /* Wireframe lines 85-86: table rows settle into paper on hover. */
+  tbody tr td {
+    transition: background-color 150ms ease-out;
+  }
+  tbody tr:hover td {
+    background-color: var(--color-paper);
+  }
+}
+
+@layer components {
+  /*
+   * Wireframe lines 80-82: every card (view or accordion group) sits on a soft
+   * two-part shadow. `rounded-lg border bg-card` is the card recipe every page
+   * already uses, so one selector covers all of them without touching components.
+   * Utilities still win, so the modal keeps its own shadow-xl.
+   */
+  .rounded-lg.border.bg-card {
+    box-shadow: 0 1px 2px rgba(23, 32, 35, 0.04), 0 4px 14px rgba(23, 32, 35, 0.05);
+    transition: box-shadow 150ms ease-out;
+  }
+  details.rounded-lg.border.bg-card[open] {
+    box-shadow: 0 1px 2px rgba(23, 32, 35, 0.05), 0 6px 18px rgba(23, 32, 35, 0.06);
+  }
+}
+
+/*
+ * Wireframe lines 108-124: staggered entrance, only when the user has not asked
+ * for less motion. Scoped to accordion groups (details) rather than table rows:
+ * the real tables run to hundreds or thousands of rows, so a per-row stagger
+ * would be jarring and slow instead of calm.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  details.rounded-lg {
+    animation: polished-rise 300ms ease-out both;
+  }
+  li:nth-child(2) > details.rounded-lg {
+    animation-delay: 60ms;
+  }
+  li:nth-child(3) > details.rounded-lg {
+    animation-delay: 120ms;
+  }
+  li:nth-child(4) > details.rounded-lg {
+    animation-delay: 240ms;
+  }
+  li:nth-child(5) > details.rounded-lg {
+    animation-delay: 290ms;
+  }
+  li:nth-child(n + 6) > details.rounded-lg {
+    animation-delay: 340ms;
+  }
+}
+@keyframes polished-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
