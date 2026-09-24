@@ -30,3 +30,6 @@ tmp/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 next-env.d.ts
+
+# Design scratch space (wireframe skill output), not app code
+wireframe/

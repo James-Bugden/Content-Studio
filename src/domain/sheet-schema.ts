@@ -95,6 +95,7 @@ export type ScheduleField = keyof typeof SCHEDULE_HEADERS;
 
 export const SHEET_TABS = {
   library: { name: 'Content Library', headerRow: 1, lastColumn: 'AG', writable: true },
+  queue: { name: 'Content Queue', headerRow: 1, lastColumn: 'AG', writable: true },
   readyQueue: { name: 'Ready Queue', headerRow: 1, lastColumn: 'AG', writable: false },
   schedule: { name: 'Content Schedule', headerRow: 2, lastColumn: 'AR', writable: true },
   queueSummary: { name: 'Content Queue Summary', headerRow: 1, lastColumn: 'Z', writable: false },
