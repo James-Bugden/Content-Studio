@@ -173,7 +173,9 @@ test('new PESTO values become suggestions for another row and Escape does not wr
   const secondPesto = second.getByRole('textbox', { name: 'PESTO stage for IDEA-BL-0002' });
   const listId = await secondPesto.getAttribute('list');
   expect(listId).toBeTruthy();
-  await expect(page.locator(`datalist#${listId} option[value="Opinions"]`)).toHaveCount(1);
+  // Select by the option rather than interpolating React's opaque useId into
+  // CSS; that id is allowed to contain selector punctuation.
+  await expect(page.locator('datalist option[value="Opinions"]')).toHaveCount(1);
 
   let writes = 0;
   const countWrite = (req: { url(): string; method(): string }) => {
