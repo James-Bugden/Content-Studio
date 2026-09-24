@@ -117,7 +117,7 @@ export class SheetsContentRepository implements ContentRepository {
     return rows;
   }
 
-  private async readTab<F extends string>(tabKey: 'library' | 'readyQueue' | 'schedule', headers: Record<F, string>, fresh = false): Promise<TabRead<F>> {
+  private async readTab<F extends string>(tabKey: 'library' | 'queue' | 'readyQueue' | 'schedule', headers: Record<F, string>, fresh = false): Promise<TabRead<F>> {
     const tab = SHEET_TABS[tabKey];
     const all = await this.cachedReadAll(tabKey, true, fresh);
     const headerRow = all[tab.headerRow - 1];
@@ -138,7 +138,7 @@ export class SheetsContentRepository implements ContentRepository {
 
   async schema(): Promise<SchemaStatus> {
     const tabs: SchemaStatus['tabs'] = [];
-    const check = async <F extends string>(tabKey: 'library' | 'readyQueue' | 'schedule', headers: Record<F, string>) => {
+    const check = async <F extends string>(tabKey: 'library' | 'queue' | 'readyQueue' | 'schedule', headers: Record<F, string>) => {
       const tab = SHEET_TABS[tabKey];
       try {
         const rows = await this.transport.readTab(tab.name, tab.lastColumn, { startRow: tab.headerRow, maxRows: 1, formulas: false, links: false });
@@ -153,6 +153,7 @@ export class SheetsContentRepository implements ContentRepository {
       }
     };
     await check('library', LIBRARY_HEADERS);
+    await check('queue', LIBRARY_HEADERS);
     await check('readyQueue', LIBRARY_HEADERS);
     await check('schedule', SCHEDULE_HEADERS);
     return { ok: tabs.every((t) => t.ok), tabs };
@@ -165,6 +166,16 @@ export class SheetsContentRepository implements ContentRepository {
 
   async getLibrary(libraryId: string): Promise<LibraryRecord> {
     const all = await this.listLibrary();
+    return uniqueBy(all, (r) => r.value.libraryId, libraryId);
+  }
+
+  async listQueue(): Promise<LibraryRecord[]> {
+    const { index, rows } = await this.readTab('queue', LIBRARY_HEADERS);
+    return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
+  }
+
+  async getQueue(libraryId: string): Promise<LibraryRecord> {
+    const all = await this.listQueue();
     return uniqueBy(all, (r) => r.value.libraryId, libraryId);
   }
 
@@ -198,12 +209,16 @@ export class SheetsContentRepository implements ContentRepository {
     return this.update('library', LIBRARY_HEADERS, LIBRARY_WRITABLE, m.target.libraryId, (r) => r.value.libraryId, m, toLibraryRecord);
   }
 
+  async updateQueue(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>> {
+    return this.update('queue', LIBRARY_HEADERS, LIBRARY_WRITABLE, m.target.libraryId, (r) => r.value.libraryId, m, toLibraryRecord);
+  }
+
   async updateSchedule(m: MutationEnvelope<{ contentId: string }, SchedulePatch>): Promise<MutationResult<ScheduleRecord>> {
     return this.update('schedule', SCHEDULE_HEADERS, SCHEDULE_WRITABLE, m.target.contentId, (r) => r.value.contentId, m, toScheduleRecord);
   }
 
   private async update<F extends string, R extends { row: number; revision: string; cells: Record<F, string>; formulaFields: F[] }>(
-    tabKey: 'library' | 'schedule',
+    tabKey: 'library' | 'queue' | 'schedule',
     headers: Record<F, string>,
     writable: readonly F[],
     id: string,

@@ -24,6 +24,10 @@ export interface ContentRepository {
   schema(): Promise<SchemaStatus>;
   listLibrary(): Promise<LibraryRecord[]>;
   getLibrary(libraryId: string): Promise<LibraryRecord>;
+  /** Content Queue: same headers/shape as Content Library, a second writable tab of idea-stage rows. */
+  listQueue(): Promise<LibraryRecord[]>;
+  getQueue(libraryId: string): Promise<LibraryRecord>;
+  updateQueue(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>>;
   /** Reads the derived Ready Queue tab. Never written. */
   listReadyQueue(): Promise<LibraryRecord[]>;
   listSchedule(): Promise<ScheduleRecord[]>;

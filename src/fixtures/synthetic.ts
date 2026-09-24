@@ -148,6 +148,22 @@ export function syntheticLibraryRows(): RawRow[] {
   return [header, ...rows];
 }
 
+/** Idea-stage backlog rows for the Content Queue tab: same header row and columns as Content Library. */
+const SYNTH_QUEUE: WithUrl[] = [
+  { libraryId: 'IDEA-BL-0001', state: 'Idea', contentSource: 'Synthetic Backlog Ideas', workflowRole: 'Backlog idea', slug: 'idea-remote-stipend', pairKey: 'syn-idea-remote-stipend', currentHook: 'Remote roles hide a second negotiation.', draftContent: 'Remote roles hide a second negotiation.\n\nAsk about the stipend before you ask about salary.', nextAction: 'Promote to Editing' },
+  { libraryId: 'IDEA-BL-0002', state: 'Idea', contentSource: 'Synthetic Backlog Ideas', workflowRole: 'Backlog idea', slug: 'idea-counter-timeline', pairKey: 'syn-idea-counter-timeline', currentHook: 'A slow counteroffer is still a counteroffer.', draftContent: 'A slow counteroffer is still a counteroffer.\n\nDo not read the delay as a no.', nextAction: 'Promote to Editing' },
+  { libraryId: 'IDEA-BL-0003', state: 'Idea', contentSource: 'Synthetic Backlog Ideas', workflowRole: 'Backlog idea', slug: 'idea-benefits-math', pairKey: 'syn-idea-benefits-math', currentHook: 'Benefits are salary you forgot to count.', draftContent: 'Benefits are salary you forgot to count.\n\nPrice the healthcare gap before you compare offers.', nextAction: 'Promote to Editing' },
+  { libraryId: 'IDEA-BL-0004', state: 'Idea', contentSource: 'Synthetic Interview Prep', workflowRole: 'Backlog idea', slug: 'idea-panel-question-bank', pairKey: 'syn-idea-panel-bank', currentHook: 'Panel interviews reward a different kind of prep.', draftContent: 'Panel interviews reward a different kind of prep.\n\nPrep one story per panelist role, not one story total.', nextAction: 'Promote to Editing' },
+  { libraryId: 'IDEA-BL-0005', state: 'Idea', contentSource: 'Synthetic Interview Prep', workflowRole: 'Backlog idea', slug: 'idea-followup-timing', pairKey: 'syn-idea-followup-timing', currentHook: 'The follow-up email has a best hour.', draftContent: 'The follow-up email has a best hour.\n\nSend it before the panel forgets the room.', nextAction: 'Promote to Editing' },
+];
+
+/** Content Queue: identical header row/columns to Content Library (LIBRARY_ORDER/LIBRARY_HEADERS), idea-stage rows only. */
+export function syntheticQueueRows(): RawRow[] {
+  const header: RawRow = { values: LIBRARY_ORDER.map((f) => LIBRARY_HEADERS[f]) };
+  const rows = SYNTH_QUEUE.map((cells) => libraryRaw(cells));
+  return [header, ...rows];
+}
+
 /** A large corpus for pagination/performance tests (REV-03, 1,600 rows). */
 export function largeLibraryRows(count = 1600): RawRow[] {
   const header: RawRow = { values: LIBRARY_ORDER.map((f) => LIBRARY_HEADERS[f]) };

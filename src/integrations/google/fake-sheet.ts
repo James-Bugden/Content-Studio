@@ -3,6 +3,7 @@ import { AppError, type ErrorCode } from '@/domain/errors';
 import type { RawRow } from '@/domain/mapping';
 import {
   syntheticLibraryRows,
+  syntheticQueueRows,
   syntheticQueueSummaryRows,
   syntheticReadyQueueRows,
   syntheticScheduleRows,
@@ -37,6 +38,7 @@ export class FakeSheetTransport implements SheetTransport {
   constructor(seed?: Partial<Record<string, RawRow[]>>) {
     const initial: Record<string, RawRow[]> = {
       [SHEET_TABS.library.name]: syntheticLibraryRows(),
+      [SHEET_TABS.queue.name]: syntheticQueueRows(),
       [SHEET_TABS.schedule.name]: syntheticScheduleRows(),
       [SHEET_TABS.queueSummary.name]: syntheticQueueSummaryRows(),
       [SHEET_TABS.settings.name]: syntheticSettingsRows(),

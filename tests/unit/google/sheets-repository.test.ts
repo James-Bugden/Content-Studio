@@ -24,10 +24,10 @@ afterEach(() => setTelemetrySink(null));
 const op = (n: string) => `op_${n}_000000`;
 
 describe('MAP-03 / MAP-04: schema discovery', () => {
-  it('reports all three tabs healthy for the synthetic workbook', async () => {
+  it('reports all tabs healthy for the synthetic workbook', async () => {
     const s = await repo.schema();
     expect(s.ok).toBe(true);
-    expect(s.tabs.map((t) => t.tab)).toEqual(['Content Library', 'Ready Queue', 'Content Schedule']);
+    expect(s.tabs.map((t) => t.tab)).toEqual(['Content Library', 'Content Queue', 'Ready Queue', 'Content Schedule']);
   });
 
   it('renamed required column gives SCHEMA_DRIFT and no write', async () => {
