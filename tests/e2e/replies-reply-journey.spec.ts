@@ -8,8 +8,11 @@ import { test, expect, type Page } from '@playwright/test';
  * second viewport project inherits everything the first one did. That passes when
  * a file is run alone and fails in CI, which is the worst way to find out.
  */
-test.beforeEach(async ({ request }) => {
-  await request.post('/api/replies/test/reset');
+test.beforeEach(async ({ page }) => {
+  await page.request.post('/api/replies/test/reset');
+  expect(
+    (await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status(),
+  ).toBe(200);
 });
 
 

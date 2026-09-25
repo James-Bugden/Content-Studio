@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  expect(
+    (await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status(),
+  ).toBe(200);
+});
+
 /**
  * Foundation smoke. The real journeys live in `reply-journey.spec.ts`; this file
  * checks the two things that are true before any feature works: the production

@@ -37,8 +37,11 @@ async function loadPageFirst(page: import('@playwright/test').Page) {
   await expect(page.getByRole('link', { name: 'Replies', exact: true })).toBeVisible();
 }
 
-test.beforeEach(async ({ request }) => {
-  await request.post('/api/replies/test/reset');
+test.beforeEach(async ({ page }) => {
+  await page.request.post('/api/replies/test/reset');
+  expect(
+    (await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status(),
+  ).toBe(200);
 });
 
 async function newSession(request: import('@playwright/test').APIRequestContext, origin: string) {
