@@ -11,6 +11,8 @@ export type MirrorCollection = 'schema' | 'library' | 'queue' | 'ready' | 'sched
 export type MirrorRow = {
   collection: MirrorCollection;
   stableId: string;
+  /** Zero-based order in the source collection. Required to preserve Sheet/UI ordering. */
+  position: number;
   sourceRow: number | null;
   sourceRevision: string | null;
   rowHash: string;
@@ -66,12 +68,13 @@ function canonicalValue(value: unknown): unknown {
   return value;
 }
 
-function row(collection: MirrorCollection, stableId: string, payload: unknown, source?: LibraryRecord | ScheduleRecord): MirrorRow {
+function row(collection: MirrorCollection, stableId: string, payload: unknown, position: number, source?: LibraryRecord | ScheduleRecord): MirrorRow {
   const id = stableId.trim();
   if (!id) throw new AppError('VALIDATION_FAILED', { reason: 'mirror_missing_stable_id', collection });
   return {
     collection,
     stableId: id,
+    position,
     sourceRow: source?.row ?? null,
     sourceRevision: source?.revision ?? null,
     rowHash: mirrorHash(payload),
@@ -80,19 +83,19 @@ function row(collection: MirrorCollection, stableId: string, payload: unknown, s
 }
 
 function recordRows(collection: 'library' | 'queue' | 'ready', records: LibraryRecord[]): MirrorRow[] {
-  return records.map((record) => row(collection, record.value.libraryId, record, record));
+  return records.map((record, position) => row(collection, record.value.libraryId, record, position, record));
 }
 
 function scheduleRows(records: ScheduleRecord[]): MirrorRow[] {
-  return records.map((record) => row('schedule', record.value.contentId, record, record));
+  return records.map((record, position) => row('schedule', record.value.contentId, record, position, record));
 }
 
 function summaryRows(records: QueueSummaryRow[]): MirrorRow[] {
-  return records.map((record) => row('queue_summary', record.source, record));
+  return records.map((record, position) => row('queue_summary', record.source, record, position));
 }
 
 function settingsRows(settings: WorkflowSettings): MirrorRow[] {
-  return [row('workflow_settings', 'workflow', settings)];
+  return [row('workflow_settings', 'workflow', settings, 0)];
 }
 
 function assertUnique(rows: MirrorRow[]): void {
@@ -125,7 +128,7 @@ export async function buildSheetMirrorSnapshot(
   ]);
 
   const rows = [
-    row('schema', 'sheet', schema),
+    row('schema', 'sheet', schema, 0),
     ...recordRows('library', library),
     ...recordRows('queue', queue),
     ...recordRows('ready', ready),
@@ -139,7 +142,7 @@ export async function buildSheetMirrorSnapshot(
     MirrorCollection,
     number
   >;
-  const snapshotHash = mirrorHash(rows.map(({ collection, stableId, rowHash }) => ({ collection, stableId, rowHash })));
+  const snapshotHash = mirrorHash(rows.map(({ collection, stableId, position, rowHash }) => ({ collection, stableId, position, rowHash })));
   return {
     schemaVersion: MIRROR_SCHEMA_VERSION,
     sourceKey: options.sourceKey,
