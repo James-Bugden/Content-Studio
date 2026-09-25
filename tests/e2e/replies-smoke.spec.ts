@@ -16,7 +16,7 @@ test('the production build serves the app and a private health endpoint', async 
   const health = await request.get('/api/health');
   expect(health.status()).toBe(200);
   expect(health.headers()['cache-control']).toContain('no-store');
-  expect(await health.json()).toEqual({ status: 'ok' });
+  expect(await health.json()).toMatchObject({ ok: true, mode: 'fake' });
 
   await page.goto('/replies');
   await expect(page.getByRole('link', { name: 'Replies', exact: true })).toBeVisible();
