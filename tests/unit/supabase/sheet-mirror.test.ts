@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AppError } from '@/domain/errors';
-import { fingerprint } from '@/domain/hash';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { SupabaseSheetMirrorStore } from '@/integrations/supabase/sheet-mirror-store';
 import {
   buildSheetMirrorSnapshot,
-  canonicalJson,
+  mirrorHash,
   type MirrorApplyResult,
   type MirrorRow,
   type SheetMirrorSnapshot,
@@ -61,7 +60,7 @@ describe('MIG-02: exact Sheet snapshot and replay', () => {
     const source = await repo.getLibrary('SYN-L008');
     const mirrored = snapshot.rows.find((item) => item.collection === 'library' && item.stableId === 'SYN-L008');
     expect(mirrored).toMatchObject({ sourceRow: source.row, sourceRevision: source.revision, payload: source });
-    expect(mirrored?.rowHash).toBe(fingerprint(canonicalJson(source)));
+    expect(mirrored?.rowHash).toBe(mirrorHash(source));
 
     const rebuilt = await buildSheetMirrorSnapshot(repo, { sourceKey, runId: runTwo, startedAt: new Date('2026-09-25T00:01:00.000Z') });
     expect(rebuilt.snapshotHash).toBe(snapshot.snapshotHash);
@@ -82,7 +81,7 @@ describe('MIG-02: exact Sheet snapshot and replay', () => {
       runId: runTwo,
       rows: nextRows,
       counts: { ...snapshot.counts, library: snapshot.counts.library - 1 },
-      snapshotHash: fingerprint(canonicalJson(nextRows.map(({ collection, stableId, rowHash }) => ({ collection, stableId, rowHash })))),
+      snapshotHash: mirrorHash(nextRows.map(({ collection, stableId, rowHash }) => ({ collection, stableId, rowHash }))),
     };
     expect(await store.applySnapshot(next)).toMatchObject({ replayed: false, retired: 1 });
     expect((await store.readActive(sourceKey)).some((item) => item.collection === removed.collection && item.stableId === removed.stableId)).toBe(false);
@@ -100,11 +99,14 @@ describe('MIG-02: exact Sheet snapshot and replay', () => {
 });
 
 describe('MIG-04: server-only Supabase boundary', () => {
-  it('sends a snapshot to one transactional RPC and never places the service key in the URL', async () => {
+  it('stages and finalizes a resumable snapshot without placing the service key in the URL', async () => {
     const calls: { url: string; init?: RequestInit }[] = [];
     const request = async (input: string | URL | Request, init?: RequestInit) => {
-      calls.push({ url: String(input), init });
-      return new Response(JSON.stringify({ runId: runOne, snapshotHash: '0000000000000000', replayed: false, upserted: 1, retired: 0 }));
+      const url = String(input);
+      calls.push({ url, init });
+      if (url.endsWith('/begin_content_studio_sheet_snapshot')) return new Response(JSON.stringify({ state: 'staging', staged: 0 }));
+      if (url.endsWith('/stage_content_studio_sheet_snapshot')) return new Response(JSON.stringify({ staged: 1 }));
+      return new Response(JSON.stringify({ runId: runOne, snapshotHash: '0'.repeat(64), replayed: false, upserted: 1, retired: 0 }));
     };
     const store = new SupabaseSheetMirrorStore({ url: 'http://127.0.0.1:54321', serviceKey: 'server-only-test-key-000000', fetch: request as typeof fetch });
     const snapshot: SheetMirrorSnapshot = {
@@ -113,24 +115,52 @@ describe('MIG-04: server-only Supabase boundary', () => {
       runId: runOne,
       startedAt: '2026-09-25T00:00:00.000Z',
       counts: { library: 1, queue: 0, ready: 0, schedule: 0, queue_summary: 0, workflow_settings: 0 },
-      snapshotHash: '0000000000000000',
-      rows: [{ collection: 'library', stableId: 'SYN-L001', sourceRow: 2, sourceRevision: 'abc', rowHash: '1111111111111111', payload: { exact: '談薪水' } }],
+      snapshotHash: '0'.repeat(64),
+      rows: [{ collection: 'library', stableId: 'SYN-L001', sourceRow: 2, sourceRevision: 'abc', rowHash: '1'.repeat(64), payload: { exact: '談薪水' } }],
     };
     await store.applySnapshot(snapshot);
-    expect(calls[0]?.url).toBe('http://127.0.0.1:54321/rest/v1/rpc/apply_content_studio_sheet_snapshot');
-    expect(calls[0]?.url).not.toContain('server-only-test-key');
+    expect(calls.map((call) => call.url)).toEqual([
+      'http://127.0.0.1:54321/rest/v1/rpc/begin_content_studio_sheet_snapshot',
+      'http://127.0.0.1:54321/rest/v1/rpc/stage_content_studio_sheet_snapshot',
+      'http://127.0.0.1:54321/rest/v1/rpc/finalize_content_studio_sheet_snapshot',
+    ]);
+    expect(calls.every((call) => !call.url.includes('server-only-test-key'))).toBe(true);
     expect(calls[0]?.init?.headers).toMatchObject({ Authorization: 'Bearer server-only-test-key-000000' });
-    expect(JSON.parse(String(calls[0]?.init?.body))).toMatchObject({ p_source_key: sourceKey, p_rows: [{ payload: { exact: '談薪水' } }] });
+    expect(JSON.parse(String(calls[0]?.init?.body))).toMatchObject({ p_source_key: sourceKey, p_snapshot_hash: '0'.repeat(64) });
+    expect(JSON.parse(String(calls[1]?.init?.body))).toMatchObject({ p_run_id: runOne, p_rows: [{ payload: { exact: '談薪水' } }] });
+  });
+
+  it('paginates active reads instead of silently accepting the REST row limit', async () => {
+    const requests: string[] = [];
+    const db = [0, 1, 2].map((n) => ({
+      collection: 'library',
+      stable_id: `SYN-L00${n}`,
+      source_row: n + 2,
+      source_revision: `rev-${n}`,
+      row_hash: String(n).repeat(64),
+      payload: { n },
+    }));
+    const request = async (input: string | URL | Request) => {
+      const url = String(input);
+      requests.push(url);
+      const offset = Number(new URL(url).searchParams.get('offset'));
+      return new Response(JSON.stringify(db.slice(offset, offset + 2)));
+    };
+    const store = new SupabaseSheetMirrorStore({ url: 'http://127.0.0.1:54321', serviceKey: 'server-only-test-key-000000', fetch: request as typeof fetch, pageRows: 2 });
+    const rows = await store.readActive(sourceKey);
+    expect(rows.map((item) => item.stableId)).toEqual(['SYN-L000', 'SYN-L001', 'SYN-L002']);
+    expect(requests).toHaveLength(2);
+    expect(new URL(requests[1]!).searchParams.get('offset')).toBe('2');
   });
 
   it('migration enables and forces RLS, denies browser roles, and grants only the server role', () => {
     const sql = readFileSync('supabase/migrations/20260925030000_sheet_read_model.sql', 'utf8').toLowerCase();
-    expect(sql.match(/enable row level security/g)).toHaveLength(2);
-    expect(sql.match(/force row level security/g)).toHaveLength(2);
+    expect(sql.match(/enable row level security/g)).toHaveLength(3);
+    expect(sql.match(/force row level security/g)).toHaveLength(3);
     expect(sql).toContain('revoke all on table public.content_studio_sheet_rows from anon, authenticated');
     expect(sql).toContain('security invoker');
     expect(sql).not.toContain('security definer');
-    expect(sql).toContain('grant execute on function public.apply_content_studio_sheet_snapshot');
+    expect(sql).toContain('grant execute on function public.finalize_content_studio_sheet_snapshot');
     expect(sql).not.toMatch(/grant\s+(?:select|insert|update|delete|all).*to\s+(?:anon|authenticated)/);
   });
 });
