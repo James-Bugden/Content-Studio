@@ -40,7 +40,7 @@ beforeAll(async () => {
       (user_id, platform, final_text, search_text, provenance, publication_evidence,
        content_hash, date_precision, posted_at)
       values ('${OWNER_ID}', 'x', 'a private reply', 'a private reply', 'posted_confirmed',
-              'user_confirmed', 'h1', 'timestamp', now());
+              'user_confirmed', 'h1', 'timestamp', '2026-09-25T04:00:00Z');
     insert into public.import_batches (user_id, source_type, source_file_hash, adapter_version)
       values ('${OWNER_ID}', 'linkedin', 'filehash', 'v1');
     insert into public.search_documents (user_id, entity_kind, entity_id, text_hash, search_text)
@@ -163,7 +163,7 @@ describe('Google-auth server bridge', () => {
   it('runs owner-scoped counters and rejects a mismatched owner', async () => {
     const { rows } = await db.asService((q) =>
       q.query<{ result: { counts: { x: number } } }>(
-        `select public.server_daily_counts($1::uuid, 'Asia/Taipei', current_date) as result`,
+        `select public.server_daily_counts($1::uuid, 'Asia/Taipei', '2026-09-25'::date) as result`,
         [OWNER_ID],
       ),
     );
@@ -171,9 +171,10 @@ describe('Google-auth server bridge', () => {
 
     const error = await expectRejection(
       db.asService((q) =>
-        q.query(`select public.server_daily_counts($1::uuid, 'Asia/Taipei', current_date)`, [
-          OTHER_USER_ID,
-        ]),
+        q.query(
+          `select public.server_daily_counts($1::uuid, 'Asia/Taipei', '2026-09-25'::date)`,
+          [OTHER_USER_ID],
+        ),
       ),
     );
     expect(error.message).toMatch(/server owner mismatch/i);
