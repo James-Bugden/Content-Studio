@@ -29,6 +29,9 @@ Names only; values live in Vercel. See `.env.example`.
 | `CS_SHEET_ID` | unset | workbook id | First do T3 against a **copy**. |
 | `CS_ASSET_FOLDER_ID` | unset | Drive folder for rendered visuals | |
 | `TYPEFULLY_API_KEY`, `TYPEFULLY_SOCIAL_SET_ID` | unset | optional | Without them publishing actions are disabled; review still works. |
+| `SUPABASE_READ_MODEL_MODE` | `off` | `off` until copied-data proof | `mirror` enables owner-triggered Sheet snapshots; `shadow` is reserved for parity reads. Sheets remain authoritative. |
+| `SUPABASE_READ_MODEL_URL`, `SUPABASE_READ_MODEL_SERVICE_KEY` | unset | dedicated Content Studio project only | Server-only. Never use either existing unrelated Supabase project. |
+| `SUPABASE_READ_MODEL_SOURCE_KEY` | unset | opaque workbook alias | Stable 8–64 character lowercase alias; never put the Sheet ID here. |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL` | unset | `anthropic` + key, optional | Without them AI proposals are off; manual review still works. |
 
 ## Owner-only steps
@@ -43,6 +46,21 @@ These need the owner's own accounts and cannot be done by an agent: credential v
 2. **Share** a *copy* of the workbook and a *copy* of the `Content / Editing` folder with the service account email (Editor), for T3. Set `CS_SHEET_ID` to the copy's id.
 3. **Sign in once** at the production URL with Google. The login page shows your account ID; paste it into `CS_OWNER_GOOGLE_SUB` and redeploy.
 4. **Optional:** Typefully API key and a test social set; Anthropic API key.
+5. **Optional Supabase read model:** create a dedicated non-production Content Studio project, apply the committed migration, and configure the four `SUPABASE_READ_MODEL_*` variables against a copied Sheet first. Do not reuse another product's project. Keep mode `off` in production until MIG-02 through MIG-05 evidence is accepted.
+
+## Sheet mirror operation (MIG-02)
+
+The mirror is one-way: Google Sheets to Supabase. Typefully and Drive never call
+Supabase. A successful mirror cannot alter the Sheet.
+
+1. Apply `supabase/migrations/20260925030000_sheet_read_model.sql` to the dedicated project.
+2. Run Supabase database/security advisors and resolve every finding before adding credentials to Vercel.
+3. Configure a copied Sheet and set `SUPABASE_READ_MODEL_MODE=mirror` only in the authorised test environment.
+4. As the owner, send a same-origin `POST /api/ops/sheet-mirror`. The response contains only run ID, counts and hashes.
+5. Repeat the same source snapshot and confirm its snapshot hash is unchanged. Run the parity report before enabling `shadow`.
+
+If Supabase is unavailable, leave the mode `off`; normal Sheet, Drive and
+Typefully work is unaffected.
 
 ## Verification (DEP-03..07)
 

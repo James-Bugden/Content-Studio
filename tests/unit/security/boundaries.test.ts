@@ -45,8 +45,8 @@ describe('client code never reaches server credentials', () => {
   });
 });
 
-describe('no Supabase in the MVP', () => {
-  it('package.json has no Supabase dependency', () => {
+describe('Supabase read model stays server-only', () => {
+  it('does not add a browser Supabase SDK', () => {
     const pkg = JSON.parse(read('package.json')) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
     const names = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.devDependencies)];
     expect(names.filter((n) => n.includes('supabase'))).toEqual([]);

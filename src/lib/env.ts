@@ -25,6 +25,10 @@ const schema = z.object({
   CS_HOOK_REFERENCE_FILE_IDS: z.string().optional(),
   TYPEFULLY_API_KEY: z.string().min(1).optional(),
   TYPEFULLY_SOCIAL_SET_ID: z.string().min(1).optional(),
+  SUPABASE_READ_MODEL_MODE: z.enum(['off', 'mirror', 'shadow']).default('off'),
+  SUPABASE_READ_MODEL_URL: z.string().url().optional(),
+  SUPABASE_READ_MODEL_SERVICE_KEY: z.string().min(20).optional(),
+  SUPABASE_READ_MODEL_SOURCE_KEY: z.string().regex(/^[a-z0-9][a-z0-9_-]{7,63}$/).optional(),
   AI_PROVIDER: z.enum(['fake', 'anthropic']).default('fake'),
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().min(1).optional(),
@@ -48,6 +52,16 @@ export function serverEnv(): ServerEnv {
   }
   if (parsed.data.CS_DATA_MODE === 'fake' && parsed.data.VERCEL_ENV === 'production') {
     throw new Error('CS_DATA_MODE=fake is refused in production');
+  }
+  if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off') {
+    const missing = [
+      ['SUPABASE_READ_MODEL_URL', parsed.data.SUPABASE_READ_MODEL_URL],
+      ['SUPABASE_READ_MODEL_SERVICE_KEY', parsed.data.SUPABASE_READ_MODEL_SERVICE_KEY],
+      ['SUPABASE_READ_MODEL_SOURCE_KEY', parsed.data.SUPABASE_READ_MODEL_SOURCE_KEY],
+    ]
+      .filter(([, value]) => !value)
+      .map(([name]) => name);
+    if (missing.length > 0) throw new Error(`Invalid environment for: ${missing.join(', ')}`);
   }
   cached = parsed.data;
   return cached;
