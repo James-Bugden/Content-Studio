@@ -23,6 +23,8 @@ export interface SheetTransport {
   readonly mode: 'fake' | 'live';
   readTab(tab: string, lastColumn: string, options: ReadOptions): Promise<RawRow[]>;
   writeCells(tab: string, writes: CellWrite[]): Promise<void>;
+  /** Atomically appends a row after the tab's current data region. */
+  appendRow(tab: string, lastColumn: string, values: readonly (string | boolean)[]): Promise<void>;
 }
 
 /** Page size for bounded reads. */

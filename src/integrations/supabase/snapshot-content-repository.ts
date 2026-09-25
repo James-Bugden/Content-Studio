@@ -4,7 +4,7 @@ import type { Capability } from '@/domain/capability';
 import type { LibraryPatch, SchedulePatch } from '@/domain/mapping';
 import type { MutationEnvelope, MutationResult } from '@/domain/mutation';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
-import type { ContentRepository, SchemaStatus } from '@/application/ports';
+import type { ContentRepository, QueueIdeaCreate, SchemaStatus } from '@/application/ports';
 import type { MirrorCollection, MirrorRow } from '@/application/sheet-mirror';
 
 type Decoder<T> = (value: unknown) => T;
@@ -142,6 +142,10 @@ export class SnapshotContentRepository implements ContentRepository {
   }
 
   updateQueue(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>> {
+    return this.readonlyWrite(m.operationId);
+  }
+
+  createQueueIdea(m: QueueIdeaCreate): Promise<MutationResult<LibraryRecord>> {
     return this.readonlyWrite(m.operationId);
   }
 

@@ -80,4 +80,19 @@ export class GoogleSheetTransport implements SheetTransport {
     });
     if (!res.ok) throw googleError(res.status, 'sheet');
   }
+
+  async appendRow(tab: string, lastColumn: string, values: readonly (string | boolean)[]): Promise<void> {
+    if (!this.writeEnabled) throw googleError(403, 'sheet');
+    const token = await this.auth();
+    const range = `${quoteTab(tab)}!A:${lastColumn}`;
+    const url =
+      `${API}/${encodeURIComponent(this.spreadsheetId)}/values/${encodeURIComponent(range)}:append` +
+      '?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+    const res = await this.fetchImpl(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ majorDimension: 'ROWS', values: [[...values]] }),
+    });
+    if (!res.ok) throw googleError(res.status, 'sheet');
+  }
 }

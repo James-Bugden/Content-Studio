@@ -71,11 +71,15 @@ jobs:
       - name: Production build
         run: npm run build
 
-  browser:
-    name: deterministic browser journeys
+  browser-shard:
+    name: browser shard ${{ matrix.shard }} of 4
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,17 +99,28 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run browser journeys
-        run: npm run test:e2e
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       # Page text in these reports is synthetic. Only the report directory is uploaded.
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
           if-no-files-found: ignore
+
+  browser:
+    name: deterministic browser journeys
+    runs-on: ubuntu-latest
+    if: always()
+    needs: browser-shard
+    steps:
+      - name: Require every browser shard to pass
+        env:
+          SHARD_RESULT: ${{ needs.browser-shard.result }}
+        run: test "$SHARD_RESULT" = success
 
   dependency-review:
     name: dependency review

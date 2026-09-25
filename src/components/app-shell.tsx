@@ -16,6 +16,7 @@ export const PRIMARY_NAV = [
   { href: '/schedule', label: 'Calendar' },
   { href: '/published', label: 'Published' },
   { href: '/reconcile', label: 'Fix issues' },
+  { href: '/replies', label: 'Replies' },
 ] as const;
 
 export type AppShellProps = {

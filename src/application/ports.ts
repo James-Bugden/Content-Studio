@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import type { Capability } from '@/domain/capability';
 import type { ErrorCode } from '@/domain/errors';
 import type { LibraryPatch, SchedulePatch } from '@/domain/mapping';
-import type { MutationEnvelope, MutationResult } from '@/domain/mutation';
+import type { Actor, MutationEnvelope, MutationResult } from '@/domain/mutation';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import type { SchemaProblem } from '@/domain/sheet-schema';
 import type { Platform, TypefullyStatus } from '@/domain/enums';
@@ -19,6 +19,15 @@ export type SchemaStatus = {
   tabs: { tab: string; ok: boolean; problems: SchemaProblem[]; passthrough: string[] }[];
 };
 
+export type QueueIdeaCreate = {
+  operationId: string;
+  actor: Actor;
+  libraryId: string;
+  sourcePlatform: Platform;
+  currentHook: string;
+  draftContent: string;
+};
+
 export interface ContentRepository {
   capability(): Capability;
   schema(): Promise<SchemaStatus>;
@@ -28,6 +37,8 @@ export interface ContentRepository {
   listQueue(): Promise<LibraryRecord[]>;
   getQueue(libraryId: string): Promise<LibraryRecord>;
   updateQueue(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>>;
+  /** Appends one idea to the existing Content Queue schema. Never adds or renames a Sheet column. */
+  createQueueIdea(m: QueueIdeaCreate): Promise<MutationResult<LibraryRecord>>;
   /** Reads the derived Ready Queue tab. Never written. */
   listReadyQueue(): Promise<LibraryRecord[]>;
   listSchedule(): Promise<ScheduleRecord[]>;

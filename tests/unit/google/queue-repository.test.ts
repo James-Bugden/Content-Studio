@@ -82,6 +82,48 @@ describe('Content Queue: updateQueue', () => {
   });
 });
 
+describe('Content Queue: createQueueIdea', () => {
+  const input = {
+    operationId: op('reply-idea'),
+    actor: owner,
+    libraryId: 'IDEA-SR-1234567890abcdef',
+    sourcePlatform: 'LinkedIn' as const,
+    currentHook: 'The strongest reply insight.',
+    draftContent: 'The strongest reply insight.\n\nTurn it into a full post.',
+  };
+
+  it('appends one row using only the existing Queue columns', async () => {
+    const before = await repo.listQueue();
+    const result = await repo.createQueueIdea(input);
+    expect(result).toMatchObject({ ok: true, replayed: false });
+    const after = await repo.listQueue();
+    expect(after).toHaveLength(before.length + 1);
+    const created = await repo.getQueue(input.libraryId);
+    expect(created.value).toMatchObject({
+      libraryId: input.libraryId,
+      state: 'Idea',
+      contentSource: 'Social Replies',
+      currentHook: input.currentHook,
+      draftContent: input.draftContent,
+    });
+    expect(created.value.sourcePlatform).toMatchObject({ ok: true, value: 'LinkedIn' });
+    expect(transport.writes.at(-1)?.tab).toBe('Content Queue');
+  });
+
+  it('replays the same Reply ID without appending a duplicate', async () => {
+    expect((await repo.createQueueIdea(input)).ok).toBe(true);
+    const replay = await repo.createQueueIdea(input);
+    expect(replay).toMatchObject({ ok: true, replayed: true });
+    expect((await repo.listQueue()).filter((row) => row.value.libraryId === input.libraryId)).toHaveLength(1);
+  });
+
+  it('refuses a viewer before touching the Sheet', async () => {
+    const result = await repo.createQueueIdea({ ...input, actor: { ...owner, role: 'viewer' } });
+    expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(transport.writes).toHaveLength(0);
+  });
+});
+
 describe('schema discovery includes Content Queue', () => {
   it('reports the Queue tab healthy', async () => {
     const s = await repo.schema();
