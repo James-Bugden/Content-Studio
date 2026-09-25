@@ -1,7 +1,6 @@
 import 'server-only';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { AppError } from '@/domain/errors';
-import { fingerprint } from '@/domain/hash';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import type { ContentRepository } from './ports';
 
@@ -50,6 +49,10 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(canonicalValue(value));
 }
 
+export function mirrorHash(value: unknown): string {
+  return createHash('sha256').update(canonicalJson(value), 'utf8').digest('hex');
+}
+
 function canonicalValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalValue);
   if (value && typeof value === 'object') {
@@ -71,7 +74,7 @@ function row(collection: MirrorCollection, stableId: string, payload: unknown, s
     stableId: id,
     sourceRow: source?.row ?? null,
     sourceRevision: source?.revision ?? null,
-    rowHash: fingerprint(canonicalJson(payload)),
+    rowHash: mirrorHash(payload),
     payload,
   };
 }
@@ -134,7 +137,7 @@ export async function buildSheetMirrorSnapshot(
     MirrorCollection,
     number
   >;
-  const snapshotHash = fingerprint(canonicalJson(rows.map(({ collection, stableId, rowHash }) => ({ collection, stableId, rowHash }))));
+  const snapshotHash = mirrorHash(rows.map(({ collection, stableId, rowHash }) => ({ collection, stableId, rowHash })));
   return {
     schemaVersion: MIRROR_SCHEMA_VERSION,
     sourceKey: options.sourceKey,
