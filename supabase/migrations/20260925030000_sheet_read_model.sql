@@ -16,7 +16,7 @@ create table if not exists public.content_studio_sheet_sync_runs (
 
 create table if not exists public.content_studio_sheet_stage (
   run_id uuid not null references public.content_studio_sheet_sync_runs(run_id) on delete cascade,
-  collection text not null check (collection in ('library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings')),
+  collection text not null check (collection in ('schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings')),
   stable_id text not null check (stable_id <> ''),
   source_row integer check (source_row is null or source_row > 0),
   source_revision text,
@@ -27,7 +27,7 @@ create table if not exists public.content_studio_sheet_stage (
 
 create table if not exists public.content_studio_sheet_rows (
   source_key text not null check (source_key ~ '^[a-z0-9][a-z0-9_-]{7,63}$'),
-  collection text not null check (collection in ('library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings')),
+  collection text not null check (collection in ('schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings')),
   stable_id text not null check (stable_id <> ''),
   source_row integer check (source_row is null or source_row > 0),
   source_revision text,
@@ -168,7 +168,7 @@ begin
   end if;
   if run.status <> 'staging' then raise exception 'snapshot run is not staging' using errcode = '55000'; end if;
 
-  foreach expected_collection in array array['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] loop
+  foreach expected_collection in array array['schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] loop
     begin
       expected_count := (run.counts ->> expected_collection)::integer;
     exception when others then
