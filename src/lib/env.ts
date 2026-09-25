@@ -29,6 +29,7 @@ const schema = z.object({
   SUPABASE_READ_MODEL_URL: z.string().url().optional(),
   SUPABASE_READ_MODEL_SERVICE_KEY: z.string().min(20).optional(),
   SUPABASE_READ_MODEL_SOURCE_KEY: z.string().regex(/^[a-z0-9][a-z0-9_-]{7,63}$/).optional(),
+  CRON_SECRET: z.string().min(16).optional(),
   AI_PROVIDER: z.enum(['fake', 'anthropic']).default('fake'),
   AI_MODEL: z.string().optional(),
   AI_API_KEY: z.string().min(1).optional(),
