@@ -59,6 +59,16 @@ Supabase. A successful mirror cannot alter the Sheet.
 4. As the owner, send a same-origin `POST /api/ops/sheet-mirror`. The response contains only run ID, counts and hashes.
 5. Repeat the same source snapshot and confirm its snapshot hash is unchanged. Run the parity report before enabling `shadow`.
 
+### Shadow proof (MIG-03)
+
+1. Set `SUPABASE_READ_MODEL_MODE=shadow` only after a complete mirror run.
+2. As the owner, send a same-origin `POST /api/ops/sheet-mirror/parity`.
+3. Require `exact: true`, no mismatches, and equal expected/active row counts. Mismatch entries contain only collection, kind and a one-way fingerprint; they never expose content or stable IDs.
+4. Keep application reads on Sheets. The snapshot adapter is read-only and all three mutation methods return `CONFIG_MISSING`; it is used for adapter-parity proof, not production authority.
+5. Repeat after every mapped-field or Sheet-parser change. Any mismatch blocks read cutover unless a dated, reviewed exception is added to the decision record.
+
+For later continuous reconciliation, use a secured server-side scheduler to invoke the complete snapshot operation. Vercel Cron sends a `GET` with `Authorization: Bearer <CRON_SECRET>`; do not register that schedule until the dedicated Supabase project, copied Sheet, secret and first manual snapshot have all been verified. Overlapping snapshot finalizers are serialized per source and an older run is refused, so duplicate scheduler delivery cannot regress the active mirror.
+
 If Supabase is unavailable, leave the mode `off`; normal Sheet, Drive and
 Typefully work is unaffected.
 
