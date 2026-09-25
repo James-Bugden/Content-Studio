@@ -59,6 +59,7 @@ describe('MIG-02: exact Sheet snapshot and replay', () => {
     const snapshot = await buildSheetMirrorSnapshot(repo, { sourceKey, runId: runOne, startedAt: new Date('2026-09-25T00:00:00.000Z') });
     const total = Object.values(snapshot.counts).reduce((sum, count) => sum + count, 0);
     expect(total).toBe(snapshot.rows.length);
+    expect(snapshot.counts.schema).toBe(1);
     expect(snapshot.counts.workflow_settings).toBe(1);
     expect(snapshot.counts.library).toBeGreaterThan(0);
     expect(snapshot.counts.schedule).toBeGreaterThan(0);
@@ -120,7 +121,7 @@ describe('MIG-04: server-only Supabase boundary', () => {
       sourceKey,
       runId: runOne,
       startedAt: '2026-09-25T00:00:00.000Z',
-      counts: { library: 1, queue: 0, ready: 0, schedule: 0, queue_summary: 0, workflow_settings: 0 },
+      counts: { schema: 0, library: 1, queue: 0, ready: 0, schedule: 0, queue_summary: 0, workflow_settings: 0 },
       snapshotHash: '0'.repeat(64),
       rows: [{ collection: 'library', stableId: 'SYN-L001', sourceRow: 2, sourceRevision: 'abc', rowHash: '1'.repeat(64), payload: { exact: '談薪水' } }],
     };
