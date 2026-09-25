@@ -34,7 +34,7 @@ import { test, expect } from '@playwright/test';
  */
 async function loadPageFirst(page: import('@playwright/test').Page) {
   await page.goto('/replies');
-  await expect(page.getByRole('link', { name: 'Social Replies' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Replies', exact: true })).toBeVisible();
 }
 
 test.beforeEach(async ({ request }) => {
@@ -152,4 +152,3 @@ test.describe('a deliberate conflict reaches the caller as a conflict', () => {
     expect(JSON.stringify(body)).not.toContain('node_modules');
   });
 });
-

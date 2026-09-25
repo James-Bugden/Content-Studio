@@ -13,7 +13,7 @@ test('the production build serves the app and a private health endpoint', async 
   expect(await health.json()).toEqual({ status: 'ok' });
 
   await page.goto('/replies');
-  await expect(page.getByRole('link', { name: 'Social Replies' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Replies', exact: true })).toBeVisible();
 });
 
 test('the narrow workspace width does not scroll horizontally', async ({ page }) => {
@@ -25,4 +25,3 @@ test('the narrow workspace width does not scroll horizontally', async ({ page })
   );
   expect(overflow).toBeLessThanOrEqual(0);
 });
-
