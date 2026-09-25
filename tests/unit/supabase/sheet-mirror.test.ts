@@ -88,7 +88,7 @@ describe('MIG-02: exact Sheet snapshot and replay', () => {
       runId: runTwo,
       rows: nextRows,
       counts: { ...snapshot.counts, library: snapshot.counts.library - 1 },
-      snapshotHash: mirrorHash(nextRows.map(({ collection, stableId, rowHash }) => ({ collection, stableId, rowHash }))),
+      snapshotHash: mirrorHash(nextRows.map(({ collection, stableId, position, rowHash }) => ({ collection, stableId, position, rowHash }))),
     };
     expect(await store.applySnapshot(next)).toMatchObject({ replayed: false, retired: 1 });
     expect((await store.readActive(sourceKey)).some((item) => item.collection === removed.collection && item.stableId === removed.stableId)).toBe(false);
@@ -123,7 +123,7 @@ describe('MIG-04: server-only Supabase boundary', () => {
       startedAt: '2026-09-25T00:00:00.000Z',
       counts: { schema: 0, library: 1, queue: 0, ready: 0, schedule: 0, queue_summary: 0, workflow_settings: 0 },
       snapshotHash: '0'.repeat(64),
-      rows: [{ collection: 'library', stableId: 'SYN-L001', sourceRow: 2, sourceRevision: 'abc', rowHash: '1'.repeat(64), payload: { exact: '談薪水' } }],
+      rows: [{ collection: 'library', stableId: 'SYN-L001', position: 0, sourceRow: 2, sourceRevision: 'abc', rowHash: '1'.repeat(64), payload: { exact: '談薪水' } }],
     };
     await store.applySnapshot(snapshot);
     expect(calls.map((call) => call.url)).toEqual([
@@ -142,6 +142,7 @@ describe('MIG-04: server-only Supabase boundary', () => {
     const db = [0, 1, 2].map((n) => ({
       collection: 'library',
       stable_id: `SYN-L00${n}`,
+      position: n,
       source_row: n + 2,
       source_revision: `rev-${n}`,
       row_hash: String(n).repeat(64),
