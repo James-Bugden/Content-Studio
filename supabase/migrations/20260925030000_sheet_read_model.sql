@@ -5,6 +5,7 @@ create table if not exists public.content_studio_sheet_sync_runs (
   run_id uuid primary key,
   schema_version integer not null check (schema_version = 1),
   source_key text not null check (source_key ~ '^[a-z0-9][a-z0-9_-]{7,63}$'),
+  received_at timestamptz not null default now(),
   started_at timestamptz not null,
   completed_at timestamptz,
   status text not null check (status in ('staging', 'complete', 'failed')),
@@ -171,6 +172,19 @@ begin
     return jsonb_build_object('runId', run.run_id, 'snapshotHash', run.snapshot_hash, 'replayed', true, 'upserted', run.upserted, 'retired', run.retired);
   end if;
   if run.status <> 'staging' then raise exception 'snapshot run is not staging' using errcode = '55000'; end if;
+
+  -- Two scheduled invocations may overlap or be delivered more than once. Serialize
+  -- finalization per workbook and refuse an older received snapshot so stale data
+  -- can never replace a newer completed snapshot.
+  perform pg_advisory_xact_lock(hashtextextended(run.source_key, 0));
+  if exists (
+    select 1 from public.content_studio_sheet_sync_runs as newer
+    where newer.source_key = run.source_key
+      and newer.status = 'complete'
+      and newer.received_at > run.received_at
+  ) then
+    raise exception 'snapshot superseded by a newer completed run' using errcode = '40001';
+  end if;
 
   foreach expected_collection in array array['schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] loop
     begin
