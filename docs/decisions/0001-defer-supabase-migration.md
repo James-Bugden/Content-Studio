@@ -1,120 +1,137 @@
-# ADR-0001: Keep Google Sheets as the content authority
+# ADR-0001: Use Supabase only as a Sheet-fed read model
 
-- Status: Accepted — defer migration
+- Status: Accepted for staged implementation; authority cutover deferred
 - Date: 2026-09-25
 - Related: CS-020 / issue #21, `docs/MASTER-SPEC.md` sections 2, 7 and 11
 
 ## Decision
 
-Keep Google Sheets as Content Studio's operational authority. Do not create a
-Supabase project, schema, dependency, environment variable, snapshot job or
-dual-write path now.
+Build Supabase as a one-way read model of Google Sheets. Google Sheets remains
+Content Studio's only writable operational authority. Supabase does not sync
+with Typefully or Drive, and browser code never writes the mirror directly.
+
+The write path remains:
+
+1. Content Studio validates and writes an exact patch to Google Sheets.
+2. Typefully operations continue through the existing Typefully gateway and
+   write their returned ID, status, final copy, publication facts and available
+   analytics to the Schedule row in Sheets.
+3. A resumable reconciler snapshots the resulting Sheet rows into Supabase.
+
+Phase 1 is authorised now: schema, immutable snapshot/replay, reconciliation
+and field-level parity on synthetic/copied data. Production reads do not switch
+to Supabase until parity, security and rollback evidence pass. A later authority
+cutover is a separate decision and is not authorised by this record.
+
+## Why this topology
+
+Supabase can make list, filter, calendar and reporting reads faster and gives a
+clean path to relational lineage and history later. Keeping it Sheet-fed limits
+the integration surface: Typefully and Drive already have safe application
+gateways, while the Sheet holds every operational fact the UI needs.
+
+There is not yet recorded production evidence of sustained Sheet latency,
+quota exhaustion or workflow-blocking conflicts. For that reason this decision
+does not justify replacing Sheet writes. It authorises a reversible read model
+whose value and exactness can be measured without risking the live workflow.
 
 The existing `ContentRepository` interface, stable content identifiers and
-mutation envelopes remain the migration seam. Reconsider a Supabase-backed
-repository only after production evidence meets at least one entry criterion
-below and a new cutover decision is approved.
+mutation envelopes remain the boundary. The Supabase reader must be
+adapter-identical to the Google reader before any shadow or production read is
+enabled.
 
-## Evidence available now
+## Sync contract
 
-- The Google repository reads a 1,600-row synthetic corpus across multiple
-  pages, and the Review Queue test keeps processing plus pagination below its
-  two-second synthetic budget. These are deterministic adapter tests, not a
-  claim about live Google latency.
-- Sheet operations already emit redacted latency, outcome and rate-limit facts,
-  so a real production trigger can be measured without logging content.
-- Stable `Library ID` and `Content ID` values, revision checks, idempotency keys
-  and the `ContentRepository` port already isolate application code from the
-  Google adapter.
-- No recorded production evidence currently shows sustained latency pain,
-  quota exhaustion, excessive conflicts, an unmet durable-audit requirement or
-  a relational query/automation requirement.
-- CS-019's copied-data integration and rollback evidence is not complete. A
-  database cutover would add risk before the current provider path has finished
-  its own release proof.
+- Direction is Google Sheets to Supabase only.
+- A successful Sheet write may enqueue or trigger a refresh, but Sheet success
+  never depends on Supabase availability.
+- Periodic full reconciliation repairs missed refreshes and is authoritative.
+- Every mirrored row stores its stable ID, exact mapped values, source revision,
+  deterministic hash, source row number and sync-run identifier.
+- Snapshot/replay is idempotent. Rows absent from a complete source snapshot
+  are retired only after that snapshot finishes and reconciles successfully.
+- Parity compares every mapped value, state, ID and timestamp and records named
+  exceptions. Content text is never emitted to logs.
+- No Supabase-to-Sheet writer exists. No indefinite dual-write exists.
 
-The first two points show that a future migration is technically possible. They
-do not satisfy CS-020's entry criteria. Absence of measured pain is a reason to
-defer, not a reason to invent a database requirement.
+## Security boundary
 
-## Product-specific trade-offs
+Supabase is server-only infrastructure in this phase. Public and authenticated
+PostgREST access is default-deny through RLS; only the server-side sync/read
+role can access mirror tables. Service-role credentials never enter browser
+code, logs, telemetry or preview environments that can reach production data.
 
-Supabase remains a credible later destination. PostgreSQL would make content
-lineage, repurposed variants, approval history and cross-workflow reporting
-more natural than spreadsheet lookups. Transactions and constraints could also
-make multi-step automation safer, while row-level security would provide a
-strong foundation if Content Studio becomes multi-user.
+A future direct-user access design would require a separate owner identity,
+non-null ownership, ownership-aware foreign keys and tested RLS policies. It is
+not implicitly enabled by this read model.
 
-Those benefits do not remove the current Drive or Typefully integrations, and
-the owner-only application does not yet need most multi-user platform features.
-A move today would instead add schema ownership, data import and reconciliation,
-RLS policy testing, backup/restore operations, monitoring and a cutover/rollback
-burden. It would also take away the Sheet's convenient manual inspection and
-bulk-edit surface unless the application first replaces those capabilities.
+## Phases and gates
 
-The worst intermediate state is an indefinite Sheet/Supabase dual-write. If a
-migration is later approved, use Supabase as a reconciled read-only shadow
-before one explicit authority cutover; never treat both systems as writable
-authorities.
+### Phase 1 — snapshot and replay (authorised)
 
-## Re-entry criteria
+Create the mirror schema and a resumable exporter/importer. Prove exact counts,
+stable IDs and deterministic row hashes with synthetic and copied Sheet data.
 
-Open a new migration decision only when a dated production sample demonstrates
-one or more of the following:
+### Phase 2 — continuous reconciliation (after Phase 1 is green)
 
-- Google read/write latency repeatedly exceeds the agreed interaction budget at
-  the real corpus size after targeted caching or batching has been evaluated.
-- Google quota or rate-limit failures interrupt normal work.
-- Conflict frequency materially blocks the content workflow.
-- Required audit/history or relational queries cannot be met safely through
-  provider history, redacted telemetry or a separately approved workbook-native
-  option.
-- Required automation needs transactional/relational behavior the Sheet adapter
-  cannot provide without unsafe complexity.
+Refresh after successful Sheet mutations and run periodic full repair. Measure
+freshness, failures and Sheet/API cost without changing application reads.
 
-The decision record must state the sample window, corpus size, p50/p95 latency,
-error and conflict counts, affected workflow, and the cost of the current pain.
+### Phase 3 — shadow reads (requires copied-data evidence)
+
+Read both repositories server-side, serve the Sheet result, and record only
+redacted parity facts. Any unexplained mismatch blocks progress.
+
+### Phase 4 — production read cutover (separate approval)
+
+Only after security, parity, freshness and rollback rehearsals pass may the app
+serve reads from Supabase. Writes still go to Sheets first.
+
+Replacing Sheets as write authority is outside this ADR.
 
 ## Alternatives considered
 
-### Continue with the current adapter — chosen
+### Continue with Sheets only
 
-This preserves one operational authority and keeps Drive and Typefully in their
-existing roles. Targeted pagination, caching or batching work can be justified
-by measured provider behavior without changing the source of truth.
+Lowest operational cost and still valid if the read model shows no material
+benefit. The repository seam means Phase 1 can be removed without UI changes.
 
-### Add Supabase now as a read model
+### Supabase as a Sheet-fed read model — chosen
 
-Rejected for now. Even a read model adds snapshot freshness, reconciliation,
-access-control and operational ownership before there is measured value.
+Adds query performance and migration evidence without changing the working
+source of truth or coupling Supabase to Typefully or Drive.
 
-### Dual-write Sheet and Supabase
+### Bidirectional Sheet/Supabase sync
 
-Rejected. Two uncoordinated authorities create exactly the stale-write and
-recovery risks the product contract forbids.
+Rejected. Two writable authorities create stale-write, conflict and recovery
+risks that the product contract explicitly forbids.
+
+### Supabase talks directly to Typefully
+
+Rejected. Typefully reconciliation, idempotency and conflict handling already
+live in the application service. Duplicating them in a second sync system would
+increase duplicate-publish and overwrite risk.
 
 ### Move all content and assets into Supabase
 
-Rejected. It would replace the approved Sheet/Drive/Typefully authority model,
-expand the migration surface and provide no evidenced MVP benefit.
+Rejected. Drive remains the canonical Markdown and asset store, while Typefully
+remains the final editing and publishing surface.
 
-## Cost, security and rollback if re-opened
+## Cost and rollback
 
-A future implementation must budget for snapshot/replay tooling, field-level
-parity reports, exception handling, owner-only authentication and RLS, direct
-anonymous/non-owner API tests, monitoring, a cutover window and operator time.
-Every exposed table must be default-deny with non-null ownership; frontend code
-must never receive a service-role credential.
+Implementation cost includes schema ownership, snapshot/replay tooling,
+field-level parity, RLS tests, monitoring and operator runbooks. Hosted database,
+backup and point-in-time recovery costs must be reviewed before a production
+read cutover.
 
-Migration remains reversible: build an immutable snapshot/read model, reconcile
-continuously, run shadow reads, approve one authority cutover, and keep a tested
-rollback window in which Sheet writes remain the recoverable authority. Do not
-retire Sheet writes or history until parity, export and rollback evidence pass.
+Rollback is immediate while Sheets remains authoritative: disable Supabase
+reads and serve the existing Google repository. The mirror may then be rebuilt
+from a fresh complete snapshot. No Sheet, Drive or Typefully data is rolled back
+or rewritten.
 
 ## Consequences
 
-- MIG-01 has a durable evidence-based no-go decision.
-- MIG-02 through MIG-05 remain deliberately deferred because no migration is
-  authorised.
-- CS-020 stays parked. If evidence later meets a re-entry criterion, reopen the
-  decision rather than treating this ADR as permanent opposition to Supabase.
+- MIG-01 records the approved topology and its limited scope.
+- MIG-02 through MIG-05 remain open and must be proved in order.
+- CS-020 stays open until the staged acceptance evidence is complete.
+- Production behavior is unchanged by the decision record itself.
