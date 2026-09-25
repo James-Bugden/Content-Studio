@@ -61,6 +61,13 @@ PostgREST access is default-deny through RLS; only the server-side sync/read
 role can access mirror tables. Service-role credentials never enter browser
 code, logs, telemetry or preview environments that can reach production data.
 
+The read model may share the approved future combined-product Supabase project.
+Content Studio owns only objects prefixed `content_studio_`; it must not query,
+alter, pull, reset or assume ownership of another app's objects or migration
+history. Deployment applies the reviewed Content Studio migration explicitly,
+not a repo-wide `db push`. A project-wide incident may affect both apps, but a
+Supabase failure still cannot block or modify the authoritative Sheet workflow.
+
 A future direct-user access design would require a separate owner identity,
 non-null ownership, ownership-aware foreign keys and tested RLS policies. It is
 not implicitly enabled by this read model.
@@ -134,4 +141,5 @@ or rewritten.
 - MIG-01 records the approved topology and its limited scope.
 - MIG-02 through MIG-05 remain open and must be proved in order.
 - CS-020 stays open until the staged acceptance evidence is complete.
-- Production behavior is unchanged by the decision record itself.
+- The approved shared project contains the isolated read-model schema; runtime
+  mode remains `off` until the service credential and copied-data proof exist.
