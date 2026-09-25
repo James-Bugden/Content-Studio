@@ -16,6 +16,7 @@ export type SupabaseSheetMirrorOptions = {
 type DbRow = {
   collection: MirrorRow['collection'];
   stable_id: string;
+  position: number;
   source_row: number | null;
   source_revision: string | null;
   row_hash: string;
@@ -73,6 +74,7 @@ export class SupabaseSheetMirrorStore implements SheetMirrorStore {
     return {
       collection: item.collection,
       stable_id: item.stableId,
+      position: item.position,
       source_row: item.sourceRow,
       source_revision: item.sourceRevision,
       row_hash: item.rowHash,
@@ -132,8 +134,8 @@ export class SupabaseSheetMirrorStore implements SheetMirrorStore {
       const query = new URLSearchParams({
         source_key: `eq.${sourceKey}`,
         retired_at: 'is.null',
-        select: 'collection,stable_id,source_row,source_revision,row_hash,payload',
-        order: 'collection.asc,stable_id.asc',
+        select: 'collection,stable_id,position,source_row,source_revision,row_hash,payload',
+        order: 'collection.asc,position.asc',
         limit: String(this.pageRows),
         offset: String(offset),
       });
@@ -144,6 +146,7 @@ export class SupabaseSheetMirrorStore implements SheetMirrorStore {
     return out.map((item) => ({
       collection: item.collection,
       stableId: item.stable_id,
+      position: item.position,
       sourceRow: item.source_row,
       sourceRevision: item.source_revision,
       rowHash: item.row_hash,
