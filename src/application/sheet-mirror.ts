@@ -6,7 +6,7 @@ import type { ContentRepository } from './ports';
 
 export const MIRROR_SCHEMA_VERSION = 1 as const;
 
-export type MirrorCollection = 'library' | 'queue' | 'ready' | 'schedule' | 'queue_summary' | 'workflow_settings';
+export type MirrorCollection = 'schema' | 'library' | 'queue' | 'ready' | 'schedule' | 'queue_summary' | 'workflow_settings';
 
 export type MirrorRow = {
   collection: MirrorCollection;
@@ -40,7 +40,7 @@ export interface SheetMirrorStore {
   readActive(sourceKey: string): Promise<MirrorRow[]>;
 }
 
-const COLLECTIONS: MirrorCollection[] = ['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'];
+const COLLECTIONS: MirrorCollection[] = ['schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'];
 const SOURCE_KEY = /^[a-z0-9][a-z0-9_-]{7,63}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -114,7 +114,8 @@ export async function buildSheetMirrorSnapshot(
 
   // The snapshot is complete or it is not applied. This prevents a transient
   // provider failure from retiring rows that were merely absent from a partial read.
-  const [library, queue, ready, schedule, summary, settings] = await Promise.all([
+  const [schema, library, queue, ready, schedule, summary, settings] = await Promise.all([
+    repo.schema(),
     repo.listLibrary(),
     repo.listQueue(),
     repo.listReadyQueue(),
@@ -124,6 +125,7 @@ export async function buildSheetMirrorSnapshot(
   ]);
 
   const rows = [
+    row('schema', 'sheet', schema),
     ...recordRows('library', library),
     ...recordRows('queue', queue),
     ...recordRows('ready', ready),
