@@ -168,6 +168,8 @@ describe('MIG-04: server-only Supabase boundary', () => {
     expect(sql).toContain('revoke all on table public.content_studio_sheet_rows from anon, authenticated');
     expect(sql).toContain('security invoker');
     expect(sql).not.toContain('security definer');
+    expect(sql).toContain('pg_advisory_xact_lock');
+    expect(sql).toContain('snapshot superseded by a newer completed run');
     expect(sql).toContain('grant execute on function public.finalize_content_studio_sheet_snapshot');
     expect(sql).not.toMatch(/grant\s+(?:select|insert|update|delete|all).*to\s+(?:anon|authenticated)/);
   });
