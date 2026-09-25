@@ -24,6 +24,7 @@ export function EditableTextCell({
   placeholder,
   maxLength = 500,
   suggestions,
+  displayValue,
   onSave,
 }: {
   value: string;
@@ -35,6 +36,8 @@ export function EditableTextCell({
   maxLength?: number;
   /** Existing values already in the Sheet, offered as a datalist so editing feels like picking, not typing blind. */
   suggestions?: readonly string[];
+  /** Optional styled rendering while preserving `value` in the accessible edit name. */
+  displayValue?: React.ReactNode;
   onSave: (next: string) => Promise<TextCellSaveOutcome>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -61,7 +64,7 @@ export function EditableTextCell({
   }, [editing]);
 
   if (!canEdit) {
-    return value ? <span className="copy block">{value}</span> : <span className="text-ink-soft">{placeholder}</span>;
+    return value ? <span className="copy block">{displayValue ?? value}</span> : <span className="text-ink-soft">{placeholder}</span>;
   }
 
   function start() {
@@ -136,7 +139,7 @@ export function EditableTextCell({
           <span className="sr-only">
             Edit {fieldLabel.toLowerCase()} for {libraryId}:{' '}
           </span>
-          <span className="min-w-0 flex-1 truncate">{value || placeholder}</span>
+          <span className="min-w-0 flex-1 truncate">{value ? (displayValue ?? value) : placeholder}</span>
           <span aria-hidden="true" className="shrink-0 text-ink-soft/50 group-hover/cell:text-primary">
             ✎
           </span>

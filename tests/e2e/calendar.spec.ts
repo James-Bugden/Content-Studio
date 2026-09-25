@@ -46,6 +46,11 @@ test.describe('desktop, 1280 px', () => {
     await expect(xDay).toContainText('Your first offer is a draft.');
     await expect(xDay).toContainText('Trending');
     await expect(xDay).toContainText('Expertise');
+    // THEME-03: the shared tag renders the expected category exactly once (a
+    // regression for the former duplicate pillar text in week cards).
+    const mainX = visibleCard(page, '2026-10-01-MAIN-X');
+    await expect(mainX.locator('[data-pillar-tone="trending"]')).toHaveCount(1);
+    await expect(mainX.locator('[data-pillar-tone="trending"]')).toHaveText('Trending');
     await expect(visibleCard(page, '2026-10-01-3RD-X')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });

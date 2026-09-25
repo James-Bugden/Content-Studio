@@ -11,6 +11,7 @@ import { CapabilityBanner } from '@/components/capability-banner';
 import { FilterBar, type FilterDef } from '@/components/filter-bar';
 import { InlineResult } from '@/components/inline-result';
 import { PageHeader } from '@/components/page-header';
+import { PillarTag } from '@/components/pillar-tag';
 import type { RecoveryStep } from '@/components/recovery-panel';
 import { RecoveryPanel } from '@/components/recovery-panel';
 import { SourceLink } from '@/components/source-link';
@@ -136,6 +137,14 @@ export default async function StatesGalleryPage() {
             </li>
           ))}
         </ul>
+      </Section>
+
+      <Section id="g-pillars" title="PESTO tags">
+        <div className="flex flex-wrap gap-2">
+          {['Personal story', 'Expertise', 'Social proof', 'Trending', 'Opinions', 'Build in public (Soar)', 'Custom value'].map((pillar) => (
+            <PillarTag key={pillar} value={pillar} />
+          ))}
+        </div>
       </Section>
 
       <Section id="g-next" title="Next action">

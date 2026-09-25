@@ -138,6 +138,7 @@ test('Platform, PESTO and Hook template save in sequence and survive a reload', 
   await pesto.press('Enter');
   expect(((await pestoWrite).postDataJSON() as { patch: Record<string, string> }).patch).toEqual({ pesto: 'Opinions' });
   await expect(r.locator('[data-text-cell="PESTO stage"] [role="status"]')).toHaveText('Saved');
+  await expect(r.locator('[data-pillar-tone="opinions"]')).toContainText('Opinions');
 
   const templateWrite = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
   await r.getByRole('button', { name: /^Edit hook template for IDEA-BL-0001/ }).click();

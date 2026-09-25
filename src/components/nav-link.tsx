@@ -6,7 +6,7 @@ import { GuardedLink } from './guarded-link';
 /**
  * Primary navigation item (CS-006, UX-01, UX-04).
  *
- * The active item carries aria-current="page" and the single blue primary marker,
+ * The active item carries aria-current="page" and the black primary marker,
  * so the current place is never signalled by colour alone (it is also bold and
  * underlined). Navigation goes through GuardedLink so a dirty editor is never lost.
  */

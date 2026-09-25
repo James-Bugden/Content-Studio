@@ -48,6 +48,6 @@ describe('QA-04 private-data scans cover repo, history and artifacts', () => {
 describe('QA-01 every acceptance ID is accounted for', () => {
   it('has a test reference or an explicit status with owner and reason', () => {
     const out = execFileSync(process.execPath, ['scripts/acceptance-matrix.mjs', '--check'], { encoding: 'utf8' });
-    expect(out).toContain('all 103 IDs accounted for');
+    expect(out).toContain('all 107 IDs accounted for');
   });
 });

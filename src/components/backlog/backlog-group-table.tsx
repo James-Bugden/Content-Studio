@@ -6,6 +6,7 @@ import { newOperationId, postJson } from '@/lib/client/api';
 import type { Platform } from '@/domain/enums';
 import { buttonClass } from '../button-styles';
 import { OpenPanelLink, panelHref } from '../panel/open-panel-link';
+import { PillarTag } from '../pillar-tag';
 import { EditableTextCell, type TextCellSaveOutcome } from './editable-text-cell';
 import { PlatformSelectCell } from './platform-select-cell';
 
@@ -254,6 +255,7 @@ export function BacklogGroupTable({
                     placeholder="No PESTO stage"
                     maxLength={200}
                     suggestions={pestoOptions}
+                    displayValue={<PillarTag value={rows[item.libraryId]!.pesto} />}
                     onSave={(next) => savePesto(item.libraryId, next)}
                   />
                 </td>
@@ -309,6 +311,7 @@ export function BacklogGroupTable({
                   placeholder="No PESTO stage"
                   maxLength={200}
                   suggestions={pestoOptions}
+                  displayValue={<PillarTag value={rows[item.libraryId]!.pesto} />}
                   onSave={(next) => savePesto(item.libraryId, next)}
                 />
               </div>

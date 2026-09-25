@@ -1,31 +1,47 @@
 @import 'tailwindcss';
 
 /*
- * Content Studio tokens: near-black ink on white surfaces, one blue primary for
- * the active tab, links and the one accent action, red reserved for a genuine
- * blocker, and green kept only for a confirmed / approved / done signal. Nothing
- * else gets colour. (The yellow focal marker lives on in the rendered visuals'
- * own palette, src/domain/visual.ts, which is the image style, not the tool's.)
+ * Content Studio tokens: an Uber-style black/white interface with restrained
+ * greys. Green means confirmed/done, yellow means attention, and red means a
+ * genuine blocker. PESTO tags use their own small categorical palette. The SOAR
+ * image palette remains separate in src/domain/visual.ts.
  *
  * The Polished craft layer (type, gradient, shadows, motion) is a straight port of
  * the approved Calm Signal wireframe: wireframe/2409-app-redesign-backlog/styles-opt1.css,
  * "Polished" block (lines 69-124). Values are copied, not re-derived.
  */
 @theme {
-  --color-paper: #fafbfc;
+  --color-paper: #f6f6f6;
   --color-card: #ffffff;
-  --color-ink: #172023;
-  --color-ink-soft: #4a5558;
-  --color-line: #d5dbde;
-  /* The one accent: active tab, links, the one primary action, focus. */
-  --color-primary: #1d4ed8;
-  --color-primary-soft: #eff4ff;
+  --color-ink: #000000;
+  --color-ink-soft: #545454;
+  --color-line: #d6d6d6;
+  /* Black is the only general UI accent: active tab, links, primary action, focus. */
+  --color-primary: #000000;
+  --color-primary-soft: #eeeeee;
   /* Confirmed / approved / done only. Never expanded past that. */
-  --color-green: #0a3d26;
-  --color-green-soft: #e3efe8;
+  --color-green: #0b6b3a;
+  --color-green-soft: #e5f6ed;
+  /* Attention / waiting / review. Always paired with a label and glyph. */
+  --color-attention: #6b4f00;
+  --color-attention-soft: #fff3bf;
+  --color-attention-line: #d6a700;
   /* A genuine blocker only. */
-  --color-block: #8a1c1c;
-  --color-block-soft: #fbe9e7;
+  --color-block: #b00020;
+  --color-block-soft: #ffeaee;
+  /* Categorical PESTO/content-pillar tags only. */
+  --color-pillar-personal: #5b21b6;
+  --color-pillar-personal-soft: #f3e8ff;
+  --color-pillar-expertise: #1e40af;
+  --color-pillar-expertise-soft: #dbeafe;
+  --color-pillar-social: #0f766e;
+  --color-pillar-social-soft: #ccfbf1;
+  --color-pillar-trending: #9a3412;
+  --color-pillar-trending-soft: #ffedd5;
+  --color-pillar-opinions: #9f1239;
+  --color-pillar-opinions-soft: #ffe4e6;
+  --color-pillar-build: #4338ca;
+  --color-pillar-build-soft: #e0e7ff;
   /* --font-*-polished come from next/font (src/app/fonts.ts) on <html>; the system stack is the fallback. */
   --font-sans: var(--font-sans-polished), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
   --font-serif: var(--font-serif-polished), Georgia, serif;
@@ -40,8 +56,7 @@ html {
 }
 
 body {
-  /* Wireframe line 76: paper at the top settling into a slightly cooler grey. */
-  background: linear-gradient(180deg, var(--color-paper) 0%, #f1f4f2 100%);
+  background: linear-gradient(180deg, #ffffff 0%, var(--color-paper) 100%);
   font-family: var(--font-sans);
   line-height: 1.5;
   overflow-wrap: anywhere;
