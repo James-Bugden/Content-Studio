@@ -9,7 +9,7 @@ export type ResultTone = 'success' | 'info' | 'warning' | 'error';
 export const TONES: Record<ResultTone, { label: string; glyph: string; box: string }> = {
   success: { label: 'Done', glyph: '✓', box: 'border-green bg-green-soft text-green' },
   info: { label: 'Note', glyph: 'i', box: 'border-line bg-card text-ink' },
-  warning: { label: 'Check', glyph: '●', box: 'border-block bg-block-soft text-block' },
+  warning: { label: 'Check', glyph: '!', box: 'border-attention-line bg-attention-soft text-attention' },
   error: { label: 'Error', glyph: '✕', box: 'border-block bg-block-soft text-block' },
 };
 

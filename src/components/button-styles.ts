@@ -1,5 +1,5 @@
 /**
- * Shared button classes (CS-006). Blue (the one primary accent) is reserved for
+ * Shared button classes (CS-006). Black (the one primary accent) is reserved for
  * the one main action in a group; everything else is a quiet outline so the next
  * action stays obvious. Green is kept only for a button that literally approves
  * or confirms something as done, so it stays a confirmed/approved signal and never
@@ -27,7 +27,7 @@ const sizes: Record<ButtonSize, string> = {
 
 const variants: Record<ButtonVariant, string> = {
   // The one accent action. The gradient only lightens the top edge (wireframe line 98).
-  primary: 'bg-primary bg-linear-to-b from-white/10 to-transparent text-white shadow-[0_1px_2px_rgba(29,78,216,.2)] hover:bg-primary/90',
+  primary: 'bg-primary bg-linear-to-b from-white/10 to-transparent text-white shadow-[0_1px_2px_rgba(0,0,0,.2)] hover:bg-primary/85',
   // Approve / confirm-as-done only: the same green as a ✓ or an "Approved" state.
   approve: 'bg-green bg-linear-to-b from-white/10 to-transparent text-white shadow-[0_1px_2px_rgba(10,61,38,.15)] hover:bg-green/90',
   secondary: 'border border-line bg-card text-ink hover:bg-paper',

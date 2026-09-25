@@ -5,6 +5,7 @@ import type { SlotPanelData } from '@/domain/board';
 import { buttonClass } from '../button-styles';
 import { GuardedLink } from '../guarded-link';
 import { InlineResult } from '../inline-result';
+import { PillarTag } from '../pillar-tag';
 import { PromoteConfirm } from '../schedule/promote-confirm';
 import { StateView } from '../state-view';
 import { TypefullyPanel } from '../typefully/typefully-panel';
@@ -64,8 +65,9 @@ export function SlotPanel({ contentId }: { contentId: string }) {
         <h2 id="panel-title" className="text-lg font-semibold">
           {slot.platform} {slot.slot} · {slot.time}
         </h2>
-        <p className="text-sm text-ink-soft">
-          {dayLabel(slot.isoDate)} · Taipei time · {slot.statusLabel}{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
+        <p className="flex flex-wrap items-center gap-1.5 text-sm text-ink-soft">
+          <span>{dayLabel(slot.isoDate)} · Taipei time · {slot.statusLabel}</span>
+          {slot.expectedPillar ? <PillarTag value={slot.expectedPillar} /> : null}
         </p>
       </header>
 

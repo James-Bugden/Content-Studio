@@ -12,11 +12,11 @@ type Look = { label: string; glyph: string; className: string };
 
 export const STATUS_LOOK: Record<GateStatus, Look> = {
   ready: { label: 'Ready', glyph: '✓', className: 'border-green bg-green-soft text-green rounded-full' },
-  needs_action: { label: 'Needs action', glyph: '→', className: 'border-line bg-card text-ink rounded-full' },
+  needs_action: { label: 'Needs action', glyph: '→', className: 'border-attention-line bg-attention-soft text-attention rounded-full' },
   blocked: { label: 'Blocked', glyph: '✕', className: 'border-block bg-block-soft text-block rounded-sm border-2' },
 };
 
-const WARNING_LOOK: Look = { label: 'Warning', glyph: '○', className: 'border-line bg-card text-ink-soft rounded-full border-dashed' };
+const WARNING_LOOK: Look = { label: 'Warning', glyph: '!', className: 'border-attention-line bg-attention-soft text-attention rounded-full border-dashed' };
 
 export function gateLook(gate: Gate): Look {
   if (gate.severity === 'soft') return WARNING_LOOK;

@@ -1,6 +1,7 @@
 import type { SlotSummary } from '@/domain/board';
 import { slotStatus, type SlotLook } from '@/domain/calendar';
 import { OpenPanelLink } from '../panel/open-panel-link';
+import { PillarTag } from '../pillar-tag';
 import { PostThumb } from '../panel/post-thumb';
 
 /**
@@ -10,11 +11,11 @@ import { PostThumb } from '../panel/post-thumb';
  */
 const STATUS_TEXT: Record<SlotLook, string> = {
   published: 'text-green',
-  scheduled: 'text-ink',
-  review: 'text-ink-soft',
+  scheduled: 'text-green',
+  review: 'text-attention',
   open: 'text-ink-soft',
-  waiting: 'text-ink-soft',
-  missed: 'text-ink-soft',
+  waiting: 'text-attention',
+  missed: 'text-block',
   problem: 'text-block',
 };
 
@@ -35,7 +36,7 @@ function StepLine({ slot }: { slot: SlotSummary }) {
   if (!hasStep(slot) || slot.empty) return null;
   const urgent = slot.step.urgency === 'now';
   return (
-    <span className={`mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${urgent ? 'border border-block bg-block-soft text-block' : 'border border-line bg-card text-ink'}`}>
+    <span className={`mt-1 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold ${urgent ? 'border border-block bg-block-soft text-block' : 'border border-attention-line bg-attention-soft text-attention'}`}>
       <span aria-hidden="true">→</span>{' '}
       <span className="truncate">{slot.step.action}</span>
     </span>
@@ -59,8 +60,9 @@ export function WeekSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
           <EmptyBody slot={slot} />
         ) : (
           <>
-            <span className="block truncate text-[11px] text-ink-soft">
-              <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
+            <span className="flex min-w-0 flex-wrap items-center gap-1 text-[11px] text-ink-soft">
+              <span><span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span></span>
+              {slot.expectedPillar ? <PillarTag value={slot.expectedPillar} /> : null}
             </span>
             <span className="mt-0.5 flex items-start gap-1.5">
               <span className="min-w-0 flex-1">
@@ -91,14 +93,14 @@ function EmptyBody({ slot }: { slot: SlotSummary }) {
   const st = slotStatus(slot);
   if (st.look === 'waiting') {
     return (
-      <span className="block text-ink-soft">
+      <span className="block text-attention">
         <span className="tabular-nums">{slot.time}</span> · Waiting for X
       </span>
     );
   }
   if (st.look === 'missed') {
     return (
-      <span className="block text-ink-soft">
+      <span className="block text-block">
         <span aria-hidden="true">×</span> Missed · <span className="tabular-nums">{slot.time}</span>
       </span>
     );
@@ -106,8 +108,9 @@ function EmptyBody({ slot }: { slot: SlotSummary }) {
   return (
     <span className="flex flex-wrap items-center justify-between gap-x-1 text-ink-soft">
       <span>
-        Open · <span className="tabular-nums">{slot.time}</span>{slot.expectedPillar ? <> · {slot.expectedPillar}</> : null}
+        Open · <span className="tabular-nums">{slot.time}</span>
       </span>
+      {slot.expectedPillar ? <PillarTag value={slot.expectedPillar} /> : null}
       {slot.step.kind === 'fill_slot' ? <span className="font-semibold text-primary underline">Fill</span> : <span>{slot.step.action}</span>}
     </span>
   );
@@ -127,6 +130,7 @@ export function ListSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
           <span className="block text-xs text-ink-soft">
             <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>
           </span>
+          {slot.expectedPillar ? <span className="mt-1 block"><PillarTag value={slot.expectedPillar} /></span> : null}
           {slot.empty ? (
             <span className="mt-1 flex flex-wrap items-center justify-between gap-2">
               <StatusLine slot={slot} />

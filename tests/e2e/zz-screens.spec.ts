@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * T2 synthetic screenshots for handoff evidence. Written outside the repo only
+ * T2 synthetic screenshots for handoff evidence (THEME-04). Written outside the repo only
  * when CS_SHOT_DIR is set; otherwise the test just asserts the pages render.
  */
 const DIR = process.env.CS_SHOT_DIR;

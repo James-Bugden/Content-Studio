@@ -21,9 +21,9 @@ import { StateView } from '../state-view';
  */
 export const ZH_STATE_LOOK: Record<ZhAdaptationState, { label: string; glyph: string; className: string }> = {
   not_required: { label: 'Not required', glyph: '–', className: 'border-line text-ink-soft' },
-  missing: { label: 'Not adapted yet', glyph: '○', className: 'border-line text-ink' },
-  draft: { label: 'Draft, not sent for review', glyph: '✎', className: 'border-line text-ink' },
-  awaiting_review: { label: 'Awaiting Chinese review', glyph: '→', className: 'border-line text-ink' },
+  missing: { label: 'Not adapted yet', glyph: '○', className: 'border-attention-line bg-attention-soft text-attention' },
+  draft: { label: 'Draft, not sent for review', glyph: '✎', className: 'border-attention-line bg-attention-soft text-attention' },
+  awaiting_review: { label: 'Awaiting Chinese review', glyph: '→', className: 'border-attention-line bg-attention-soft text-attention' },
   approved: { label: 'Chinese copy approved', glyph: '✓', className: 'border-green text-green' },
   stale: { label: 'Stale: the X copy changed', glyph: '✕', className: 'border-block text-block border-2' },
   ambiguous: { label: 'Threads row unclear', glyph: '?', className: 'border-block text-block' },

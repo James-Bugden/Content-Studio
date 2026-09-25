@@ -424,6 +424,26 @@
   "cs": "CS-015",
   "text": "concurrent Typefully/Sheet edits produce comparison/conflict and cannot silently overwrite newer work."
  },
+ "THEME-01": {
+  "issue": 58,
+  "cs": "CS-024",
+  "text": "black, white and neutral surfaces dominate; the former blue primary treatment is removed."
+ },
+ "THEME-02": {
+  "issue": 58,
+  "cs": "CS-024",
+  "text": "green means confirmed, yellow means attention and red means blocked/error, always with a visible label and glyph or shape."
+ },
+ "THEME-03": {
+  "issue": 58,
+  "cs": "CS-024",
+  "text": "Backlog and Calendar share one deterministic PESTO/content-pillar palette; unknown and empty values remain neutral."
+ },
+ "THEME-04": {
+  "issue": 58,
+  "cs": "CS-024",
+  "text": "the themed interface passes unit, browser, accessibility and desktop/phone visual verification."
+ },
  "UX-01": {
   "issue": 7,
   "cs": "CS-006",

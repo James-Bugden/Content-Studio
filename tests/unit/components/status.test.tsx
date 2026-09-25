@@ -39,6 +39,18 @@ describe('StatusBadge (UX-02: never colour only)', () => {
     });
     expect(new Set(glyphs).size).toBe(3);
   });
+
+  it('uses the green/yellow/red semantic scale with words and shapes (THEME-02)', () => {
+    const classes = (['ready', 'needs_action', 'blocked'] as const).map((status) => {
+      const { container, unmount } = render(<StatusBadge status={status} />);
+      const className = container.firstElementChild?.getAttribute('class') ?? '';
+      unmount();
+      return className;
+    });
+    expect(classes[0]).toContain('bg-green-soft');
+    expect(classes[1]).toContain('bg-attention-soft');
+    expect(classes[2]).toContain('bg-block-soft');
+  });
 });
 
 describe('GateChip', () => {
