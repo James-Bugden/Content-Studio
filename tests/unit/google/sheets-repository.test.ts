@@ -198,6 +198,9 @@ describe('fixtures: pagination, empty queue, settings', () => {
       async writeCells(): Promise<void> {
         throw new AppError('FORBIDDEN', { provider: 'sheet' });
       }
+      async appendRow(): Promise<void> {
+        throw new AppError('FORBIDDEN', { provider: 'sheet' });
+      }
     })();
     const atBoundary = new SheetsContentRepository(boundary);
     const rows = await atBoundary.listLibrary();

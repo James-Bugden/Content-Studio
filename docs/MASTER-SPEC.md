@@ -1,10 +1,10 @@
 # Content Studio master specification
 
-Status: planning baseline, 2026-09-23. This document records implementation decisions, not claims that integrations or deployment already exist.
+Status: implementation baseline, updated 2026-09-25 for the unified Content and Replies application.
 
 ## 1. Product contract
 
-Content Studio is an owner-only internal dashboard that makes the existing content operation easier to review, approve, schedule and reconcile. It sits over the current Google Sheet, Drive Markdown/assets and Typefully. It does not create another content repository.
+Content Studio is an owner-only internal dashboard for two related workflows: outbound Content and manually posted social Replies. Content sits over the current Google Sheet, Drive Markdown/assets and Typefully. Replies uses Supabase for its private library, retrieval, resources and facts. Google Sheets remains the only writable authority for Content.
 
 Canonical flow:
 
@@ -15,6 +15,13 @@ Content / Editing Markdown/master
   -> Content Schedule
   -> Typefully
   -> published/final-copy/analytics sync to Content Schedule
+
+Replies
+  -> draft and edit in Content Studio
+  -> post manually on the social platform
+  -> record exact final reply in Supabase
+  -> reuse recorded replies prospectively
+  -> optionally save an explicit idea to Sheet Content Queue
 ```
 
 Goals:
@@ -25,14 +32,16 @@ Goals:
 - Reconcile with Typefully before creating anything and sync exact final copy back.
 - Preserve a clear audit trail and recover safely from partial external failures.
 - Provide a replaceable integration boundary so a later Supabase migration does not require rewriting the UI.
+- Draft and record social replies under the same Google owner session and shared application shell.
+- Learn reply style prospectively from replies explicitly recorded after launch.
 
 Non-goals for MVP:
 
 - A public creator SaaS, multi-tenant workspace or general CMS.
 - Replacing the Sheet, Drive, Typefully or the canonical Markdown intake path.
 - Direct social-platform publishing, autonomous approval, automatic hook selection or silent copy rewriting.
-- A second draft bank, duplicate calendar, arbitrary web scraping, or embedding private content in public logs/tests.
-- Instagram, rich collaborative editing, drag-and-drop scheduling, or Supabase as an MVP requirement.
+- A duplicate Content calendar, arbitrary web scraping, importing historical social replies, or embedding private content in public logs/tests.
+- Instagram, rich collaborative editing, drag-and-drop scheduling, or automatic social-platform posting.
 
 ## 2. Ground truth and authority
 
@@ -43,9 +52,11 @@ Non-goals for MVP:
 | Ready handoff | Sheet `Ready Queue`, derived from `Content Library`; never separately persisted by the app |
 | Final human edit and publishing | Typefully |
 | Exact final copy, published metadata and available analytics | Synced back to `Content Schedule` |
+| Reply sessions, recorded replies, retrieval, resources and facts | Isolated Supabase Reply tables |
+| Explicit Reply-to-Content idea | New row in existing Sheet `Content Queue`; never scheduled automatically |
 | UI cache | Disposable only; never authoritative |
 
-The app may keep request-local data, encrypted session data and bounded cache entries. It must not persist content records in another database. Cache keys include source revision/fingerprint; writes always re-read and compare the authoritative record.
+The app may keep request-local data, encrypted session data and bounded cache entries. Supabase Reply records and optional `content_studio_*` snapshots are isolated: snapshots are disposable and never writable Content authority. Cache keys include source revision/fingerprint; Content writes always re-read and compare the authoritative Sheet record.
 
 Canonical Drive references consulted for this baseline are `AI-WORKFLOWS-INDEX.md`, `CONTENT-WORKFLOW.md`, `STYLE-GUIDE.md`, `REPRODUCE.md`, `REVIEW.md`, `PLATFORM-PRODUCTION.md` and the workflow-folder `README.md`. The former Google Doc index is superseded; the Markdown index is canonical. Runtime code must discover configured Drive IDs rather than hard-code private file IDs in the public repository.
 
@@ -62,6 +73,7 @@ Browser
       -> MarkdownRepository -> Google Drive
       -> PublisherGateway -> Typefully
       -> AI services -> structured, validated proposals only
+      -> Reply services -> server-only Supabase client
       -> TelemetrySink -> redacted events/metrics
 ```
 
@@ -69,17 +81,17 @@ Use Zod at every boundary. Keep domain types in one package/module. UI component
 
 Recommended modules: `src/domain`, `src/application`, `src/integrations/google`, `src/integrations/typefully`, `src/integrations/ai`, `src/components`, `src/observability`, and `tests/{unit,integration,e2e,fixtures}`.
 
-### Social Replies patterns used selectively
+### Integrated Replies workflow
 
-Use [Social Replies implementation contracts](https://github.com/James-Bugden/Social-Replies-/blob/main/docs/implementation/contracts.md) as the reference for one shared typed vocabulary, validated server boundaries, versioned async work and operation-based idempotency. Use its [interaction spec](https://github.com/James-Bugden/Social-Replies-/blob/main/docs/design/interaction-spec.md) for protected-editor behaviour, explicit proposal acceptance, stale-response handling and narrow-screen discipline. Use its [acceptance matrix](https://github.com/James-Bugden/Social-Replies-/blob/main/docs/testing/acceptance-matrix.md) and [agent instructions](https://github.com/James-Bugden/Social-Replies-/blob/main/AGENTS.md) for stable test IDs, synthetic-public/private-real separation and exact handoff evidence.
+The mature Social Replies workspace is hosted at `/replies`, with utility pages below `/replies/*` and server routes below `/api/replies/*`. It reuses the Content Studio Auth.js Google owner session. Supabase credentials remain server-only. A service-role-only RPC resolves the single enabled owner from `private.app_owner`; every subsequent Reply query also carries that owner UUID explicitly.
 
-Do not copy Social Replies' Supabase-first persistence, reply-library schema, reply counters, inbound-engagement UI or retrieval/import architecture. Content Studio has different authorities and must use Sheet/Drive/Typefully adapters until a separately justified migration. Reuse its safety and workflow conventions, not its product layout or storage model.
+Replies retains its Supabase persistence, reply counters, retrieval, resources and facts. No historical export/import is required: only replies explicitly recorded going forward become retrieval evidence. Replies never write Typefully or Content Schedule. “Save as content idea” is a separate, explicit, idempotent append to the existing Sheet `Content Queue`.
 
 ### Authentication and permissions
 
 - Auth.js Google OIDC login; no public signup or account chooser after owner binding.
 - Authorise by immutable Google `sub` stored only in server configuration; email is display/defence-in-depth, not sole identity.
-- Google Sheets/Drive and Typefully tokens remain server-side. Request the minimum scopes needed; read-only adapters are usable before write scopes are configured.
+- Google Sheets/Drive, Typefully and Supabase credentials remain server-side. Request the minimum scopes needed; read-only adapters are usable before write scopes are configured.
 - Roles in MVP: `owner` (read/write/approve/publish actions) and optional `viewer` (read-only). Default deny.
 - Every mutation verifies session, role, same-origin/CSRF protection, resource identity, expected revision/fingerprint and idempotency key.
 - Private responses use `Cache-Control: private, no-store`. Content, URLs containing private IDs and tokens do not enter analytics or error messages.
@@ -157,7 +169,7 @@ Approval evidence lives in existing cells: an approval stamp `[cs:approved:<hash
 
 - `Content Queue Summary`: read-only source-level counts and master links.
 - `Workflow Settings`: read-only runtime policy input for canonical paths, Taipei slots and gates. Unknown/missing values block affected actions rather than falling back silently.
-- `Backlog Ideas` and `Example`: out of MVP write scope.
+- Legacy `Backlog Ideas` and `Example` tabs remain out of write scope. The supported backlog is the mapped `Content Queue` tab.
 
 Header discovery is by exact name, not fixed column index. Startup fails safely on duplicate/missing required headers. Unknown extra columns are preserved.
 
@@ -239,7 +251,7 @@ Error codes include `AUTH_REQUIRED`, `FORBIDDEN`, `CONFIG_MISSING`, `SCHEMA_DRIF
 | Tier | Scope |
 | --- | --- |
 | T0 | Types, reducers, gate rules, field mapping, schema drift, idempotency, redaction, adapter contract tests and failure/race fixtures |
-| T1 | Deterministic end-to-end journeys with fake Google/Drive/Typefully/AI adapters |
+| T1 | Deterministic end-to-end journeys with fake Google/Drive/Typefully/AI/Reply adapters |
 | T2 | Real browser accessibility and visual review at 375/500/750/1280 CSS px and 200% zoom; 360/390 px asset previews |
 | T3 | Sandboxed integration verification against a copied synthetic Sheet/Drive folder and Typefully test surface |
 | T4 | Production candidate smoke on the exact deployed commit with owner-only access and non-sensitive test content |
@@ -248,11 +260,11 @@ Stable acceptance groups: `SEC` auth/privacy; `MAP` field/schema; `DRV` Markdown
 
 ## 10. Deployment
 
-Use a separate Vercel project with preview and production environments. Configure exact callback URLs, owner subject, Google/Typefully/AI credentials and workbook/folder identifiers privately. Preview uses copied synthetic data and cannot reach production content. Verify runtime limits, token refresh, no-store headers, CSP, timezone and provider rate limits. Production promotion requires green required T0/T1/T2, successful T3 against copies, rollback steps and a T4 owner-only smoke. Never alter unrelated website, mail or Soar infrastructure.
+Use the Content Studio Vercel project with preview and production environments. Configure exact callback URLs, owner subject, Google/Typefully/AI credentials, server-only Supabase credentials and workbook/folder identifiers privately. Preview uses synthetic data and cannot reach production Content or Reply records. Verify runtime limits, token refresh, no-store headers, CSP, timezone and provider rate limits. Production promotion requires green required T0/T1/T2, successful T3 against copies, rollback steps and a T4 owner-only smoke. Never alter unrelated website, mail or Soar infrastructure.
 
 ## 11. Supabase migration path
 
-Do not dual-write in MVP. The `ContentRepository` interface, stable domain IDs and mutation envelopes are the seam. Add Supabase only when measured Sheet limits justify it. Migration phases: snapshot/read model; continuous reconciliation; shadow reads with parity reports; explicit authority cutover; then retire Sheet writes only after rollback and history export are verified. Drive may remain source/assets and Typefully remains publisher. A migration cannot silently change IDs, exact text, timestamps, approvals or lineage.
+Do not dual-write Content records. The `content_studio_*` Supabase namespace is an optional read model only; Sheet writes remain authoritative. Reply tables are a separate authority for Replies and are never joined into Content snapshot tables. Any future Content authority cutover still requires parity reports, explicit approval, rollback and history export.
 
 ## 12. Recommended execution order
 
@@ -262,5 +274,6 @@ Do not dual-write in MVP. The `ContentRepository` interface, stable domain IDs a
 4. Scheduling/publishing: [CS-014](https://github.com/James-Bugden/Content-Studio/issues/15) -> [CS-015](https://github.com/James-Bugden/Content-Studio/issues/16) -> [CS-016](https://github.com/James-Bugden/Content-Studio/issues/17).
 5. Hardening/release: [CS-017](https://github.com/James-Bugden/Content-Studio/issues/18) -> [CS-018](https://github.com/James-Bugden/Content-Studio/issues/19) -> [CS-019](https://github.com/James-Bugden/Content-Studio/issues/20).
 6. Follow-on migration option: [CS-020](https://github.com/James-Bugden/Content-Studio/issues/21) only after measured need.
+7. Unified application: [CS-025](https://github.com/James-Bugden/Content-Studio/issues/61) -> [CS-026](https://github.com/James-Bugden/Content-Studio/issues/62) -> [CS-027](https://github.com/James-Bugden/Content-Studio/issues/63) -> [CS-028](https://github.com/James-Bugden/Content-Studio/issues/64).
 
 Parallel work is safe only behind the shared contracts and fake adapters. The first vertical demo should be: login -> read one synthetic Library row and Markdown section -> review/edit with conflict protection -> approve -> see the derived Ready Queue state. Typefully and live AI are not required for that slice.

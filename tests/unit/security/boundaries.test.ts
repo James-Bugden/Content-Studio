@@ -45,10 +45,29 @@ describe('client code never reaches server credentials', () => {
   });
 });
 
-describe('Supabase read model stays server-only', () => {
-  it('does not add a browser Supabase SDK', () => {
-    const pkg = JSON.parse(read('package.json')) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
-    const names = [...Object.keys(pkg.dependencies), ...Object.keys(pkg.devDependencies)];
-    expect(names.filter((n) => n.includes('supabase'))).toEqual([]);
+describe('Supabase clients stay server-only', () => {
+  it('never imports the SDK or privileged Reply helpers from a client module', () => {
+    const replyClientFiles = tracked('src/', ['.ts', '.tsx']).filter((file) =>
+      /^\s*['"]use client['"]/m.test(read(file)),
+    );
+    const forbidden = [
+      '@supabase/supabase-js',
+      '@/replies/lib/supabase/',
+      '@/replies/lib/auth/',
+      '@/replies/lib/config/env',
+      '@/replies/lib/server/',
+    ];
+    const offenders = replyClientFiles.filter((file) => {
+      const runtimeSource = read(file).replace(/^import\s+type\s+.*;$/gm, '');
+      return forbidden.some((specifier) => runtimeSource.includes(specifier));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('never exposes the service credential through a public environment name', () => {
+    const offenders = tracked('src/', ['.ts', '.tsx']).filter((file) =>
+      read(file).includes('NEXT_PUBLIC_SUPABASE_READ_MODEL_SERVICE_KEY'),
+    );
+    expect(offenders).toEqual([]);
   });
 });

@@ -14,9 +14,16 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx', 'tests/integration/**/*.test.ts'],
+    include: [
+      'tests/unit/**/*.test.ts',
+      'tests/unit/**/*.test.tsx',
+      'tests/replies/unit/**/*.test.ts',
+      'tests/replies/unit/**/*.test.tsx',
+      'tests/integration/**/*.test.ts',
+    ],
     setupFiles: ['tests/setup/vitest.setup.ts'],
     testTimeout: 30_000,
+    hookTimeout: 60_000,
     pool: 'forks',
     maxWorkers: 4,
   },

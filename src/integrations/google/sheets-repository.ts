@@ -11,7 +11,8 @@ import {
   type RawRow,
   type SchedulePatch,
 } from '@/domain/mapping';
-import { operationIdSchema, type MutationEnvelope, type MutationResult, type StepResult } from '@/domain/mutation';
+import { libraryIdSchema, operationIdSchema, type MutationEnvelope, type MutationResult, type StepResult } from '@/domain/mutation';
+import { SHEET_WRITE_VALUE } from '@/domain/enums';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import {
   LIBRARY_HEADERS,
@@ -27,7 +28,7 @@ import {
 } from '@/domain/sheet-schema';
 import { parseQueueSummary, parseWorkflowSettings } from '@/domain/settings';
 import { emit, targetHash, timed } from '@/observability/events';
-import type { ContentRepository, SchemaStatus } from '@/application/ports';
+import type { ContentRepository, QueueIdeaCreate, SchemaStatus } from '@/application/ports';
 import { MAX_TAB_ROWS, PAGE_ROWS, type CellWrite, type SheetTransport } from './sheet-transport';
 
 /**
@@ -211,6 +212,152 @@ export class SheetsContentRepository implements ContentRepository {
 
   async updateQueue(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>> {
     return this.update('queue', LIBRARY_HEADERS, LIBRARY_WRITABLE, m.target.libraryId, (r) => r.value.libraryId, m, toLibraryRecord);
+  }
+
+  async createQueueIdea(m: QueueIdeaCreate): Promise<MutationResult<LibraryRecord>> {
+    const opId = m.operationId;
+    const fail = (code: AppError['code'], details?: Record<string, unknown>): MutationResult<LibraryRecord> => ({
+      ok: false,
+      operationId: opId,
+      code,
+      steps: [{ step: 'append queue idea', provider: 'sheet', status: 'failed', errorCode: code }],
+      ...(details ? { details } : {}),
+    });
+
+    if (m.actor.role !== 'owner') return fail('FORBIDDEN');
+    if (!operationIdSchema.safeParse(opId).success || !libraryIdSchema.safeParse(m.libraryId).success) {
+      return fail('VALIDATION_FAILED', { reason: 'identifier' });
+    }
+    if (!this.options.writable) return fail('CONFIG_MISSING', { reason: 'write_disabled' });
+    if (
+      m.currentHook.trim() === '' ||
+      m.currentHook.length > 500 ||
+      m.draftContent.trim() === '' ||
+      m.draftContent.length > MAX_CELL_CHARS
+    ) {
+      return fail('VALIDATION_FAILED', { reason: 'content' });
+    }
+
+    const expected: Partial<Record<LibraryField, string>> = {
+      libraryId: m.libraryId,
+      state: 'Idea',
+      contentSource: 'Social Replies',
+      sourcePlatform: m.sourcePlatform,
+      targetPlatform: m.sourcePlatform,
+      slug: `social-reply-${m.libraryId.toLowerCase()}`,
+      workflowRole: 'Backlog idea',
+      pairKey: `social-reply-${m.libraryId.toLowerCase()}`,
+      reviewStatus: SHEET_WRITE_VALUE.review.Pending,
+      queueForSchedule: 'FALSE',
+      nextAction: 'Promote to Editing',
+      currentHook: m.currentHook,
+      draftContent: m.draftContent,
+    };
+    const patchHash = fingerprint(JSON.stringify(expected));
+    const prior = this.ops.get(opId);
+    if (prior) {
+      if (prior.patchHash !== patchHash) return fail('CONFLICT', { reason: 'operation_reused_with_different_idea' });
+      if (prior.result.ok) {
+        return { ...(prior.result as MutationResult<LibraryRecord> & { ok: true }), replayed: true };
+      }
+    }
+
+    let before: TabRead<LibraryField>;
+    try {
+      before = await this.readTab('queue', LIBRARY_HEADERS, true);
+    } catch (error) {
+      return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
+    }
+    const existing = before.rows
+      .map(({ raw, row }) => toLibraryRecord(before.index, raw, row))
+      .filter((record) => record.value.libraryId === m.libraryId);
+    if (existing.length > 1) return fail('CONFLICT', { reason: 'duplicate_id' });
+    if (existing.length === 1) {
+      if (!patchAlreadyApplied(existing[0]!.cells, expected)) {
+        return fail('CONFLICT', { reason: 'library_id_already_used' });
+      }
+      const result: MutationResult<LibraryRecord> = {
+        ok: true,
+        operationId: opId,
+        replayed: true,
+        value: existing[0]!,
+        steps: [{ step: 'append queue idea', provider: 'sheet', status: 'skipped_already_applied', revision: existing[0]!.revision }],
+      };
+      this.remember(opId, patchHash, result);
+      return result;
+    }
+
+    const values: (string | boolean)[] = Array.from({ length: before.index.width }, () => '');
+    for (const [field, value] of Object.entries(expected) as [LibraryField, string][]) {
+      values[before.index.columns[field]] = field === 'queueForSchedule' ? value === 'TRUE' : value;
+    }
+
+    try {
+      await timed(
+        {
+          name: 'sheet.append.queue',
+          adapter: 'sheet',
+          operationId: opId,
+          targetHash: targetHash(m.libraryId),
+          facts: { cells: Object.keys(expected).length },
+        },
+        () => this.transport.appendRow(SHEET_TABS.queue.name, SHEET_TABS.queue.lastColumn, values),
+      );
+    } catch (error) {
+      return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
+    } finally {
+      this.readCache.clear();
+    }
+
+    try {
+      const after = await this.readTab('queue', LIBRARY_HEADERS, true);
+      const matches = after.rows
+        .map(({ raw, row }) => toLibraryRecord(after.index, raw, row))
+        .filter((record) => record.value.libraryId === m.libraryId);
+      if (matches.length !== 1 || !patchAlreadyApplied(matches[0]!.cells, expected)) {
+        return {
+          ok: false,
+          operationId: opId,
+          code: 'PARTIAL_FAILURE',
+          steps: [
+            { step: 'append queue idea', provider: 'sheet', status: 'done' },
+            { step: 'confirm queue idea', provider: 'sheet', status: 'failed', errorCode: 'CONFLICT' },
+          ],
+          details: { reason: matches.length === 1 ? 'content_mismatch' : 'row_not_unique' },
+        };
+      }
+      const result: MutationResult<LibraryRecord> = {
+        ok: true,
+        operationId: opId,
+        replayed: false,
+        value: matches[0]!,
+        steps: [{ step: 'append queue idea', provider: 'sheet', status: 'done', revision: matches[0]!.revision }],
+      };
+      this.remember(opId, patchHash, result);
+      emit({
+        name: 'sheet.append.queue',
+        adapter: 'sheet',
+        outcome: 'ok',
+        operationId: opId,
+        targetHash: targetHash(m.libraryId),
+      });
+      return result;
+    } catch (error) {
+      return {
+        ok: false,
+        operationId: opId,
+        code: 'PARTIAL_FAILURE',
+        steps: [
+          { step: 'append queue idea', provider: 'sheet', status: 'done' },
+          {
+            step: 'confirm queue idea',
+            provider: 'sheet',
+            status: 'failed',
+            errorCode: isAppError(error) ? error.code : 'UNKNOWN',
+          },
+        ],
+      };
+    }
   }
 
   async updateSchedule(m: MutationEnvelope<{ contentId: string }, SchedulePatch>): Promise<MutationResult<ScheduleRecord>> {

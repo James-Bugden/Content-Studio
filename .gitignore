@@ -4,6 +4,7 @@ dist/
 build/
 coverage/
 .vercel/
+supabase/.temp/
 .env
 .env.*
 !.env.example

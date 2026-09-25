@@ -160,6 +160,54 @@ export type BacklogOutcome =
   | { ok: true; item: BacklogItem; revision: string; replayed: boolean }
   | { ok: false; code: ErrorCode; message?: string };
 
+export const replyContentIdeaSchema = z.object({
+  operationId: operationIdSchema,
+  replyId: z.string().uuid(),
+  platform: z.enum(['linkedin', 'x', 'threads']),
+  finalText: z.string().trim().min(1).max(50_000),
+});
+export type ReplyContentIdea = z.infer<typeof replyContentIdeaSchema>;
+
+const REPLY_PLATFORM: Record<ReplyContentIdea['platform'], Platform> = {
+  linkedin: 'LinkedIn',
+  x: 'X',
+  threads: 'Threads',
+};
+
+/**
+ * Adds a posted Reply to the existing Content Queue as a prospective idea.
+ * The ID is derived from the immutable Reply UUID, so retries find the same row.
+ */
+export async function saveReplyAsContentIdea(
+  repo: ContentRepository,
+  actor: Actor,
+  input: ReplyContentIdea,
+): Promise<BacklogOutcome> {
+  if (actor.role !== 'owner') return { ok: false, code: 'FORBIDDEN' };
+  const compactId = input.replyId.replace(/-/g, '').slice(0, 16);
+  const libraryId = `IDEA-SR-${compactId}`;
+  const firstParagraph = input.finalText
+    .split(/\n\s*\n|\n/)
+    .map((part) => part.trim())
+    .find(Boolean);
+  const currentHook = (firstParagraph ?? input.finalText.trim()).slice(0, 500);
+  const result = await repo.createQueueIdea({
+    operationId: input.operationId,
+    actor,
+    libraryId,
+    sourcePlatform: REPLY_PLATFORM[input.platform],
+    currentHook,
+    draftContent: input.finalText,
+  });
+  if (!result.ok) return { ok: false, code: result.code };
+  return {
+    ok: true,
+    item: toBacklogItem(result.value),
+    revision: result.value.revision,
+    replayed: result.replayed,
+  };
+}
+
 /** Owner-only, mirroring applyReviewTransition's actor check. */
 export async function applyBacklogEdit(repo: ContentRepository, actor: Actor, t: BacklogEdit): Promise<BacklogOutcome> {
   if (actor.role !== 'owner') return { ok: false, code: 'FORBIDDEN' };

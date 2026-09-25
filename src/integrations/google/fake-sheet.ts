@@ -103,6 +103,18 @@ export class FakeSheetTransport implements SheetTransport {
     this.writes.push({ tab, writes });
   }
 
+  async appendRow(tab: string, _lastColumn: string, values: readonly (string | boolean)[]): Promise<void> {
+    this.beforeWrite?.(tab);
+    this.maybeFail('write', tab);
+    const grid = this.tabs.get(tab);
+    if (!grid) throw new AppError('SCHEMA_DRIFT', { provider: 'sheet', missingTab: true });
+    grid.push(values.map((value) => ({ value: typeof value === 'boolean' ? (value ? 'TRUE' : 'FALSE') : value })));
+    this.writes.push({
+      tab,
+      writes: values.map((value, column) => ({ row: grid.length, column, value })),
+    });
+  }
+
   private recomputeReadyQueue(): void {
     const lib = this.tabs.get(SHEET_TABS.library.name) ?? [];
     const header = lib[0]?.map((c) => c.value) ?? [];

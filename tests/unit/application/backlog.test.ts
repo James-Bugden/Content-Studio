@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
-import { applyBacklogEdit, backlogEditSchema, loadBacklogGroups, loadBacklogOptions } from '@/application/backlog';
+import {
+  applyBacklogEdit,
+  backlogEditSchema,
+  loadBacklogGroups,
+  loadBacklogOptions,
+  saveReplyAsContentIdea,
+} from '@/application/backlog';
 import { SHEET_TABS } from '@/domain/sheet-schema';
 import type { Actor } from '@/domain/mutation';
 
@@ -172,5 +178,26 @@ describe('loadBacklogOptions', () => {
     // Every other synthetic row still carries the fixture's default hookTemplate
     // ("Contrarian #12" — LIBRARY_DEFAULTS), so both it and the overridden row's value are present.
     expect(options.hookTemplates).toEqual(['Contrarian #12 - Everyone says X, but Y', 'Story #7 - The day X changed how I Y']);
+  });
+});
+
+describe('saveReplyAsContentIdea', () => {
+  it('derives a stable Queue ID and uses the first paragraph as the hook', async () => {
+    const outcome = await saveReplyAsContentIdea(repo, owner, {
+      operationId: op('reply-content'),
+      replyId: '12345678-1234-4123-8123-1234567890ab',
+      platform: 'threads',
+      finalText: 'First insight.\n\nA second paragraph stays in the draft.',
+    });
+    expect(outcome).toMatchObject({
+      ok: true,
+      item: {
+        libraryId: 'IDEA-SR-1234567812344123',
+        hook: 'First insight.',
+        platform: 'Threads',
+      },
+    });
+    const row = await repo.getQueue('IDEA-SR-1234567812344123');
+    expect(row.value.draftContent).toBe('First insight.\n\nA second paragraph stays in the draft.');
   });
 });
