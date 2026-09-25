@@ -121,6 +121,76 @@ test('a second in-place edit after the first still saves (the row keeps the new 
   await expect(row(await openGroup(page, 'Synthetic Interview Prep'), 'IDEA-BL-0005')).toContainText('Second edit.');
 });
 
+test('Platform, PESTO and Hook template save in sequence and survive a reload', async ({ page }) => {
+  await page.goto('/backlog');
+  const g = await openGroup(page, 'Synthetic Backlog Ideas');
+  const r = row(g, 'IDEA-BL-0001');
+
+  const platformWrite = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
+  await r.getByRole('combobox', { name: 'Platform for IDEA-BL-0001' }).selectOption('X');
+  expect(((await platformWrite).postDataJSON() as { patch: Record<string, string> }).patch).toEqual({ platform: 'X' });
+  await expect(r.getByRole('status')).toHaveText('Saved');
+
+  const pestoWrite = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
+  await r.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0001/ }).click();
+  const pesto = r.getByRole('textbox', { name: 'PESTO stage for IDEA-BL-0001' });
+  await pesto.fill('Opinions');
+  await pesto.press('Enter');
+  expect(((await pestoWrite).postDataJSON() as { patch: Record<string, string> }).patch).toEqual({ pesto: 'Opinions' });
+  await expect(r.locator('[data-text-cell="PESTO stage"] [role="status"]')).toHaveText('Saved');
+
+  const templateWrite = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
+  await r.getByRole('button', { name: /^Edit hook template for IDEA-BL-0001/ }).click();
+  // A text input with a datalist has the accessibility role `combobox`.
+  const template = r.getByRole('combobox', { name: 'Hook template for IDEA-BL-0001' });
+  await expect(template).toHaveAttribute('list', /.+/);
+  await template.fill('Story #7 - The day X changed how I Y');
+  await template.press('Enter');
+  expect(((await templateWrite).postDataJSON() as { patch: Record<string, string> }).patch).toEqual({ hookTemplate: 'Story #7 - The day X changed how I Y' });
+  await expect(r.locator('[data-text-cell="Hook template"] [role="status"]')).toHaveText('Saved');
+  await expect(page).not.toHaveURL(/queue=/);
+
+  await page.reload();
+  const saved = row(await openGroup(page, 'Synthetic Backlog Ideas'), 'IDEA-BL-0001');
+  await expect(saved.getByRole('combobox', { name: 'Platform for IDEA-BL-0001' })).toHaveValue('X');
+  await expect(saved.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0001/ })).toContainText('Opinions');
+  await expect(saved.getByRole('button', { name: /^Edit hook template for IDEA-BL-0001/ })).toContainText('Story #7 - The day X changed how I Y');
+});
+
+test('new PESTO values become suggestions for another row and Escape does not write', async ({ page }) => {
+  await page.goto('/backlog');
+  let g = await openGroup(page, 'Synthetic Backlog Ideas');
+  const first = row(g, 'IDEA-BL-0001');
+  await first.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0001/ }).click();
+  const firstPesto = first.getByRole('textbox', { name: 'PESTO stage for IDEA-BL-0001' });
+  await firstPesto.fill('Opinions');
+  await firstPesto.press('Enter');
+  await expect(first.locator('[data-text-cell="PESTO stage"] [role="status"]')).toHaveText('Saved');
+
+  await page.reload();
+  g = await openGroup(page, 'Synthetic Backlog Ideas');
+  const second = row(g, 'IDEA-BL-0002');
+  await second.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0002/ }).click();
+  const secondPesto = second.getByRole('combobox', { name: 'PESTO stage for IDEA-BL-0002' });
+  const listId = await secondPesto.getAttribute('list');
+  expect(listId).toBeTruthy();
+  // Select by the option rather than interpolating React's opaque useId into
+  // CSS; that id is allowed to contain selector punctuation.
+  await expect(page.locator('datalist option[value="Opinions"]')).toHaveCount(1);
+
+  let writes = 0;
+  const countWrite = (req: { url(): string; method(): string }) => {
+    if (req.url().includes('/api/backlog/edit') && req.method() === 'POST') writes += 1;
+  };
+  page.on('request', countWrite);
+  await secondPesto.fill('Must not be saved');
+  await secondPesto.press('Escape');
+  await page.waitForTimeout(100);
+  page.off('request', countWrite);
+  expect(writes).toBe(0);
+  await expect(second.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0002/ })).toContainText('No PESTO stage');
+});
+
 test('Escape reverts an in-progress hook edit without saving', async ({ page }) => {
   await page.goto('/backlog');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
@@ -183,14 +253,18 @@ test('editing the hook in the panel and saving updates the table row', async ({ 
   await expect(row(g, 'IDEA-BL-0002')).toContainText('A slow counteroffer is still a counteroffer, act on it.');
 });
 
-test('a viewer sees plain text: no hook input, no Approve or Skip, only Open', async ({ page }) => {
+test('a viewer sees Platform, PESTO, Hook template and Hook as plain text, with only Open actionable', async ({ page }) => {
   await signInAs(page.request, 'viewer');
   await page.goto('/backlog');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   const r = row(g, 'IDEA-BL-0001');
+  await expect(r).toContainText('LinkedIn');
+  await expect(r).toContainText('No PESTO stage');
+  await expect(r).toContainText('Contrarian #12 - Everyone says X, but Y');
   await expect(r).toContainText('Remote roles hide a second negotiation.');
   await expect(r.getByRole('button')).toHaveCount(0);
   await expect(r.getByRole('textbox')).toHaveCount(0);
+  await expect(r.getByRole('combobox')).toHaveCount(0);
   await expect(r.getByRole('link', { name: 'Open IDEA-BL-0001 in the panel' })).toBeVisible();
 });
 

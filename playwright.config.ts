@@ -27,7 +27,10 @@ export default defineConfig({
     { name: 'w1280', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
   ],
   webServer: {
-    command: `npm run build && npm run start -- --port ${PORT}`,
+    // Bind explicitly to loopback. Besides keeping the synthetic test server
+    // private, this avoids Next.js enumerating host network interfaces in
+    // restricted CI/container runtimes where that syscall is unavailable.
+    command: `npm run build && npm run start -- --port ${PORT} --hostname 127.0.0.1`,
     url: `http://127.0.0.1:${PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
