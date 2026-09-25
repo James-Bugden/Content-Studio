@@ -89,6 +89,29 @@ describe('MIG-03: read-only shadow parity', () => {
     expect(serialized).not.toContain('private-revision');
   });
 
+  it('rejects order, source metadata, duplicate rows and payload drift even when row hashes claim a match', async () => {
+    const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey, runId });
+    const original = snapshot.rows.find((row) => row.collection === 'library')!;
+    const replacements: MirrorRow[] = [
+      { ...original, position: original.position + 1 },
+      { ...original, sourceRow: (original.sourceRow ?? 0) + 1 },
+      { ...original, sourceRevision: 'a different private revision' },
+      { ...original, payload: { forged: 'private text' } },
+    ];
+    for (const replacement of replacements) {
+      const active = snapshot.rows.map((row) => row === original ? replacement : row);
+      const report = compareSheetMirror(snapshot, active);
+      expect(report.exact).toBe(false);
+      expect(report.mismatches).toEqual([{ collection: 'library', kind: 'changed', fingerprint: expect.any(String) }]);
+      expect(JSON.stringify(report)).not.toContain(original.stableId);
+      expect(JSON.stringify(report)).not.toContain('private');
+    }
+    const duplicate = compareSheetMirror(snapshot, [...snapshot.rows, original]);
+    expect(duplicate.exact).toBe(false);
+    expect(duplicate.activeRows).toBe(snapshot.rows.length + 1);
+    expect(duplicate.mismatches).toEqual([{ collection: 'library', kind: 'changed', fingerprint: expect.any(String) }]);
+  });
+
   it('fails closed on duplicate source positions or malformed singleton payloads', async () => {
     const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey, runId });
     const library = snapshot.rows.filter((row) => row.collection === 'library');

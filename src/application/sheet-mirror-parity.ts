@@ -26,13 +26,26 @@ function fingerprint(row: MirrorRow): string {
 /** Compare content hashes without returning content, revisions, row numbers or IDs. */
 export function compareSheetMirror(snapshot: SheetMirrorSnapshot, active: MirrorRow[]): SheetMirrorParityReport {
   const expected = new Map(snapshot.rows.map((row) => [key(row), row]));
-  const actual = new Map(active.map((row) => [key(row), row]));
+  const actual = new Map<string, MirrorRow>();
+  const duplicates = new Set<string>();
+  for (const row of active) {
+    const id = key(row);
+    if (actual.has(id)) duplicates.add(id);
+    else actual.set(id, row);
+  }
   const mismatches: ParityMismatch[] = [];
 
   for (const [id, row] of expected) {
     const mirrored = actual.get(id);
     if (!mirrored) mismatches.push({ collection: row.collection, kind: 'missing', fingerprint: fingerprint(row) });
-    else if (mirrored.rowHash !== row.rowHash) mismatches.push({ collection: row.collection, kind: 'changed', fingerprint: fingerprint(row) });
+    else if (
+      duplicates.has(id) ||
+      mirrored.position !== row.position ||
+      mirrored.sourceRow !== row.sourceRow ||
+      mirrored.sourceRevision !== row.sourceRevision ||
+      mirrored.rowHash !== row.rowHash ||
+      mirrorHash(mirrored.payload) !== row.rowHash
+    ) mismatches.push({ collection: row.collection, kind: 'changed', fingerprint: fingerprint(row) });
   }
   for (const [id, row] of actual) {
     if (!expected.has(id)) mismatches.push({ collection: row.collection, kind: 'unexpected', fingerprint: fingerprint(row) });
