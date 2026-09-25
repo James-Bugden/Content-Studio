@@ -48,6 +48,12 @@ class MemoryStore implements SheetMirrorStore {
 }
 
 describe('MIG-02: exact Sheet snapshot and replay', () => {
+  it('uses a content-sensitive SHA-256 hash rather than a constant or short change fingerprint', () => {
+    expect(mirrorHash({ value: 'A' })).toMatch(/^[0-9a-f]{64}$/);
+    expect(mirrorHash({ value: 'A' })).not.toBe(mirrorHash({ value: 'B' }));
+    expect(mirrorHash({ b: 2, a: 1 })).toBe(mirrorHash({ a: 1, b: 2 }));
+  });
+
   it('preserves every collection, stable ID, exact payload, revision and deterministic hash', async () => {
     const repo = new SheetsContentRepository(new FakeSheetTransport());
     const snapshot = await buildSheetMirrorSnapshot(repo, { sourceKey, runId: runOne, startedAt: new Date('2026-09-25T00:00:00.000Z') });
