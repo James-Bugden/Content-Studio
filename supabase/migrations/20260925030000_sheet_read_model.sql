@@ -18,6 +18,7 @@ create table if not exists public.content_studio_sheet_stage (
   run_id uuid not null references public.content_studio_sheet_sync_runs(run_id) on delete cascade,
   collection text not null check (collection in ('schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings')),
   stable_id text not null check (stable_id <> ''),
+  position integer not null check (position >= 0),
   source_row integer check (source_row is null or source_row > 0),
   source_revision text,
   row_hash text not null check (row_hash ~ '^[0-9a-f]{64}$'),
@@ -29,6 +30,7 @@ create table if not exists public.content_studio_sheet_rows (
   source_key text not null check (source_key ~ '^[a-z0-9][a-z0-9_-]{7,63}$'),
   collection text not null check (collection in ('schema', 'library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings')),
   stable_id text not null check (stable_id <> ''),
+  position integer not null check (position >= 0),
   source_row integer check (source_row is null or source_row > 0),
   source_revision text,
   row_hash text not null check (row_hash ~ '^[0-9a-f]{64}$'),
@@ -40,7 +42,7 @@ create table if not exists public.content_studio_sheet_rows (
 );
 
 create index if not exists content_studio_sheet_rows_active
-  on public.content_studio_sheet_rows (source_key, collection, stable_id)
+  on public.content_studio_sheet_rows (source_key, collection, position)
   where retired_at is null;
 
 create index if not exists content_studio_sheet_rows_sync_run
@@ -125,18 +127,20 @@ begin
   if run_status <> 'staging' then raise exception 'snapshot run is not staging' using errcode = '55000'; end if;
 
   insert into public.content_studio_sheet_stage (
-    run_id, collection, stable_id, source_row, source_revision, row_hash, payload
+    run_id, collection, stable_id, position, source_row, source_revision, row_hash, payload
   )
-  select p_run_id, item.collection, item.stable_id, item.source_row, item.source_revision, item.row_hash, item.payload
+  select p_run_id, item.collection, item.stable_id, item.position, item.source_row, item.source_revision, item.row_hash, item.payload
   from jsonb_to_recordset(p_rows) as item(
     collection text,
     stable_id text,
+    position integer,
     source_row integer,
     source_revision text,
     row_hash text,
     payload jsonb
   )
   on conflict (run_id, collection, stable_id) do update set
+    position = excluded.position,
     source_row = excluded.source_row,
     source_revision = excluded.source_revision,
     row_hash = excluded.row_hash,
@@ -183,12 +187,13 @@ begin
   end loop;
 
   insert into public.content_studio_sheet_rows (
-    source_key, collection, stable_id, source_row, source_revision, row_hash, payload, sync_run_id, synced_at, retired_at
+    source_key, collection, stable_id, position, source_row, source_revision, row_hash, payload, sync_run_id, synced_at, retired_at
   )
-  select run.source_key, stage.collection, stage.stable_id, stage.source_row, stage.source_revision, stage.row_hash, stage.payload, p_run_id, now(), null
+  select run.source_key, stage.collection, stage.stable_id, stage.position, stage.source_row, stage.source_revision, stage.row_hash, stage.payload, p_run_id, now(), null
   from public.content_studio_sheet_stage as stage
   where stage.run_id = p_run_id
   on conflict (source_key, collection, stable_id) do update set
+    position = excluded.position,
     source_row = excluded.source_row,
     source_revision = excluded.source_revision,
     row_hash = excluded.row_hash,
