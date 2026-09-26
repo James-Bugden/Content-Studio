@@ -83,8 +83,8 @@ function matchesFilters(record: LibraryRecord, source: string, f: BacklogFilters
  * within a group are sorted by libraryId. A group with no rows left after
  * filtering is dropped, not shown empty.
  */
-export async function loadBacklogGroups(repo: ContentRepository, filters: BacklogFilters = {}): Promise<BacklogGroup[]> {
-  const rows = await repo.listQueue();
+export async function loadBacklogGroups(repo: ContentRepository, filters: BacklogFilters = {}, existingRows?: LibraryRecord[]): Promise<BacklogGroup[]> {
+  const rows = existingRows ?? await repo.listQueue();
   const bySource = new Map<string, LibraryRecord[]>();
   for (const record of rows) {
     const source = record.value.contentSource.trim();
@@ -113,8 +113,8 @@ export async function loadBacklogGroups(repo: ContentRepository, filters: Backlo
  * distinct PESTO and Hook template values already in use, for the edit cells'
  * suggestion lists.
  */
-export async function loadBacklogOptions(repo: ContentRepository): Promise<BacklogOptions> {
-  const rows = await repo.listQueue();
+export async function loadBacklogOptions(repo: ContentRepository, existingRows?: LibraryRecord[]): Promise<BacklogOptions> {
+  const rows = existingRows ?? await repo.listQueue();
   const sources = new Set<string>();
   const platforms = new Set<Platform>();
   const pestoStages = new Set<string>();

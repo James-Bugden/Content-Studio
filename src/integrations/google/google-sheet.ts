@@ -36,25 +36,22 @@ export class GoogleSheetTransport implements SheetTransport {
       const token = await this.auth();
       const headers = { authorization: `Bearer ${token}` };
       const base = `${API}/${encodeURIComponent(this.spreadsheetId)}/values/${encodeURIComponent(range)}`;
-      const valuesRes = await this.fetchImpl(`${base}?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`, { headers });
-      if (!valuesRes.ok) throw googleError(valuesRes.status, 'sheet');
+      // These representations describe the same range and have no dependency
+      // on one another. Fetch them concurrently to avoid three network latencies
+      // for every page of the large Content Library.
+      const linkUrl = `${API}/${encodeURIComponent(this.spreadsheetId)}?ranges=${encodeURIComponent(range)}&fields=${encodeURIComponent('sheets(data(rowData(values(hyperlink))))')}`;
+      const [valuesRes, formulaRes, linkRes] = await Promise.all([
+        this.fetchImpl(`${base}?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`, { headers }),
+        options.formulas ? this.fetchImpl(`${base}?valueRenderOption=FORMULA&majorDimension=ROWS`, { headers }) : Promise.resolve(null),
+        options.links ? this.fetchImpl(linkUrl, { headers }) : Promise.resolve(null),
+      ]);
+      for (const response of [valuesRes, formulaRes, linkRes]) {
+        if (response && !response.ok) throw googleError(response.status, 'sheet');
+      }
       const values = ((await valuesRes.json()) as { values?: unknown[][] }).values ?? [];
-
-      let formulas: unknown[][] = [];
-      if (options.formulas) {
-        const fRes = await this.fetchImpl(`${base}?valueRenderOption=FORMULA&majorDimension=ROWS`, { headers });
-        if (!fRes.ok) throw googleError(fRes.status, 'sheet');
-        formulas = ((await fRes.json()) as { values?: unknown[][] }).values ?? [];
-      }
-
-      let links: (string | null)[][] = [];
-      if (options.links) {
-        const url = `${API}/${encodeURIComponent(this.spreadsheetId)}?ranges=${encodeURIComponent(range)}&fields=${encodeURIComponent('sheets(data(rowData(values(hyperlink))))')}`;
-        const lRes = await this.fetchImpl(url, { headers });
-        if (!lRes.ok) throw googleError(lRes.status, 'sheet');
-        const body = (await lRes.json()) as { sheets?: { data?: { rowData?: { values?: { hyperlink?: string }[] }[] }[] }[] };
-        links = (body.sheets?.[0]?.data?.[0]?.rowData ?? []).map((r) => (r.values ?? []).map((v) => v.hyperlink ?? null));
-      }
+      const formulas = formulaRes ? ((await formulaRes.json()) as { values?: unknown[][] }).values ?? [] : [];
+      const linkBody = linkRes ? (await linkRes.json()) as { sheets?: { data?: { rowData?: { values?: { hyperlink?: string }[] }[] }[] }[] } : null;
+      const links: (string | null)[][] = (linkBody?.sheets?.[0]?.data?.[0]?.rowData ?? []).map((r) => (r.values ?? []).map((v) => v.hyperlink ?? null));
 
       return values.map((row, i) => ({
         values: row,

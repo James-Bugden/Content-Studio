@@ -22,8 +22,7 @@ import { PostThumb } from './post-thumb';
 type QueueItem = { libraryId: string; revision: string; row: number; hook: string; slug: string; draftContent: string; thumb: Thumb };
 type Load = { state: 'loading' } | { state: 'error'; message: string } | { state: 'ok'; item: QueueItem; canEdit: boolean };
 type EditOutcome = { ok: true; item: QueueItem; revision: string; replayed: boolean } | { ok: false; code: string; message?: string };
-type ListResponse = { ok: true; data: { source: string; total: number; items: QueueItem[] }[] } | { ok: false; message?: string };
-type MeResponse = { ok: true; role: 'owner' | 'viewer' } | { ok: false; message?: string };
+type ItemResponse = { ok: true; item: QueueItem; canEdit: boolean } | { ok: false; message?: string };
 
 export function QueuePanel({ libraryId }: { libraryId: string }) {
   const [load, setLoad] = useState<Load>({ state: 'loading' });
@@ -35,22 +34,13 @@ export function QueuePanel({ libraryId }: { libraryId: string }) {
   const draftRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = useCallback(async () => {
-    const [listRes, meRes] = await Promise.all([
-      fetch('/api/backlog', { credentials: 'same-origin', cache: 'no-store' }),
-      fetch('/api/me', { credentials: 'same-origin', cache: 'no-store' }),
-    ]);
-    const listBody = (await listRes.json().catch(() => null)) as ListResponse | null;
-    if (!listRes.ok || !listBody?.ok) {
-      setLoad({ state: 'error', message: (listBody && !listBody.ok && listBody.message) || 'The backlog could not be loaded. Nothing was changed.' });
+    const response = await fetch(`/api/backlog/${encodeURIComponent(libraryId)}`, { credentials: 'same-origin', cache: 'no-store' });
+    const body = (await response.json().catch(() => null)) as ItemResponse | null;
+    if (!response.ok || !body?.ok) {
+      setLoad({ state: 'error', message: (body && !body.ok && body.message) || 'The idea could not be loaded. Nothing was changed.' });
       return;
     }
-    const item = listBody.data.flatMap((g) => g.items).find((i) => i.libraryId === libraryId);
-    if (!item) {
-      setLoad({ state: 'error', message: 'This idea could not be found. It may have moved out of the backlog.' });
-      return;
-    }
-    const meBody = (await meRes.json().catch(() => null)) as MeResponse | null;
-    const canEdit = Boolean(meRes.ok && meBody?.ok && meBody.role === 'owner');
+    const { item, canEdit } = body;
     setHook(item.hook);
     setDraft(item.draftContent);
     setLoad({ state: 'ok', item, canEdit });
@@ -83,7 +73,9 @@ export function QueuePanel({ libraryId }: { libraryId: string }) {
     const body = res.body as EditOutcome;
     if (body.ok) {
       setResult({ tone: 'success', text: body.replayed ? 'Already saved: this idea already holds this text.' : 'Saved.' });
-      await refresh();
+      setLoad({ state: 'ok', item: body.item, canEdit });
+      setHook(body.item.hook);
+      setDraft(body.item.draftContent);
       return;
     }
     setResult({

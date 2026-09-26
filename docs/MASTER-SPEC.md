@@ -169,7 +169,7 @@ Approval evidence lives in existing cells: an approval stamp `[cs:approved:<hash
 
 - `Content Queue Summary`: read-only source-level counts and master links.
 - `Workflow Settings`: read-only runtime policy input for canonical paths, Taipei slots and gates. Unknown/missing values block affected actions rather than falling back silently.
-- Legacy `Backlog Ideas` and `Example` tabs remain out of write scope. The supported backlog is the mapped `Content Queue` tab.
+- The app's primary Backlog view is the mapped `Content Library` tab: existing posts awaiting editorial work. `Content Queue` stays as a distinct Ideas view for idea-stage rows. Legacy `Backlog Ideas` and `Example` tabs remain out of write scope. Both views use their existing Sheet columns; this distinction changes no Sheet schema or row location.
 
 Header discovery is by exact name, not fixed column index. Startup fails safely on duplicate/missing required headers. Unknown extra columns are preserved.
 

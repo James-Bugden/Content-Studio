@@ -44,8 +44,38 @@ test('the Backlog nav link is visible and opens the Backlog page', async ({ page
   await expect(page.getByRole('heading', { name: 'Backlog', level: 1 })).toBeVisible();
 });
 
-test('the page shows the 2 synthetic source groups, closed by default, with idea counts', async ({ page }) => {
+test('Content Library is the primary backlog with source, hooks, draft and safe next-post navigation', async ({ page }) => {
   await page.goto('/backlog');
+  const table = page.getByRole('region', { name: 'Content Library posts' });
+  await expect(table).toBeVisible();
+  if (page.viewportSize()!.width >= 768) {
+    for (const heading of ['Content Source', 'Hook Template', 'Hook Alternatives', 'Content', 'Status']) {
+      await expect(table.getByRole('columnheader', { name: heading })).toBeVisible();
+    }
+  }
+  const first = table.locator('[data-backlog-id]:visible').first();
+  const firstId = await first.getAttribute('data-backlog-id');
+  await first.getByRole('link', { name: /^Edit / }).click();
+  await expect(page).toHaveURL(new RegExp(`post=${firstId}`));
+  const panel = page.getByRole('dialog');
+  await expect(panel.getByRole('button', { name: 'Next' })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Next' }).click();
+  await expect(page).not.toHaveURL(new RegExp(`post=${firstId}`));
+});
+
+test('Content Source filter narrows Library rows and preserves idea view separately', async ({ page }) => {
+  await page.goto('/backlog');
+  const source = page.getByLabel('Content Source');
+  const firstSource = await source.locator('option').nth(1).textContent();
+  await source.selectOption({ label: firstSource! });
+  const rows = page.getByRole('region', { name: 'Content Library posts' }).locator('[data-backlog-id]:visible');
+  await expect(rows.first()).toContainText(firstSource!);
+  await page.getByRole('link', { name: 'Ideas in Content Queue' }).click();
+  await expect(page.getByRole('heading', { name: 'Backlog ideas' })).toBeVisible();
+});
+
+test('the page shows the 2 synthetic source groups, closed by default, with idea counts', async ({ page }) => {
+  await page.goto('/backlog?view=ideas');
   // Scoped to the group heading, not the source also present as a Reference filter option.
   await expect(group(page, 'Synthetic Backlog Ideas').getByText('(3 ideas)')).toBeVisible();
   await expect(group(page, 'Synthetic Interview Prep').getByText('(2 ideas)')).toBeVisible();
@@ -54,7 +84,7 @@ test('the page shows the 2 synthetic source groups, closed by default, with idea
 });
 
 test('an opened group is a numbered table: one row per idea with its Library ID, hook and actions', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   await expect(g.locator('[data-library-id]:visible')).toHaveCount(3);
   const first = row(g, 'IDEA-BL-0001');
@@ -69,7 +99,7 @@ test('an opened group is a numbered table: one row per idea with its Library ID,
 });
 
 test('the Open link opens the side panel via the queue param', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   await row(g, 'IDEA-BL-0001').getByRole('link', { name: 'Open IDEA-BL-0001 in the panel' }).click();
   await expect(page).toHaveURL(/queue=IDEA-BL-0001/);
@@ -79,7 +109,7 @@ test('the Open link opens the side panel via the queue param', async ({ page }) 
 });
 
 test('clicking the row itself (not a control) also opens the panel', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   // The Library ID cell is plain text, so this click lands on the row, not on a control.
   await row(g, 'IDEA-BL-0002').getByText('IDEA-BL-0002', { exact: true }).click();
@@ -88,7 +118,7 @@ test('clicking the row itself (not a control) also opens the panel', async ({ pa
 });
 
 test('editing a hook in place: Enter saves, and the new hook survives a reload', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   const r = row(g, 'IDEA-BL-0002');
   await r.getByRole('button', { name: /^Edit hook for IDEA-BL-0002/ }).click();
@@ -107,7 +137,7 @@ test('editing a hook in place: Enter saves, and the new hook survives a reload',
 });
 
 test('a second in-place edit after the first still saves (the row keeps the new revision)', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Interview Prep');
   const r = row(g, 'IDEA-BL-0005');
   for (const text of ['First edit.', 'Second edit.']) {
@@ -122,7 +152,7 @@ test('a second in-place edit after the first still saves (the row keeps the new 
 });
 
 test('Platform, PESTO and Hook template save in sequence and survive a reload', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   const r = row(g, 'IDEA-BL-0001');
 
@@ -159,7 +189,7 @@ test('Platform, PESTO and Hook template save in sequence and survive a reload', 
 });
 
 test('new PESTO values become suggestions for another row and Escape does not write', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   let g = await openGroup(page, 'Synthetic Backlog Ideas');
   const first = row(g, 'IDEA-BL-0001');
   await first.getByRole('button', { name: /^Edit pesto stage for IDEA-BL-0001/ }).click();
@@ -193,7 +223,7 @@ test('new PESTO values become suggestions for another row and Escape does not wr
 });
 
 test('Escape reverts an in-progress hook edit without saving', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   const r = row(g, 'IDEA-BL-0003');
   await r.getByRole('button', { name: /^Edit hook for IDEA-BL-0003/ }).click();
@@ -210,7 +240,7 @@ test('Escape reverts an in-progress hook edit without saving', async ({ page }) 
 });
 
 test('Approve writes the review status in place and the row reports it, no panel needed', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   const r = row(g, 'IDEA-BL-0001');
   const write = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
@@ -227,7 +257,7 @@ test('Approve writes the review status in place and the row reports it, no panel
 });
 
 test('Skip writes the review status in place', async ({ page }) => {
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Interview Prep');
   const r = row(g, 'IDEA-BL-0004');
   const write = page.waitForRequest((req) => req.url().includes('/api/backlog/edit') && req.method() === 'POST');
@@ -237,7 +267,7 @@ test('Skip writes the review status in place', async ({ page }) => {
 });
 
 test('editing the hook in the panel and saving updates the table row', async ({ page }) => {
-  await page.goto('/backlog?queue=IDEA-BL-0002');
+  await page.goto('/backlog?view=ideas&queue=IDEA-BL-0002');
   const panel = page.getByRole('dialog');
   const hook = panel.getByLabel('Hook');
   await expect(hook).toHaveValue('A slow counteroffer is still a counteroffer.');
@@ -256,7 +286,7 @@ test('editing the hook in the panel and saving updates the table row', async ({ 
 
 test('a viewer sees Platform, PESTO, Hook template and Hook as plain text, with only Open actionable', async ({ page }) => {
   await signInAs(page.request, 'viewer');
-  await page.goto('/backlog');
+  await page.goto('/backlog?view=ideas');
   const g = await openGroup(page, 'Synthetic Backlog Ideas');
   const r = row(g, 'IDEA-BL-0001');
   await expect(r).toContainText('LinkedIn');
@@ -271,7 +301,7 @@ test('a viewer sees Platform, PESTO, Hook template and Hook as plain text, with 
 
 test('a viewer cannot edit in the panel either: read-only with no Save button', async ({ page }) => {
   await signInAs(page.request, 'viewer');
-  await page.goto('/backlog?queue=IDEA-BL-0003');
+  await page.goto('/backlog?view=ideas&queue=IDEA-BL-0003');
   const panel = page.getByRole('dialog');
   await expect(panel.getByText('Read-only access.')).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Save' })).toHaveCount(0);
@@ -279,7 +309,7 @@ test('a viewer cannot edit in the panel either: read-only with no Save button', 
 });
 
 test('closing the panel with an unsaved edit asks first and staying keeps the edit (UX-04)', async ({ page }) => {
-  await page.goto('/backlog?queue=IDEA-BL-0004');
+  await page.goto('/backlog?view=ideas&queue=IDEA-BL-0004');
   const panel = page.getByRole('dialog').first();
   const hook = panel.getByLabel('Hook');
   await expect(hook).toHaveValue(/./);

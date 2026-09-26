@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { contentIdSchema, libraryIdSchema } from '@/domain/mutation';
 import { useLeaveConfirmation } from '../leave-confirm';
 import { PostPanel } from './post-panel';
 import { QueuePanel } from './queue-panel';
+import { panelHref } from './open-panel-link';
+import { BacklogPostPanel } from './backlog-post-panel';
 import { SlotPanel } from './slot-panel';
 
 /**
@@ -18,9 +20,11 @@ import { SlotPanel } from './slot-panel';
  */
 export function PanelHost() {
   const params = useSearchParams();
+  const search = params.toString();
   const router = useRouter();
   const pathname = usePathname();
   const ref = useRef<HTMLDialogElement>(null);
+  const [neighbours, setNeighbours] = useState<{ prev: string | null; next: string | null }>({ prev: null, next: null });
   const { guard, dialog } = useLeaveConfirmation();
 
   // The promote page already uses `?slot=` to pick a target slot, so the panel stays shut there.
@@ -52,6 +56,17 @@ export function PanelHost() {
     if (!open && el.open) el.close();
   }, [open]);
 
+  useEffect(() => {
+    if (pathname !== '/backlog' || !post) return;
+    const ids = [...document.querySelectorAll<HTMLElement>('[data-backlog-id]')].filter((el) => el.getClientRects().length > 0).map((el) => el.dataset.backlogId!).filter(Boolean);
+    const index = ids.indexOf(post);
+    queueMicrotask(() => setNeighbours({ prev: index > 0 ? ids[index - 1]! : null, next: index >= 0 && index < ids.length - 1 ? ids[index + 1]! : null }));
+  }, [pathname, post, search]);
+
+  function moveTo(id: string) {
+    guard(() => router.replace(panelHref(pathname, new URLSearchParams(params.toString()), { post: id }), { scroll: false }));
+  }
+
   return (
     <>
       <dialog
@@ -70,12 +85,17 @@ export function PanelHost() {
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between gap-2 border-b border-line bg-card px-4 py-2">
               <p className="text-xs font-semibold tracking-wide text-ink-soft">{post ? 'Post' : slot ? 'Schedule slot' : 'Backlog idea'}</p>
+              {post && pathname === '/backlog' ? <nav aria-label="Move between posts" className="ml-auto flex gap-2 text-sm">
+                <button type="button" disabled={!neighbours.prev} onClick={() => neighbours.prev && moveTo(neighbours.prev)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>
+                <button type="button" disabled={!neighbours.next} onClick={() => neighbours.next && moveTo(neighbours.next)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Next</button>
+              </nav> : null}
               <button type="button" onClick={close} className="inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-sm hover:bg-paper">
                 <span aria-hidden="true">✕</span> Close
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {post ? <PostPanel key={post} libraryId={post} /> : null}
+              {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} /> : null}
+              {post && pathname !== '/backlog' ? <PostPanel key={post} libraryId={post} /> : null}
               {slot ? <SlotPanel key={slot} contentId={slot} /> : null}
               {queue ? <QueuePanel key={queue} libraryId={queue} /> : null}
             </div>
