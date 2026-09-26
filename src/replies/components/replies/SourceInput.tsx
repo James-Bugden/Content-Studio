@@ -106,7 +106,7 @@ export function SourceInput(props: SourceInputProps) {
                 className={cx(
                   'min-h-8 rounded-full border px-3 text-meta',
                   selected
-                    ? 'border-green bg-green-soft font-medium text-green'
+                    ? 'border-primary bg-primary font-medium text-white hover:bg-primary/85'
                     : 'border-border-input bg-card text-ink-soft hover:bg-paper-alt',
                 )}
               >
@@ -127,7 +127,7 @@ export function SourceInput(props: SourceInputProps) {
             className={cx(
               'min-h-8 rounded-md border px-3 text-meta',
               props.targetKind === kind
-                ? 'border-green bg-green-soft text-green'
+                ? 'border-primary bg-primary font-medium text-white hover:bg-primary/85'
                 : 'border-border-input bg-card text-ink-soft hover:bg-paper-alt',
             )}
           >
@@ -217,4 +217,3 @@ export function SourceInput(props: SourceInputProps) {
     </section>
   );
 }
-
