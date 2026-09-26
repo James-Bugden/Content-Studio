@@ -18,6 +18,13 @@ test.beforeEach(async ({ page }) => {
   await signInAs(page.request, 'owner');
 });
 
+test('a denied Drive read explains the access problem and never enables Save', async ({ page }) => {
+  await control(page.request, { kind: 'fail', provider: 'drive', op: 'read', code: 'FORBIDDEN' });
+  await page.goto('/review/SYN-L001');
+  await expect(page.getByText('Google Drive denied access to the master file.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+});
+
 test('REV-07: exact emoji, CJK, whitespace and line breaks round-trip', async ({ page }) => {
   await page.goto('/review/SYN-L008');
   const exact = '談薪水不是吵架 🙂\n\n  indented line\t\n\n\nlast line with trailing spaces   ';

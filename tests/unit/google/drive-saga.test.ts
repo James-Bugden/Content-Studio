@@ -8,6 +8,7 @@ import { previewAsset } from '@/application/assets';
 import { findSection, fingerprint, parseDriveFileId } from '@/domain';
 import { SYNTH_MARKDOWN, SYNTH_MASTER_FILE_ID } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
+import type { DriveGateway } from '@/application/ports';
 
 const owner: Actor = { sub: '100000000000000000001', role: 'owner' };
 let sheet: FakeSheetTransport;
@@ -48,6 +49,14 @@ describe('links', () => {
 
   it('resolves the master file from the Open master hyperlink', async () => {
     expect(markdownFileId(await repo.getLibrary('SYN-L001'))).toBe(SYNTH_MASTER_FILE_ID);
+  });
+
+  it('preserves a closed Drive error code when its Error class comes from another module graph', async () => {
+    const record = await repo.getLibrary('SYN-L001');
+    const foreign = { ...drive, readText: async () => { throw Object.assign(new Error('denied'), { code: 'FORBIDDEN' }); } } as unknown as DriveGateway;
+    expect(await readSection(foreign, record)).toMatchObject({ ok: false, reason: 'provider', code: 'FORBIDDEN' });
+    const unknown = { ...drive, readText: async () => { throw Object.assign(new Error('unknown'), { code: 'PRIVATE_DETAIL' }); } } as unknown as DriveGateway;
+    expect(await readSection(unknown, record)).toMatchObject({ ok: false, reason: 'provider', code: 'PROVIDER_UNAVAILABLE' });
   });
 });
 
