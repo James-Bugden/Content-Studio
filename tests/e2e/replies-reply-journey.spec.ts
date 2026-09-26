@@ -272,6 +272,7 @@ test.describe('layout', () => {
     await expect(linkedin).toHaveCSS('color', 'rgb(255, 255, 255)');
     const threads = page.getByRole('radio', { name: 'Threads' });
     await threads.click();
+    await page.mouse.move(0, 0);
     await expect(threads).toHaveAttribute('aria-checked', 'true');
     await expect(threads).toHaveCSS('background-color', 'rgb(0, 0, 0)');
     await expect(linkedin).toHaveAttribute('aria-checked', 'false');
@@ -281,6 +282,7 @@ test.describe('layout', () => {
     await expect(post).toHaveCSS('background-color', 'rgb(0, 0, 0)');
     const comment = page.getByRole('button', { name: 'Comment', exact: true });
     await comment.click();
+    await page.mouse.move(0, 0);
     await expect(comment).toHaveAttribute('aria-pressed', 'true');
     await expect(comment).toHaveCSS('color', 'rgb(255, 255, 255)');
     await expect(post).toHaveAttribute('aria-pressed', 'false');
