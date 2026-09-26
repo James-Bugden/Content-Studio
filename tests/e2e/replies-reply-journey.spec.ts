@@ -192,6 +192,9 @@ test.describe('the reply loop', () => {
     const saveButton = page.getByRole('button', { name: 'Save as content idea' });
     await saveButton.click();
     await expect(page.getByText("Couldn't save the idea. Your reply is still recorded.")).toBeVisible();
+    const failureNotice = page.getByRole('status').filter({ hasText: "Couldn't save the idea." });
+    await expect(failureNotice).toHaveAttribute('aria-live', 'polite');
+    await expect(failureNotice).toHaveClass(/text-danger/);
     await expect(saveButton).toBeEnabled();
     if (process.env.CS_SHOT_DIR) {
       await saveButton.scrollIntoViewIfNeeded();
