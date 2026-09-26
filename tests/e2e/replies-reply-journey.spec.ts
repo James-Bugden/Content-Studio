@@ -142,6 +142,9 @@ test.describe('the reply loop', () => {
     const draftId = (await draftSearch.json()).items[0].id as string;
     const unposted = await postIdea({ operationId: 'idea_unposted_0001', replyId: draftId });
     expect(unposted).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+    const beforeSave = await page.request.get('/api/backlog').then((response) => response.json());
+    expect(beforeSave.data.flatMap((group: { items: { libraryId: string }[] }) => group.items)
+      .filter((item: { libraryId: string }) => item.libraryId.startsWith('IDEA-SR-'))).toHaveLength(0);
 
     const corrected = await page.request.patch(`/api/replies/library/${replyId}`, {
       data: { action: 'correct', expected_revision: 0, final_text: 'Corrected recorded wording.', reason: 'Typo' },
