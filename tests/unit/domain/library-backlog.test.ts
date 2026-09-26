@@ -37,6 +37,8 @@ describe('Content Library backlog', () => {
     const [first, second] = await records();
     const rows = [first!, { ...second!, row: 100, value: { ...second!.value, contentSource: 'A source', currentHook: 'Distinctive example hook' } }];
     expect(libraryBacklogView(rows, { search: 'DISTINCTIVE EXAMPLE' }).rows.map((r) => r.row)).toEqual([100]);
+    const titled = { ...first!, value: { ...first!.value, slug: 'Amazon-behavioral-100-hours-of-prep', currentHook: '', draftContent: '' } };
+    expect(libraryBacklogView([titled], { search: '100 hours of prep' }).total).toBe(1);
     expect(libraryBacklogView(rows, { sort: 'source' }).rows[0]?.row).toBe(100);
     const statuses = new Map([[first!.value.libraryId, { label: 'Ready to schedule' }]]);
     expect(libraryBacklogView(rows, { status: 'Ready to schedule' }, statuses).rows.map((r) => r.row)).toEqual([first!.row]);

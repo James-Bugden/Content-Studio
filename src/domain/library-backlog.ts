@@ -1,5 +1,6 @@
 import type { LibraryRecord } from './records';
 import { PLATFORMS, type Platform } from './enums';
+import { readableTitle } from './display';
 
 export const BACKLOG_SORTS = ['sheet', 'source', 'hook', 'status'] as const;
 export type BacklogSort = (typeof BACKLOG_SORTS)[number];
@@ -26,7 +27,7 @@ export function libraryBacklogView(rows: LibraryRecord[], filters: LibraryBacklo
     (!filters.source || r.value.contentSource.trim() === filters.source) &&
     (!filters.platform || (r.value.targetPlatform.ok && r.value.targetPlatform.value === filters.platform)) &&
     (!filters.status || (statuses.get(r.value.libraryId)?.label ?? libraryBacklogStatus(r)) === filters.status) &&
-    (!search || [r.value.currentHook, r.value.draftContent, r.value.contentSource, r.value.slug].some((v) => v.toLocaleLowerCase('en-GB').includes(search))),
+    (!search || [r.value.currentHook, r.value.draftContent, r.value.contentSource, r.value.slug, readableTitle(r.value.slug)].some((v) => v.toLocaleLowerCase('en-GB').includes(search))),
   );
   const sort = filters.sort ?? 'sheet';
   if (sort !== 'sheet') matches.sort((a, b) => {

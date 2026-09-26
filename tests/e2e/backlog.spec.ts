@@ -122,6 +122,16 @@ test('Backlog search, status, sort and column controls keep private search out o
   }
 });
 
+test('Backlog shows a visible title and finds the readable slug without putting it in the URL', async ({ page }) => {
+  await page.goto('/backlog');
+  const table = page.getByRole('region', { name: 'Content Library posts' });
+  await expect(table.locator('[data-backlog-id]:visible').first().getByText('Negotiate scope first', { exact: true })).toBeVisible();
+  await page.getByLabel('Find a post').fill('negotiate scope first');
+  await expect(page.getByText('1 post · page 1 of 1')).toBeVisible();
+  await expect(table.locator('[data-backlog-id]:visible')).toHaveCount(1);
+  expect(page.url()).not.toContain('negotiate');
+});
+
 test('Backlog editor is focused and the post list fits a narrow phone', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto('/backlog');
