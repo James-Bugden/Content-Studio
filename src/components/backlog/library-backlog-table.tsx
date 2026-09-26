@@ -61,7 +61,7 @@ export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
             <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><span className={`shrink-0 rounded-full px-2 py-1 font-semibold ${statusTone(libraryBacklogStatus(record))}`}>{libraryBacklogStatus(record)}</span></div>
             <p className="text-base font-semibold">{title}</p>
             <p className="line-clamp-3 whitespace-pre-line text-sm text-ink-soft">{item.draftContent || 'Open to read and edit the source post.'}</p>
-            <p className="text-xs text-ink-soft">{item.targetPlatform.ok ? item.targetPlatform.value : '—'} · Hook template: {item.hookTemplate || '—'}</p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span><PillarTag value={item.pesto} /><span>Hook template: {item.hookTemplate || '—'}</span></div>
             {item.hookAlternatives ? <p className="line-clamp-2 whitespace-pre-line text-xs text-ink-soft">Alternatives: {item.hookAlternatives}</p> : null}
             <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>
           </li>;
