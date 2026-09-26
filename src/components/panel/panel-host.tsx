@@ -57,8 +57,12 @@ export function PanelHost() {
       next.delete('slot');
       next.delete('queue');
       const q = next.toString();
-      router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-      if (pathname !== '/backlog' || !post) router.refresh();
+      const href = q ? `${pathname}?${q}` : pathname;
+      if (pathname === '/backlog' && post) window.history.replaceState(null, '', href);
+      else {
+        router.replace(href, { scroll: false });
+        router.refresh();
+      }
     });
   }, [guard, params, pathname, post, router]);
 
@@ -84,7 +88,7 @@ export function PanelHost() {
         if (epoch !== navigationEpoch.current) return;
         const next = new URLSearchParams(params.toString());
         if (!navigation.privateSearch) next.set('page', String(target.page));
-        router.replace(panelHref(pathname, next, { post: target.id }), { scroll: false });
+        window.history.replaceState(null, '', panelHref(pathname, next, { post: target.id }));
       } catch (error) {
         setFailedDirection(direction);
         setNavigationError(error instanceof Error ? error.message : 'The next post could not load. Try again.');
