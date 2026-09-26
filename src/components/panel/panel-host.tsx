@@ -51,7 +51,7 @@ export function PanelHost() {
       next.delete('queue');
       const q = next.toString();
       router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
-      router.refresh();
+      if (pathname !== '/backlog' || !post) router.refresh();
     });
   }, [guard, params, pathname, router]);
 
