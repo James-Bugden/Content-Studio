@@ -46,17 +46,18 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
           {rows.map((record) => {
             const item = record.value;
             const status = statuses[item.libraryId] ?? fallbackStatus(libraryBacklogStatus(record));
-            const title = item.currentHook || readableTitle(item.slug) || item.libraryId;
+            const title = readableTitle(item.slug) || item.currentHook || item.libraryId;
             return (
               <tr key={item.libraryId} data-backlog-id={item.libraryId} className="border-b border-line align-top last:border-0 hover:bg-paper">
                 <td className={`${cell} tabular-nums text-ink-soft`}>{record.row}</td>
-                <td className={`max-w-48 ${cell} font-medium`}>{item.contentSource || 'Uncategorised'}</td>
+                <td className={`max-w-48 ${cell} font-medium`}><span title={item.contentSource || 'Uncategorised'} className="block truncate">{item.contentSource || 'Uncategorised'}</span></td>
                 <td className={cell}>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</td>
                 <td className={cell}><PillarTag value={item.pesto} /></td>
                 {showHooks ? <><td className={`max-w-44 ${cell} break-words`}>{item.hookTemplate || '—'}</td>
                 <td className={`max-w-48 ${cell} whitespace-pre-line break-words text-ink-soft`}>{item.hookAlternatives || '—'}</td></> : null}
                 <td className={`min-w-64 max-w-md ${cell}`}>
-                  <p className="line-clamp-3 whitespace-pre-line break-words text-ink">
+                  <p className="line-clamp-2 break-words font-semibold text-ink">{title}</p>
+                  <p className="mt-1 line-clamp-2 whitespace-pre-line break-words text-ink-soft">
                     {item.draftContent || 'Open to read and edit the source post.'}
                   </p>
                 </td>
@@ -70,7 +71,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
       <ul className="divide-y divide-line md:hidden">
         {rows.map((record) => {
           const item = record.value;
-          const title = item.currentHook || readableTitle(item.slug) || item.libraryId;
+          const title = readableTitle(item.slug) || item.currentHook || item.libraryId;
           const status = statuses[item.libraryId] ?? fallbackStatus(libraryBacklogStatus(record));
           return <li key={item.libraryId} data-backlog-id={item.libraryId} className="space-y-2 p-4">
             <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><ReadinessExplanation status={status} /></div>

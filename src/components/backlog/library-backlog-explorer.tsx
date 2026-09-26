@@ -76,7 +76,7 @@ export function LibraryBacklogExplorer({ initial, filters, previousHref, nextHre
       <label htmlFor="library-search" className="text-sm font-medium">Find a post</label>
       <input id="library-search" type="search" value={search} maxLength={120}
         onChange={(event) => { setSearch(event.target.value); setSearchPage(1); setResult(null); setPending(Boolean(event.target.value.trim())); setError(false); }}
-        placeholder="Search hook, content or source" className="min-h-11 min-w-64 flex-1 rounded-md border border-line bg-card px-3 text-sm" />
+        placeholder="Search title, hook, content or source" className="min-h-11 min-w-64 flex-1 rounded-md border border-line bg-card px-3 text-sm" />
     </div>
     <div className="flex flex-wrap items-center gap-4 text-sm">
       <label className="inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={compact} onChange={(e) => setCompact(e.target.checked)} /> Compact rows</label>
