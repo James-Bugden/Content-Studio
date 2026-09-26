@@ -44,6 +44,14 @@ test('the Backlog nav link is visible and opens the Backlog page', async ({ page
   await expect(page.getByRole('heading', { name: 'Backlog', level: 1 })).toBeVisible();
 });
 
+test('a throttled Library read offers recovery instead of a server error', async ({ page }) => {
+  expect((await page.request.post('/api/test-control', { data: { kind: 'fail', provider: 'sheet', op: 'read', tab: 'Content Library', code: 'RATE_LIMITED' } })).status()).toBe(200);
+  await page.goto('/backlog');
+  await expect(page.getByText('Slow down requested')).toBeVisible();
+  await page.getByRole('link', { name: 'Try again' }).click();
+  await expect(page.getByRole('region', { name: 'Content Library posts' })).toBeVisible();
+});
+
 test('Content Library is the primary backlog with source, hooks, draft and safe next-post navigation', async ({ page }) => {
   await page.goto('/backlog');
   const table = page.getByRole('region', { name: 'Content Library posts' });

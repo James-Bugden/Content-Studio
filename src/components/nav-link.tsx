@@ -16,6 +16,7 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
   return (
     <GuardedLink
       href={href}
+      prefetch={false}
       aria-current={active ? 'page' : undefined}
       className={[
         'inline-flex min-h-11 items-center rounded-md px-3 text-sm whitespace-nowrap transition-colors duration-150 ease-out',

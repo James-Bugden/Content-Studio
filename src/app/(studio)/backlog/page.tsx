@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { loadBacklogOptions, loadBacklogGroups, type BacklogFilters } from '@/application/backlog';
-import { PageHeader, StateView } from '@/components';
+import { ErrorState, PageHeader, StateView } from '@/components';
 import { BacklogGroupTable } from '@/components/backlog/backlog-group-table';
 import { LibraryBacklogExplorer } from '@/components/backlog/library-backlog-explorer';
 import { FilterBar } from '@/components/filter-bar';
 import { PLATFORMS, type Platform } from '@/domain/enums';
+import { isAppError } from '@/domain/errors';
 import { libraryBacklogView } from '@/domain/library-backlog';
 import { BACKLOG_SORTS, type BacklogSort } from '@/domain/library-backlog';
 import { backlogReadiness } from '@/application/backlog-readiness';
@@ -41,9 +42,16 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const ideas = one(params, 'view') === 'ideas';
   if (!ideas) {
-    const [library, queue, schedule] = await timed({ name: 'backlog.load', adapter: 'app', facts: { view: 'posts' } }, () => Promise.all([
-      repo.listLibrary(), repo.listReadyQueue().catch(() => null), repo.listSchedule().catch(() => null),
-    ]));
+    let library: Awaited<ReturnType<typeof repo.listLibrary>>;
+    let queue: Awaited<ReturnType<typeof repo.listReadyQueue>> | null;
+    let schedule: Awaited<ReturnType<typeof repo.listSchedule>> | null;
+    try {
+      [library, queue, schedule] = await timed({ name: 'backlog.load', adapter: 'app', facts: { view: 'posts' } }, () => Promise.all([
+        repo.listLibrary(), repo.listReadyQueue().catch(() => null), repo.listSchedule().catch(() => null),
+      ]));
+    } catch (error) {
+      return <><PageHeader title="Backlog" description="Posts from Content Library." /><ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} action={<a href="/backlog" className="font-semibold underline">Try again</a>} /></>;
+    }
     const readiness = backlogReadiness(library, queue, schedule);
     const requestedPage = Number(one(params, 'page'));
     const view = libraryBacklogView(library, {
