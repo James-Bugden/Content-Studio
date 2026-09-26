@@ -29,6 +29,7 @@ export function LibraryBacklogExplorer({ initial, filters, previousHref, nextHre
   const [result, setResult] = useState<Result | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [compact, setCompact] = useState(true);
   const [showHooks, setShowHooks] = useState(true);
 
@@ -54,7 +55,7 @@ export function LibraryBacklogExplorer({ initial, filters, previousHref, nextHre
       }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [search, searchPage, source, platform, status, sort]);
+  }, [search, searchPage, source, platform, status, sort, retry]);
 
   const active = search.trim() ? result ?? initial : initial;
   return <section aria-label="Browse Content Library" className="space-y-3">
@@ -74,7 +75,7 @@ export function LibraryBacklogExplorer({ initial, filters, previousHref, nextHre
       {pending ? 'Searching…' : error ? 'Results unavailable.' : `${active.total} ${active.total === 1 ? 'post' : 'posts'} · page ${active.page} of ${active.totalPages}`}.
       {' '}Ready to schedule and Ready for Typefully are different checks.
     </p>
-    {error ? <p role="alert" className="text-sm text-block">Search could not load. Your search text is kept here; try again.</p> : null}
+    {error ? <p role="alert" className="text-sm text-block">Search could not load. Your search text is kept here. <button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button></p> : null}
     {search.trim() && (pending || error || !result) ? null : active.total === 0 ? <p role="status" className="rounded-lg border border-line bg-card p-4 text-sm">No posts match. Try a different source, status or search.</p>
       : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} />}
     {active.totalPages > 1 && !(search.trim() && (pending || error || !result)) ? <nav aria-label="Backlog pages" className="flex items-center justify-between text-sm">
