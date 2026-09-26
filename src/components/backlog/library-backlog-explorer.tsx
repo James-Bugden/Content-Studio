@@ -64,16 +64,13 @@ export function LibraryBacklogExplorer({ initial, filters, previousHref, nextHre
       <input id="library-search" type="search" value={search} maxLength={120}
         onChange={(event) => { setSearch(event.target.value); setSearchPage(1); setResult(null); setPending(Boolean(event.target.value.trim())); setError(false); }}
         placeholder="Search hook, content or source" className="min-h-11 min-w-64 flex-1 rounded-md border border-line bg-card px-3 text-sm" />
-      <span className="text-xs text-ink-soft">Search stays out of the URL.</span>
     </div>
     <div className="flex flex-wrap items-center gap-4 text-sm">
       <label className="inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={compact} onChange={(e) => setCompact(e.target.checked)} /> Compact rows</label>
       <label className="inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={showHooks} onChange={(e) => setShowHooks(e.target.checked)} /> Show hook columns</label>
-      <span className="text-xs text-ink-soft">Scroll sideways to see every column on smaller screens.</span>
     </div>
     <p className="text-sm text-ink-soft" aria-live="polite">
       {pending ? 'Searching…' : error ? 'Results unavailable.' : `${active.total} ${active.total === 1 ? 'post' : 'posts'} · page ${active.page} of ${active.totalPages}`}.
-      {' '}Ready to schedule and Ready for Typefully are different checks.
     </p>
     {error ? <p role="alert" className="text-sm text-block">Search could not load. Your search text is kept here. <button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button></p> : null}
     {search.trim() && (pending || error || !result) ? null : active.total === 0 ? <p role="status" className="rounded-lg border border-line bg-card p-4 text-sm">No posts match. Try a different source, status or search.</p>

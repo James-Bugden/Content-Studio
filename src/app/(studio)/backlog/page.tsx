@@ -53,7 +53,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     }, readiness);
     return (
       <>
-        <PageHeader title="Backlog" description="Unedited posts from the Content Library Sheet. Filter by source, open a post and work through the list." />
+        <PageHeader title="Backlog" description="Posts from Content Library. Filter, review and edit them here." />
         <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><span aria-current="page" className="font-semibold">Posts ({library.length})</span><a className="text-primary underline" href="/backlog?view=ideas">Ideas in Content Queue</a></nav>
         <FilterBar filters={[
           { key: 'source', label: 'Content Source', options: view.sources.map((s) => ({ value: s, label: s })) },

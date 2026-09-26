@@ -20,16 +20,16 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
   const cell = compact ? 'px-2 py-2' : 'px-3 py-4';
   return (
     <div role="region" aria-label="Content Library posts" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-card">
-      <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[78rem]' : 'min-w-[56rem]'}`}>
+      <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[68rem]' : 'min-w-[52rem]'}`}>
         <colgroup>
-          <col className="w-12" /><col className="w-40" /><col className="w-24" />
-          <col className="w-28" />{showHooks ? <><col className="w-44" /><col className="w-44" /></> : null}
-          <col /><col className="w-40" /><col className="w-24" />
+          <col className="w-9" /><col className="w-32" /><col className="w-[4.5rem]" />
+          <col className="w-24" />{showHooks ? <><col className="w-36" /><col className="w-36" /></> : null}
+          <col /><col className="w-36" /><col className="w-20" />
         </colgroup>
         <thead className="sticky top-0 bg-paper text-xs text-ink-soft">
           <tr className="border-b border-line">
             {['#', 'Content Source', 'Platform', 'PESTO', ...(showHooks ? ['Hook Template', 'Hook Alternatives'] : []), 'Content', 'Status', ''].map((label) =>
-              <th key={label} scope="col" className={`${cell} font-medium ${label === '' ? 'sticky right-0 z-10 bg-paper' : label === 'Status' ? 'sticky right-24 z-10 bg-paper' : ''}`}>{label}</th>,
+              <th key={label} scope="col" className={`${cell} font-medium ${label === '' ? 'sticky right-0 z-10 bg-paper' : label === 'Status' ? 'sticky right-20 z-10 bg-paper' : ''}`}>{label}</th>,
             )}
           </tr>
         </thead>
@@ -51,7 +51,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                     {item.draftContent || 'Open to read and edit the source post.'}
                   </p>
                 </td>
-                <td className={`sticky right-24 z-10 whitespace-nowrap border-l border-line bg-card ${cell}`}><span title={status.reason} className={`rounded-full px-2 py-1 text-xs font-semibold ${statusTone(status)}`}>{status.label}</span></td>
+                <td className={`sticky right-20 z-10 whitespace-nowrap border-l border-line bg-card ${cell}`}><span title={status.reason} className={`rounded-full px-2 py-1 text-xs font-semibold ${statusTone(status)}`}>{status.label}</span><span className="sr-only">: {status.reason}</span></td>
                 <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
               </tr>
             );
@@ -64,7 +64,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
           const title = item.currentHook || readableTitle(item.slug) || item.libraryId;
           const status = statuses[item.libraryId] ?? fallbackStatus(libraryBacklogStatus(record));
           return <li key={item.libraryId} data-backlog-id={item.libraryId} className="space-y-2 p-4">
-            <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><span title={status.reason} className={`shrink-0 rounded-full px-2 py-1 font-semibold ${statusTone(status)}`}>{status.label}</span></div>
+            <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><span title={status.reason} className={`shrink-0 rounded-full px-2 py-1 font-semibold ${statusTone(status)}`}>{status.label}<span className="sr-only">: {status.reason}</span></span></div>
             <p className="text-base font-semibold">{title}</p>
             <p className="line-clamp-3 whitespace-pre-line text-sm text-ink-soft">{item.draftContent || 'Open to read and edit the source post.'}</p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span><PillarTag value={item.pesto} /><span>Hook template: {item.hookTemplate || '—'}</span></div>
