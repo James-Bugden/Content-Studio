@@ -56,6 +56,27 @@ describe('service account tokens', () => {
 });
 
 describe('GoogleSheetTransport', () => {
+  it('starts values, formulas and link reads together for a large range', async () => {
+    const urls: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const impl = (async (url: string | URL) => {
+      const text = String(url);
+      if (text.includes('oauth2.googleapis.com')) return tokenOk();
+      urls.push(text);
+      await gate;
+      if (text.includes('valueRenderOption=FORMULA')) return jsonRes({ values: [['ID']] });
+      if (text.includes('valueRenderOption=FORMATTED_VALUE')) return jsonRes({ values: [['ID']] });
+      return jsonRes({ sheets: [] });
+    }) as typeof fetch;
+    const t = new GoogleSheetTransport('SYNTH_sheet_id_0000000000', new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
+    const read = t.readTab('Content Library', 'AG', { startRow: 1, maxRows: 500, formulas: true, links: true });
+    for (let i = 0; i < 20 && urls.length < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    const started = urls.length;
+    release();
+    await read;
+    expect(started).toBe(3);
+  });
   it('reads a quoted, bounded range with values, formulas and links', async () => {
     const { impl, calls } = scripted([
       tokenOk,

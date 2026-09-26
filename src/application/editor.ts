@@ -8,6 +8,7 @@ export type { EditorModel };
 import { readSection } from './markdown-source';
 import type { ContentRepository, DriveGateway } from './ports';
 import { screenshotUses } from './review';
+import { AppError } from '@/domain/errors';
 
 /**
  * Editor view model (CS-008). Loads the authoritative Library row and its
@@ -16,12 +17,10 @@ import { screenshotUses } from './review';
  */
 
 export async function loadEditor(repo: ContentRepository, drive: DriveGateway, libraryId: string): Promise<EditorModel> {
-  const record: LibraryRecord = await repo.getLibrary(libraryId);
-  const [library, schedule, read] = await Promise.all([
-    repo.listLibrary(),
-    repo.listSchedule().catch(() => null),
-    readSection(drive, record),
-  ]);
+  const [library, schedule] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null)]);
+  const record: LibraryRecord | undefined = library.find((r) => r.value.libraryId === libraryId);
+  if (!record) throw new AppError('NOT_FOUND');
+  const read = await readSection(drive, record);
   const item = record.value;
   const mismatch = read.ok && read.section.body !== item.draftContent;
   const gates = evaluateLibraryGates(item, {
