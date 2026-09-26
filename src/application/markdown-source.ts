@@ -1,5 +1,5 @@
 import 'server-only';
-import { AppError, isAppError, type ErrorCode } from '@/domain/errors';
+import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
 import { parseDriveFileId } from '@/domain/links';
 import { findSection, type MarkdownSection } from '@/domain/markdown';
 import type { LibraryRecord } from '@/domain/records';
@@ -26,6 +26,14 @@ export function markdownFileId(record: LibraryRecord): string | null {
   return null;
 }
 
+function safeReadErrorCode(error: unknown): ErrorCode {
+  if (isAppError(error)) return error.code;
+  // Next may load the gateway and application in separate server module graphs,
+  // where instanceof AppError is false. Accept only the closed code vocabulary.
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+  return typeof code === 'string' && (ERROR_CODES as readonly string[]).includes(code) ? code as ErrorCode : 'PROVIDER_UNAVAILABLE';
+}
+
 export async function readSection(drive: DriveGateway, record: LibraryRecord): Promise<SectionRead> {
   const fileId = markdownFileId(record);
   if (!fileId) return { ok: false, code: 'NOT_FOUND', reason: 'no_link' };
@@ -34,7 +42,7 @@ export async function readSection(drive: DriveGateway, record: LibraryRecord): P
   try {
     ({ text, meta } = await drive.readText(fileId));
   } catch (error) {
-    return { ok: false, code: isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE', reason: 'provider', fileId };
+    return { ok: false, code: safeReadErrorCode(error), reason: 'provider', fileId };
   }
   if (meta.trashed) return { ok: false, code: 'NOT_FOUND', reason: 'trashed', fileId };
   const found = findSection(text, record.value.libraryId);
