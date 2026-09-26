@@ -21,6 +21,9 @@ test('synthetic screens render without horizontal overflow', async ({ page }, in
       await page.screenshot({ path: `${DIR}/${info.project.name}${path.replace(/[/?&=]/g, '_')}.png`, fullPage: true });
       if (path === '/replies') {
         await page.getByRole('button', { name: 'Get reply ideas' }).scrollIntoViewIfNeeded();
+        // Move the action above the sticky strip; being inside the viewport
+        // alone does not mean it is visually exposed on a phone.
+        if (info.project.name === 'w375') await page.evaluate(() => window.scrollBy(0, 180));
         await page.screenshot({ path: `${DIR}/${info.project.name}_replies-action.png` });
       }
     }
