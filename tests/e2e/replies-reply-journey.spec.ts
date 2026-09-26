@@ -165,6 +165,33 @@ test.describe('the reply loop', () => {
     expect(afterWithdraw).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
   });
 
+  test('failed idea save keeps the recorded reply and permits a retry', async ({ page }) => {
+    await page.goto('/replies');
+    await analyse(page);
+    await page.getByRole('textbox', { name: 'Your reply' }).fill('A posted reply that remains recoverable.');
+    await page.getByRole('button', { name: 'Mark posted' }).click();
+    await expect(page.getByRole('button', { name: 'Save as content idea' })).toBeVisible();
+
+    const search = await page.request.post('/api/replies/library/search', {
+      data: { query: 'remains recoverable', include_unknown_dates: true, limit: 10 },
+    });
+    expect(search.ok()).toBe(true);
+    const replyId = (await search.json()).items[0].id as string;
+    expect((await page.request.patch(`/api/replies/library/${replyId}`, {
+      data: { action: 'withdraw', withdrawn: true },
+    })).ok()).toBe(true);
+
+    const saveButton = page.getByRole('button', { name: 'Save as content idea' });
+    await saveButton.click();
+    await expect(page.getByText("Couldn't save the idea. Your reply is still recorded.")).toBeVisible();
+    await expect(saveButton).toBeEnabled();
+    expect((await page.request.patch(`/api/replies/library/${replyId}`, {
+      data: { action: 'withdraw', withdrawn: false },
+    })).ok()).toBe(true);
+    await saveButton.click();
+    await expect(page.getByText('Saved to the Content backlog.')).toBeVisible();
+  });
+
   test('keeps the editor usable while ideas are still arriving', async ({ page }) => {
     await page.goto('/replies');
     await analyse(page);
