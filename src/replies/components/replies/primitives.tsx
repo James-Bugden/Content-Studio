@@ -60,7 +60,7 @@ export function Button({
         'inline-flex items-center justify-center rounded-md px-3 font-medium',
         'disabled:cursor-not-allowed disabled:opacity-50',
         size === 'primary' ? 'min-h-11 text-[0.9375rem]' : 'min-h-8 text-meta',
-        variant === 'primary' && 'bg-green text-paper hover:bg-green-hover',
+        variant === 'primary' && 'bg-primary text-white hover:bg-primary/85',
         variant === 'secondary' && 'border border-border-input bg-card text-ink hover:bg-paper-alt',
         variant === 'quiet' && 'text-ink-soft hover:text-ink hover:bg-paper-alt',
         className,
@@ -144,4 +144,3 @@ export function Pill({ children, tone = 'neutral' }: { children: ReactNode; tone
     </span>
   );
 }
-

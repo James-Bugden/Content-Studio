@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
  * when CS_SHOT_DIR is set; otherwise the test just asserts the pages render.
  */
 const DIR = process.env.CS_SHOT_DIR;
-const PAGES = ['/', '/review', '/review?layout=cards', '/review?post=SYN-L012', '/schedule?week=2026-10-01&slot=2026-10-02-MAIN-X', '/review/SYN-L008', '/ready', '/visuals', '/schedule', '/schedule/2026-10-02-MAIN-X', '/schedule/2026-10-02-MAIN-LI', '/published', '/published/2026-10-01-MAIN-X', '/reconcile'];
+const PAGES = ['/', '/replies', '/review', '/review?layout=cards', '/review?post=SYN-L012', '/schedule?week=2026-10-01&slot=2026-10-02-MAIN-X', '/review/SYN-L008', '/ready', '/visuals', '/schedule', '/schedule/2026-10-02-MAIN-X', '/schedule/2026-10-02-MAIN-LI', '/published', '/published/2026-10-01-MAIN-X', '/reconcile'];
 
 test('synthetic screens render without horizontal overflow', async ({ page }, info) => {
   await page.request.post('/api/test-control', { data: { kind: 'reset' } });
