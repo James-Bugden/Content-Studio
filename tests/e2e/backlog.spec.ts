@@ -71,6 +71,23 @@ test('Content Library is the primary backlog with source, hooks, draft and safe 
   await expect(page).not.toHaveURL(new RegExp(`post=${firstId}`));
 });
 
+test('Backlog status reasons are visible on tap and keyboard without changing posts', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/backlog');
+  const rows = page.getByRole('region', { name: 'Content Library posts' }).locator('[data-backlog-id]:visible');
+  const first = rows.first().locator('details');
+  const second = rows.nth(1).locator('details');
+  await expect(first.locator('p')).toBeHidden();
+  await first.locator('summary').click();
+  await expect(first.locator('p')).toBeVisible();
+  await second.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(second.locator('p')).toBeVisible();
+  await expect(first.locator('p')).toBeHidden();
+  await expect(page).toHaveURL(/\/backlog$/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
 test('Content Source filter narrows Library rows and preserves idea view separately', async ({ page }) => {
   await page.goto('/backlog');
   const source = page.getByLabel('Content Source');
