@@ -4,6 +4,13 @@ import { libraryBacklogStatus } from '@/domain/library-backlog';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { PillarTag } from '../pillar-tag';
 
+function statusTone(status: string): string {
+  if (status === 'Rejected' || status === 'Needs changes') return 'bg-block-soft text-block';
+  if (status === 'Approved') return 'bg-green-soft text-green';
+  if (status === 'Drafting' || status === 'Needs review' || status === 'Schedule requested') return 'bg-attention-soft text-attention';
+  return 'bg-paper text-ink-soft';
+}
+
 /** Bounded rows, keeping the page light even when the Sheet holds thousands of posts. */
 export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
   return (
@@ -39,9 +46,7 @@ export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
                     {item.draftContent || 'Open to read and edit the source post.'}
                   </p>
                 </td>
-                <td className="sticky right-24 z-10 whitespace-nowrap border-l border-line bg-card px-3 py-3"><span className={
-                  `rounded-full px-2 py-1 text-xs font-semibold ${status === 'Rejected' || status === 'Needs changes' ? 'bg-block-soft text-block' : status === 'Approved' || status === 'Queued for scheduling' ? 'bg-green-soft text-green' : status === 'Drafting' || status === 'Needs review' ? 'bg-attention-soft text-attention' : 'bg-paper text-ink-soft'}`
-                }>{status}</span></td>
+                <td className="sticky right-24 z-10 whitespace-nowrap border-l border-line bg-card px-3 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusTone(status)}`}>{status}</span></td>
                 <td className="sticky right-0 z-10 border-l border-line bg-card px-3 py-3"><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
               </tr>
             );
@@ -53,7 +58,7 @@ export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
           const item = record.value;
           const title = item.currentHook || readableTitle(item.slug) || item.libraryId;
           return <li key={item.libraryId} data-backlog-id={item.libraryId} className="space-y-2 p-4">
-            <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><span className="shrink-0 rounded-full bg-paper px-2 py-1">{libraryBacklogStatus(record)}</span></div>
+            <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><span className={`shrink-0 rounded-full px-2 py-1 font-semibold ${statusTone(libraryBacklogStatus(record))}`}>{libraryBacklogStatus(record)}</span></div>
             <p className="text-base font-semibold">{title}</p>
             <p className="line-clamp-3 whitespace-pre-line text-sm text-ink-soft">{item.draftContent || 'Open to read and edit the source post.'}</p>
             <p className="text-xs text-ink-soft">{item.targetPlatform.ok ? item.targetPlatform.value : '—'} · Hook template: {item.hookTemplate || '—'}</p>

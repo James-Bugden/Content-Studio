@@ -8,7 +8,7 @@ export function libraryBacklogStatus(record: LibraryRecord): string {
   const { state, reviewStatus, queueForSchedule } = record.value;
   if (reviewStatus.ok && reviewStatus.value === 'Skipped') return 'Rejected';
   if (reviewStatus.ok && reviewStatus.value === 'Changes Requested') return 'Needs changes';
-  if (reviewStatus.ok && reviewStatus.value === 'Approved') return queueForSchedule ? 'Queued for scheduling' : 'Approved';
+  if (reviewStatus.ok && reviewStatus.value === 'Approved') return queueForSchedule ? 'Schedule requested' : 'Approved';
   if (state.trim() === 'Editing') return 'Drafting';
   if (state.trim() && state.trim() !== 'Idea') return state.trim();
   return record.value.draftContent.trim() ? 'Drafting' : 'Needs review';

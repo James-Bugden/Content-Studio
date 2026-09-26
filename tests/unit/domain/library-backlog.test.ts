@@ -29,7 +29,7 @@ describe('Content Library backlog', () => {
 
   it('does not call a Library row ready for Typefully just because it is approved', async () => {
     const first = (await records())[0]!;
-    expect(libraryBacklogStatus({ ...first, value: { ...first.value, reviewStatus: { ok: true, value: 'Approved' }, queueForSchedule: true } })).toBe('Queued for scheduling');
+    expect(libraryBacklogStatus({ ...first, value: { ...first.value, reviewStatus: { ok: true, value: 'Approved' }, queueForSchedule: true } })).toBe('Schedule requested');
     expect(libraryBacklogStatus({ ...first, value: { ...first.value, reviewStatus: { ok: true, value: 'Skipped' } } })).toBe('Rejected');
   });
 });
