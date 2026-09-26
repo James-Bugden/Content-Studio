@@ -50,7 +50,7 @@ test('Content Library is the primary backlog with source, hooks, draft and safe 
   await expect(table).toBeVisible();
   if (page.viewportSize()!.width >= 768) {
     for (const heading of ['Content Source', 'Hook Template', 'Hook Alternatives', 'Content', 'Status']) {
-      await expect(table.getByRole('columnheader', { name: heading })).toBeVisible();
+      await expect(table.getByRole('columnheader', { name: heading, exact: true })).toBeVisible();
     }
   }
   const first = table.locator('[data-backlog-id]:visible').first();
