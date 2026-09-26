@@ -261,6 +261,31 @@ test.describe('Threads', () => {
 });
 
 test.describe('layout', () => {
+  test('primary action and selected source controls use monochrome with accessible state', async ({ page }) => {
+    await page.goto('/replies');
+    const action = page.getByRole('button', { name: 'Get reply ideas' });
+    await expect(action).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    await expect(action).toHaveCSS('color', 'rgb(255, 255, 255)');
+    const linkedin = page.getByRole('radio', { name: 'LinkedIn' });
+    await expect(linkedin).toHaveAttribute('aria-checked', 'true');
+    await expect(linkedin).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    await expect(linkedin).toHaveCSS('color', 'rgb(255, 255, 255)');
+    const threads = page.getByRole('radio', { name: 'Threads' });
+    await threads.click();
+    await expect(threads).toHaveAttribute('aria-checked', 'true');
+    await expect(threads).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    await expect(linkedin).toHaveAttribute('aria-checked', 'false');
+
+    const post = page.getByRole('button', { name: 'Post', exact: true });
+    await expect(post).toHaveAttribute('aria-pressed', 'true');
+    await expect(post).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    const comment = page.getByRole('button', { name: 'Comment', exact: true });
+    await comment.click();
+    await expect(comment).toHaveAttribute('aria-pressed', 'true');
+    await expect(comment).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(post).toHaveAttribute('aria-pressed', 'false');
+  });
+
   for (const width of [375, 500, 600, 750, 1280]) {
     test(`does not scroll horizontally at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
