@@ -14,7 +14,7 @@ import { QaPanel } from './qa-panel';
  * conflict behaviour; after a hook choice the whole editor reloads from the
  * authoritative model so the hook and the draft stay in step.
  */
-export function EditorWorkspace({ model: initialModel, canEdit, ns }: { model: EditorModel; canEdit: boolean; ns: string }) {
+export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = false }: { model: EditorModel; canEdit: boolean; ns: string; focusMode?: boolean }) {
   const router = useRouter();
   const [model, setModel] = useState(initialModel);
   const [text, setText] = useState(() => initialEditorText(initialModel));
@@ -47,8 +47,14 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns }: { model: E
     <div className="flex flex-col gap-6">
       <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} />
       {reloadFailed ? <InlineResult tone="warning">The change was saved, but the editor could not reload it. Reload the page to see the latest version.</InlineResult> : null}
-      <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />
-      <HookPanel
+      {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} /></div></details>
+        : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />}
+      {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">Hook review</summary><div className="mt-3">{hookPanel()}</div></details> : hookPanel()}
+    </div>
+  );
+
+  function hookPanel() {
+    return <HookPanel
         libraryId={model.libraryId}
         platform={model.targetPlatform}
         currentHook={model.sheet.hook}
@@ -59,7 +65,6 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns }: { model: E
         sectionHash={snapshot.sectionHash}
         canEdit={canEdit}
         onChanged={reload}
-      />
-    </div>
-  );
+      />;
+  }
 }

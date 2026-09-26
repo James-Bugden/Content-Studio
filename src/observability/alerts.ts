@@ -69,3 +69,13 @@ export function summariseEvents(events: readonly Ev[]): EventSummary[] {
     })
     .sort((a, b) => a.adapter.localeCompare(b.adapter));
 }
+
+/** Content-free page timings from this instance's recent bounded event buffer. */
+export function summariseBacklogTimings(events: readonly Ev[]) {
+  return ['backlog.load', 'backlog.search', 'editor.load'].map((name) => {
+    const durations = events.filter((e) => e.name === name && e.outcome === 'ok' && typeof e.latencyMs === 'number')
+      .map((e) => e.latencyMs!).sort((a, b) => a - b);
+    const percentile = (p: number) => durations.length ? durations[Math.min(durations.length - 1, Math.floor(p * durations.length))]! : null;
+    return { name, samples: durations.length, p50: percentile(0.5), p95: percentile(0.95) };
+  });
+}

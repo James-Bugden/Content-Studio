@@ -3,11 +3,14 @@ import { getServices } from '@/application/container';
 import { loadBacklogOptions, loadBacklogGroups, type BacklogFilters } from '@/application/backlog';
 import { PageHeader, StateView } from '@/components';
 import { BacklogGroupTable } from '@/components/backlog/backlog-group-table';
-import { LibraryBacklogTable } from '@/components/backlog/library-backlog-table';
+import { LibraryBacklogExplorer } from '@/components/backlog/library-backlog-explorer';
 import { FilterBar } from '@/components/filter-bar';
 import { PLATFORMS, type Platform } from '@/domain/enums';
 import { libraryBacklogView } from '@/domain/library-backlog';
+import { BACKLOG_SORTS, type BacklogSort } from '@/domain/library-backlog';
+import { backlogReadiness } from '@/application/backlog-readiness';
 import { requireActor } from '@/lib/auth';
+import { timed } from '@/observability/events';
 
 export const metadata: Metadata = { title: 'Backlog | Content Studio' };
 export const dynamic = 'force-dynamic';
@@ -18,10 +21,16 @@ function platform(params: Params): Platform | undefined {
   const raw = one(params, 'platform');
   return raw && (PLATFORMS as readonly string[]).includes(raw) ? raw as Platform : undefined;
 }
+function sort(params: Params): BacklogSort | undefined {
+  const raw = one(params, 'sort');
+  return raw && (BACKLOG_SORTS as readonly string[]).includes(raw) ? raw as BacklogSort : undefined;
+}
 function pageHref(params: Params, page: number): string {
   const query = new URLSearchParams();
   if (one(params, 'source')) query.set('source', one(params, 'source')!);
   if (platform(params)) query.set('platform', platform(params)!);
+  if (one(params, 'status')) query.set('status', one(params, 'status')!);
+  if (sort(params)) query.set('sort', sort(params)!);
   query.set('page', String(page));
   return `/backlog?${query}`;
 }
@@ -32,12 +41,16 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const ideas = one(params, 'view') === 'ideas';
   if (!ideas) {
-    const library = await repo.listLibrary();
+    const [library, queue, schedule] = await timed({ name: 'backlog.load', adapter: 'app', facts: { view: 'posts' } }, () => Promise.all([
+      repo.listLibrary(), repo.listReadyQueue().catch(() => null), repo.listSchedule().catch(() => null),
+    ]));
+    const readiness = backlogReadiness(library, queue, schedule);
     const requestedPage = Number(one(params, 'page'));
     const view = libraryBacklogView(library, {
       source: one(params, 'source'), platform: platform(params),
+      status: one(params, 'status'), sort: sort(params),
       page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
-    });
+    }, readiness);
     return (
       <>
         <PageHeader title="Backlog" description="Unedited posts from the Content Library Sheet. Filter by source, open a post and work through the list." />
@@ -45,14 +58,16 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         <FilterBar filters={[
           { key: 'source', label: 'Content Source', options: view.sources.map((s) => ({ value: s, label: s })) },
           { key: 'platform', label: 'Platform', options: view.platforms.map((p) => ({ value: p, label: p })) },
+          { key: 'status', label: 'Status', options: view.statusOptions.map((s) => ({ value: s, label: s })) },
+          { key: 'sort', label: 'Sort', allLabel: 'Sheet order', options: [
+            { value: 'source', label: 'Source' }, { value: 'hook', label: 'Hook' }, { value: 'status', label: 'Status' },
+          ] },
         ]} />
-        <p className="mb-3 text-sm text-ink-soft">{view.total} {view.total === 1 ? 'post' : 'posts'} · page {view.page} of {view.totalPages}. Typefully readiness is confirmed after the existing schedule checks.</p>
-        {view.total === 0 ? <StateView kind="no_match" detail={library.length ? 'No posts match these filters.' : 'The Content Library is empty.'} action={null} /> : <LibraryBacklogTable rows={view.rows} />}
-        {view.totalPages > 1 ? <nav aria-label="Backlog pages" className="mt-4 flex items-center justify-between text-sm">
-          {view.page > 1 ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(params, view.page - 1)}>Previous page</a> : <span />}
-          <span>Page {view.page} / {view.totalPages}</span>
-          {view.page < view.totalPages ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(params, view.page + 1)}>Next page</a> : <span />}
-        </nav> : null}
+        <LibraryBacklogExplorer key={`${one(params, 'source')}:${platform(params)}:${one(params, 'status')}:${sort(params)}:${view.page}`}
+          initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages }}
+          filters={{ source: one(params, 'source'), platform: platform(params), status: one(params, 'status'), sort: sort(params) }}
+          previousHref={view.page > 1 ? pageHref(params, view.page - 1) : null}
+          nextHref={view.page < view.totalPages ? pageHref(params, view.page + 1) : null} />
       </>
     );
   }

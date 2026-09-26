@@ -83,7 +83,7 @@ export function PanelHost() {
       >
         {open ? (
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between gap-2 border-b border-line bg-card px-4 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-card px-4 py-2">
               <p className="text-xs font-semibold tracking-wide text-ink-soft">{post ? 'Post' : slot ? 'Schedule slot' : 'Backlog idea'}</p>
               {post && pathname === '/backlog' ? <nav aria-label="Move between posts" className="ml-auto flex gap-2 text-sm">
                 <button type="button" disabled={!neighbours.prev} onClick={() => neighbours.prev && moveTo(neighbours.prev)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>

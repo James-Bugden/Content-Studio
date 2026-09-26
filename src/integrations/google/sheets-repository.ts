@@ -59,7 +59,7 @@ export class SheetsContentRepository implements ContentRepository {
 
   constructor(
     private readonly transport: SheetTransport,
-    private readonly options: { writable: boolean; readCacheMs?: number } = { writable: true },
+    private readonly options: { writable: boolean; readCacheMs?: number; libraryReadCacheMs?: number } = { writable: true },
   ) {}
 
   /**
@@ -72,7 +72,9 @@ export class SheetsContentRepository implements ContentRepository {
   private readonly readCache = new Map<string, { at: number; rows: Promise<RawRow[]> }>();
 
   private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<RawRow[]> {
-    const ttl = this.options.readCacheMs ?? 0;
+    // Filter/search/editor navigation shares a short-lived Library snapshot.
+    // Writes clear this cache; mutation preconditions always read fresh.
+    const ttl = tabKey === 'library' ? this.options.libraryReadCacheMs ?? this.options.readCacheMs ?? 0 : this.options.readCacheMs ?? 0;
     const key = `${tabKey}:${withExtras}`;
     const hit = this.readCache.get(key);
     if (!fresh && hit && Date.now() - hit.at <= ttl) return hit.rows;
