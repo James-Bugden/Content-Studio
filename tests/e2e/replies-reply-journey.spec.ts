@@ -161,6 +161,14 @@ test.describe('Threads', () => {
 });
 
 test.describe('layout', () => {
+  test('primary action uses the black-and-white theme', async ({ page }) => {
+    await page.goto('/replies');
+    const action = page.getByRole('button', { name: 'Get reply ideas' });
+    await expect(action).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    await expect(action).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(action).toHaveAttribute('type', 'button');
+  });
+
   for (const width of [375, 500, 600, 750, 1280]) {
     test(`does not scroll horizontally at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });

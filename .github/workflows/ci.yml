@@ -99,7 +99,19 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run browser journeys
+        env:
+          CS_SHOT_DIR: ${{ runner.temp }}/screens
+          CS_SHOT_REPLIES_ONLY: '1'
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+
+      # These contain only synthetic fake-provider pages, never owner data.
+      - name: Upload Replies visual evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: replies-screens-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/screens/
+          retention-days: 7
+          if-no-files-found: ignore
 
       # Page text in these reports is synthetic. Only the report directory is uploaded.
       - name: Upload report on failure
