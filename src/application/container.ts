@@ -104,7 +104,7 @@ function build(): Services {
   const tokens = new ServiceAccountTokens(env.GOOGLE_SERVICE_ACCOUNT_EMAIL, env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
   services = {
     mode: 'live',
-    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, readCacheMs: 3000, libraryReadCacheMs: 15_000 }),
+    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, readCacheMs: 3000, libraryReadCacheMs: 15_000, readinessReadCacheMs: 15_000 }),
     drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
     typefully: createTypefullyGateway(env),

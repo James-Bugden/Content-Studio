@@ -233,6 +233,14 @@ describe('fixtures: pagination, empty queue, settings', () => {
 });
 
 describe('live read cache', () => {
+  it('shares Backlog readiness tab reads within their own short TTL', async () => {
+    const t = new FakeSheetTransport();
+    const cached = new SheetsContentRepository(t, { writable: true, readCacheMs: 0, readinessReadCacheMs: 15_000 });
+    await Promise.all([cached.listReadyQueue(), cached.listSchedule()]);
+    const reads = t.reads;
+    await Promise.all([cached.listReadyQueue(), cached.listSchedule()]);
+    expect(t.reads).toBe(reads);
+  });
   it('shares reads within the TTL, and a write reads fresh and clears it', async () => {
     const t = new FakeSheetTransport();
     const cached = new SheetsContentRepository(t, { writable: true, readCacheMs: 60_000 });
