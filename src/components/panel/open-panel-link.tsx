@@ -44,7 +44,10 @@ export function OpenPanelLink({
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
-        router.replace(href, { scroll: false });
+        // Backlog posts already load through the editor API. A client-side URL
+        // update avoids an unrelated server route refresh racing private search.
+        if (pathname === '/backlog' && 'post' in target) window.history.replaceState(null, '', href);
+        else router.replace(href, { scroll: false });
       }}
     >
       {children}

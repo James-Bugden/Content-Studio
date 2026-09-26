@@ -26,16 +26,6 @@ function sort(params: Params): BacklogSort | undefined {
   const raw = one(params, 'sort');
   return raw && (BACKLOG_SORTS as readonly string[]).includes(raw) ? raw as BacklogSort : undefined;
 }
-function pageHref(params: Params, page: number): string {
-  const query = new URLSearchParams();
-  if (one(params, 'source')) query.set('source', one(params, 'source')!);
-  if (platform(params)) query.set('platform', platform(params)!);
-  if (one(params, 'status')) query.set('status', one(params, 'status')!);
-  if (sort(params)) query.set('sort', sort(params)!);
-  query.set('page', String(page));
-  return `/backlog?${query}`;
-}
-
 function safeBacklogErrorCode(error: unknown): ErrorCode {
   if (isAppError(error)) return error.code;
   // Next's separate server module graphs can lose Error prototype identity.
@@ -81,9 +71,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         ]} />
         <LibraryBacklogExplorer
           initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages }}
-          filters={{ source: one(params, 'source'), platform: platform(params), status: one(params, 'status'), sort: sort(params) }}
-          previousHref={view.page > 1 ? pageHref(params, view.page - 1) : null}
-          nextHref={view.page < view.totalPages ? pageHref(params, view.page + 1) : null} />
+          filters={{ source: one(params, 'source'), platform: platform(params), status: one(params, 'status'), sort: sort(params) }} />
       </>
     );
   }

@@ -67,9 +67,10 @@ export type PostEditorProps = {
   value?: string;
   onValueChange?: (text: string) => void;
   onSnapshot?: (snapshot: EditorSnapshot) => void;
+  onSaved?: () => void;
 };
 
-export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot }: PostEditorProps) {
+export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved }: PostEditorProps) {
   const textId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialBase = initialEditorText(model);
@@ -132,6 +133,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       clearRecovery(ns, model.libraryId);
       setMismatch(false);
       setStatus({ kind: 'saved', replayed: body.replayed });
+      onSaved?.();
       return;
     }
     if (res.status === 401) {

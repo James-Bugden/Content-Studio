@@ -45,7 +45,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
 
   return (
     <div className="flex flex-col gap-6">
-      <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} />
+      <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? () => router.refresh() : undefined} />
       {reloadFailed ? <InlineResult tone="warning">The change was saved, but the editor could not reload it. Reload the page to see the latest version.</InlineResult> : null}
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} /></div></details>
         : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />}

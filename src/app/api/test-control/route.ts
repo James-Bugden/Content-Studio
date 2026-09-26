@@ -5,6 +5,7 @@ import { LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-sc
 import { ERROR_CODES } from '@/domain/errors';
 import { testAuthEnabled } from '@/lib/auth/policy';
 import { json } from '@/lib/http';
+import { largeLibraryRows, SYNTH_MASTER_FILE_ID } from '@/fixtures/synthetic';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ const typefullyAction = z.discriminatedUnion('type', [
 
 const bodySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('reset') }),
+  z.object({ kind: z.literal('seed_library_pages') }),
   z.object({
     kind: z.literal('fail'),
     provider: z.enum(['sheet', 'drive']),
@@ -68,6 +70,17 @@ export async function POST(request: Request) {
   }
   const fakes = getServices().fakes;
   if (!fakes) return new Response('Not found', { status: 404 });
+  if (body.kind === 'seed_library_pages') {
+    const rows = largeLibraryRows(45).slice(1);
+    const grid = fakes.sheet.rawTab(SHEET_TABS.library.name);
+    for (const row of rows) grid.push(row.values.map((value, index) => {
+      const formula = row.formulas?.[index];
+      return { value: String(value ?? ''), ...(typeof formula === 'string' && formula.startsWith('=') ? { formula } : {}) };
+    }));
+    const sections = rows.map((row, index) => `\n## SYN-B${String(index + 1).padStart(4, '0')} · bulk-${index + 1}\n\nSynthetic hook ${index + 1}\n\nSynthetic body ${index + 1}.\n`).join('');
+    fakes.drive.externalEdit(SYNTH_MASTER_FILE_ID, fakes.drive.textOf(SYNTH_MASTER_FILE_ID) + sections);
+    return json({ ok: true });
+  }
   if (body.kind === 'fail') {
     if (body.provider === 'sheet' && body.op !== 'meta') fakes.sheet.failNext({ op: body.op, code: body.code, ...(body.tab ? { tab: body.tab } : {}), times: body.times ?? 1 });
     if (body.provider === 'drive') fakes.drive.failNext({ op: body.op, code: body.code, times: body.times ?? 1 });
