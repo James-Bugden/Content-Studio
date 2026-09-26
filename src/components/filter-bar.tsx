@@ -15,7 +15,7 @@ import { buttonClass } from './button-styles';
  * this control. Changing a filter while an editor is dirty asks first.
  */
 export type FilterOption = { value: string; label: string };
-export type FilterDef = { key: string; label: string; options: FilterOption[] };
+export type FilterDef = { key: string; label: string; options: FilterOption[]; allLabel?: string };
 
 /** Only values present in the option list survive. */
 export function sanitiseFilterValue(filter: FilterDef, value: string | null): string {
@@ -32,6 +32,7 @@ export function nextFilterQuery(filters: FilterDef[], current: URLSearchParams, 
     params.delete(filter.key);
     if (clean) params.set(filter.key, clean);
   }
+  params.delete('page');
   const query = params.toString();
   return query ? `?${query}` : '';
 }
@@ -66,7 +67,7 @@ export function FilterBar({ filters }: { filters: FilterDef[] }) {
               onChange={(event) => go({ key: filter.key, value: event.target.value })}
               className="min-h-11 w-full min-w-0 rounded-md border border-line bg-card px-2 text-sm"
             >
-              <option value="">All</option>
+              <option value="">{filter.allLabel ?? 'All'}</option>
               {filter.options.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

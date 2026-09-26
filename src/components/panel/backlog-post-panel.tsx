@@ -33,6 +33,6 @@ export function BacklogPostPanel({ libraryId }: { libraryId: string }) {
       <h2 id="panel-title" className="text-lg font-semibold">{readableTitle(load.model.slug) || load.model.sheet.hook || load.model.libraryId}</h2>
       <p className="text-sm text-ink-soft">{load.model.source} · {load.model.targetPlatform} · Review: {load.model.reviewStatus}</p>
     </header>
-    <EditorWorkspace model={load.model} canEdit={load.canEdit} ns={load.ns} />
+    <EditorWorkspace model={load.model} canEdit={load.canEdit} ns={load.ns} focusMode />
   </div>;
 }

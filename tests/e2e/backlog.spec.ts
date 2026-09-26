@@ -74,6 +74,45 @@ test('Content Source filter narrows Library rows and preserves idea view separat
   await expect(page.getByRole('heading', { name: 'Backlog ideas' })).toBeVisible();
 });
 
+test('Backlog search, status, sort and column controls keep private search out of URL', async ({ page }) => {
+  await page.goto('/backlog');
+  const table = page.getByRole('region', { name: 'Content Library posts' });
+  await page.getByLabel('Find a post').fill('Most people negotiate the salary');
+  await expect(page.getByText('1 post · page 1 of 1')).toBeVisible();
+  await expect(table.locator('[data-backlog-id]:visible')).toHaveCount(1);
+  expect(page.url()).not.toContain('Most%20people');
+  await page.getByRole('combobox', { name: 'Platform' }).selectOption('LinkedIn');
+  await expect(page.getByLabel('Find a post')).toHaveValue('Most people negotiate the salary');
+  await expect(page.getByText('1 post · page 1 of 1')).toBeVisible();
+  await page.getByLabel('Find a post').fill('');
+  await page.getByLabel('Sort').selectOption('source');
+  await expect(page).toHaveURL(/sort=source/);
+  await page.getByRole('combobox', { name: 'Status' }).selectOption({ index: 1 });
+  await expect(page).toHaveURL(/status=/);
+  if (page.viewportSize()!.width >= 768) {
+    await page.getByLabel('Show hook columns').uncheck();
+    await expect(table.getByRole('columnheader', { name: 'Hook Template' })).toHaveCount(0);
+    await page.getByLabel('Show hook columns').check();
+    await expect(table.getByRole('columnheader', { name: 'Hook Template' })).toBeVisible();
+  }
+});
+
+test('Backlog editor is focused and the post list fits a narrow phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('/backlog');
+  const region = page.getByRole('region', { name: 'Content Library posts' });
+  await expect(region.locator('[data-backlog-id]:visible').first()).toBeVisible();
+  await region.locator('[data-backlog-id]:visible').first().getByRole('link', { name: /^Edit / }).click();
+  const panel = page.getByRole('dialog');
+  await expect(panel.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
+  await expect(panel.locator('summary').filter({ hasText: 'English check' })).toBeVisible();
+  await expect(panel.locator('summary').filter({ hasText: 'Hook review' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Next' })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Next' }).click();
+  await expect(panel.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
 test('the page shows the 2 synthetic source groups, closed by default, with idea counts', async ({ page }) => {
   await page.goto('/backlog?view=ideas');
   // Scoped to the group heading, not the source also present as a Reference filter option.

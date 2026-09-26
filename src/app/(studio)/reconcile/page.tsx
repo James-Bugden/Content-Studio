@@ -5,6 +5,8 @@ import { CapabilityBanner, ErrorState, PageHeader, StateView } from '@/component
 import { ReconcileList } from '@/components/reconcile/reconcile-list';
 import { isAppError } from '@/domain/errors';
 import { requireActor } from '@/lib/auth';
+import { summariseBacklogTimings } from '@/observability/alerts';
+import { recentEvents } from '@/observability/events';
 
 export const metadata: Metadata = { title: 'Reconcile | Content Studio' };
 export const dynamic = 'force-dynamic';
@@ -110,6 +112,17 @@ export default async function ReconcilePage() {
               </table>
             </div>
           )}
+        </section>
+
+        <section aria-labelledby="backlog-timing-h">
+          <h2 id="backlog-timing-h" className="text-lg font-semibold">Backlog timings (this server instance)</h2>
+          <p className="text-sm text-ink-soft">Recent successful requests only. Durations include provider reads; no post text or search terms are recorded.</p>
+          <div tabIndex={0} role="region" aria-label="Backlog timing table" className="mt-2 overflow-x-auto rounded-lg border border-line bg-card">
+            <table className="w-full min-w-[24rem] text-left text-sm">
+              <thead className="bg-paper"><tr>{['Action', 'Samples', 'p50 ms', 'p95 ms'].map((h) => <th key={h} scope="col" className="px-3 py-2">{h}</th>)}</tr></thead>
+              <tbody>{summariseBacklogTimings(recentEvents()).map((e) => <tr key={e.name} className="border-t border-line"><th scope="row" className="px-3 py-2 font-medium">{e.name}</th><td className="px-3 py-2">{e.samples}</td><td className="px-3 py-2">{e.p50 ?? 'n/a'}</td><td className="px-3 py-2">{e.p95 ?? 'n/a'}</td></tr>)}</tbody>
+            </table>
+          </div>
         </section>
       </div>
     </>
