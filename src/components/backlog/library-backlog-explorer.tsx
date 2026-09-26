@@ -2,32 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { LibraryRecord } from '@/domain/records';
-import type { BacklogReadiness, LibraryBacklogFilters } from '@/domain/library-backlog';
+import type { LibraryBacklogFilters } from '@/domain/library-backlog';
 import { adjacentPosition } from '@/domain/backlog-navigation';
-import { useBacklogNavigation } from './backlog-navigation';
+import { useBacklogNavigation, type BacklogResult } from './backlog-navigation';
 import { LibraryBacklogTable } from './library-backlog-table';
 
-type Result = {
-  ok: true;
-  rows: Pick<LibraryRecord, 'row' | 'value'>[];
-  statuses: Record<string, BacklogReadiness>;
-  total: number;
-  page: number;
-  totalPages: number;
-};
-
 type Props = {
-  initial: Result;
+  initial: BacklogResult;
   filters: Pick<LibraryBacklogFilters, 'source' | 'platform' | 'status' | 'sort'>;
 };
 
 /** Search is deliberately ephemeral: private post copy never goes in a URL. */
 export function LibraryBacklogExplorer({ initial, filters }: Props) {
   const { source, platform, status, sort } = filters;
-  const [search, setSearch] = useState('');
-  const [searchPage, setSearchPage] = useState(1);
-  const [result, setResult] = useState<{ key: string; data: Result } | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -40,7 +27,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     next.set('page', String(target));
     return `/backlog?${next}`;
   };
-  const { setNavigation } = useBacklogNavigation();
+  const { setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult } = useBacklogNavigation();
   const filtersKey = JSON.stringify([source, platform, status, sort]);
   const previousFilters = useRef(filtersKey);
   const requestedPage = Number(params.get('page'));
@@ -64,7 +51,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
       setSearchPage(1);
       setResult(null);
     }
-  }, [filtersKey]);
+  }, [filtersKey, setSearchPage, setResult]);
 
   useEffect(() => {
     if (!search.trim()) return;
@@ -78,7 +65,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ search, page: searchPage, source, platform, status, sort }),
         });
-        const body = await response.json() as Result;
+        const body = await response.json() as BacklogResult;
         if (!response.ok || !body.ok) throw new Error('search_failed');
         setResult({ key: queryKey, data: body });
       } catch {
@@ -88,7 +75,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
       }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [search, searchPage, source, platform, status, sort, retry, queryKey]);
+  }, [search, searchPage, source, platform, status, sort, retry, queryKey, setResult]);
 
   const matched = result?.key === queryKey ? result.data : null;
   const loading = Boolean(search.trim() && !matched && !error);
@@ -104,7 +91,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     const requestedKey = JSON.stringify([search, position.page, filtersKey]);
     const controller = new AbortController();
     pageRequests.current.add(controller);
-    let next: Result;
+    let next: BacklogResult;
     try {
       const response = await fetch('/api/backlog/search', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
@@ -112,7 +99,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
         body: JSON.stringify({ search, page: position.page, source, platform, status, sort }),
       });
       if (!response.ok) throw new Error('The next page could not load. Try again.');
-      next = await response.json() as Result;
+      next = await response.json() as BacklogResult;
     } finally {
       pageRequests.current.delete(controller);
     }
@@ -125,7 +112,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     setResult({ key: requestedKey, data: next });
     if (search.trim()) setSearchPage(next.page);
     return { id: target.value.libraryId, page: next.page };
-  }, [usable, active, search, filtersKey, source, platform, status, sort, queryKey]);
+  }, [usable, active, search, filtersKey, source, platform, status, sort, queryKey, setResult, setSearchPage]);
 
   useEffect(() => {
     if (!usable) { setNavigation(null); return; }

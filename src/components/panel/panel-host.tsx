@@ -25,7 +25,7 @@ export function PanelHost() {
   const pathname = usePathname();
   const ref = useRef<HTMLDialogElement>(null);
   const navigationEpoch = useRef(0);
-  const { navigation } = useBacklogNavigation();
+  const { navigation, setSearch, setSearchPage, setResult } = useBacklogNavigation();
   const [moving, setMoving] = useState(false);
   const [navigationError, setNavigationError] = useState('');
   const [failedDirection, setFailedDirection] = useState<-1 | 1>(1);
@@ -41,6 +41,13 @@ export function PanelHost() {
   const queue = !post && !slot && queueParam && libraryIdSchema.safeParse(queueParam).success ? queueParam : null;
   const open = Boolean(post || slot || queue);
 
+  useEffect(() => {
+    if (pathname === '/backlog' && params.get('view') !== 'ideas') return;
+    setSearch('');
+    setSearchPage(1);
+    setResult(null);
+  }, [pathname, params, setSearch, setSearchPage, setResult]);
+
   const close = useCallback(() => {
     guard(() => {
       navigationEpoch.current += 1;
@@ -53,7 +60,7 @@ export function PanelHost() {
       router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
       if (pathname !== '/backlog' || !post) router.refresh();
     });
-  }, [guard, params, pathname, router]);
+  }, [guard, params, pathname, post, router]);
 
   useEffect(() => {
     const el = ref.current;

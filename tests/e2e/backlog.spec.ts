@@ -104,7 +104,9 @@ test('Backlog editor moves across page 1/2 in either direction, with private sea
   await expect(page.getByText('45 posts · page 1 of 2')).toBeVisible();
   await page.getByLabel('Sort').selectOption('hook');
   await expect(page.getByText('45 posts · page 1 of 2')).toBeVisible();
+  await expect(page.getByLabel('Find a post')).toHaveValue('Synthetic body');
   await table.locator('[data-backlog-id]:visible').last().getByRole('link', { name: /^Edit / }).click();
+  await expect(page.getByLabel('Find a post')).toHaveValue('Synthetic body');
   const before = page.url();
   const copy = panel.getByRole('textbox', { name: /Post copy/ });
   await expect(copy).toBeVisible();
@@ -116,6 +118,7 @@ test('Backlog editor moves across page 1/2 in either direction, with private sea
   await panel.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('dialog', { name: 'Leave without saving?' }).getByRole('button', { name: 'Leave and discard changes' }).click();
   await expect(page.getByText('45 posts · page 2 of 2')).toBeVisible();
+  await expect(page.getByLabel('Find a post')).toHaveValue('Synthetic body');
   expect(page.url()).not.toContain('Synthetic%20body');
   await panel.getByRole('button', { name: 'Previous' }).click();
   await expect(page.getByText('45 posts · page 1 of 2')).toBeVisible();
