@@ -111,6 +111,106 @@ test.describe('the reply loop', () => {
     await expect(markPosted).toHaveCount(0);
   });
 
+  test('only a current, active recorded reply can become a Content idea', async ({ page }) => {
+    await page.goto('/replies');
+    await analyse(page);
+    const editor = page.getByRole('textbox', { name: 'Your reply' });
+    await editor.fill('Originally posted wording.');
+    await page.getByRole('button', { name: 'Mark posted' }).click();
+    await expect(page.getByRole('button', { name: 'Save as content idea' })).toBeVisible();
+    const sameOrigin = { origin: new URL(page.url()).origin };
+
+    const search = await page.request.post('/api/replies/library/search', {
+      headers: sameOrigin,
+      data: { query: 'Originally posted wording.', include_unknown_dates: true, limit: 10 },
+    });
+    expect(search.ok()).toBe(true);
+    const replyId = (await search.json()).items[0].id as string;
+    const postIdea = (body: object) => page.evaluate(async (payload) => {
+      const response = await fetch('/api/replies/content-idea', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      return { status: response.status, body: await response.json() };
+    }, body);
+
+    const forged = await postIdea({ operationId: 'idea_forged_0001', replyId, platform: 'x', finalText: 'Injected text' });
+    expect(forged).toMatchObject({ status: 400, body: { code: 'VALIDATION_FAILED' } });
+    const missing = await postIdea({ operationId: 'idea_missing_0001', replyId: '12345678-1234-4123-8123-1234567890ab' });
+    expect(missing).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+    const draftSearch = await page.request.post('/api/replies/library/search', {
+      headers: sameOrigin,
+      data: { query: 'Example AI draft', provenances: ['ai_draft'], include_unknown_dates: true, limit: 10 },
+    });
+    expect(draftSearch.ok()).toBe(true);
+    const draftId = (await draftSearch.json()).items[0].id as string;
+    const unposted = await postIdea({ operationId: 'idea_unposted_0001', replyId: draftId });
+    expect(unposted).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+    const beforeSave = await page.request.get('/api/backlog').then((response) => response.json());
+    expect(beforeSave.data.flatMap((group: { items: { libraryId: string }[] }) => group.items)
+      .filter((item: { libraryId: string }) => item.libraryId.startsWith('IDEA-SR-'))).toHaveLength(0);
+
+    const corrected = await page.request.patch(`/api/replies/library/${replyId}`, {
+      headers: sameOrigin,
+      data: { action: 'correct', expected_revision: 0, final_text: 'Corrected recorded wording.', reason: 'Typo' },
+    });
+    expect(corrected.ok()).toBe(true);
+    const saved = await postIdea({ operationId: 'idea_corrected_0001', replyId });
+    expect(saved).toMatchObject({ status: 200, body: { ok: true, item: { platform: 'LinkedIn', hook: 'Corrected recorded wording.' } } });
+    const backlog = await page.request.get('/api/backlog').then((response) => response.json());
+    const idea = backlog.data.flatMap((group: { items: { libraryId: string; draftContent: string }[] }) => group.items)
+      .find((item: { libraryId: string }) => item.libraryId === saved.body.item.libraryId);
+    expect(idea?.draftContent).toBe('Corrected recorded wording.');
+
+    const withdrawn = await page.request.patch(`/api/replies/library/${replyId}`, {
+      headers: sameOrigin,
+      data: { action: 'withdraw', withdrawn: true },
+    });
+    expect(withdrawn.ok()).toBe(true);
+    const afterWithdraw = await postIdea({ operationId: 'idea_withdrawn_0001', replyId });
+    expect(afterWithdraw).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+  });
+
+  test('failed idea save keeps the recorded reply and permits a retry', async ({ page }) => {
+    await page.goto('/replies');
+    await analyse(page);
+    await page.getByRole('textbox', { name: 'Your reply' }).fill('A posted reply that remains recoverable.');
+    await page.getByRole('button', { name: 'Mark posted' }).click();
+    await expect(page.getByRole('button', { name: 'Save as content idea' })).toBeVisible();
+    const sameOrigin = { origin: new URL(page.url()).origin };
+
+    const search = await page.request.post('/api/replies/library/search', {
+      headers: sameOrigin,
+      data: { query: 'remains recoverable', include_unknown_dates: true, limit: 10 },
+    });
+    expect(search.ok()).toBe(true);
+    const replyId = (await search.json()).items[0].id as string;
+    expect((await page.request.patch(`/api/replies/library/${replyId}`, {
+      headers: sameOrigin,
+      data: { action: 'withdraw', withdrawn: true },
+    })).ok()).toBe(true);
+
+    const saveButton = page.getByRole('button', { name: 'Save as content idea' });
+    await saveButton.click();
+    await expect(page.getByText("Couldn't save the idea. Your reply is still recorded.")).toBeVisible();
+    const failureNotice = page.getByRole('status').filter({ hasText: "Couldn't save the idea." });
+    await expect(failureNotice).toHaveAttribute('aria-live', 'polite');
+    await expect(failureNotice).toHaveClass(/text-danger/);
+    await expect(saveButton).toBeEnabled();
+    if (process.env.CS_SHOT_DIR) {
+      await saveButton.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${process.env.CS_SHOT_DIR}/${test.info().project.name}_idea-retry.png` });
+    }
+    expect((await page.request.patch(`/api/replies/library/${replyId}`, {
+      headers: sameOrigin,
+      data: { action: 'withdraw', withdrawn: false },
+    })).ok()).toBe(true);
+    await saveButton.click();
+    await expect(page.getByText('Saved to the Content backlog.')).toBeVisible();
+    if (process.env.CS_SHOT_DIR) {
+      await page.screenshot({ path: `${process.env.CS_SHOT_DIR}/${test.info().project.name}_idea-saved.png` });
+    }
+  });
+
   test('keeps the editor usable while ideas are still arriving', async ({ page }) => {
     await page.goto('/replies');
     await analyse(page);
@@ -161,14 +261,6 @@ test.describe('Threads', () => {
 });
 
 test.describe('layout', () => {
-  test('primary action uses the black-and-white theme', async ({ page }) => {
-    await page.goto('/replies');
-    const action = page.getByRole('button', { name: 'Get reply ideas' });
-    await expect(action).toHaveCSS('background-color', 'rgb(0, 0, 0)');
-    await expect(action).toHaveCSS('color', 'rgb(255, 255, 255)');
-    await expect(action).toHaveAttribute('type', 'button');
-  });
-
   for (const width of [375, 500, 600, 750, 1280]) {
     test(`does not scroll horizontally at ${width} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });

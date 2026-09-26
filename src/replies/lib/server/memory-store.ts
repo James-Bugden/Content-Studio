@@ -568,6 +568,13 @@ export function createMemoryStore(): Store {
       return { replyId: reply.id, replayed: false, recordedAt };
     },
 
+    async getRecordedReplyForIdea(replyId) {
+      const reply = replies.find((row) =>
+        row.id === replyId && row.provenance === 'posted_confirmed' && row.withdrawnAt === null,
+      );
+      return reply ? { platform: reply.platform, finalText: reply.finalText } : null;
+    },
+
     async setReplyWithdrawn(replyId, withdrawn) {
       const reply = replies.find((r) => r.id === replyId);
       if (!reply) throw new AppError('not_found', 'That is not available.');
@@ -732,4 +739,3 @@ export function createMemoryStore(): Store {
     },
   };
 }
-

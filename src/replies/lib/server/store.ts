@@ -17,7 +17,7 @@ import type { DatePrecision, Platform, Provenance, TargetKind } from '@/replies/
  *
  * The interface is deliberately narrow and domain-shaped rather than a generic
  * query builder. A route can only do the things named here, which keeps the
- * "ordinary requests use the owner's session, never a service-role bypass" rule
+ * owner-only boundary and the explicit owner scoping of service-role reads
  * checkable by reading one file.
  *
  * The in-memory implementation is a test double, not a second product. It is
@@ -109,6 +109,12 @@ export interface RecordResult {
   recordedAt: string;
 }
 
+/** Only an active, confirmed post may become a Content Queue idea. */
+export interface RecordedReplyForIdea {
+  platform: Platform;
+  finalText: string;
+}
+
 export interface LibrarySearchInput {
   query: string;
   platforms?: Platform[];
@@ -172,6 +178,7 @@ export interface Store {
 
   recordReply(input: RecordReplyInput): Promise<RecordResult>;
   recordManualReply(input: ManualReplyInput): Promise<RecordResult>;
+  getRecordedReplyForIdea(replyId: string): Promise<RecordedReplyForIdea | null>;
   setReplyWithdrawn(replyId: string, withdrawn: boolean): Promise<void>;
   correctReply(
     replyId: string,
@@ -254,4 +261,3 @@ export interface AdminSettings {
   target_threads: number;
   timezone: string;
 }
-

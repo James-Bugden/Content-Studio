@@ -163,12 +163,12 @@ export type BacklogOutcome =
 export const replyContentIdeaSchema = z.object({
   operationId: operationIdSchema,
   replyId: z.string().uuid(),
-  platform: z.enum(['linkedin', 'x', 'threads']),
-  finalText: z.string().trim().min(1).max(50_000),
-});
+}).strict();
 export type ReplyContentIdea = z.infer<typeof replyContentIdeaSchema>;
 
-const REPLY_PLATFORM: Record<ReplyContentIdea['platform'], Platform> = {
+export type RecordedReplyContent = { platform: 'linkedin' | 'x' | 'threads'; finalText: string };
+
+const REPLY_PLATFORM: Record<RecordedReplyContent['platform'], Platform> = {
   linkedin: 'LinkedIn',
   x: 'X',
   threads: 'Threads',
@@ -182,22 +182,23 @@ export async function saveReplyAsContentIdea(
   repo: ContentRepository,
   actor: Actor,
   input: ReplyContentIdea,
+  recorded: RecordedReplyContent,
 ): Promise<BacklogOutcome> {
   if (actor.role !== 'owner') return { ok: false, code: 'FORBIDDEN' };
   const compactId = input.replyId.replace(/-/g, '').slice(0, 16);
   const libraryId = `IDEA-SR-${compactId}`;
-  const firstParagraph = input.finalText
+  const firstParagraph = recorded.finalText
     .split(/\n\s*\n|\n/)
     .map((part) => part.trim())
     .find(Boolean);
-  const currentHook = (firstParagraph ?? input.finalText.trim()).slice(0, 500);
+  const currentHook = (firstParagraph ?? recorded.finalText.trim()).slice(0, 500);
   const result = await repo.createQueueIdea({
     operationId: input.operationId,
     actor,
     libraryId,
-    sourcePlatform: REPLY_PLATFORM[input.platform],
+    sourcePlatform: REPLY_PLATFORM[recorded.platform],
     currentHook,
-    draftContent: input.finalText,
+    draftContent: recorded.finalText,
   });
   if (!result.ok) return { ok: false, code: result.code };
   return {

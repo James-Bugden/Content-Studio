@@ -370,14 +370,12 @@ export function Workspace({
       await api.saveContentIdea({
         operationId: `idea_${state.save.replyId.replace(/-/g, '')}`,
         replyId: state.save.replyId,
-        platform: state.platform,
-        finalText: state.draft,
       });
       setIdeaSave('saved');
     } catch {
       setIdeaSave('failed');
     }
-  }, [state.save, state.platform, state.draft]);
+  }, [state.save]);
 
   /**
    * Undo recorded status.
