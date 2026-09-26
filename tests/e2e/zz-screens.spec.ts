@@ -19,6 +19,10 @@ test('synthetic screens render without horizontal overflow', async ({ page }, in
     expect(overflow, `${path} overflows`).toBeLessThanOrEqual(0);
     if (DIR && (process.env.CS_SHOT_REPLIES_ONLY !== '1' || path === '/replies')) {
       await page.screenshot({ path: `${DIR}/${info.project.name}${path.replace(/[/?&=]/g, '_')}.png`, fullPage: true });
+      if (path === '/replies') {
+        await page.getByRole('button', { name: 'Get reply ideas' }).scrollIntoViewIfNeeded();
+        await page.screenshot({ path: `${DIR}/${info.project.name}_replies-action.png` });
+      }
     }
   }
 });
