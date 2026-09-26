@@ -84,7 +84,7 @@ test('Backlog search, status, sort and column controls keep private search out o
   await page.getByLabel('Find a post').fill('');
   await page.getByLabel('Sort').selectOption('source');
   await expect(page).toHaveURL(/sort=source/);
-  await page.getByLabel('Status').selectOption({ index: 1 });
+  await page.getByRole('combobox', { name: 'Status' }).selectOption({ index: 1 });
   await expect(page).toHaveURL(/status=/);
   if (page.viewportSize()!.width >= 768) {
     await page.getByLabel('Show hook columns').uncheck();
@@ -102,8 +102,8 @@ test('Backlog editor is focused and the post list fits a narrow phone', async ({
   await region.locator('[data-backlog-id]:visible').first().getByRole('link', { name: /^Edit / }).click();
   const panel = page.getByRole('dialog');
   await expect(panel.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
-  await expect(panel.getByText('English check')).toBeVisible();
-  await expect(panel.getByText('Hook review')).toBeVisible();
+  await expect(panel.locator('summary').filter({ hasText: 'English check' })).toBeVisible();
+  await expect(panel.locator('summary').filter({ hasText: 'Hook review' })).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Next' })).toBeEnabled();
   await panel.getByRole('button', { name: 'Next' }).click();
   await expect(panel.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
