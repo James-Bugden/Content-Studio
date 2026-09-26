@@ -3,6 +3,7 @@ import { signOutAction } from '@/app/actions/auth';
 import { SignOutButton } from '@/components/auth/sign-out-button';
 import { AppShell } from '@/components/app-shell';
 import { PanelHost } from '@/components/panel/panel-host';
+import { BacklogNavigationProvider } from '@/components/backlog/backlog-navigation';
 import { Suspense } from 'react';
 import { getActor } from '@/lib/auth';
 
@@ -25,10 +26,12 @@ export default async function StudioLayout({ children }: { children: React.React
         </div>
       }
     >
-      {children}
-      <Suspense fallback={null}>
-        <PanelHost />
-      </Suspense>
+      <BacklogNavigationProvider>
+        {children}
+        <Suspense fallback={null}>
+          <PanelHost />
+        </Suspense>
+      </BacklogNavigationProvider>
     </AppShell>
   );
 }

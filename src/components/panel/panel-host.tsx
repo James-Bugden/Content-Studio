@@ -9,6 +9,7 @@ import { QueuePanel } from './queue-panel';
 import { panelHref } from './open-panel-link';
 import { BacklogPostPanel } from './backlog-post-panel';
 import { SlotPanel } from './slot-panel';
+import { useBacklogNavigation } from '../backlog/backlog-navigation';
 
 /**
  * Side-panel host (UX redesign). Mounted once in the studio layout. When the URL
@@ -20,11 +21,14 @@ import { SlotPanel } from './slot-panel';
  */
 export function PanelHost() {
   const params = useSearchParams();
-  const search = params.toString();
   const router = useRouter();
   const pathname = usePathname();
   const ref = useRef<HTMLDialogElement>(null);
-  const [neighbours, setNeighbours] = useState<{ prev: string | null; next: string | null }>({ prev: null, next: null });
+  const navigationEpoch = useRef(0);
+  const { navigation } = useBacklogNavigation();
+  const [moving, setMoving] = useState(false);
+  const [navigationError, setNavigationError] = useState('');
+  const [failedDirection, setFailedDirection] = useState<-1 | 1>(1);
   const { guard, dialog } = useLeaveConfirmation();
 
   // The promote page already uses `?slot=` to pick a target slot, so the panel stays shut there.
@@ -39,6 +43,8 @@ export function PanelHost() {
 
   const close = useCallback(() => {
     guard(() => {
+      navigationEpoch.current += 1;
+      setNavigationError('');
       const next = new URLSearchParams(params.toString());
       next.delete('post');
       next.delete('slot');
@@ -56,15 +62,29 @@ export function PanelHost() {
     if (!open && el.open) el.close();
   }, [open]);
 
-  useEffect(() => {
-    if (pathname !== '/backlog' || !post) return;
-    const ids = [...document.querySelectorAll<HTMLElement>('[data-backlog-id]')].filter((el) => el.getClientRects().length > 0).map((el) => el.dataset.backlogId!).filter(Boolean);
-    const index = ids.indexOf(post);
-    queueMicrotask(() => setNeighbours({ prev: index > 0 ? ids[index - 1]! : null, next: index >= 0 && index < ids.length - 1 ? ids[index + 1]! : null }));
-  }, [pathname, post, search]);
+  const index = navigation && post ? navigation.ids.indexOf(post) : -1;
+  const hasPrevious = index > 0 || index === 0 && (navigation?.page ?? 1) > 1;
+  const hasNext = index >= 0 && (index < (navigation?.ids.length ?? 0) - 1 || (navigation?.page ?? 1) < (navigation?.totalPages ?? 1));
 
-  function moveTo(id: string) {
-    guard(() => router.replace(panelHref(pathname, new URLSearchParams(params.toString()), { post: id }), { scroll: false }));
+  function moveTo(direction: -1 | 1) {
+    if (!navigation || !post || moving) return;
+    guard(async () => {
+      const epoch = navigationEpoch.current;
+      setMoving(true);
+      setNavigationError('');
+      try {
+        const target = await navigation.adjacent(post, direction);
+        if (epoch !== navigationEpoch.current) return;
+        const next = new URLSearchParams(params.toString());
+        if (!navigation.privateSearch) next.set('page', String(target.page));
+        router.replace(panelHref(pathname, next, { post: target.id }), { scroll: false });
+      } catch (error) {
+        setFailedDirection(direction);
+        setNavigationError(error instanceof Error ? error.message : 'The next post could not load. Try again.');
+      } finally {
+        setMoving(false);
+      }
+    });
   }
 
   return (
@@ -86,13 +106,15 @@ export function PanelHost() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-card px-4 py-2">
               <p className="text-xs font-semibold tracking-wide text-ink-soft">{post ? 'Post' : slot ? 'Schedule slot' : 'Backlog idea'}</p>
               {post && pathname === '/backlog' ? <nav aria-label="Move between posts" className="ml-auto flex gap-2 text-sm">
-                <button type="button" disabled={!neighbours.prev} onClick={() => neighbours.prev && moveTo(neighbours.prev)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>
-                <button type="button" disabled={!neighbours.next} onClick={() => neighbours.next && moveTo(neighbours.next)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Next</button>
+                <button type="button" disabled={!hasPrevious || moving} onClick={() => moveTo(-1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>
+                <button type="button" disabled={!hasNext || moving} onClick={() => moveTo(1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Next</button>
               </nav> : null}
               <button type="button" onClick={close} className="inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-sm hover:bg-paper">
                 <span aria-hidden="true">✕</span> Close
               </button>
             </div>
+            {moving ? <p role="status" className="px-4 py-2 text-sm">Loading adjacent post…</p> : null}
+            {navigationError ? <p role="alert" className="px-4 py-2 text-sm text-block">{navigationError} <button type="button" className="font-semibold underline" onClick={() => moveTo(failedDirection)}>Try again</button></p> : null}
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} /> : null}
               {post && pathname !== '/backlog' ? <PostPanel key={post} libraryId={post} /> : null}

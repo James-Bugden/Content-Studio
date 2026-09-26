@@ -25,6 +25,20 @@ describe('Content Library backlog', () => {
     expect(page.rows).toHaveLength(40);
     expect(page.rows[0]?.row).toBe(42);
     expect(libraryBacklogView(rows, { page: 900 }).page).toBe(3);
+    const filtered = rows.map((record, i) => ({ ...record, value: {
+      ...record.value,
+      contentSource: i < 82 ? 'Matching source' : 'Other source',
+      currentHook: `Hook ${String(105 - i).padStart(3, '0')}`,
+      draftContent: i < 82 ? 'Private matching phrase' : 'Different content',
+    } }));
+    const filters = { source: 'Matching source', search: 'private matching phrase', sort: 'hook' as const };
+    const firstPage = libraryBacklogView(filtered, { ...filters, page: 1 });
+    const secondPage = libraryBacklogView(filtered, { ...filters, page: 2 });
+    expect(firstPage.total).toBe(82);
+    expect(firstPage.rows).toHaveLength(40);
+    expect(secondPage.rows).toHaveLength(40);
+    expect(secondPage.rows[0]?.value.libraryId).toBe('SYNTH-41');
+    expect(firstPage.rows.at(-1)?.value.libraryId).toBe('SYNTH-42');
   });
 
   it('does not call a Library row ready for Typefully just because it is approved', async () => {
