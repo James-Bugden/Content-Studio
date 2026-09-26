@@ -17,7 +17,7 @@ export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
         <thead className="sticky top-0 bg-paper text-xs text-ink-soft">
           <tr className="border-b border-line">
             {['#', 'Content Source', 'Platform', 'PESTO', 'Hook Template', 'Hook Alternatives', 'Content', 'Status', ''].map((label) =>
-              <th key={label} scope="col" className="px-3 py-2 font-medium">{label}</th>,
+              <th key={label} scope="col" className={`px-3 py-2 font-medium ${label === '' ? 'sticky right-0 bg-paper' : ''}`}>{label}</th>,
             )}
           </tr>
         </thead>
@@ -42,7 +42,7 @@ export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
                 <td className="whitespace-nowrap px-3 py-3"><span className={
                   `rounded-full px-2 py-1 text-xs font-semibold ${status === 'Rejected' || status === 'Needs changes' ? 'bg-block-soft text-block' : status === 'Approved' || status === 'Queued for scheduling' ? 'bg-green-soft text-green' : status === 'Drafting' || status === 'Needs review' ? 'bg-attention-soft text-attention' : 'bg-paper text-ink-soft'}`
                 }>{status}</span></td>
-                <td className="px-3 py-3"><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
+                <td className="sticky right-0 border-l border-line bg-card px-3 py-3"><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
               </tr>
             );
           })}
