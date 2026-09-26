@@ -110,8 +110,6 @@ export const api = {
   saveContentIdea: (body: {
     operationId: string;
     replyId: string;
-    platform: 'linkedin' | 'x' | 'threads';
-    finalText: string;
   }) =>
     send<{ ok: true; item: { libraryId: string }; replayed: boolean }>(
       '/api/replies/content-idea',

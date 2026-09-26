@@ -111,6 +111,57 @@ test.describe('the reply loop', () => {
     await expect(markPosted).toHaveCount(0);
   });
 
+  test('only a current, active recorded reply can become a Content idea', async ({ page }) => {
+    await page.goto('/replies');
+    await analyse(page);
+    const editor = page.getByRole('textbox', { name: 'Your reply' });
+    await editor.fill('Originally posted wording.');
+    await page.getByRole('button', { name: 'Mark posted' }).click();
+    await expect(page.getByRole('button', { name: 'Save as content idea' })).toBeVisible();
+
+    const search = await page.request.post('/api/replies/library/search', {
+      data: { query: 'Originally posted wording.', include_unknown_dates: true, limit: 10 },
+    });
+    expect(search.ok()).toBe(true);
+    const replyId = (await search.json()).items[0].id as string;
+    const postIdea = (body: object) => page.evaluate(async (payload) => {
+      const response = await fetch('/api/replies/content-idea', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      return { status: response.status, body: await response.json() };
+    }, body);
+
+    const forged = await postIdea({ operationId: 'idea_forged_0001', replyId, platform: 'x', finalText: 'Injected text' });
+    expect(forged).toMatchObject({ status: 400, body: { code: 'VALIDATION_FAILED' } });
+    const missing = await postIdea({ operationId: 'idea_missing_0001', replyId: '12345678-1234-4123-8123-1234567890ab' });
+    expect(missing).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+    const draftSearch = await page.request.post('/api/replies/library/search', {
+      data: { query: 'Example AI draft', provenances: ['ai_draft'], include_unknown_dates: true, limit: 10 },
+    });
+    expect(draftSearch.ok()).toBe(true);
+    const draftId = (await draftSearch.json()).items[0].id as string;
+    const unposted = await postIdea({ operationId: 'idea_unposted_0001', replyId: draftId });
+    expect(unposted).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+
+    const corrected = await page.request.patch(`/api/replies/library/${replyId}`, {
+      data: { action: 'correct', expected_revision: 0, final_text: 'Corrected recorded wording.', reason: 'Typo' },
+    });
+    expect(corrected.ok()).toBe(true);
+    const saved = await postIdea({ operationId: 'idea_corrected_0001', replyId });
+    expect(saved).toMatchObject({ status: 200, body: { ok: true, item: { platform: 'LinkedIn', hook: 'Corrected recorded wording.' } } });
+    const backlog = await page.request.get('/api/backlog').then((response) => response.json());
+    const idea = backlog.data.flatMap((group: { items: { libraryId: string; draftContent: string }[] }) => group.items)
+      .find((item: { libraryId: string }) => item.libraryId === saved.body.item.libraryId);
+    expect(idea?.draftContent).toBe('Corrected recorded wording.');
+
+    const withdrawn = await page.request.patch(`/api/replies/library/${replyId}`, {
+      data: { action: 'withdraw', withdrawn: true },
+    });
+    expect(withdrawn.ok()).toBe(true);
+    const afterWithdraw = await postIdea({ operationId: 'idea_withdrawn_0001', replyId });
+    expect(afterWithdraw).toMatchObject({ status: 404, body: { code: 'NOT_FOUND' } });
+  });
+
   test('keeps the editor usable while ideas are still arriving', async ({ page }) => {
     await page.goto('/replies');
     await analyse(page);

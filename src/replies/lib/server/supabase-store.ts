@@ -33,10 +33,9 @@ import type {
 /**
  * The real data layer.
  *
- * Every call goes through the caller's own Supabase session, so row-level security
- * applies to all of it. There is no service-role client in this file and no way to
- * obtain one from here: an ordinary request cannot bypass the owner boundary even
- * if a route forgot to check it (C01).
+ * The combined app uses a server-only service credential after Auth.js verifies
+ * its owner. The credential bypasses RLS, so each direct table lookup must be
+ * explicitly scoped to the owner resolved by the service-only database bridge.
  *
  * The composite operations that must be atomic, meaning recording a reply,
  * correcting one and withdrawing one, are RPC calls into the SQL functions rather
@@ -642,6 +641,19 @@ export function createSupabaseStore(session: OwnerSession): Store {
         }),
       );
       return { replyId: result.reply_id, replayed: result.replayed, recordedAt: result.recorded_at };
+    },
+
+    async getRecordedReplyForIdea(replyId) {
+      const { data, error } = await supabase
+        .from('reply_library')
+        .select('platform, final_text')
+        .eq('user_id', userId)
+        .eq('id', replyId)
+        .eq('provenance', 'posted_confirmed')
+        .is('withdrawn_at', null)
+        .maybeSingle();
+      if (error) throw new AppError('internal_error', 'Could not check the recorded reply. Nothing was saved.');
+      return data ? { platform: data.platform as Platform, finalText: data.final_text as string } : null;
     },
 
     async setReplyWithdrawn(replyId, withdrawn) {

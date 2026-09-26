@@ -6,6 +6,7 @@ import {
   backlogEditSchema,
   loadBacklogGroups,
   loadBacklogOptions,
+  replyContentIdeaSchema,
   saveReplyAsContentIdea,
 } from '@/application/backlog';
 import { SHEET_TABS } from '@/domain/sheet-schema';
@@ -182,13 +183,26 @@ describe('loadBacklogOptions', () => {
 });
 
 describe('saveReplyAsContentIdea', () => {
+  it('rejects browser-supplied platform or text in the request contract', () => {
+    expect(replyContentIdeaSchema.safeParse({
+      operationId: op('forged'), replyId: '12345678-1234-4123-8123-1234567890ab',
+      platform: 'x', finalText: 'Forged copy',
+    }).success).toBe(false);
+  });
+
+  it('refuses a viewer before writing to the Sheet', async () => {
+    const result = await saveReplyAsContentIdea(repo, viewer, {
+      operationId: op('viewer-reply'), replyId: '12345678-1234-4123-8123-1234567890ab',
+    }, { platform: 'x', finalText: 'A post' });
+    expect(result).toEqual({ ok: false, code: 'FORBIDDEN' });
+    await expect(repo.getQueue('IDEA-SR-1234567812344123')).rejects.toThrow();
+  });
+
   it('derives a stable Queue ID and uses the first paragraph as the hook', async () => {
     const outcome = await saveReplyAsContentIdea(repo, owner, {
       operationId: op('reply-content'),
       replyId: '12345678-1234-4123-8123-1234567890ab',
-      platform: 'threads',
-      finalText: 'First insight.\n\nA second paragraph stays in the draft.',
-    });
+    }, { platform: 'threads', finalText: 'First insight.\n\nA second paragraph stays in the draft.' });
     expect(outcome).toMatchObject({
       ok: true,
       item: {
@@ -199,5 +213,19 @@ describe('saveReplyAsContentIdea', () => {
     });
     const row = await repo.getQueue('IDEA-SR-1234567812344123');
     expect(row.value.draftContent).toBe('First insight.\n\nA second paragraph stays in the draft.');
+    const retry = await saveReplyAsContentIdea(repo, owner, {
+      operationId: op('reply-content'), replyId: '12345678-1234-4123-8123-1234567890ab',
+    }, { platform: 'threads', finalText: 'First insight.\n\nA second paragraph stays in the draft.' });
+    expect(retry).toMatchObject({ ok: true, replayed: true, item: { libraryId: 'IDEA-SR-1234567812344123' } });
+  });
+
+  it('preserves exact CJK text and whitespace from the recorded reply', async () => {
+    const text = '  首句。\n\n第二段保留。  ';
+    const outcome = await saveReplyAsContentIdea(repo, owner, {
+      operationId: op('reply-cjk'), replyId: '12345678-1234-4123-8123-1234567890ab',
+    }, { platform: 'threads', finalText: text });
+    expect(outcome).toMatchObject({ ok: true, item: { hook: '首句。' } });
+    const row = await repo.getQueue('IDEA-SR-1234567812344123');
+    expect(row.value.draftContent).toBe(text);
   });
 });
