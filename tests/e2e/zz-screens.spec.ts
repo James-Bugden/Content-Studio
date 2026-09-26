@@ -17,6 +17,8 @@ test('synthetic screens render without horizontal overflow', async ({ page }, in
     if (path.includes('post=') || path.includes('slot=')) await page.locator('dialog[open] h2').first().waitFor();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, `${path} overflows`).toBeLessThanOrEqual(0);
-    if (DIR) await page.screenshot({ path: `${DIR}/${info.project.name}${path.replace(/[/?&=]/g, '_')}.png`, fullPage: true });
+    if (DIR && (process.env.CS_SHOT_REPLIES_ONLY !== '1' || path === '/replies')) {
+      await page.screenshot({ path: `${DIR}/${info.project.name}${path.replace(/[/?&=]/g, '_')}.png`, fullPage: true });
+    }
   }
 });
