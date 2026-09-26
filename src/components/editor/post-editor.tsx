@@ -44,6 +44,21 @@ export function initialEditorText(model: EditorModel): string {
   return model.markdown.state === 'ok' ? model.markdown.body : model.sheet.draft;
 }
 
+function markdownFailure(model: Extract<EditorModel['markdown'], { state: 'unavailable' }>): string {
+  if (model.reason === 'no_link') return 'This row has no usable master Markdown link. Check its source link in the Sheet.';
+  if (model.reason === 'missing_section') return 'The master file has no section for this post. Check the source file.';
+  if (model.reason === 'duplicate_section') return 'The master file has more than one section for this post. Resolve the duplicate before editing.';
+  if (model.reason === 'trashed') return 'The master file is in the Drive bin. Restore it before editing.';
+  switch (model.code) {
+    case 'FORBIDDEN': return 'Google Drive denied access to the master file. Check that it is shared with the configured service account.';
+    case 'NOT_FOUND': return 'Google Drive could not find the master file. Check that its link and sharing are still valid.';
+    case 'RATE_LIMITED': return 'Google Drive is limiting reads. Try again shortly.';
+    case 'CONFIG_MISSING': return 'Google Drive access is not configured. Check the service account setup.';
+    case 'PROVIDER_UNAVAILABLE': return 'Google Drive could not respond. Try again shortly.';
+    default: return 'Google Drive could not load the master file. Check its link and access.';
+  }
+}
+
 export type PostEditorProps = {
   model: EditorModel;
   canEdit: boolean;
@@ -223,8 +238,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
 
       {model.markdown.state !== 'ok' ? (
         <InlineResult tone="warning">
-          The master Markdown section could not be loaded ({model.markdown.reason.replace(/_/g, ' ')}). Saving is disabled so the Sheet and Markdown cannot drift apart. You can still copy the
-          text.
+          {markdownFailure(model.markdown)} Saving is disabled so the Sheet and Markdown cannot drift apart. Any Sheet draft shown below can still be copied.
         </InlineResult>
       ) : null}
 
