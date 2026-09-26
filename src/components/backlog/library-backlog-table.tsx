@@ -8,7 +8,12 @@ import { PillarTag } from '../pillar-tag';
 export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
   return (
     <div role="region" aria-label="Content Library posts" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-card">
-      <table className="hidden w-full min-w-[68rem] border-collapse text-left text-sm md:table">
+      <table className="hidden w-full min-w-[78rem] table-fixed border-collapse text-left text-sm md:table">
+        <colgroup>
+          <col className="w-12" /><col className="w-40" /><col className="w-24" />
+          <col className="w-28" /><col className="w-44" /><col className="w-44" />
+          <col /><col className="w-40" /><col className="w-24" />
+        </colgroup>
         <thead className="sticky top-0 bg-paper text-xs text-ink-soft">
           <tr className="border-b border-line">
             {['#', 'Content Source', 'Platform', 'PESTO', 'Hook Template', 'Hook Alternatives', 'Content', 'Status', ''].map((label) =>
@@ -30,13 +35,12 @@ export function LibraryBacklogTable({ rows }: { rows: LibraryRecord[] }) {
                 <td className="max-w-44 px-3 py-3 break-words">{item.hookTemplate || '—'}</td>
                 <td className="max-w-48 px-3 py-3 whitespace-pre-line break-words text-ink-soft">{item.hookAlternatives || '—'}</td>
                 <td className="min-w-64 max-w-md px-3 py-3">
-                  <p className="font-medium">{title}</p>
-                  <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-ink-soft">
+                  <p className="line-clamp-3 whitespace-pre-line break-words text-ink">
                     {item.draftContent || 'Open to read and edit the source post.'}
                   </p>
                 </td>
                 <td className="whitespace-nowrap px-3 py-3"><span className={
-                  `rounded-full px-2 py-1 text-xs font-semibold ${status === 'Rejected' || status === 'Needs changes' ? 'bg-block-soft text-block' : status === 'Approved' || status === 'Queued for scheduling' ? 'bg-green-soft text-green' : 'bg-paper text-ink-soft'}`
+                  `rounded-full px-2 py-1 text-xs font-semibold ${status === 'Rejected' || status === 'Needs changes' ? 'bg-block-soft text-block' : status === 'Approved' || status === 'Queued for scheduling' ? 'bg-green-soft text-green' : status === 'Drafting' || status === 'Needs review' ? 'bg-attention-soft text-attention' : 'bg-paper text-ink-soft'}`
                 }>{status}</span></td>
                 <td className="px-3 py-3"><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
               </tr>
