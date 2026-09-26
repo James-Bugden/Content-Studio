@@ -63,7 +63,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
             { value: 'source', label: 'Source' }, { value: 'hook', label: 'Hook' }, { value: 'status', label: 'Status' },
           ] },
         ]} />
-        <LibraryBacklogExplorer key={`${one(params, 'source')}:${platform(params)}:${one(params, 'status')}:${sort(params)}:${view.page}`}
+        <LibraryBacklogExplorer
           initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages }}
           filters={{ source: one(params, 'source'), platform: platform(params), status: one(params, 'status'), sort: sort(params) }}
           previousHref={view.page > 1 ? pageHref(params, view.page - 1) : null}
