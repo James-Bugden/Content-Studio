@@ -34,7 +34,9 @@ import { test, expect } from '@playwright/test';
  */
 async function loadPageFirst(page: import('@playwright/test').Page) {
   await page.goto('/replies');
-  await expect(page.getByRole('link', { name: 'Replies', exact: true })).toBeVisible();
+  // The shell rendered and marks Replies as the current page. On phones (CS-046) the
+  // link sits behind the tab bar's More menu, so assert presence, not visibility.
+  await expect(page.locator('nav[aria-label="Primary"] a[href="/replies"][aria-current="page"]').first()).toBeAttached();
 }
 
 test.beforeEach(async ({ page }) => {
