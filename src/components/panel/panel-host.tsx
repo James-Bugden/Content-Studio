@@ -91,7 +91,6 @@ export function PanelHost() {
   const hasNext = index >= 0 && (index < (navigation?.ids.length ?? 0) - 1 || (navigation?.page ?? 1) < (navigation?.totalPages ?? 1));
 
   const position = navigation && post && index >= 0 ? `${(navigation.page - 1) * LIBRARY_BACKLOG_PAGE_SIZE + index + 1} of ${navigation.total}` : undefined;
-  const nextOnPage = navigation && index >= 0 ? navigation.ids[index + 1] ?? null : null;
 
   function moveTo(direction: -1 | 1) {
     if (!navigation || !post || moving) return;
@@ -212,7 +211,7 @@ export function PanelHost() {
             {moving ? <p role="status" className="px-4 py-2 text-sm">Loading adjacent post…</p> : null}
             {navigationError ? <p role="alert" className="px-4 py-2 text-sm text-block">{navigationError} <button type="button" className="font-semibold underline" onClick={() => moveTo(failedDirection)}>Try again</button></p> : null}
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} nextId={nextOnPage} position={position} onSaved={onDraftSaved} onSaveFailed={onDraftSaveFailed} /> : null}
+              {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} position={position} onSaved={onDraftSaved} onSaveFailed={onDraftSaveFailed} /> : null}
               {post && pathname !== '/backlog' ? <PostPanel key={post} libraryId={post} /> : null}
               {slot ? <SlotPanel key={slot} contentId={slot} /> : null}
               {queue ? <QueuePanel key={queue} libraryId={queue} /> : null}
