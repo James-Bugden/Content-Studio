@@ -76,10 +76,14 @@ export default async function ReconcilePage() {
           )}
         </section>
 
+        {/* CS-048: engineering diagnostics stay available but out of the way. */}
+        <details className="rounded-lg border border-line bg-card px-4 py-2">
+          <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-ink-soft">Diagnostics</summary>
+          <div className="flex flex-col gap-6 pt-2 pb-3">
         <section aria-labelledby="health-h">
-          <h2 id="health-h" className="text-lg font-semibold">
+          <h3 id="health-h" className="font-semibold">
             Adapter health (this server instance)
-          </h2>
+          </h3>
           {report.events.length === 0 ? (
             <p className="mt-2 text-sm text-ink-soft">No provider calls recorded yet in this instance.</p>
           ) : (
@@ -115,7 +119,7 @@ export default async function ReconcilePage() {
         </section>
 
         <section aria-labelledby="backlog-timing-h">
-          <h2 id="backlog-timing-h" className="text-lg font-semibold">Backlog timings (this server instance)</h2>
+          <h3 id="backlog-timing-h" className="font-semibold">Backlog timings (this server instance)</h3>
           <p className="text-sm text-ink-soft">Recent successful requests only. Durations include provider reads; no post text or search terms are recorded.</p>
           <div tabIndex={0} role="region" aria-label="Backlog timing table" className="mt-2 overflow-x-auto rounded-lg border border-line bg-card">
             <table className="w-full min-w-[24rem] text-left text-sm">
@@ -124,6 +128,8 @@ export default async function ReconcilePage() {
             </table>
           </div>
         </section>
+          </div>
+        </details>
       </div>
     </>
   );
