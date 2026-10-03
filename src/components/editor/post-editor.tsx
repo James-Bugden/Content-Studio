@@ -301,7 +301,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
 
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={buttonClass('primary')} disabled={!markdownOk || (!dirty && !mismatch) || status.kind === 'saving'} onClick={() => void save()}>
+          <button type="button" data-shortcut="save-draft" aria-keyshortcuts="Control+S Meta+S" className={buttonClass('primary')} disabled={!markdownOk || (!dirty && !mismatch) || status.kind === 'saving'} onClick={() => void save()}>
             {status.kind === 'saving' ? 'Saving…' : !dirty && mismatch ? 'Make the Sheet match the Markdown' : 'Save draft'}
           </button>
           <button type="button" className={buttonClass()} disabled={!dirty || status.kind === 'saving'} onClick={() => setText(base)}>

@@ -449,3 +449,104 @@ test('closing the panel with an unsaved edit asks first and staying keeps the ed
   await expect(page).toHaveURL(/queue=IDEA-BL-0004/);
   await expect(hook).toHaveValue('An unsaved backlog edit');
 });
+
+test('Backlog headers sort the whole inventory and a second click reverses it (CS-043)', async ({ page }) => {
+  expect((await page.request.post('/api/test-control', { data: { kind: 'seed_library_pages' } })).status()).toBe(200);
+  await page.goto('/backlog');
+  await expect(page.getByText('57 posts · page 1 of 2')).toBeVisible();
+  const table = page.getByRole('region', { name: 'Content Library posts' });
+  const rows = table.locator('[data-backlog-id]:visible');
+  if (page.viewportSize()!.width >= 768) {
+    const cellText = async (column: number) => (await rows.first().locator('td').nth(column).textContent()) ?? '';
+    const number = table.getByRole('columnheader', { name: '#', exact: true });
+    await expect(number).toHaveAttribute('aria-sort', 'ascending');
+    const firstRow = Number(await cellText(0));
+    await number.getByRole('button').click();
+    await expect(page).toHaveURL(/dir=desc/);
+    await expect(number).toHaveAttribute('aria-sort', 'descending');
+    // Descending Sheet order starts from the end of the whole inventory, not page 1's last row.
+    await expect.poll(async () => Number(await cellText(0))).toBeGreaterThan(firstRow + 40);
+
+    const source = table.getByRole('columnheader', { name: 'Content Source', exact: true });
+    await source.getByRole('button').click();
+    await expect(page).toHaveURL(/sort=source/);
+    await expect(page).not.toHaveURL(/dir=desc/);
+    await expect(source).toHaveAttribute('aria-sort', 'ascending');
+    await expect(number).not.toHaveAttribute('aria-sort', /./);
+    const ascending = await cellText(1);
+    await source.getByRole('button').click();
+    await expect(page).toHaveURL(/dir=desc/);
+    await expect(source).toHaveAttribute('aria-sort', 'descending');
+    await expect.poll(async () => (await cellText(1)).localeCompare(ascending)).toBeGreaterThan(0);
+  } else {
+    // Phones: the same sort, direction and grouping through the filter controls.
+    const firstCard = async () => (await rows.first().locator('span').first().textContent()) ?? '';
+    await page.getByLabel('Sort').selectOption('source');
+    await expect(page).toHaveURL(/sort=source/);
+    const ascending = await firstCard();
+    await page.getByLabel('Direction').selectOption('desc');
+    await expect(page).toHaveURL(/dir=desc/);
+    await expect.poll(async () => (await firstCard()).localeCompare(ascending)).toBeGreaterThan(0);
+  }
+
+  await expect(page.getByLabel('PESTO')).toBeVisible();
+  await page.getByLabel('Group by').selectOption('platform');
+  await expect(page).toHaveURL(/group=platform/);
+  await expect(table.locator('[data-backlog-group]:visible').first()).toContainText(/\d+ posts?/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+});
+
+test('keyboard review: / focuses search, J/K and arrows move posts, Ctrl+S saves, Esc closes with the guard (CS-043)', async ({ page }) => {
+  await page.goto('/backlog');
+  const table = page.getByRole('region', { name: 'Content Library posts' });
+  const rows = table.locator('[data-backlog-id]:visible');
+  await expect(rows.nth(1)).toBeVisible();
+  const firstId = await rows.nth(0).getAttribute('data-backlog-id');
+  const secondId = await rows.nth(1).getAttribute('data-backlog-id');
+
+  await page.getByRole('heading', { name: 'Backlog', level: 1 }).click();
+  await page.keyboard.press('/');
+  const search = page.getByLabel('Find a post');
+  await expect(search).toBeFocused();
+  await page.keyboard.type('/');
+  await expect(search).toHaveValue('/');
+  await search.fill('');
+
+  await rows.first().getByRole('link', { name: /^Edit / }).click();
+  const panel = page.getByRole('dialog').first();
+  const copy = panel.getByRole('textbox', { name: /Post copy/ });
+  const close = panel.getByRole('button', { name: 'Close' });
+  await expect(copy).toBeVisible();
+  for (const [key, id] of [['j', secondId], ['k', firstId], ['ArrowDown', secondId], ['ArrowUp', firstId]] as const) {
+    await close.focus();
+    await page.keyboard.press(key);
+    await expect(page).toHaveURL(new RegExp(`post=${id}`));
+    await expect(copy).toBeVisible();
+  }
+
+  // Typing never triggers single-key shortcuts.
+  await copy.fill('A synthetic keyboard draft');
+  await copy.press('End');
+  await copy.press('j');
+  await expect(copy).toHaveValue('A synthetic keyboard draftj');
+  await expect(page).toHaveURL(new RegExp(`post=${firstId}`));
+
+  // Esc closes through the dirty guard; J still asks before discarding.
+  await copy.press('Escape');
+  const confirm = page.getByRole('dialog', { name: 'Leave without saving?' });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Stay and keep editing' }).click();
+  await expect(copy).toHaveValue('A synthetic keyboard draftj');
+  await close.focus();
+  await page.keyboard.press('j');
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Stay and keep editing' }).click();
+  await expect(page).toHaveURL(new RegExp(`post=${firstId}`));
+
+  // Cmd/Ctrl+S saves from inside the textarea.
+  await copy.press('Control+s');
+  await expect(panel.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
+  await close.focus();
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/post=/);
+});

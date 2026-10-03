@@ -8,10 +8,19 @@ import { FilterBar } from '@/components/filter-bar';
 import { PLATFORMS, type Platform } from '@/domain/enums';
 import { ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
 import { libraryBacklogView } from '@/domain/library-backlog';
-import { BACKLOG_SORTS, type BacklogSort } from '@/domain/library-backlog';
+import { BACKLOG_DIRECTIONS, BACKLOG_GROUPS, BACKLOG_SORTS, type BacklogDirection, type BacklogGroup, type BacklogSort } from '@/domain/library-backlog';
 import { backlogReadiness } from '@/application/backlog-readiness';
 import { requireActor } from '@/lib/auth';
 import { timed } from '@/observability/events';
+
+const BACKLOG_SORT_OPTIONS = [
+  { value: 'source', label: 'Source' }, { value: 'platform', label: 'Platform' }, { value: 'pesto', label: 'PESTO' },
+  { value: 'hookTemplate', label: 'Hook template' }, { value: 'hook', label: 'Hook' }, { value: 'status', label: 'Status' },
+  { value: 'approved', label: 'Approved' },
+];
+const BACKLOG_GROUP_OPTIONS = [
+  { value: 'source', label: 'Source' }, { value: 'platform', label: 'Platform' }, { value: 'pesto', label: 'PESTO' }, { value: 'status', label: 'Status' },
+];
 
 export const metadata: Metadata = { title: 'Backlog | Content Studio' };
 export const dynamic = 'force-dynamic';
@@ -25,6 +34,14 @@ function platform(params: Params): Platform | undefined {
 function sort(params: Params): BacklogSort | undefined {
   const raw = one(params, 'sort');
   return raw && (BACKLOG_SORTS as readonly string[]).includes(raw) ? raw as BacklogSort : undefined;
+}
+function direction(params: Params): BacklogDirection | undefined {
+  const raw = one(params, 'dir');
+  return raw && (BACKLOG_DIRECTIONS as readonly string[]).includes(raw) ? raw as BacklogDirection : undefined;
+}
+function grouping(params: Params): BacklogGroup | undefined {
+  const raw = one(params, 'group');
+  return raw && (BACKLOG_GROUPS as readonly string[]).includes(raw) ? raw as BacklogGroup : undefined;
 }
 function safeBacklogErrorCode(error: unknown): ErrorCode {
   if (isAppError(error)) return error.code;
@@ -52,10 +69,12 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     }
     const readiness = backlogReadiness(library, queue, schedule);
     const requestedPage = Number(one(params, 'page'));
+    const filters = {
+      source: one(params, 'source'), platform: platform(params), pesto: one(params, 'pesto'),
+      status: one(params, 'status'), sort: sort(params), dir: direction(params), group: grouping(params),
+    };
     const view = libraryBacklogView(library, {
-      source: one(params, 'source'), platform: platform(params),
-      status: one(params, 'status'), sort: sort(params),
-      page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
+      ...filters, page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
     }, readiness);
     return (
       <>
@@ -64,14 +83,15 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         <FilterBar filters={[
           { key: 'source', label: 'Content Source', options: view.sources.map((s) => ({ value: s, label: s })) },
           { key: 'platform', label: 'Platform', options: view.platforms.map((p) => ({ value: p, label: p })) },
+          { key: 'pesto', label: 'PESTO', options: view.pestoOptions.map((s) => ({ value: s, label: s })) },
           { key: 'status', label: 'Status', options: view.statusOptions.map((s) => ({ value: s, label: s })) },
-          { key: 'sort', label: 'Sort', allLabel: 'Sheet order', options: [
-            { value: 'source', label: 'Source' }, { value: 'hook', label: 'Hook' }, { value: 'status', label: 'Status' },
-          ] },
+          { key: 'sort', label: 'Sort', allLabel: 'Sheet order (#)', options: BACKLOG_SORT_OPTIONS },
+          { key: 'dir', label: 'Direction', allLabel: 'Ascending', options: [{ value: 'desc', label: 'Descending' }] },
+          { key: 'group', label: 'Group by', allLabel: 'No grouping', options: BACKLOG_GROUP_OPTIONS },
         ]} />
         <LibraryBacklogExplorer
-          initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages }}
-          filters={{ source: one(params, 'source'), platform: platform(params), status: one(params, 'status'), sort: sort(params) }} />
+          initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
+          filters={filters} />
       </>
     );
   }

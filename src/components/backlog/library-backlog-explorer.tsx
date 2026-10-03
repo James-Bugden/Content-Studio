@@ -1,20 +1,28 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import type { LibraryBacklogFilters } from '@/domain/library-backlog';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { nextHeaderSort, type BacklogSort, type LibraryBacklogFilters } from '@/domain/library-backlog';
+import { useLeaveConfirmation } from '../leave-confirm';
+import { isTypingTarget } from '../keyboard';
 import { adjacentPosition } from '@/domain/backlog-navigation';
 import { useBacklogNavigation, type BacklogResult } from './backlog-navigation';
 import { LibraryBacklogTable } from './library-backlog-table';
 
 type Props = {
   initial: BacklogResult;
-  filters: Pick<LibraryBacklogFilters, 'source' | 'platform' | 'status' | 'sort'>;
+  filters: Pick<LibraryBacklogFilters, 'source' | 'platform' | 'pesto' | 'status' | 'sort' | 'dir' | 'group'>;
 };
+
+
 
 /** Search is deliberately ephemeral: private post copy never goes in a URL. */
 export function LibraryBacklogExplorer({ initial, filters }: Props) {
-  const { source, platform, status, sort } = filters;
+  const { source, platform, pesto, status, sort, dir, group } = filters;
+  const router = useRouter();
+  const pathname = usePathname() ?? '/backlog';
+  const { guard, dialog } = useLeaveConfirmation();
+  const searchInput = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -28,7 +36,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     return `/backlog?${next}`;
   };
   const { setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult } = useBacklogNavigation();
-  const filtersKey = JSON.stringify([source, platform, status, sort]);
+  const filtersKey = JSON.stringify([source, platform, pesto, status, sort, dir, group]);
   const previousFilters = useRef(filtersKey);
   const requestedPage = Number(params.get('page'));
   const page = search.trim() ? searchPage : Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
@@ -63,7 +71,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
         const response = await fetch('/api/backlog/search', {
           method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ search, page: searchPage, source, platform, status, sort }),
+          body: JSON.stringify({ search, page: searchPage, source, platform, pesto, status, sort, dir, group }),
         });
         const body = await response.json() as BacklogResult;
         if (!response.ok || !body.ok) throw new Error('search_failed');
@@ -75,7 +83,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
       }
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [search, searchPage, source, platform, status, sort, retry, queryKey, setResult]);
+  }, [search, searchPage, source, platform, pesto, status, sort, dir, group, retry, queryKey, setResult]);
 
   const matched = result?.key === queryKey ? result.data : null;
   const loading = Boolean(search.trim() && !matched && !error);
@@ -96,7 +104,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
       const response = await fetch('/api/backlog/search', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ search, page: position.page, source, platform, status, sort }),
+        body: JSON.stringify({ search, page: position.page, source, platform, pesto, status, sort, dir, group }),
       });
       if (!response.ok) throw new Error('The next page could not load. Try again.');
       next = await response.json() as BacklogResult;
@@ -112,17 +120,41 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     setResult({ key: requestedKey, data: next });
     if (search.trim()) setSearchPage(next.page);
     return { id: target.value.libraryId, page: next.page };
-  }, [usable, active, search, filtersKey, source, platform, status, sort, queryKey, setResult, setSearchPage]);
+  }, [usable, active, search, filtersKey, source, platform, pesto, status, sort, dir, group, queryKey, setResult, setSearchPage]);
 
   useEffect(() => {
     if (!usable) { setNavigation(null); return; }
     setNavigation({ ids: active.rows.map((row) => row.value.libraryId), page: active.page, totalPages: active.totalPages, privateSearch: Boolean(search.trim()), adjacent });
     return () => setNavigation(null);
   }, [usable, active, adjacent, search, setNavigation]);
+
+  // `/` jumps to search, unless the user is typing somewhere or a dialog (the post panel) is open.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+      if (isTypingTarget(event.target) || document.querySelector('dialog[open]')) return;
+      event.preventDefault();
+      searchInput.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Sort and direction live in the URL (enum values only); search text never does.
+  const sortBy = (key: BacklogSort) => {
+    const next = nextHeaderSort({ sort, dir }, key);
+    const query = new URLSearchParams(params.toString());
+    query.delete('post');
+    query.delete('page');
+    if (next.sort === 'sheet') query.delete('sort'); else query.set('sort', next.sort);
+    if (next.dir === 'asc') query.delete('dir'); else query.set('dir', next.dir);
+    const q = query.toString();
+    guard(() => router.push(q ? `${pathname}?${q}` : pathname, { scroll: false }));
+  };
   return <section aria-label="Browse Content Library" className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
       <label htmlFor="library-search" className="text-sm font-medium">Find a post</label>
-      <input id="library-search" type="search" value={search} maxLength={120}
+      <input ref={searchInput} id="library-search" type="search" aria-keyshortcuts="/" value={search} maxLength={120}
         onChange={(event) => { setSearch(event.target.value); setSearchPage(1); setResult(null); setPending(Boolean(event.target.value.trim())); setError(false); }}
         placeholder="Search title, hook, content or source" className="min-h-11 min-w-64 flex-1 rounded-md border border-line bg-card px-3 text-sm" />
     </div>
@@ -135,7 +167,8 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     </p>
     {error ? <p role="alert" className="text-sm text-block">Search could not load. Your search text is kept here. <button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button></p> : null}
     {search.trim() && (pending || loading || error) ? null : active.total === 0 ? <p role="status" className="rounded-lg border border-line bg-card p-4 text-sm">No posts match. Try a different source, status or search.</p>
-      : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} />}
+      : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks}
+        sort={sort ?? 'sheet'} dir={dir ?? 'asc'} group={group} groupTotals={active.groupTotals} onSort={sortBy} />}
     {active.totalPages > 1 && !(search.trim() && (pending || loading || error)) ? <nav aria-label="Backlog pages" className="flex items-center justify-between text-sm">
       {search.trim() ? <button type="button" disabled={pending || active.page <= 1} onClick={() => { setPending(true); setSearchPage(active.page - 1); }} className="min-h-11 text-primary underline disabled:opacity-40">Previous page</button>
         : active.page > 1 ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(active.page - 1)}>Previous page</a> : <span />}
@@ -143,5 +176,6 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
       {search.trim() ? <button type="button" disabled={pending || active.page >= active.totalPages} onClick={() => { setPending(true); setSearchPage(active.page + 1); }} className="min-h-11 text-primary underline disabled:opacity-40">Next page</button>
         : active.page < active.totalPages ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(active.page + 1)}>Next page</a> : <span />}
     </nav> : null}
+    {dialog}
   </section>;
 }
