@@ -17,11 +17,17 @@ import { AppError } from '@/domain/errors';
  */
 
 export async function loadEditor(repo: ContentRepository, drive: DriveGateway, libraryId: string): Promise<EditorModel> {
-  const [library, schedule] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null)]);
+  const library = await repo.listLibrary();
   const record: LibraryRecord | undefined = library.find((r) => r.value.libraryId === libraryId);
   if (!record) throw new AppError('NOT_FOUND');
-  const read = await readSection(drive, record);
   const item = record.value;
+  // CS-051: the Schedule tab is only needed to check screenshot reuse. Reading it
+  // for every post doubled the Sheets requests per editor open (each tab page is
+  // three API calls) and ran production into Google's per-minute read quota.
+  const [read, schedule] = await Promise.all([
+    readSection(drive, record),
+    item.visual.source.kind === 'screenshot' ? repo.listSchedule().catch(() => null) : Promise.resolve([]),
+  ]);
   const mismatch = read.ok && read.section.body !== item.draftContent;
   const gates = evaluateLibraryGates(item, {
     purpose: 'review',

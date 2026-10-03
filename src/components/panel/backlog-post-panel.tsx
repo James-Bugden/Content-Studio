@@ -4,44 +4,49 @@ import { useEffect, useState } from 'react';
 import { readableTitle } from '@/domain/display';
 import { EditorWorkspace } from '../editor/editor-workspace';
 import { StateView } from '../state-view';
-import { fetchEditor, prefetchEditor, takePrefetchedEditor, type EditorLoad } from './editor-cache';
+import { buttonClass } from '../button-styles';
+import { fetchEditor, type EditorLoad } from './editor-cache';
 
-type Load = { kind: 'loading' } | { kind: 'error'; message: string } | ({ kind: 'ready' } & EditorLoad);
+type Load = { kind: 'loading' } | { kind: 'error'; message: string; rateLimited: boolean } | ({ kind: 'ready' } & EditorLoad);
 
 /**
  * The Backlog goes straight to the guarded copy editor, avoiding the heavier
  * board, scheduling and promotion reads needed by the general post panel.
- * For bulk passes (CS-047) it uses a prefetched load when one is waiting, puts
- * the cursor in the copy, and once open starts loading the next post on the
- * current results page so Next is instant.
+ * For bulk passes (CS-047) it puts the cursor in the copy. A failed load offers
+ * Try again in place (CS-051), so a brief Sheets slow-down costs one click.
  */
-export function BacklogPostPanel({ libraryId, nextId, position, onSaved, onSaveFailed }: {
+export function BacklogPostPanel({ libraryId, position, onSaved, onSaveFailed }: {
   libraryId: string;
-  /** The following post on the current results page, prefetched once this one is open. */
-  nextId?: string | null;
   /** "12 of 340" style position in the current results, when known. */
   position?: string;
   onSaved?: () => void;
   onSaveFailed?: () => void;
 }) {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    (takePrefetchedEditor(libraryId) ?? fetchEditor(libraryId, controller.signal))
+    fetchEditor(libraryId, controller.signal)
       .then((ready) => { if (!controller.signal.aborted) setLoad({ kind: 'ready', ...ready }); })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setLoad({ kind: 'error', message: error instanceof Error ? error.message : 'The post could not be loaded.' });
+        if (controller.signal.aborted) return;
+        const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : undefined;
+        setLoad({ kind: 'error', message: error instanceof Error ? error.message : 'The post could not be loaded.', rateLimited: code === 'RATE_LIMITED' });
       });
     return () => controller.abort();
-  }, [libraryId]);
-
-  const ready = load.kind === 'ready';
-  useEffect(() => {
-    if (ready && nextId) prefetchEditor(nextId);
-  }, [ready, nextId]);
+  }, [libraryId, attempt]);
 
   if (load.kind === 'loading') return <StateView kind="loading" title="Loading the editor" />;
-  if (load.kind === 'error') return <StateView kind="provider_error" title="Could not open this post" detail={load.message} />;
+  if (load.kind === 'error') {
+    return (
+      <StateView
+        kind={load.rateLimited ? 'rate_limited' : 'provider_error'}
+        title="Could not open this post"
+        detail={load.message}
+        action={<button type="button" className={buttonClass('secondary', 'sm')} onClick={() => { setLoad({ kind: 'loading' }); setAttempt((n) => n + 1); }}>Try again</button>}
+      />
+    );
+  }
   return <div className="flex flex-col gap-4">
     <header>
       <h2 id="panel-title" className="text-lg font-semibold">{readableTitle(load.model.slug) || load.model.sheet.hook || load.model.libraryId}</h2>
