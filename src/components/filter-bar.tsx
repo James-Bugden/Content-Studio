@@ -42,7 +42,7 @@ export function nextFilterQuery(filters: FilterDef[], current: URLSearchParams, 
  * of "Label value" chips instead of a boxed grid of full-width selects. Labels
  * stay real <label> elements, and controls keep a 44px touch height on phones.
  */
-export function FilterBar({ filters, variant = 'panel' }: { filters: FilterDef[]; variant?: 'panel' | 'toolbar' }) {
+export function FilterBar({ filters, variant = 'panel', trailing }: { filters: FilterDef[]; variant?: 'panel' | 'toolbar'; /** Extra controls placed after the selects, e.g. a sort-direction toggle. */ trailing?: React.ReactNode }) {
   const toolbar = variant === 'toolbar';
   const router = useRouter();
   const pathname = usePathname() ?? '';
@@ -86,7 +86,7 @@ export function FilterBar({ filters, variant = 'panel' }: { filters: FilterDef[]
               onChange={(event) => go({ key: filter.key, value: event.target.value })}
               className={
                 toolbar
-                  ? 'min-h-11 max-w-40 min-w-0 cursor-pointer truncate rounded-md bg-transparent pr-1 font-medium text-ink md:min-h-9'
+                  ? 'field-sizing-content min-h-11 max-w-40 min-w-0 cursor-pointer truncate rounded-md bg-transparent pr-1 font-medium text-ink md:min-h-9'
                   : 'min-h-11 w-full min-w-0 rounded-md border border-line bg-card px-2 text-sm'
               }
             >
@@ -100,6 +100,7 @@ export function FilterBar({ filters, variant = 'panel' }: { filters: FilterDef[]
           </div>
         );
       })}
+      {trailing}
       {toolbar && active.length === 0 ? null : (
         <button type="button" className={toolbar ? `${buttonClass('secondary', 'sm')} max-md:min-h-11` : buttonClass('secondary')} onClick={() => go('clear')} disabled={active.length === 0}>
           Clear filters
