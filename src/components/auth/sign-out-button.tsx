@@ -9,7 +9,7 @@ import { clearLocalRecovery } from '@/lib/client/local-recovery';
 export function SignOutButton({ action }: { action: () => Promise<void> }) {
   return (
     <form action={action} onSubmit={() => clearLocalRecovery()}>
-      <button type="submit" className="rounded border px-3 py-1.5 text-sm">
+      <button type="submit" className="min-h-9 rounded-md border border-line bg-card px-2.5 text-sm text-ink-soft hover:text-ink">
         Sign out
       </button>
     </form>
