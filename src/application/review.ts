@@ -8,8 +8,9 @@ import {
   SHEET_WRITE_VALUE,
 } from '@/domain/enums';
 import type { ErrorCode } from '@/domain/errors';
-import { evaluateLibraryGates, type Gate, type GateCode, type GateResult, type ScreenshotUse } from '@/domain/gates';
+import { evaluateLibraryGates, type Gate, type GateResult, type ScreenshotUse } from '@/domain/gates';
 import { shortHash } from '@/domain/hash';
+import { APPROVAL_BLOCKERS } from '@/domain/approval';
 import type { LibraryPatch } from '@/domain/mapping';
 import type { Actor, MutationResult } from '@/domain/mutation';
 import type { LibraryItem, LibraryRecord, ScheduleRecord } from '@/domain/records';
@@ -213,25 +214,7 @@ export async function loadReviewQueue(repo: ContentRepository, filters: ReviewFi
 export const REVIEW_ACTIONS = ['approve', 'approve_and_queue', 'queue', 'unqueue', 'skip', 'request_changes', 'reopen'] as const;
 export type ReviewAction = (typeof REVIEW_ACTIONS)[number];
 
-/** Gates that make approval unsafe. Pending review is what approval resolves. */
-const APPROVAL_BLOCKERS: ReadonlySet<GateCode> = new Set<GateCode>([
-  'UNRECOGNISED_VALUE',
-  'MISSING_IDENTITY',
-  'COPYRIGHT_REWORK',
-  'COPYRIGHT_UNCHECKED',
-  'DUPLICATE_CHECK',
-  'DUPLICATE_CONFIRMED',
-  'DUPLICATE_UNCHECKED',
-  'MISSING_COPY',
-  'MISSING_SOURCE_LINK',
-  'MARKDOWN_MISMATCH',
-  'HOOK_MISSING',
-  'REVIEW_SKIPPED',
-  'VISUAL_UNDECIDED',
-  'VISUAL_INVALID',
-  'SCREENSHOT_REUSED',
-  'SCREENSHOT_UNCERTAIN',
-]);
+
 
 export const reviewTransitionSchema = z.object({
   operationId: z.string().regex(/^[A-Za-z0-9_-]{8,80}$/),

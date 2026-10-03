@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PostPanelData } from '@/domain/board';
 import type { Gate } from '@/domain/gates';
+import { approvalBlockers } from '@/domain/approval';
 import type { ReviewCard } from '@/domain/views';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
@@ -89,9 +90,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
     setPreview((await res.json().catch(() => ({ ok: false }))) as Preview);
   }
 
-  const approvalBlocked = card.gates.blockers.some((g) =>
-    ['COPYRIGHT_REWORK', 'COPYRIGHT_UNCHECKED', 'DUPLICATE_CHECK', 'DUPLICATE_CONFIRMED', 'DUPLICATE_UNCHECKED', 'MISSING_COPY', 'HOOK_MISSING', 'VISUAL_UNDECIDED', 'VISUAL_INVALID', 'SCREENSHOT_REUSED', 'SCREENSHOT_UNCERTAIN', 'UNRECOGNISED_VALUE', 'MARKDOWN_MISMATCH', 'MISSING_SOURCE_LINK'].includes(g.code),
-  );
+  const approvalBlocked = approvalBlockers(card.gates.blockers).length > 0;
   const draft = model.markdown.state === 'ok' ? model.markdown.body : model.sheet.draft;
 
   return (
