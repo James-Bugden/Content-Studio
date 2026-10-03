@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getServices } from '@/application/container';
 import { backlogReadiness } from '@/application/backlog-readiness';
-import { libraryBacklogView, BACKLOG_SORTS } from '@/domain/library-backlog';
+import { libraryBacklogView, BACKLOG_DIRECTIONS, BACKLOG_GROUPS, BACKLOG_SORTS } from '@/domain/library-backlog';
 import { PLATFORMS } from '@/domain/enums';
 import { AppError } from '@/domain/errors';
 import { assertSameOrigin, requireActor } from '@/lib/auth';
@@ -14,8 +14,11 @@ const requestSchema = z.object({
   search: z.string().trim().max(120),
   source: z.string().max(120).optional(),
   platform: z.enum(PLATFORMS).optional(),
+  pesto: z.string().max(120).optional(),
   status: z.string().max(60).optional(),
   sort: z.enum(BACKLOG_SORTS).optional(),
+  dir: z.enum(BACKLOG_DIRECTIONS).optional(),
+  group: z.enum(BACKLOG_GROUPS).optional(),
   page: z.number().int().min(1).max(250).default(1),
 }).strict();
 
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
     // A stale or invented status cannot turn into a silent unfiltered result.
     const view = libraryBacklogView(library, parsed.data, readiness);
     if (parsed.data.status && !view.statusOptions.includes(parsed.data.status)) throw new AppError('VALIDATION_FAILED');
-    return json({ ok: true, total: view.total, page: view.page, totalPages: view.totalPages,
+    return json({ ok: true, total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals,
       rows: view.rows.map(({ row, value }) => ({ row, value })),
       statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)])),
     });
