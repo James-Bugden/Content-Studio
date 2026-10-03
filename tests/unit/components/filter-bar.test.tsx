@@ -69,6 +69,16 @@ describe('FilterBar', () => {
     expect((screen.getByRole('button', { name: 'Clear filters' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('toolbar variant (CS-046) keeps real labels and only offers Clear filters when one is applied', () => {
+    const { rerender } = render(<FilterBar filters={filters} variant="toolbar" />);
+    expect((screen.getByLabelText('Target platform') as HTMLSelectElement).tagName).toBe('SELECT');
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    nav.params = new URLSearchParams('status=ready');
+    rerender(<FilterBar filters={filters} variant="toolbar" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(nav.push.mock.calls[0]?.[0]).toBe('/review');
+  });
+
   it('asks before changing filters while an editor is dirty (UX-04)', () => {
     setDirty('editor', true);
     render(<FilterBar filters={filters} />);

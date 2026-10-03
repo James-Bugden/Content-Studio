@@ -19,7 +19,9 @@ test('the production build serves the app and a private health endpoint', async 
   expect(await health.json()).toMatchObject({ ok: true, mode: 'fake' });
 
   await page.goto('/replies');
-  await expect(page.getByRole('link', { name: 'Replies', exact: true })).toBeVisible();
+  // The shell rendered and marks Replies as the current page. On phones (CS-046) the
+  // link sits behind the tab bar's More menu, so assert presence, not visibility.
+  await expect(page.locator('nav[aria-label="Primary"] a[href="/replies"][aria-current="page"]').first()).toBeAttached();
 });
 
 test('the narrow workspace width does not scroll horizontally', async ({ page }) => {

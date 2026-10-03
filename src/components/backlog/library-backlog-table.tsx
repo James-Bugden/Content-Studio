@@ -53,7 +53,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
     <div role="region" aria-label="Content Library posts" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-card">
       <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[68rem]' : 'min-w-[52rem]'}`}>
         <colgroup>
-          <col className="w-9" /><col className="w-32" /><col className="w-[4.5rem]" />
+          <col className="w-12" /><col className="w-36" /><col className="w-24" />
           <col className="w-24" />{showHooks ? <><col className="w-36" /><col className="w-36" /></> : null}
           <col /><col className="w-36" /><col className="w-20" />
         </colgroup>
@@ -62,7 +62,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
             {columns.map((column) => {
               const active = column.sort !== undefined && column.sort === sort;
               const sortKey = column.sort;
-              return <th key={column.label} scope="col" aria-sort={active ? (dir === 'desc' ? 'descending' : 'ascending') : undefined} className={`${cell} font-medium ${column.className ?? ''}`}>
+              return <th key={column.label} scope="col" aria-sort={active ? (dir === 'desc' ? 'descending' : 'ascending') : undefined} className={`${cell} font-medium whitespace-nowrap ${column.className ?? ''}`}>
                 {sortKey && onSort ? <button type="button" onClick={() => onSort(sortKey)} title={`Sort by ${column.label === '#' ? 'Sheet order' : column.label}`}
                   className={`inline-flex min-h-8 items-center gap-1 rounded text-left font-medium hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${active ? 'text-ink' : ''}`}>
                   {column.label}<span aria-hidden="true" className={active ? '' : 'opacity-30'}>{active && dir === 'desc' ? '↓' : '↑'}</span>

@@ -88,7 +88,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
           { key: 'sort', label: 'Sort', allLabel: 'Sheet order (#)', options: BACKLOG_SORT_OPTIONS },
           { key: 'dir', label: 'Direction', allLabel: 'Ascending', options: [{ value: 'desc', label: 'Descending' }] },
           { key: 'group', label: 'Group by', allLabel: 'No grouping', options: BACKLOG_GROUP_OPTIONS },
-        ]} />
+        ]} variant="toolbar" />
         <LibraryBacklogExplorer
           initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
           filters={filters} />
