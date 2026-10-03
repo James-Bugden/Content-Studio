@@ -14,7 +14,12 @@ import { QaPanel } from './qa-panel';
  * conflict behaviour; after a hook choice the whole editor reloads from the
  * authoritative model so the hook and the draft stay in step.
  */
-export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = false }: { model: EditorModel; canEdit: boolean; ns: string; focusMode?: boolean }) {
+export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = false, onSaved, onSaveFailed }: {
+  model: EditorModel; canEdit: boolean; ns: string; focusMode?: boolean;
+  /** Focus mode only: replaces the default page refresh after a save (the Backlog defers it to close, CS-047). */
+  onSaved?: () => void;
+  onSaveFailed?: () => void;
+}) {
   const router = useRouter();
   const [model, setModel] = useState(initialModel);
   const [text, setText] = useState(() => initialEditorText(initialModel));
@@ -45,7 +50,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
 
   return (
     <div className="flex flex-col gap-6">
-      <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? () => router.refresh() : undefined} />
+      <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? (onSaved ?? (() => router.refresh())) : undefined} onSaveFailed={onSaveFailed} autoFocus={focusMode} />
       {reloadFailed ? <InlineResult tone="warning">The change was saved, but the editor could not reload it. Reload the page to see the latest version.</InlineResult> : null}
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} /></div></details>
         : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />}

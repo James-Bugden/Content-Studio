@@ -66,8 +66,8 @@ test('Content Library is the primary backlog with source, hooks, draft and safe 
   await first.getByRole('link', { name: /^Edit / }).click();
   await expect(page).toHaveURL(new RegExp(`post=${firstId}`));
   const panel = page.getByRole('dialog');
-  await expect(panel.getByRole('button', { name: 'Next' })).toBeEnabled();
-  await panel.getByRole('button', { name: 'Next' }).click();
+  await expect(panel.getByRole('button', { name: 'Next', exact: true })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page).not.toHaveURL(new RegExp(`post=${firstId}`));
 });
 
@@ -80,8 +80,8 @@ test('Backlog editor moves across page 1/2 in either direction, with private sea
   const lastId = await last.getAttribute('data-backlog-id');
   await last.getByRole('link', { name: /^Edit / }).click();
   const panel = page.getByRole('dialog').first();
-  await expect(panel.getByRole('button', { name: 'Next' })).toBeEnabled();
-  await panel.getByRole('button', { name: 'Next' }).click();
+  await expect(panel.getByRole('button', { name: 'Next', exact: true })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(page.getByText('57 posts · page 2 of 2')).toBeVisible();
   await expect(page).toHaveURL(/page=2/);
   const firstId = await table.locator('[data-backlog-id]:visible').first().getAttribute('data-backlog-id');
@@ -91,7 +91,7 @@ test('Backlog editor moves across page 1/2 in either direction, with private sea
   await expect(page).toHaveURL(new RegExp(`post=${lastId}`));
 
   await page.route('**/api/backlog/search', async (route) => { await route.fulfill({ status: 429, contentType: 'application/json', body: '{"ok":false}' }); });
-  await panel.getByRole('button', { name: 'Next' }).click();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('The next page could not load');
   await expect(page.getByText('57 posts · page 1 of 2')).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`post=${lastId}`));
@@ -111,11 +111,11 @@ test('Backlog editor moves across page 1/2 in either direction, with private sea
   const copy = panel.getByRole('textbox', { name: /Post copy/ });
   await expect(copy).toBeVisible();
   await copy.fill('An unsaved synthetic draft');
-  await panel.getByRole('button', { name: 'Next' }).click();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('dialog', { name: 'Leave without saving?' }).getByRole('button', { name: 'Stay and keep editing' }).click();
   expect(page.url()).toBe(before);
   await expect(copy).toHaveValue('An unsaved synthetic draft');
-  await panel.getByRole('button', { name: 'Next' }).click();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByRole('dialog', { name: 'Leave without saving?' }).getByRole('button', { name: 'Leave and discard changes' }).click();
   await expect(page.getByText('45 posts · page 2 of 2')).toBeVisible();
   await expect(page.getByLabel('Find a post')).toHaveValue('Synthetic body');
@@ -195,8 +195,8 @@ test('Backlog editor is focused and the post list fits a narrow phone', async ({
   await expect(panel.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
   await expect(panel.locator('summary').filter({ hasText: 'English check' })).toBeVisible();
   await expect(panel.locator('summary').filter({ hasText: 'Hook review' })).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Next' })).toBeEnabled();
-  await panel.getByRole('button', { name: 'Next' }).click();
+  await expect(panel.getByRole('button', { name: 'Next', exact: true })).toBeEnabled();
+  await panel.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(panel.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
@@ -549,4 +549,47 @@ test('keyboard review: / focuses search, J/K and arrows move posts, Ctrl+S saves
   await close.focus();
   await page.keyboard.press('Escape');
   await expect(page).not.toHaveURL(/post=/);
+});
+
+test('bulk pass: Save & next saves, opens the next post with the cursor in the copy, and Alt+arrows move while typing (CS-047)', async ({ page }) => {
+  await page.goto('/backlog');
+  const table = page.getByRole('region', { name: 'Content Library posts' });
+  const rows = table.locator('[data-backlog-id]:visible');
+  await expect(rows.nth(2)).toBeVisible();
+  const [firstId, secondId, thirdId] = await Promise.all([0, 1, 2].map((i) => rows.nth(i).getAttribute('data-backlog-id')));
+
+  await rows.first().getByRole('link', { name: /^Edit / }).click();
+  const panel = page.getByRole('dialog').first();
+  const copy = panel.getByRole('textbox', { name: /Post copy/ });
+  await expect(copy).toBeFocused();
+  await expect(panel.getByText(/^1 of \d+ ·/)).toBeVisible();
+
+  // Edit, then Cmd/Ctrl+Enter from inside the copy: saved, and the next post opens ready to type.
+  await copy.fill('A synthetic bulk-pass draft');
+  await copy.press('Control+Enter');
+  await expect(page).toHaveURL(new RegExp(`post=${secondId}`));
+  await expect(copy).toBeFocused();
+  await expect(copy).not.toHaveValue('A synthetic bulk-pass draft');
+  await expect(panel.getByText(/^2 of \d+ ·/)).toBeVisible();
+
+  // Nothing changed: Save & next just moves on, without a leave prompt.
+  await panel.getByRole('button', { name: 'Save & next' }).click();
+  await expect(page).toHaveURL(new RegExp(`post=${thirdId}`));
+  await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toHaveCount(0);
+
+  // Alt+arrows move even while the cursor is in the copy.
+  await copy.press('Alt+ArrowUp');
+  await expect(page).toHaveURL(new RegExp(`post=${secondId}`));
+  await copy.press('Alt+ArrowUp');
+  await expect(page).toHaveURL(new RegExp(`post=${firstId}`));
+
+  // The first post kept the saved text.
+  await expect(copy).toHaveValue('A synthetic bulk-pass draft');
+
+  // A failed save stays on the post and keeps the text.
+  expect((await page.request.post('/api/test-control', { data: { kind: 'fail', provider: 'drive', op: 'write', code: 'PROVIDER_UNAVAILABLE' } })).status()).toBe(200);
+  await copy.fill('A synthetic draft that will not save');
+  await copy.press('Control+Enter');
+  await expect(page).toHaveURL(new RegExp(`post=${firstId}`));
+  await expect(copy).toHaveValue('A synthetic draft that will not save');
 });

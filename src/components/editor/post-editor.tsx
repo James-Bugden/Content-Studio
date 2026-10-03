@@ -68,9 +68,13 @@ export type PostEditorProps = {
   onValueChange?: (text: string) => void;
   onSnapshot?: (snapshot: EditorSnapshot) => void;
   onSaved?: () => void;
+  /** Any save that did not complete (error, conflict, partial, signed out). */
+  onSaveFailed?: () => void;
+  /** Put the cursor in the copy on open, so a bulk pass can type straight away (CS-047). */
+  autoFocus?: boolean;
 };
 
-export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved }: PostEditorProps) {
+export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false }: PostEditorProps) {
   const textId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialBase = initialEditorText(model);
@@ -109,11 +113,27 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
   const markdownOk = model.markdown.state === 'ok';
 
   useEffect(() => {
+    const el = textareaRef.current;
+    if (!autoFocus || !el || !canEdit) return;
+    el.focus({ preventScroll: true });
+    el.setSelectionRange(0, 0);
+    el.scrollTop = 0;
+    // Once on open only; later re-renders must never steal focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     onSnapshot?.({ dirty, sheetRevision, sectionHash, markdownOk });
   }, [onSnapshot, dirty, sheetRevision, sectionHash, markdownOk]);
 
   async function save() {
     if (!markdownOk) return;
+    const ok = await attemptSave();
+    if (!ok) onSaveFailed?.();
+  }
+
+  /** Runs one save and reports whether it completed; every outcome also sets `status`. */
+  async function attemptSave(): Promise<boolean> {
     // Same operation id for a retry of the same text; a new one if the text changed.
     const op = opRef.current && opRef.current.text === text ? opRef.current : { id: newOperationId('draft'), text };
     opRef.current = op;
@@ -134,20 +154,20 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       setMismatch(false);
       setStatus({ kind: 'saved', replayed: body.replayed });
       onSaved?.();
-      return;
+      return true;
     }
     if (res.status === 401) {
       setStatus({ kind: 'error', code: 'AUTH_REQUIRED', message: 'You were signed out. Your text is kept in this tab. Sign in again in a new tab, then come back and save.' });
-      return;
+      return false;
     }
     if (body.code === 'STALE_READ' && body.conflict) {
       opRef.current = null;
       setStatus({ kind: 'conflict', provider: body.conflict.provider, current: body.conflict.current });
-      return;
+      return false;
     }
     if (body.code === 'PARTIAL_FAILURE' && body.steps) {
       setStatus({ kind: 'partial', steps: body.steps, operationId: op.id });
-      return;
+      return false;
     }
     if (body.code === 'VALIDATION_FAILED' && body.details?.reason === 'unsafe_markdown_structure') {
       setStatus({
@@ -155,9 +175,10 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         code: body.code,
         message: 'Not saved: the draft has a heading at the section level (for example "## ...") or an unclosed code fence (```). Either would break the other posts in the master file. Remove it and save again.',
       });
-      return;
+      return false;
     }
     setStatus({ kind: 'error', code: body.code, message: body.message ?? 'The save did not complete. Nothing is confirmed as written; your text is kept here.' });
+    return false;
   }
 
   async function refreshRevisions(): Promise<EditorModel | null> {

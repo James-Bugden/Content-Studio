@@ -19,6 +19,8 @@ export type BacklogNavigation = {
   ids: string[];
   page: number;
   totalPages: number;
+  /** Whole-result count, for the "n of total" position in the panel (CS-047). */
+  total: number;
   privateSearch: boolean;
   adjacent: (id: string, direction: -1 | 1) => Promise<{ id: string; page: number }>;
 };

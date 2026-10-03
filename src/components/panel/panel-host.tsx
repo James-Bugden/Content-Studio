@@ -11,6 +11,8 @@ import { BacklogPostPanel } from './backlog-post-panel';
 import { SlotPanel } from './slot-panel';
 import { useBacklogNavigation } from '../backlog/backlog-navigation';
 import { isTypingTarget } from '../keyboard';
+import { buttonClass } from '../button-styles';
+import { LIBRARY_BACKLOG_PAGE_SIZE } from '@/domain/library-backlog';
 
 /**
  * Side-panel host (UX redesign). Mounted once in the studio layout. When the URL
@@ -31,6 +33,10 @@ export function PanelHost() {
   const [navigationError, setNavigationError] = useState('');
   const [failedDirection, setFailedDirection] = useState<-1 | 1>(1);
   const { guard, dialog } = useLeaveConfirmation();
+  /** A Backlog draft was saved while the panel was open, so the table refreshes once on close (CS-047). */
+  const rowsStale = useRef(false);
+  /** The post whose in-flight save should be followed by moving to the next post. */
+  const advanceAfterSave = useRef<string | null>(null);
 
   // The promote page already uses `?slot=` to pick a target slot, so the panel stays shut there.
   const ownsSlotParam = /^\/ready\/[^/]+\/promote$/.test(pathname);
@@ -59,8 +65,14 @@ export function PanelHost() {
       next.delete('queue');
       const q = next.toString();
       const href = q ? `${pathname}?${q}` : pathname;
-      if (pathname === '/backlog' && post) window.history.replaceState(null, '', href);
-      else {
+      if (pathname === '/backlog' && post) {
+        window.history.replaceState(null, '', href);
+        // One refresh after a bulk pass instead of a full Sheet re-read after every save.
+        if (rowsStale.current) {
+          rowsStale.current = false;
+          router.refresh();
+        }
+      } else {
         router.replace(href, { scroll: false });
         router.refresh();
       }
@@ -77,6 +89,9 @@ export function PanelHost() {
   const index = navigation && post ? navigation.ids.indexOf(post) : -1;
   const hasPrevious = index > 0 || index === 0 && (navigation?.page ?? 1) > 1;
   const hasNext = index >= 0 && (index < (navigation?.ids.length ?? 0) - 1 || (navigation?.page ?? 1) < (navigation?.totalPages ?? 1));
+
+  const position = navigation && post && index >= 0 ? `${(navigation.page - 1) * LIBRARY_BACKLOG_PAGE_SIZE + index + 1} of ${navigation.total}` : undefined;
+  const nextOnPage = navigation && index >= 0 ? navigation.ids[index + 1] ?? null : null;
 
   function moveTo(direction: -1 | 1) {
     if (!navigation || !post || moving) return;
@@ -100,14 +115,56 @@ export function PanelHost() {
   }
 
   /**
-   * Review shortcuts (CS-043). Cmd/Ctrl+S saves the open draft from anywhere in
+   * Save and next (CS-047): saves the open draft when it has changes, then moves
+   * to the next post in the current sort and filters. With nothing to save it
+   * just moves on. A failed save stays put with its error, so nothing is lost.
+   * The move waits two frames so the editor's saved state reaches the dirty
+   * guard first; if something was typed during the save, the guard still asks.
+   */
+  function saveAndNext() {
+    if (!post || moving) return;
+    const save = ref.current?.querySelector<HTMLButtonElement>('button[data-shortcut="save-draft"]');
+    if (save && !save.disabled) {
+      advanceAfterSave.current = post;
+      save.click();
+      return;
+    }
+    if (hasNext) moveTo(1);
+  }
+
+  function onDraftSaved() {
+    rowsStale.current = true;
+    if (advanceAfterSave.current !== post) return;
+    advanceAfterSave.current = null;
+    if (hasNext) requestAnimationFrame(() => requestAnimationFrame(() => moveTo(1)));
+  }
+
+  function onDraftSaveFailed() {
+    advanceAfterSave.current = null;
+  }
+
+  /**
+   * Review shortcuts (CS-043, CS-047). Cmd/Ctrl+S saves the open draft from anywhere in
    * the panel; J/K and the arrow keys follow the Backlog's current sort and
    * filters through the same guarded Previous/Next, but never while typing.
    * Escape is the dialog's own cancel, which already runs the guarded close.
+   * Cmd/Ctrl+Enter is Save and next, and Alt+↓/↑ move posts, both of which also
+   * work from inside the copy so a bulk pass never needs the mouse.
    */
   function onPanelKeyDown(event: React.KeyboardEvent<HTMLDialogElement>) {
     const target = event.target instanceof Element ? event.target : null;
     if (target && target.closest('dialog') !== ref.current) return;
+    if (post && pathname === '/backlog' && (event.metaKey || event.ctrlKey) && !event.altKey && event.key === 'Enter') {
+      event.preventDefault();
+      saveAndNext();
+      return;
+    }
+    if (post && pathname === '/backlog' && event.altKey && !event.metaKey && !event.ctrlKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      if (direction === 1 ? hasNext : hasPrevious) moveTo(direction);
+      return;
+    }
     if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 's') {
       event.preventDefault();
       const save = ref.current?.querySelector<HTMLButtonElement>('button[data-shortcut="save-draft"]');
@@ -144,6 +201,9 @@ export function PanelHost() {
               {post && pathname === '/backlog' ? <nav aria-label="Move between posts" className="ml-auto flex gap-2 text-sm">
                 <button type="button" aria-keyshortcuts="K ArrowUp" title="Previous post (K or ↑)" disabled={!hasPrevious || moving} onClick={() => moveTo(-1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>
                 <button type="button" aria-keyshortcuts="J ArrowDown" title="Next post (J or ↓)" disabled={!hasNext || moving} onClick={() => moveTo(1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Next</button>
+                <button type="button" data-shortcut="save-and-next" aria-keyshortcuts="Control+Enter Meta+Enter" title={hasNext ? 'Save this draft if changed, then open the next post (Ctrl or Cmd + Enter)' : 'Save this draft (last post in these results)'} disabled={moving} onClick={saveAndNext} className={buttonClass('primary')}>
+                  {hasNext ? 'Save & next' : 'Save'}
+                </button>
               </nav> : null}
               <button type="button" onClick={close} className="inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-sm hover:bg-paper">
                 <span aria-hidden="true">✕</span> Close
@@ -152,7 +212,7 @@ export function PanelHost() {
             {moving ? <p role="status" className="px-4 py-2 text-sm">Loading adjacent post…</p> : null}
             {navigationError ? <p role="alert" className="px-4 py-2 text-sm text-block">{navigationError} <button type="button" className="font-semibold underline" onClick={() => moveTo(failedDirection)}>Try again</button></p> : null}
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} /> : null}
+              {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} nextId={nextOnPage} position={position} onSaved={onDraftSaved} onSaveFailed={onDraftSaveFailed} /> : null}
               {post && pathname !== '/backlog' ? <PostPanel key={post} libraryId={post} /> : null}
               {slot ? <SlotPanel key={slot} contentId={slot} /> : null}
               {queue ? <QueuePanel key={queue} libraryId={queue} /> : null}

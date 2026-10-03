@@ -124,7 +124,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
 
   useEffect(() => {
     if (!usable) { setNavigation(null); return; }
-    setNavigation({ ids: active.rows.map((row) => row.value.libraryId), page: active.page, totalPages: active.totalPages, privateSearch: Boolean(search.trim()), adjacent });
+    setNavigation({ ids: active.rows.map((row) => row.value.libraryId), page: active.page, totalPages: active.totalPages, total: active.total, privateSearch: Boolean(search.trim()), adjacent });
     return () => setNavigation(null);
   }, [usable, active, adjacent, search, setNavigation]);
 
