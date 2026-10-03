@@ -57,7 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         role="status"
         aria-live="polite"
         aria-label="Notifications"
-        className="pointer-events-none fixed right-4 bottom-4 left-4 z-40 flex flex-col items-end gap-2 sm:left-auto sm:w-96"
+        className="pointer-events-none fixed right-4 bottom-20 left-4 z-40 md:bottom-4 flex flex-col items-end gap-2 sm:left-auto sm:w-96"
       >
         {toasts.map((toast) => {
           const t = TONES[toast.tone];

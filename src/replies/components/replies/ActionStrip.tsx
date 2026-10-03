@@ -102,7 +102,7 @@ export function ActionStrip(props: ActionStripProps) {
       data-strip="action"
       className={
         floating
-          ? 'sticky bottom-0 z-10 border-t border-hairline bg-paper/95 px-4 py-3 backdrop-blur'
+          ? 'sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 md:bottom-0 border-t border-hairline bg-paper/95 px-4 py-3 backdrop-blur'
           : 'border-t border-hairline bg-paper px-4 py-3'
       }
     >

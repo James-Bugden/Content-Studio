@@ -2,12 +2,14 @@ import { NavLink } from './nav-link';
 import { ToastProvider } from './toaster';
 
 /**
- * Application frame for every signed-in surface (CS-006, UX-01, UX-03).
+ * Application frame for every signed-in surface (CS-006, UX-01, UX-03; CS-042).
  *
- * Server component: landmarks, skip link and the primary navigation. The only
- * client pieces are the nav items (they need the current path) and the toast
- * region. The account control is a slot so authentication stays with its own
- * module and never leaks into client code from here.
+ * Server component: landmarks, skip link and the primary navigation. On wide
+ * screens the navigation is a left sidebar; on phones the same list becomes a
+ * bottom tab bar, so there is one Primary navigation landmark at every width.
+ * The only client pieces are the nav items (they need the current path) and the
+ * toast region. The account control is a slot so authentication stays with its
+ * own module and never leaks into client code from here.
  */
 export const PRIMARY_NAV = [
   { href: '/', label: 'Next up' },
@@ -34,24 +36,35 @@ export function AppShell({ children, accountSlot }: AppShellProps) {
       >
         Skip to main content
       </a>
-      <header className="border-b border-line bg-card">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <p className="font-serif text-[15px] font-semibold tracking-[-0.01em]">Content Studio</p>
-          {accountSlot ? <div className="flex min-w-0 items-center gap-2 text-sm">{accountSlot}</div> : null}
-        </div>
-        <nav aria-label="Primary" className="mx-auto max-w-6xl px-2 pb-2">
-          <ul className="flex flex-wrap gap-1">
-            {PRIMARY_NAV.map((item) => (
-              <li key={item.href}>
-                <NavLink href={item.href}>{item.label}</NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </header>
-      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-6">
-        {children}
-      </main>
+      <div className="min-h-screen md:grid md:grid-cols-[13.5rem_minmax(0,1fr)]">
+        <header className="flex items-center justify-between gap-3 border-b border-line bg-side px-4 py-3 md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:justify-start md:gap-4 md:border-r md:border-b-0 md:px-2.5 md:py-4">
+          <p className="flex items-center gap-2 px-1.5 text-sm font-semibold">
+            <span aria-hidden="true" className="grid size-6 place-items-center rounded-md bg-primary text-[11px] font-semibold text-white">
+              CS
+            </span>
+            Content Studio
+          </p>
+          <nav
+            aria-label="Primary"
+            className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card pb-[env(safe-area-inset-bottom)] md:static md:z-auto md:border-0 md:bg-transparent md:pb-0"
+          >
+            <ul className="flex overflow-x-auto md:flex-col md:gap-0.5 md:overflow-visible">
+              {PRIMARY_NAV.map((item) => (
+                <li
+                  key={item.href}
+                  className={`min-w-[4.75rem] flex-1 md:min-w-0 md:flex-none ${item.href === '/replies' ? 'md:mt-3 md:border-t md:border-line md:pt-3' : ''}`}
+                >
+                  <NavLink href={item.href}>{item.label}</NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          {accountSlot ? <div className="flex min-w-0 items-center gap-2 text-sm md:mt-auto md:px-1.5">{accountSlot}</div> : null}
+        </header>
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl min-w-0 px-4 pt-6 pb-24 md:px-8 md:pb-10">
+          {children}
+        </main>
+      </div>
     </ToastProvider>
   );
 }

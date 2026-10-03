@@ -6,11 +6,11 @@ import { Button, Pill } from '@/replies/components/replies/primitives';
 import { SourceInput } from '@/replies/components/replies/SourceInput';
 
 describe('visual theme (THEME-01)', () => {
-  it('uses black as the general UI accent and removes the former blue primary', () => {
+  it('uses near-black ink as the general UI accent and removes the former blue primary', () => {
     const css = readFileSync('src/app/globals.css', 'utf8');
-    expect(css).toContain('--color-primary: #000000;');
+    expect(css).toContain('--color-primary: #18191b;');
     expect(css).not.toContain('#1d4ed8');
-    expect(css).toContain('--color-paper: #f6f6f6;');
+    expect(css).toContain('--color-paper: #fbfbfa;');
     expect(css).toContain('--color-card: #ffffff;');
   });
 });

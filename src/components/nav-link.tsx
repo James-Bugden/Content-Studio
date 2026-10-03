@@ -4,25 +4,27 @@ import { usePathname } from 'next/navigation';
 import { GuardedLink } from './guarded-link';
 
 /**
- * Primary navigation item (CS-006, UX-01, UX-04).
+ * Primary navigation item (CS-006, UX-01, UX-04; CS-042).
  *
- * The active item carries aria-current="page" and the black primary marker,
- * so the current place is never signalled by colour alone (it is also bold and
- * underlined). Navigation goes through GuardedLink so a dirty editor is never lost.
+ * The active item carries aria-current="page" and is marked by a raised card
+ * surface plus semibold weight, so the current place is never signalled by
+ * colour alone. Sidebar row on wide screens, tab-bar cell on phones.
+ * Navigation goes through GuardedLink so a dirty editor is never lost.
  */
 export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname() ?? '';
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+  const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
   return (
     <GuardedLink
       href={href}
       prefetch={false}
       aria-current={active ? 'page' : undefined}
       className={[
-        'inline-flex min-h-11 items-center rounded-md px-3 text-sm whitespace-nowrap transition-colors duration-150 ease-out',
+        'flex min-h-14 items-center justify-center px-2 text-center text-xs whitespace-nowrap transition-colors duration-150 ease-out',
+        'md:min-h-9 md:justify-start md:rounded-md md:px-2.5 md:text-left md:text-sm',
         active
-          ? 'bg-primary font-semibold text-white underline decoration-2 underline-offset-4 shadow-[0_1px_2px_rgba(23,32,35,.08)]'
-          : 'text-ink-soft hover:bg-ink/5 hover:text-ink',
+          ? 'font-semibold text-ink md:bg-card md:shadow-[0_1px_2px_rgba(24,25,27,.08)] max-md:shadow-[inset_0_2px_0_var(--color-primary)]'
+          : 'font-medium text-ink-soft hover:text-ink md:hover:bg-ink/5',
       ].join(' ')}
     >
       {children}

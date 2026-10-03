@@ -1,30 +1,30 @@
 @import 'tailwindcss';
 
 /*
- * Content Studio tokens: an Uber-style black/white interface with restrained
- * greys. Green means confirmed/done, yellow means attention, and red means a
- * genuine blocker. PESTO tags use their own small categorical palette. The SOAR
- * image palette remains separate in src/domain/visual.ts.
- *
- * The Polished craft layer (type, gradient, shadows, motion) is a straight port of
- * the approved Calm Signal wireframe: wireframe/2409-app-redesign-backlog/styles-opt1.css,
- * "Polished" block (lines 69-124). Values are copied, not re-derived.
+ * Content Studio tokens (CS-042): the Linear-style direction James approved on
+ * 2026-10-03. Warm near-white surfaces, a near-black ink accent, hairline
+ * borders and one sans face. Green means confirmed/done, yellow means
+ * attention, and red means a genuine blocker. PESTO tags use their own small
+ * categorical palette. The SOAR image palette remains separate in
+ * src/domain/visual.ts.
  */
 @theme {
-  --color-paper: #f6f6f6;
+  --color-paper: #fbfbfa;
+  /* Sidebar surface. */
+  --color-side: #f3f3f1;
   --color-card: #ffffff;
-  --color-ink: #000000;
-  --color-ink-soft: #545454;
-  --color-line: #d6d6d6;
+  --color-ink: #18191b;
+  --color-ink-soft: #5c5f66;
+  --color-line: #e4e4e0;
   /* Reply-workspace aliases mapped onto the same black/white status system. */
-  --color-paper-alt: #eeeeee;
-  --color-hairline: #d6d6d6;
+  --color-paper-alt: #f0f0ed;
+  --color-hairline: #e4e4e0;
   --color-border-input: #767676;
   --color-gold: #6b4f00;
   --color-danger: #b00020;
-  /* Black is the only general UI accent: active tab, links, primary action, focus. */
-  --color-primary: #000000;
-  --color-primary-soft: #eeeeee;
+  /* Near-black ink is the only general UI accent: active item, links, primary action, focus. */
+  --color-primary: #18191b;
+  --color-primary-soft: #ececea;
   /* Confirmed / approved / done only. Never expanded past that. */
   --color-green: #0b6b3a;
   --color-green-soft: #e5f6ed;
@@ -48,15 +48,16 @@
   --color-pillar-opinions-soft: #ffe4e6;
   --color-pillar-build: #4338ca;
   --color-pillar-build-soft: #e0e7ff;
-  /* --font-*-polished come from next/font (src/app/fonts.ts) on <html>; the system stack is the fallback. */
+  /* --font-sans-polished comes from next/font (src/app/fonts.ts) on <html>; the system stack is the fallback.
+     --font-serif is kept as an alias of the sans so older `font-serif` call sites render the one app face. */
   --font-sans: var(--font-sans-polished), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", sans-serif;
-  --font-serif: var(--font-serif-polished), Georgia, serif;
+  --font-serif: var(--font-sans);
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --font-cjk: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", var(--font-sans);
   --text-meta: 0.8125rem;
   --text-reply: 1rem;
-  /* Card corner from the wireframe (line 81); rounded-lg is the only card radius in use. */
-  --radius-lg: 6px;
+  /* rounded-lg is the only card radius in use. */
+  --radius-lg: 8px;
 }
 
 html {
@@ -72,16 +73,17 @@ html {
 }
 
 body {
-  background: linear-gradient(180deg, #ffffff 0%, var(--color-paper) 100%);
+  background: var(--color-paper);
   font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
   overflow-wrap: anywhere;
 }
 
 :focus-visible {
-  outline: 3px solid var(--color-primary);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  box-shadow: 0 0 0 6px var(--color-primary-soft);
 }
 
 .copy {
@@ -101,14 +103,12 @@ body {
 }
 
 @layer base {
-  /* Wireframe lines 71-73: page title, wordmark and accordion group names in the serif. */
   h1,
-  details.rounded-lg > summary > .font-semibold {
-    font-family: var(--font-serif);
-    letter-spacing: -0.01em;
+  h2 {
+    letter-spacing: -0.011em;
   }
 
-  /* Wireframe lines 85-86: table rows settle into paper on hover. */
+  /* Table rows settle into paper on hover. */
   tbody tr td {
     transition: background-color 150ms ease-out;
   }
@@ -119,53 +119,12 @@ body {
 
 @layer components {
   /*
-   * Wireframe lines 80-82: every card (view or accordion group) sits on a soft
-   * two-part shadow. `rounded-lg border bg-card` is the card recipe every page
-   * already uses, so one selector covers all of them without touching components.
-   * Utilities still win, so the modal keeps its own shadow-xl.
+   * Every card (view or accordion group) sits on a hairline lift.
+   * `rounded-lg border bg-card` is the card recipe every page already uses, so
+   * one selector covers all of them without touching components. Utilities
+   * still win, so the modal keeps its own shadow-xl.
    */
   .rounded-lg.border.bg-card {
-    box-shadow: 0 1px 2px rgba(23, 32, 35, 0.04), 0 4px 14px rgba(23, 32, 35, 0.05);
-    transition: box-shadow 150ms ease-out;
-  }
-  details.rounded-lg.border.bg-card[open] {
-    box-shadow: 0 1px 2px rgba(23, 32, 35, 0.05), 0 6px 18px rgba(23, 32, 35, 0.06);
-  }
-}
-
-/*
- * Wireframe lines 108-124: staggered entrance, only when the user has not asked
- * for less motion. Scoped to accordion groups (details) rather than table rows:
- * the real tables run to hundreds or thousands of rows, so a per-row stagger
- * would be jarring and slow instead of calm.
- */
-@media (prefers-reduced-motion: no-preference) {
-  details.rounded-lg {
-    animation: polished-rise 300ms ease-out both;
-  }
-  li:nth-child(2) > details.rounded-lg {
-    animation-delay: 60ms;
-  }
-  li:nth-child(3) > details.rounded-lg {
-    animation-delay: 120ms;
-  }
-  li:nth-child(4) > details.rounded-lg {
-    animation-delay: 240ms;
-  }
-  li:nth-child(5) > details.rounded-lg {
-    animation-delay: 290ms;
-  }
-  li:nth-child(n + 6) > details.rounded-lg {
-    animation-delay: 340ms;
-  }
-}
-@keyframes polished-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
+    box-shadow: 0 1px 2px rgba(24, 25, 27, 0.04);
   }
 }

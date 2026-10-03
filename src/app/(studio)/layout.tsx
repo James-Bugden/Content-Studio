@@ -21,7 +21,7 @@ export default async function StudioLayout({ children }: { children: React.React
     <AppShell
       accountSlot={
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-ink-soft">{actor.role === 'owner' ? 'Owner' : 'Read only'}</span>
+          {actor.role === 'owner' ? null : <span className="text-ink-soft">Read only</span>}
           <SignOutButton action={signOutAction} />
         </div>
       }

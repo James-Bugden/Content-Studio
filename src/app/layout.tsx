@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { plexSans, sourceSerif } from './fonts';
+import { inter } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -9,11 +9,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Font variables live on <html> so the @theme tokens that reference them
+  // The font variable lives on <html> so the @theme tokens that reference them
   // resolve at :root (a custom property that points at an undefined variable
   // becomes invalid where it is declared, not where it is used).
   return (
-    <html lang="en-GB" className={`${plexSans.variable} ${sourceSerif.variable}`}>
+    <html lang="en-GB" className={inter.variable}>
       <body className="min-h-screen">{children}</body>
     </html>
   );
