@@ -11,6 +11,8 @@ export type BacklogResult = {
   total: number;
   page: number;
   totalPages: number;
+  /** Whole-result row counts per group key when grouped (CS-043). */
+  groupTotals?: Record<string, number>;
 };
 
 export type BacklogNavigation = {

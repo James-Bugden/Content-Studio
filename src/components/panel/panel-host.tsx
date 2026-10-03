@@ -10,6 +10,7 @@ import { panelHref } from './open-panel-link';
 import { BacklogPostPanel } from './backlog-post-panel';
 import { SlotPanel } from './slot-panel';
 import { useBacklogNavigation } from '../backlog/backlog-navigation';
+import { isTypingTarget } from '../keyboard';
 
 /**
  * Side-panel host (UX redesign). Mounted once in the studio layout. When the URL
@@ -98,10 +99,34 @@ export function PanelHost() {
     });
   }
 
+  /**
+   * Review shortcuts (CS-043). Cmd/Ctrl+S saves the open draft from anywhere in
+   * the panel; J/K and the arrow keys follow the Backlog's current sort and
+   * filters through the same guarded Previous/Next, but never while typing.
+   * Escape is the dialog's own cancel, which already runs the guarded close.
+   */
+  function onPanelKeyDown(event: React.KeyboardEvent<HTMLDialogElement>) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('dialog') !== ref.current) return;
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      const save = ref.current?.querySelector<HTMLButtonElement>('button[data-shortcut="save-draft"]');
+      if (save && !save.disabled) save.click();
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) return;
+    if (!post || pathname !== '/backlog') return;
+    const direction = event.key === 'j' || event.key === 'J' || event.key === 'ArrowDown' ? 1 : event.key === 'k' || event.key === 'K' || event.key === 'ArrowUp' ? -1 : 0;
+    if (!direction) return;
+    event.preventDefault();
+    if (direction === 1 ? hasNext : hasPrevious) moveTo(direction);
+  }
+
   return (
     <>
       <dialog
         ref={ref}
+        onKeyDown={onPanelKeyDown}
         aria-labelledby="panel-title"
         onCancel={(e) => {
           e.preventDefault();
@@ -117,8 +142,8 @@ export function PanelHost() {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-card px-4 py-2">
               <p className="text-xs font-semibold tracking-wide text-ink-soft">{post ? 'Post' : slot ? 'Schedule slot' : 'Backlog idea'}</p>
               {post && pathname === '/backlog' ? <nav aria-label="Move between posts" className="ml-auto flex gap-2 text-sm">
-                <button type="button" disabled={!hasPrevious || moving} onClick={() => moveTo(-1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>
-                <button type="button" disabled={!hasNext || moving} onClick={() => moveTo(1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Next</button>
+                <button type="button" aria-keyshortcuts="K ArrowUp" title="Previous post (K or ↑)" disabled={!hasPrevious || moving} onClick={() => moveTo(-1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Previous</button>
+                <button type="button" aria-keyshortcuts="J ArrowDown" title="Next post (J or ↓)" disabled={!hasNext || moving} onClick={() => moveTo(1)} className="min-h-11 rounded border border-line px-2 disabled:opacity-40">Next</button>
               </nav> : null}
               <button type="button" onClick={close} className="inline-flex min-h-11 items-center gap-1 rounded-md px-3 text-sm hover:bg-paper">
                 <span aria-hidden="true">✕</span> Close
