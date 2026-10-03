@@ -18,8 +18,14 @@ const TONE: Record<Thumb['tone'], string> = {
 };
 const GLYPH: Record<Thumb['tone'], string> = { done: '✓', todo: '○', problem: '●', none: '·' };
 
-export function PostThumb({ thumb, size = 'md', showLabel = true }: { thumb: Thumb | null; size?: 'sm' | 'md' | 'lg'; showLabel?: boolean }) {
+/**
+ * `imageOnly` (CS-045) renders nothing unless there is a real image, for dense
+ * lists where a placeholder box would only add noise; the image state is still
+ * stated in words elsewhere on the row or in the panel.
+ */
+export function PostThumb({ thumb, size = 'md', showLabel = true, imageOnly = false }: { thumb: Thumb | null; size?: 'sm' | 'md' | 'lg'; showLabel?: boolean; imageOnly?: boolean }) {
   const t: Thumb = thumb ?? { src: null, label: 'No image', tone: 'none' };
+  if (imageOnly && !t.src) return null;
   const box = size === 'sm' ? 'size-12' : size === 'lg' ? 'w-full aspect-square max-w-sm' : 'size-20';
   return (
     <figure className="flex min-w-0 flex-col gap-1">

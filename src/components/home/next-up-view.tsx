@@ -7,9 +7,10 @@ import { PostThumb } from '../panel/post-thumb';
 import { StepButton } from '../panel/step-button';
 
 /**
- * Next up (UX redesign), presentation only. Answers "what do I do next" from one
- * board read: four summary tiles, the urgent list, then the next list. Every row
- * has one button that opens the side panel on the right post or slot.
+ * Next up (UX redesign; Linear-style in CS-045), presentation only. Answers "what
+ * do I do next" from one board read: a quiet summary line, the urgent list, then
+ * the next list. Every row has one button that opens the side panel on the right
+ * post or slot; only the very first task gets the filled primary button.
  */
 export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'>;
 
@@ -41,23 +42,14 @@ export function NextUpView({ today, counts, tasks, posts }: NextUpViewProps) {
         <h2 id="summary-h" className="sr-only">
           Summary
         </h2>
-        <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-soft">
           {tiles.map((t) => (
-            <li key={t.label} className="min-w-0">
-              <Link
-                href={t.href}
-                data-tile={t.label}
-                className="flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-line bg-card p-4 hover:border-ink"
-              >
-                {t.count > 0 ? (
-                  <span className="text-3xl font-semibold tabular-nums">{t.count}</span>
-                ) : (
-                  <span className="inline-flex items-center gap-2 text-3xl font-semibold text-green tabular-nums">
-                    <span aria-hidden="true">✓</span>
-                    <span>0</span>
-                  </span>
-                )}
-                <span className="text-sm font-medium">{t.label}</span>
+            <li key={t.label}>
+              <Link href={t.href} data-tile={t.label} className="inline-flex min-h-11 items-center gap-1.5 rounded-md hover:text-ink">
+                <span className={`text-base font-semibold tabular-nums ${t.count > 0 ? 'text-ink' : 'text-green'}`}>
+                  {t.count > 0 ? t.count : <><span aria-hidden="true">✓ </span>0</>}
+                </span>
+                <span>{t.label}</span>
               </Link>
             </li>
           ))}
@@ -81,7 +73,7 @@ export function NextUpView({ today, counts, tasks, posts }: NextUpViewProps) {
               <h2 id="now-h" className="text-lg font-semibold">
                 Do these now <span className="font-normal text-ink-soft tabular-nums">({now.length})</span>
               </h2>
-              <TaskList tasks={now} thumbs={thumbs} />
+              <TaskList tasks={now} thumbs={thumbs} firstIsPrimary />
             </section>
           ) : null}
           {next.length > 0 ? (
@@ -89,7 +81,7 @@ export function NextUpView({ today, counts, tasks, posts }: NextUpViewProps) {
               <h2 id="next-h" className="text-lg font-semibold">
                 Next <span className="font-normal text-ink-soft tabular-nums">({next.length + more.length})</span>
               </h2>
-              <TaskList tasks={next} thumbs={thumbs} />
+              <TaskList tasks={next} thumbs={thumbs} firstIsPrimary={now.length === 0} />
               {more.length > 0 ? (
                 <details className="mt-2">
                   <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-medium underline underline-offset-4">
@@ -106,29 +98,29 @@ export function NextUpView({ today, counts, tasks, posts }: NextUpViewProps) {
   );
 }
 
-function TaskList({ tasks, thumbs }: { tasks: Task[]; thumbs: Map<string, Thumb> }) {
+/** Dot colour by urgency: red only for "do now", amber soon, grey otherwise. Always paired with words. */
+const URGENCY_DOT: Record<Task['step']['urgency'], string> = { now: 'bg-block', soon: 'bg-attention-line', later: 'bg-ink-soft/40', none: 'bg-ink-soft/40' };
+
+function TaskList({ tasks, thumbs, firstIsPrimary = false }: { tasks: Task[]; thumbs: Map<string, Thumb>; firstIsPrimary?: boolean }) {
   return (
-    <ul className="mt-3 divide-y divide-line rounded-lg border border-line bg-card">
-      {tasks.map((t) => {
+    <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-card">
+      {tasks.map((t, i) => {
         const thumb = 'post' in t.target ? thumbs.get(t.target.post) : undefined;
         const when = t.when ? shortWhen(t.when) : '';
         return (
-          <li key={t.key} data-task={t.key} className="flex flex-wrap items-center gap-x-4 gap-y-2 p-3 sm:flex-nowrap">
-            {thumb ? (
-              <div className="shrink-0">
-                <PostThumb thumb={thumb} size="sm" showLabel={false} />
-              </div>
-            ) : null}
+          <li key={t.key} data-task={t.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 hover:bg-paper sm:flex-nowrap">
+            <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${URGENCY_DOT[t.step.urgency]}`} />
+            {thumb ? <PostThumb thumb={thumb} size="sm" showLabel={false} imageOnly /> : null}
             <div className="min-w-0 flex-[1_1_12rem]">
-              <p className="copy truncate font-semibold">{taskTitle(t)}</p>
-              <p className="text-xs text-ink-soft">
-                {platformName(t.platform)}
-                {when ? `, ${when}` : ''}
-              </p>
-              <p className="mt-0.5 text-sm text-ink-soft">{t.step.why}</p>
+              <p className="copy truncate font-medium">{taskTitle(t)}</p>
+              <p className="truncate text-sm text-ink-soft">{t.step.why}</p>
             </div>
+            <p className="shrink-0 text-xs text-ink-soft tabular-nums">
+              {platformName(t.platform)}
+              {when ? `, ${when}` : ''}
+            </p>
             <div className="shrink-0">
-              <StepButton step={t.step} target={t.target} />
+              <StepButton step={t.step} target={t.target} size="sm" primary={firstIsPrimary && i === 0} />
             </div>
           </li>
         );
