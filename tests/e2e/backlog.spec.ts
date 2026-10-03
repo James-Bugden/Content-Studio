@@ -143,7 +143,7 @@ test('Backlog status reasons are visible on tap and keyboard without changing po
 
 test('Content Source filter narrows Library rows and preserves idea view separately', async ({ page }) => {
   await page.goto('/backlog');
-  const source = page.getByLabel('Content Source');
+  const source = page.getByLabel('Source', { exact: true });
   const firstSource = await source.locator('option').nth(1).textContent();
   await source.selectOption({ label: firstSource! });
   const rows = page.getByRole('region', { name: 'Content Library posts' }).locator('[data-backlog-id]:visible');
@@ -484,13 +484,13 @@ test('Backlog headers sort the whole inventory and a second click reverses it (C
     await page.getByLabel('Sort').selectOption('source');
     await expect(page).toHaveURL(/sort=source/);
     const ascending = await firstCard();
-    await page.getByLabel('Direction').selectOption('desc');
+    await page.getByRole('button', { name: /^Order: ascending/ }).click();
     await expect(page).toHaveURL(/dir=desc/);
     await expect.poll(async () => (await firstCard()).localeCompare(ascending)).toBeGreaterThan(0);
   }
 
   await expect(page.getByLabel('PESTO')).toBeVisible();
-  await page.getByLabel('Group by').selectOption('platform');
+  await page.getByLabel('Group', { exact: true }).selectOption('platform');
   await expect(page).toHaveURL(/group=platform/);
   await expect(table.locator('[data-backlog-group]:visible').first()).toContainText(/\d+ posts?/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

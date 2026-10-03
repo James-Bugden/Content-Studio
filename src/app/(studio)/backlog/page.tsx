@@ -5,6 +5,7 @@ import { ErrorState, PageHeader, StateView } from '@/components';
 import { BacklogGroupTable } from '@/components/backlog/backlog-group-table';
 import { LibraryBacklogExplorer } from '@/components/backlog/library-backlog-explorer';
 import { FilterBar } from '@/components/filter-bar';
+import { SortDirectionToggle } from '@/components/backlog/sort-direction-toggle';
 import { PLATFORMS, type Platform } from '@/domain/enums';
 import { ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
 import { libraryBacklogView } from '@/domain/library-backlog';
@@ -81,14 +82,13 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         <PageHeader title="Backlog" description="Posts from Content Library. Filter, review and edit them here." />
         <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><span aria-current="page" className="font-semibold">Posts ({library.length})</span><a className="text-primary underline" href="/backlog?view=ideas">Ideas in Content Queue</a></nav>
         <FilterBar filters={[
-          { key: 'source', label: 'Content Source', options: view.sources.map((s) => ({ value: s, label: s })) },
+          { key: 'source', label: 'Source', options: view.sources.map((s) => ({ value: s, label: s })) },
           { key: 'platform', label: 'Platform', options: view.platforms.map((p) => ({ value: p, label: p })) },
           { key: 'pesto', label: 'PESTO', options: view.pestoOptions.map((s) => ({ value: s, label: s })) },
           { key: 'status', label: 'Status', options: view.statusOptions.map((s) => ({ value: s, label: s })) },
+          { key: 'group', label: 'Group', allLabel: 'None', options: BACKLOG_GROUP_OPTIONS },
           { key: 'sort', label: 'Sort', allLabel: 'Sheet order (#)', options: BACKLOG_SORT_OPTIONS },
-          { key: 'dir', label: 'Direction', allLabel: 'Ascending', options: [{ value: 'desc', label: 'Descending' }] },
-          { key: 'group', label: 'Group by', allLabel: 'No grouping', options: BACKLOG_GROUP_OPTIONS },
-        ]} variant="toolbar" />
+        ]} variant="toolbar" trailing={<SortDirectionToggle />} />
         <LibraryBacklogExplorer
           initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
           filters={filters} />
