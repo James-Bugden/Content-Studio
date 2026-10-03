@@ -9,6 +9,11 @@ import { GuardedLink } from '../guarded-link';
  * (sessionStorage, cleared on sign-out) and keyed by the item's fingerprint, so a
  * dismissed item comes back as soon as its facts change. Dismissing never
  * resolves anything: the item disappears for good only when the authorities agree.
+ *
+ * CS-048: items are grouped by kind under one collapsible heading each (blocking
+ * groups first and open), so ten identical "missing section" rows read as one
+ * line with a count instead of ten cards. No coloured rails; a dot plus words
+ * carries severity.
  */
 export type ReconcileItemView = {
   id: string;
@@ -47,6 +52,7 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
   }
   const visible = items.filter((i) => !dismissed.includes(i.id));
   const hidden = items.length - visible.length;
+  const groups = groupByKind(visible);
   return (
     <div className="flex flex-col gap-3">
       {hidden > 0 ? (
@@ -69,44 +75,77 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
         </p>
       ) : null}
       <ul className="flex flex-col gap-3">
-        {visible.map((i) => (
-          <li key={i.id}>
-            <article aria-labelledby={`rc-${i.id}`} className={`rounded-lg border bg-card p-4 ${i.severity === 'blocking' ? 'border-l-4 border-block' : 'border-line'}`}>
-              <p className="text-xs font-semibold tracking-wide text-ink-soft">
-                {i.severity === 'blocking' ? '✕ Blocking' : '○ Needs attention'} · {i.kind.replace(/_/g, ' ')}
-              </p>
-              <h3 id={`rc-${i.id}`} className="mt-1 font-semibold">
-                {i.title}
-              </h3>
-              <ul className="mt-1 list-disc pl-5 text-sm">
-                {i.facts.map((f) => (
-                  <li key={f}>{f}</li>
+        {groups.map((g) => (
+          <li key={g.kind}>
+            <details open={g.blocking || g.items.length <= 3} data-reconcile-kind={g.kind} className="group rounded-lg border border-line bg-card">
+              <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 px-4 py-2 marker:hidden [&::-webkit-details-marker]:hidden">
+                <span aria-hidden="true" className="inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">▸</span>
+                <span aria-hidden="true" className={`size-2 rounded-full ${g.blocking ? 'bg-block' : 'bg-attention-line'}`} />
+                <span className="font-semibold">{kindLabel(g.kind)}</span>
+                <span className="text-sm text-ink-soft tabular-nums">
+                  {g.items.length} · {g.blocking ? 'blocking' : 'needs attention'}
+                </span>
+              </summary>
+              <ul className="divide-y divide-line border-t border-line">
+                {g.items.map((i) => (
+                  <li key={i.id}>
+                    <article aria-labelledby={`rc-${i.id}`} className="flex flex-wrap items-start gap-x-4 gap-y-2 px-4 py-3">
+                      <div className="min-w-0 flex-[1_1_18rem]">
+                        <h3 id={`rc-${i.id}`} className="font-medium">
+                          {i.title}
+                        </h3>
+                        <p className="text-sm text-ink-soft">{i.facts.join(' ')}</p>
+                        {i.operationId ? <p className="text-xs text-ink-soft">Operation {i.operationId}</p> : null}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {i.action.href ? (
+                          <GuardedLink href={i.action.href} className={buttonClass(i.severity === 'blocking' ? 'primary' : 'secondary', 'sm')}>
+                            {i.action.label}
+                          </GuardedLink>
+                        ) : (
+                          <span className="text-sm text-ink-soft">Next step: {i.action.label.toLowerCase()}.</span>
+                        )}
+                        <button type="button" className={buttonClass('secondary', 'sm')} onClick={() => dismiss(i.id)}>
+                          Dismiss as reviewed
+                        </button>
+                      </div>
+                    </article>
+                  </li>
                 ))}
               </ul>
-              {i.operationId ? <p className="mt-1 text-xs text-ink-soft">Operation {i.operationId}</p> : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {i.action.href ? (
-                  <GuardedLink
-                    href={i.action.href}
-                    className={
-                      i.severity === 'blocking'
-                        ? 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border-2 border-block bg-block-soft px-4 py-2 text-sm font-medium text-block hover:bg-block-soft/70'
-                        : buttonClass('primary')
-                    }
-                  >
-                    {i.action.label}
-                  </GuardedLink>
-                ) : (
-                  <span className="text-sm text-ink-soft">Next step: {i.action.label.toLowerCase()}.</span>
-                )}
-                <button type="button" className={buttonClass()} onClick={() => dismiss(i.id)}>
-                  Dismiss as reviewed
-                </button>
-              </div>
-            </article>
+            </details>
           </li>
         ))}
       </ul>
     </div>
   );
+}
+
+/** Plain-words heading for each kind of disagreement (CS-048). Unknown kinds fall back to their name. */
+const KIND_LABEL: Record<string, string> = {
+  schema_drift: 'Sheet columns changed',
+  provider_config: 'Connection not set up',
+  markdown_mismatch: 'Sheet draft differs from the Markdown',
+  markdown_missing: 'Markdown section missing or duplicated',
+  stale_approval: 'Approval out of date',
+  stale_visual_approval: 'Image approval out of date',
+  zh_stale: 'Chinese version out of date',
+  zh_ambiguous: 'Several Threads rows claim one post',
+  stale_published_sync: 'Published results not synced',
+  typefully_ambiguous: 'Unclear Typefully match',
+  typefully_sync_conflict: 'Typefully and the Sheet disagree',
+  partial_mutation: 'A change only partly saved',
+};
+
+function kindLabel(kind: string): string {
+  const fallback = kind.replace(/_/g, ' ');
+  return KIND_LABEL[kind] ?? fallback.charAt(0).toUpperCase() + fallback.slice(1);
+}
+
+/** Groups keep the report's order; any group containing a blocker is listed first. */
+export function groupByKind(items: ReconcileItemView[]): { kind: string; blocking: boolean; items: ReconcileItemView[] }[] {
+  const groups = new Map<string, ReconcileItemView[]>();
+  for (const item of items) groups.set(item.kind, [...(groups.get(item.kind) ?? []), item]);
+  const list = [...groups].map(([kind, members]) => ({ kind, blocking: members.some((m) => m.severity === 'blocking'), items: members }));
+  return [...list.filter((g) => g.blocking), ...list.filter((g) => !g.blocking)];
 }
