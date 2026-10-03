@@ -119,3 +119,27 @@ test('viewer gets a read-only editor and the save API refuses', async ({ page })
   });
   expect(res.status()).toBe(403);
 });
+
+test('CS-049: the editor page can approve, waits for unsaved edits, and blocks unsafe approvals', async ({ page }) => {
+  await page.goto('/review/SYN-L008');
+  const review = page.getByRole('region', { name: 'Review' });
+  const approveOnly = review.getByRole('button', { name: 'Approve only' });
+  await expect(approveOnly).toBeEnabled();
+
+  // Unsaved text: approval waits, because the stamp covers the saved copy.
+  await editor(page).fill('A synthetic unsaved change');
+  await expect(approveOnly).toBeDisabled();
+  await expect(review.getByText('Save the draft first')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo changes' }).click();
+
+  await approveOnly.click();
+  await expect(review.getByText('Approved. The Sheet now holds this approval.')).toBeVisible();
+  await expect(review.getByText(/^✓\s*Approved\.$/)).toBeVisible();
+  await expect(review.getByRole('button', { name: 'Approve only' })).toHaveCount(0);
+
+  // A post with a copyright rework cannot be approved from here either.
+  await page.goto('/review/SYN-L002');
+  const blocked = page.getByRole('region', { name: 'Review' });
+  await expect(blocked.getByRole('button', { name: 'Approve only' })).toBeDisabled();
+  await expect(blocked.getByText(/Approval opens once these are fixed/)).toBeVisible();
+});
