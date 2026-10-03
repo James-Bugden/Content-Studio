@@ -48,24 +48,28 @@ test('skip link is the first Tab stop and moves focus to main', async ({ page })
   await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('main');
 });
 
+const NAV_LABELS = ['Next up', 'Posts', 'Backlog', 'Calendar', 'Published', 'Fix issues', 'Replies'];
+
 test('landmarks and primary navigation are labelled and keyboard reachable', async ({ page }) => {
   await page.goto(GALLERY);
   await expect(page.getByRole('banner')).toHaveCount(1);
   await expect(page.getByRole('main')).toHaveCount(1);
   const nav = page.getByRole('navigation', { name: 'Primary' });
-  await expect(nav.getByRole('link')).toHaveText([
-    'Next up',
-    'Posts',
-    'Backlog',
-    'Calendar',
-    'Published',
-    'Fix issues',
-    'Replies',
-  ]);
   // Tab past the skip link lands on the first nav item.
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toHaveText('Next up');
+  const phone = (page.viewportSize()?.width ?? 1280) < 768;
+  if (phone) {
+    // CS-046: the tab bar shows four destinations; the rest sit behind More, never off-screen.
+    await expect(nav.getByRole('link')).toHaveText(NAV_LABELS.slice(0, 4));
+    await nav.getByText('More', { exact: true }).click();
+    await expect(nav.getByRole('link')).toHaveText(NAV_LABELS);
+    await page.keyboard.press('Escape');
+    await expect(nav.getByRole('link')).toHaveText(NAV_LABELS.slice(0, 4));
+  } else {
+    await expect(nav.getByRole('link')).toHaveText(NAV_LABELS);
+  }
 });
 
 for (const width of [375, 500, 750, 1280]) {

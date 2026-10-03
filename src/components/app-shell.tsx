@@ -1,4 +1,5 @@
 import { NavLink } from './nav-link';
+import { NavMore } from './nav-more';
 import { ToastProvider } from './toaster';
 
 /**
@@ -7,6 +8,7 @@ import { ToastProvider } from './toaster';
  * Server component: landmarks, skip link and the primary navigation. On wide
  * screens the navigation is a left sidebar; on phones the same list becomes a
  * bottom tab bar, so there is one Primary navigation landmark at every width.
+ * The tab bar shows the first four items and a "More" menu for the rest.
  * The only client pieces are the nav items (they need the current path) and the
  * toast region. The account control is a slot so authentication stays with its
  * own module and never leaks into client code from here.
@@ -20,6 +22,9 @@ export const PRIMARY_NAV = [
   { href: '/reconcile', label: 'Fix issues' },
   { href: '/replies', label: 'Replies' },
 ] as const;
+
+/** Phone tab bar shows these four directly; the rest sit behind "More" (CS-046). */
+const TAB_BAR_COUNT = 4;
 
 export type AppShellProps = {
   children: React.ReactNode;
@@ -48,15 +53,18 @@ export function AppShell({ children, accountSlot }: AppShellProps) {
             aria-label="Primary"
             className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card pb-[env(safe-area-inset-bottom)] md:static md:z-auto md:border-0 md:bg-transparent md:pb-0"
           >
-            <ul className="flex overflow-x-auto md:flex-col md:gap-0.5 md:overflow-visible">
-              {PRIMARY_NAV.map((item) => (
+            <ul className="flex md:flex-col md:gap-0.5">
+              {PRIMARY_NAV.map((item, i) => (
                 <li
                   key={item.href}
-                  className={`min-w-[4.75rem] flex-1 md:min-w-0 md:flex-none ${item.href === '/replies' ? 'md:mt-3 md:border-t md:border-line md:pt-3' : ''}`}
+                  className={`min-w-0 flex-1 md:flex-none ${i >= TAB_BAR_COUNT ? 'max-md:hidden' : ''} ${item.href === '/replies' ? 'md:mt-3 md:border-t md:border-line md:pt-3' : ''}`}
                 >
                   <NavLink href={item.href}>{item.label}</NavLink>
                 </li>
               ))}
+              <li className="min-w-0 flex-1 md:hidden">
+                <NavMore items={PRIMARY_NAV.slice(TAB_BAR_COUNT)} />
+              </li>
             </ul>
           </nav>
           {accountSlot ? <div className="flex min-w-0 items-center gap-2 text-sm md:mt-auto md:px-1.5">{accountSlot}</div> : null}

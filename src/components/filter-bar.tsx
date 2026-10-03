@@ -37,7 +37,13 @@ export function nextFilterQuery(filters: FilterDef[], current: URLSearchParams, 
   return query ? `?${query}` : '';
 }
 
-export function FilterBar({ filters }: { filters: FilterDef[] }) {
+/**
+ * `toolbar` (CS-046) lays the same controls out as one compact Linear-style row
+ * of "Label value" chips instead of a boxed grid of full-width selects. Labels
+ * stay real <label> elements, and controls keep a 44px touch height on phones.
+ */
+export function FilterBar({ filters, variant = 'panel' }: { filters: FilterDef[]; variant?: 'panel' | 'toolbar' }) {
+  const toolbar = variant === 'toolbar';
   const router = useRouter();
   const pathname = usePathname() ?? '';
   const searchParams = useSearchParams();
@@ -53,19 +59,36 @@ export function FilterBar({ filters }: { filters: FilterDef[] }) {
   };
 
   return (
-    <div role="group" aria-label="Filters" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-card p-3">
+    <div
+      role="group"
+      aria-label="Filters"
+      className={toolbar ? 'mb-3 flex flex-wrap items-center gap-2' : 'mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-card p-3'}
+    >
       {filters.map((filter) => {
         const id = `${baseId}-${filter.key}`;
         return (
-          <div key={filter.key} className="flex min-w-0 flex-[1_1_10rem] flex-col gap-1">
-            <label htmlFor={id} className="text-sm font-medium">
+          <div
+            key={filter.key}
+            className={
+              toolbar
+                ? `inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md border bg-card pl-2.5 text-sm md:min-h-9 ${
+                    sanitiseFilterValue(filter, current.get(filter.key)) ? 'border-ink/40' : 'border-line'
+                  }`
+                : 'flex min-w-0 flex-[1_1_10rem] flex-col gap-1'
+            }
+          >
+            <label htmlFor={id} className={toolbar ? 'whitespace-nowrap text-ink-soft' : 'text-sm font-medium'}>
               {filter.label}
             </label>
             <select
               id={id}
               value={sanitiseFilterValue(filter, current.get(filter.key))}
               onChange={(event) => go({ key: filter.key, value: event.target.value })}
-              className="min-h-11 w-full min-w-0 rounded-md border border-line bg-card px-2 text-sm"
+              className={
+                toolbar
+                  ? 'min-h-11 max-w-40 min-w-0 cursor-pointer truncate rounded-md bg-transparent pr-1 font-medium text-ink md:min-h-9'
+                  : 'min-h-11 w-full min-w-0 rounded-md border border-line bg-card px-2 text-sm'
+              }
             >
               <option value="">{filter.allLabel ?? 'All'}</option>
               {filter.options.map((option) => (
@@ -77,9 +100,11 @@ export function FilterBar({ filters }: { filters: FilterDef[] }) {
           </div>
         );
       })}
-      <button type="button" className={buttonClass('secondary')} onClick={() => go('clear')} disabled={active.length === 0}>
-        Clear filters
-      </button>
+      {toolbar && active.length === 0 ? null : (
+        <button type="button" className={toolbar ? `${buttonClass('secondary', 'sm')} max-md:min-h-11` : buttonClass('secondary')} onClick={() => go('clear')} disabled={active.length === 0}>
+          Clear filters
+        </button>
+      )}
       <p className="sr-only" aria-live="polite">
         {active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`}
       </p>
