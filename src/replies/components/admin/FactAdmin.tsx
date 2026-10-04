@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button, Card, Meta, Pill, ReplyText, SectionHeading, StatusLine } from '@/replies/components/replies/primitives';
 import { ADMIN } from '@/replies/lib/workspace/copy';
 import { factSensitivitySchema } from '@/replies/lib/contracts/vocabulary';
@@ -109,6 +109,12 @@ function FactForm({
   const tagsId = useId();
   const validFromId = useId();
   const validToId = useId();
+
+  // Opened in place (CS-060): move the cursor into the form so it is obvious it opened.
+  useEffect(() => {
+    document.getElementById(factId)?.focus({ preventScroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isChinese = /\p{Script=Han}/u.test(form.fact_text);
 
@@ -253,6 +259,8 @@ export function FactAdmin({ initial }: { initial: AdminFact[] }) {
   const [mode, setMode] = useState<'closed' | 'add' | 'edit'>('closed');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  /** A short result shown on the row that changed, so it is seen where the edit happened (CS-060). */
+  const [rowNote, setRowNote] = useState<{ id: string; text: string } | null>(null);
 
   async function refresh() {
     const { facts } = await adminApi.listFacts();
@@ -272,7 +280,8 @@ export function FactAdmin({ initial }: { initial: AdminFact[] }) {
     await refresh();
     setMode('closed');
     setEditingId(null);
-    setStatus(ADMIN.facts.saved);
+    setStatus(null);
+    setRowNote({ id: fact.id, text: ADMIN.facts.saved });
   }
 
   const editingFact = editingId ? items.find((f) => f.id === editingId) ?? null : null;
@@ -294,19 +303,6 @@ export function FactAdmin({ initial }: { initial: AdminFact[] }) {
         />
       ) : null}
 
-      {mode === 'edit' && editingFact ? (
-        <FactForm
-          initial={formFromFact(editingFact)}
-          heading={ADMIN.facts.editTitle}
-          isNew={false}
-          onCancel={() => {
-            setMode('closed');
-            setEditingId(null);
-          }}
-          onSubmit={(fields) => update(editingFact, fields)}
-        />
-      ) : null}
-
       {mode === 'closed' ? (
         <Button variant="primary" size="primary" className="mb-3" onClick={() => setMode('add')}>
           {ADMIN.facts.add}
@@ -319,6 +315,23 @@ export function FactAdmin({ initial }: { initial: AdminFact[] }) {
         <ul className="list-none p-0">
           {items.map((fact) => {
             const isChinese = /\p{Script=Han}/u.test(fact.fact_text);
+            if (mode === 'edit' && editingFact && editingFact.id === fact.id) {
+              // Edit opens right where the row is, not above a long list (CS-060).
+              return (
+                <li className="mb-2" key={fact.id}>
+                  <FactForm
+                    initial={formFromFact(editingFact)}
+                    heading={ADMIN.facts.editTitle}
+                    isNew={false}
+                    onCancel={() => {
+                      setMode('closed');
+                      setEditingId(null);
+                    }}
+                    onSubmit={(fields) => update(editingFact, fields)}
+                  />
+                </li>
+              );
+            }
             return (
               <Card as="li" className="mb-2" key={fact.id}>
                 <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -335,10 +348,13 @@ export function FactAdmin({ initial }: { initial: AdminFact[] }) {
 
                 <ReplyText text={fact.fact_text} chinese={isChinese} />
 
+                {rowNote?.id === fact.id ? <StatusLine>{rowNote.text}</StatusLine> : null}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
                     onClick={() => {
+                      setRowNote(null);
+                      setStatus(null);
                       setEditingId(fact.id);
                       setMode('edit');
                     }}

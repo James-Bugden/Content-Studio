@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button, Card, Meta, Pill, SectionHeading, StatusLine } from '@/replies/components/replies/primitives';
 import { ADMIN } from '@/replies/lib/workspace/copy';
 import { PLATFORM_LABELS, resourceOwnershipSchema, resourceTypeSchema, type Platform } from '@/replies/lib/contracts/vocabulary';
@@ -135,6 +135,12 @@ function ResourceForm({
   const ctaEnId = useId();
   const ctaZhId = useId();
   const accessNotesId = useId();
+
+  // Opened in place (CS-060): move the cursor into the form so it is obvious it opened.
+  useEffect(() => {
+    document.getElementById(titleId)?.focus({ preventScroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function submit() {
     setSaving(true);
@@ -395,6 +401,8 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [addingGuides, setAddingGuides] = useState(false);
+  /** A short result shown on the row that changed, so it is seen where the edit happened (CS-060). */
+  const [rowNote, setRowNote] = useState<{ id: string; text: string } | null>(null);
 
   async function refresh() {
     const { resources } = await adminApi.listResources();
@@ -413,7 +421,8 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
     await refresh();
     setMode('closed');
     setEditingId(null);
-    setStatus(ADMIN.resources.saved);
+    setStatus(null);
+    setRowNote({ id: resource.id, text: ADMIN.resources.saved });
   }
 
   async function addSiteGuides() {
@@ -431,12 +440,13 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
   }
 
   async function toggleActive(resource: AdminResource) {
+    setRowNote(null);
     try {
       await adminApi.updateResource(resource.id, resource.version, { active: !resource.active });
       await refresh();
-      setStatus(resource.active ? ADMIN.resources.disabled : ADMIN.resources.enabled);
+      setRowNote({ id: resource.id, text: resource.active ? ADMIN.resources.disabled : ADMIN.resources.enabled });
     } catch {
-      setStatus(ADMIN.resources.saveFailed);
+      setRowNote({ id: resource.id, text: ADMIN.resources.saveFailed });
     }
   }
 
@@ -458,18 +468,6 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
         />
       ) : null}
 
-      {mode === 'edit' && editingResource ? (
-        <ResourceForm
-          initial={formFromResource(editingResource)}
-          heading={ADMIN.resources.editTitle}
-          onCancel={() => {
-            setMode('closed');
-            setEditingId(null);
-          }}
-          onSubmit={(fields) => update(editingResource, fields)}
-        />
-      ) : null}
-
       {mode === 'closed' ? (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Button variant="primary" size="primary" onClick={() => setMode('add')}>
@@ -486,7 +484,20 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
         <StatusLine>{ADMIN.resources.empty}</StatusLine>
       ) : (
         <ul className="list-none p-0">
-          {items.map((resource) => (
+          {items.map((resource) => mode === 'edit' && editingResource && editingResource.id === resource.id ? (
+            // Edit opens right where the row is, not above a long list (CS-060).
+            <li className="mb-2" key={resource.id}>
+              <ResourceForm
+                initial={formFromResource(editingResource)}
+                heading={ADMIN.resources.editTitle}
+                onCancel={() => {
+                  setMode('closed');
+                  setEditingId(null);
+                }}
+                onSubmit={(fields) => update(editingResource, fields)}
+              />
+            </li>
+          ) : (
             <Card as="li" className="mb-2" key={resource.id}>
               <div className="mb-1 flex flex-wrap items-center gap-2">
                 <Pill>{resource.type}</Pill>
@@ -507,10 +518,13 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
               {/* Access wording only ever appears when the registry actually verified it. */}
               {resource.access_notes ? <Meta>{resource.access_notes}</Meta> : null}
 
+              {rowNote?.id === resource.id ? <StatusLine>{rowNote.text}</StatusLine> : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button
                   variant="secondary"
                   onClick={() => {
+                    setRowNote(null);
+                    setStatus(null);
                     setEditingId(resource.id);
                     setMode('edit');
                   }}
