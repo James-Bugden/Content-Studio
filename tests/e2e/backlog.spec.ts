@@ -644,3 +644,32 @@ test('the post editor saves a chosen hook to the Sheet under the hook alternativ
   await page.reload();
   await expect(page.getByRole('dialog').getByLabel('Chosen hook')).toHaveValue('Negotiate the scope before the salary.');
 });
+
+test('the Backlog shows approved and queued totals for the whole Library and they move when a post is approved and queued (CS-059)', async ({ page }) => {
+  await page.goto('/backlog');
+  const totals = page.getByRole('region', { name: 'Content totals' });
+  const num = async (label: string) => Number((await totals.locator('div', { has: page.getByText(label, { exact: true }) }).locator('dd span').first().textContent())!.replace(/,/g, ''));
+  const before = { approved: await num('Approved'), queued: await num('Queued for scheduling'), total: await num('Total posts') };
+  expect(before.total).toBeGreaterThan(0);
+  expect(before.approved).toBeLessThanOrEqual(before.total);
+  expect(before.queued).toBeLessThanOrEqual(before.approved);
+  // The nav count and the total agree.
+  await expect(page.getByRole('navigation', { name: 'Backlog views' })).toContainText(`Posts (${before.total})`);
+
+  const wide = (page.viewportSize()?.width ?? 0) >= 768;
+  const row = page.locator(`${wide ? 'tr' : 'li'}[data-backlog-id="SYN-L001"]`);
+  await row.getByRole('link', { name: /^Edit / }).click();
+  const panel = page.getByRole('dialog');
+  await panel.getByRole('button', { name: 'Approve and queue' }).click();
+  await expect(panel.getByText('Approved and queued for scheduling.')).toBeVisible();
+
+  // The totals move as soon as the approval lands, with the panel still open.
+  await expect.poll(() => num('Approved')).toBe(before.approved + 1);
+  expect(await num('Queued for scheduling')).toBe(before.queued + 1);
+  expect(await num('Total posts')).toBe(before.total);
+
+  await panel.getByRole('button', { name: 'Close' }).click();
+  await page.reload();
+  expect(await num('Approved')).toBe(before.approved + 1);
+  expect(await num('Queued for scheduling')).toBe(before.queued + 1);
+});

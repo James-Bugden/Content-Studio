@@ -8,7 +8,8 @@ import { FilterBar } from '@/components/filter-bar';
 import { SortDirectionToggle } from '@/components/backlog/sort-direction-toggle';
 import { PLATFORMS, type Platform } from '@/domain/enums';
 import { ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
-import { libraryBacklogView } from '@/domain/library-backlog';
+import { libraryBacklogTotals, libraryBacklogView } from '@/domain/library-backlog';
+import { BacklogTotalsStrip } from '@/components/backlog/backlog-totals';
 import { BACKLOG_DIRECTIONS, BACKLOG_GROUPS, BACKLOG_SORTS, type BacklogDirection, type BacklogGroup, type BacklogSort } from '@/domain/library-backlog';
 import { backlogReadiness } from '@/application/backlog-readiness';
 import { requireActor } from '@/lib/auth';
@@ -80,6 +81,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     return (
       <>
         <PageHeader title="Backlog" description="Posts from Content Library. Filter, review and edit them here." />
+        <BacklogTotalsStrip initial={libraryBacklogTotals(library)} />
         <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><span aria-current="page" className="font-semibold">Posts ({library.length})</span><a className="text-primary underline" href="/backlog?view=ideas">Ideas in Content Queue</a></nav>
         <FilterBar filters={[
           { key: 'source', label: 'Source', options: view.sources.map((s) => ({ value: s, label: s })) },

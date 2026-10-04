@@ -118,3 +118,24 @@ export function libraryBacklogView(rows: LibraryRecord[], filters: LibraryBacklo
   const page = Math.min(Math.max(filters.page ?? 1, 1), totalPages);
   return { sources, platforms, pestoOptions, statusOptions, total: matches.length, totalPages, page, groupTotals, rows: matches.slice((page - 1) * LIBRARY_BACKLOG_PAGE_SIZE, page * LIBRARY_BACKLOG_PAGE_SIZE) };
 }
+
+/**
+ * Whole-Library progress totals for the Backlog header (CS-059): how many posts
+ * exist, how many are approved, and how many of those are queued for scheduling.
+ * Counted from the Content Library rows themselves, so they never depend on a
+ * filter, a page or the derived Ready Queue; a filter changes the table, not what
+ * has been done.
+ */
+export type BacklogTotals = { total: number; approved: number; queued: number };
+
+export function libraryBacklogTotals(rows: readonly Pick<LibraryRecord, 'value'>[]): BacklogTotals {
+  let approved = 0;
+  let queued = 0;
+  for (const { value } of rows) {
+    if (value.reviewStatus.ok && value.reviewStatus.value === 'Approved') {
+      approved += 1;
+      if (value.queueForSchedule) queued += 1;
+    }
+  }
+  return { total: rows.length, approved, queued };
+}

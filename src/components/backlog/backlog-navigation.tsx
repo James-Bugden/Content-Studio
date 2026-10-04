@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import type { LibraryRecord } from '@/domain/records';
 import type { BacklogReadiness } from '@/domain/library-backlog';
 
@@ -34,6 +34,9 @@ const Context = createContext<{
   setSearchPage: (page: number) => void;
   result: { key: string; data: BacklogResult } | null;
   setResult: (result: { key: string; data: BacklogResult } | null) => void;
+  /** Bumped whenever a post is saved or reviewed, so the totals strip re-reads (CS-059). */
+  totalsVersion: number;
+  refreshTotals: () => void;
 } | null>(null);
 
 export function BacklogNavigationProvider({ children }: { children: React.ReactNode }) {
@@ -41,7 +44,9 @@ export function BacklogNavigationProvider({ children }: { children: React.ReactN
   const [search, setSearch] = useState('');
   const [searchPage, setSearchPage] = useState(1);
   const [result, setResult] = useState<{ key: string; data: BacklogResult } | null>(null);
-  return <Context.Provider value={{ navigation, setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult }}>{children}</Context.Provider>;
+  const [totalsVersion, setTotalsVersion] = useState(0);
+  const refreshTotals = useCallback(() => setTotalsVersion((v) => v + 1), []);
+  return <Context.Provider value={{ navigation, setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult, totalsVersion, refreshTotals }}>{children}</Context.Provider>;
 }
 
 export function useBacklogNavigation() {

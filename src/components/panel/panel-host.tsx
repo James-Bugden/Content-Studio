@@ -28,7 +28,7 @@ export function PanelHost() {
   const pathname = usePathname();
   const ref = useRef<HTMLDialogElement>(null);
   const navigationEpoch = useRef(0);
-  const { navigation, setSearch, setSearchPage, setResult } = useBacklogNavigation();
+  const { navigation, setSearch, setSearchPage, setResult, refreshTotals } = useBacklogNavigation();
   const [moving, setMoving] = useState(false);
   const [navigationError, setNavigationError] = useState('');
   const [failedDirection, setFailedDirection] = useState<-1 | 1>(1);
@@ -134,6 +134,8 @@ export function PanelHost() {
 
   function onDraftSaved() {
     rowsStale.current = true;
+    // Saved or reviewed: re-read the approved / queued totals now, not when the panel closes (CS-059).
+    refreshTotals();
     if (advanceAfterSave.current !== post) return;
     advanceAfterSave.current = null;
     if (hasNext) requestAnimationFrame(() => requestAnimationFrame(() => moveTo(1)));
