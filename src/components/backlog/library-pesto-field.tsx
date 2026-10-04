@@ -41,11 +41,11 @@ export function LibraryPestoField({ libraryId, value, revision, canEdit, suggest
     const previous = current.value;
     setCurrent((c) => ({ ...c, value: next }));
     setStatus({ kind: 'saving' });
-    const res = await postJson<Outcome>(`/api/library/${encodeURIComponent(libraryId)}/pesto`, {
+    const res = await postJson<Outcome>(`/api/library/${encodeURIComponent(libraryId)}/fields`, {
       operationId: newOperationId('pesto'),
       libraryId,
       expectedRevision: current.revision,
-      pesto: next,
+      patch: { pesto: next },
     });
     const body = res.body as Outcome;
     if (body.ok) {

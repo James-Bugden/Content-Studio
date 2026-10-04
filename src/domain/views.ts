@@ -70,6 +70,8 @@ export type EditorModel = {
   pesto: string;
   /** PESTO stages already used in the Library, offered as suggestions. */
   pestoOptions: string[];
+  /** Hook Alternatives cell, shown beside the chosen-hook field (CS-056). */
+  hookAlternatives: string;
   markdown:
     | { state: 'ok'; body: string; sectionHash: string; fileRevision: string; modifiedTime: string; headingLine: string }
     | { state: 'unavailable'; reason: string; code: string };

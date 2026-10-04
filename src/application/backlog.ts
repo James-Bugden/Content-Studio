@@ -232,31 +232,39 @@ export async function applyBacklogEdit(repo: ContentRepository, actor: Actor, t:
 }
 
 /**
- * PESTO edit on a Content Library post (CS-054): the Posts table and the post
- * editor. Same envelope as every other guarded write: owner only, operation id,
- * expected revision. Only the PESTO cell is written.
+ * Field edits on a Content Library post from the Posts table and the post editor:
+ * PESTO (CS-054) and the chosen hook, `Current Hook` (CS-056). Same envelope as
+ * every other guarded write: owner only, operation id, expected revision. Only
+ * the named cells are written; both are existing Sheet columns.
  */
-export const libraryPestoEditSchema = z.object({
+export const libraryFieldEditSchema = z.object({
   operationId: operationIdSchema,
   libraryId: libraryIdSchema,
   expectedRevision: revisionSchema,
-  pesto: z.string().max(200),
+  patch: z.object({
+    pesto: z.string().max(200).optional(),
+    currentHook: z.string().max(500).optional(),
+  }).strict().refine((p) => Object.keys(p).length > 0, 'patch must set at least one field'),
 }).strict();
-export type LibraryPestoEdit = z.infer<typeof libraryPestoEditSchema>;
+export type LibraryFieldEdit = z.infer<typeof libraryFieldEditSchema>;
 
-export type LibraryPestoOutcome =
-  | { ok: true; pesto: string; revision: string; replayed: boolean }
+export type LibraryFieldOutcome =
+  | { ok: true; pesto: string; currentHook: string; revision: string; replayed: boolean }
   | { ok: false; code: ErrorCode };
 
-export async function applyLibraryPestoEdit(repo: ContentRepository, actor: Actor, t: LibraryPestoEdit): Promise<LibraryPestoOutcome> {
+export async function applyLibraryFieldEdit(repo: ContentRepository, actor: Actor, t: LibraryFieldEdit): Promise<LibraryFieldOutcome> {
   if (actor.role !== 'owner') return { ok: false, code: 'FORBIDDEN' };
+  const patch: LibraryPatch = {};
+  if (t.patch.pesto !== undefined) patch.pesto = t.patch.pesto.trim();
+  if (t.patch.currentHook !== undefined) patch.currentHook = t.patch.currentHook.trim();
   const result = await repo.updateLibrary({
     operationId: t.operationId,
     actor,
     target: { libraryId: t.libraryId },
     expectedRevision: t.expectedRevision,
-    patch: { pesto: t.pesto.trim() },
+    patch,
   });
   if (!result.ok) return { ok: false, code: result.code };
-  return { ok: true, pesto: result.value.value.pesto, revision: result.value.revision, replayed: result.replayed };
+  const v = result.value.value;
+  return { ok: true, pesto: v.pesto, currentHook: v.currentHook, revision: result.value.revision, replayed: result.replayed };
 }
