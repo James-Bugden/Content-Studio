@@ -9,6 +9,23 @@ import { fingerprint } from './hash';
  * heading line and the next heading, minus one separating blank line on each side,
  * which is kept as frame. Every byte outside the body is preserved exactly.
  *
+ * Master files written by the review export (CS-055) use a second layout, where
+ * the Library ID sits in a marker rather than a heading:
+ *
+ *   ### LinkedIn — some-slug
+ *   <!-- POST_START library_id="MD-…" sheet_row="194" -->
+ *   Decision: PENDING
+ *   …review metadata…
+ *   #### Draft
+ *
+ *   The post copy.
+ *
+ *   <!-- POST_END -->
+ *
+ * There the section is the `Draft` heading's body inside that post's markers, so
+ * only the copy is editable and the review metadata and markers are frame. A
+ * heading that names the Library ID still wins when both exist.
+ *
  * Markdown is untrusted data: nothing here renders HTML, follows links or reads
  * instructions from the text.
  */
@@ -29,6 +46,7 @@ export type SectionLookup =
   | { ok: false; reason: 'missing' | 'duplicate'; count: number };
 
 const HEADING = /^(#{1,6})[ \t]+(.*)$/;
+const FENCE = /^\s{0,3}(```|~~~)/;
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -62,7 +80,7 @@ export function findSection(source: string, libraryId: string): SectionLookup {
   });
 
   const matches = headings.filter((h) => token.test(HEADING.exec(lines[h.index]!.text)![2]!));
-  if (matches.length === 0) return { ok: false, reason: 'missing', count: 0 };
+  if (matches.length === 0) return findMarkedSection(lines, headings, libraryId, source);
   if (matches.length > 1) return { ok: false, reason: 'duplicate', count: matches.length };
 
   const head = matches[0]!;
@@ -90,6 +108,72 @@ export function findSection(source: string, libraryId: string): SectionLookup {
   };
 }
 
+const POST_START = /^\s*<!--\s*POST_START\b(.*?)-->\s*$/;
+const POST_END = /^\s*<!--\s*POST_END\s*-->\s*$/;
+const DRAFT_HEADING = /^draft$/i;
+
+function markerLibraryId(attrs: string): string | null {
+  const m = /\blibrary_id\s*=\s*"([^"]*)"/.exec(attrs);
+  return m ? m[1]!.trim() : null;
+}
+
+/** The `#### Draft` body inside a `POST_START library_id="…"` … `POST_END` block (CS-055). */
+function findMarkedSection(lines: Line[], headings: { index: number; level: number }[], libraryId: string, source: string): SectionLookup {
+  let inFence = false;
+  const starts: number[] = [];
+  lines.forEach((line, index) => {
+    if (FENCE.test(line.text)) inFence = !inFence;
+    if (inFence) return;
+    const m = POST_START.exec(line.text);
+    if (m && markerLibraryId(m[1]!) === libraryId) starts.push(index);
+  });
+  if (starts.length === 0) return { ok: false, reason: 'missing', count: 0 };
+  if (starts.length > 1) return { ok: false, reason: 'duplicate', count: starts.length };
+
+  const startIndex = starts[0]!;
+  let endIndex = -1;
+  for (let i = startIndex + 1; i < lines.length; i += 1) {
+    if (POST_START.test(lines[i]!.text)) break;
+    if (POST_END.test(lines[i]!.text)) { endIndex = i; break; }
+  }
+  if (endIndex < 0) return { ok: false, reason: 'missing', count: 0 };
+
+  const drafts = headings.filter((h) => h.index > startIndex && h.index < endIndex && DRAFT_HEADING.test(HEADING.exec(lines[h.index]!.text)![2]!.trim()));
+  if (drafts.length !== 1) return { ok: false, reason: drafts.length === 0 ? 'missing' : 'duplicate', count: drafts.length };
+  const draft = drafts[0]!;
+  // The Draft body runs to the next heading inside the block, or to POST_END.
+  const next = headings.find((h) => h.index > draft.index && h.index < endIndex);
+  let first = draft.index + 1;
+  let last = (next ? next.index : endIndex) - 1;
+  if (first <= last && lines[first]!.text.trim() === '') first += 1;
+  if (last >= first && lines[last]!.text.trim() === '') last -= 1;
+
+  let bodyStart: number;
+  let bodyEnd: number;
+  if (first > last) {
+    bodyStart = lines[first]?.start ?? source.length;
+    bodyEnd = bodyStart;
+  } else {
+    bodyStart = lines[first]!.start;
+    bodyEnd = lines[last]!.end;
+  }
+  const body = source.slice(bodyStart, bodyEnd);
+  // Show the post's own heading (e.g. "### LinkedIn — slug") when there is one just above the marker.
+  const title = [...headings].reverse().find((h) => h.index < startIndex);
+  return {
+    ok: true,
+    section: {
+      libraryId,
+      headingLine: title ? lines[title.index]!.text : lines[draft.index]!.text,
+      level: draft.level,
+      body,
+      bodyHash: fingerprint(body),
+      bodyStart,
+      bodyEnd,
+    },
+  };
+}
+
 /** Replace only the body of a section. Every other byte is returned unchanged. */
 export function replaceSectionBody(source: string, section: MarkdownSection, newBody: string): string {
   const before = source.slice(0, section.bodyStart);
@@ -102,8 +186,6 @@ export function replaceSectionBody(source: string, section: MarkdownSection, new
   }
   return before + newBody + after;
 }
-
-const FENCE = /^\s{0,3}(```|~~~)/;
 
 /**
  * Structural safety for a section body (adversarial review finding 1). A body

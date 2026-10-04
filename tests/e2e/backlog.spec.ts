@@ -489,7 +489,7 @@ test('Backlog headers sort the whole inventory and a second click reverses it (C
     await expect.poll(async () => (await firstCard()).localeCompare(ascending)).toBeGreaterThan(0);
   }
 
-  await expect(page.getByLabel('PESTO')).toBeVisible();
+  await expect(page.getByLabel('PESTO', { exact: true })).toBeVisible();
   await page.getByLabel('Group', { exact: true }).selectOption('platform');
   await expect(page).toHaveURL(/group=platform/);
   await expect(table.locator('[data-backlog-group]:visible').first()).toContainText(/\d+ posts?/);
@@ -594,31 +594,27 @@ test('bulk pass: Save & next saves, opens the next post with the cursor in the c
   await expect(copy).toHaveValue('A synthetic draft that will not save');
 });
 
-test('PESTO is editable on a post in the Posts table and in the post editor (CS-054)', async ({ page }) => {
+test('PESTO is picked from a dropdown on a post in the Posts table and in the post editor (CS-054/055)', async ({ page }) => {
   const wide = (page.viewportSize()?.width ?? 0) >= 768;
   await page.goto('/backlog');
   const r = page.locator(`${wide ? 'tr' : 'li'}[data-backlog-id="SYN-L001"]`);
+  const picker = r.getByRole('combobox', { name: 'PESTO stage for SYN-L001' });
+  await expect(picker.locator('option')).toContainText(['No PESTO stage', 'Personal', 'Expertise', 'Social proof', 'Trending', 'Opinions']);
   const write = page.waitForRequest((req) => req.url().includes('/api/library/SYN-L001/pesto') && req.method() === 'POST');
-  await r.getByRole('button', { name: /^Edit pesto stage for SYN-L001/ }).click();
-  const field = r.getByRole('combobox', { name: 'PESTO stage for SYN-L001' }).or(r.getByRole('textbox', { name: 'PESTO stage for SYN-L001' }));
-  await field.fill('Stories');
-  await field.press('Enter');
-  expect(((await write).postDataJSON() as { pesto: string }).pesto).toBe('Stories');
-  await expect(r.locator('[data-text-cell="PESTO stage"] [role="status"]')).toHaveText('Saved');
+  await picker.selectOption('Trending');
+  expect(((await write).postDataJSON() as { pesto: string }).pesto).toBe('Trending');
+  await expect(r.locator('[data-pesto-field] [role="status"]')).toHaveText('Saved');
 
   // The editor shows the saved stage and edits it against the new Sheet revision.
   await r.getByRole('link', { name: /^Edit / }).click();
   const panel = page.getByRole('dialog');
-  const editorPesto = panel.getByRole('button', { name: /^Edit pesto stage for SYN-L001/ });
-  await expect(editorPesto).toContainText('Stories');
-  await editorPesto.click();
-  const editorField = panel.getByRole('combobox', { name: 'PESTO stage for SYN-L001' }).or(panel.getByRole('textbox', { name: 'PESTO stage for SYN-L001' }));
-  await editorField.fill('Opinions');
-  await editorField.press('Enter');
-  await expect(panel.getByRole('button', { name: /^Edit pesto stage for SYN-L001/ })).toContainText('Opinions');
+  const editorPicker = panel.getByRole('combobox', { name: 'PESTO stage for SYN-L001' });
+  await expect(editorPicker).toHaveValue('Trending');
+  await editorPicker.selectOption('Opinions');
+  await expect(panel.getByRole('combobox', { name: 'PESTO stage for SYN-L001' })).toHaveValue('Opinions');
 
   await page.goto('/backlog');
-  await expect(page.locator(`${wide ? 'tr' : 'li'}[data-backlog-id="SYN-L001"]`).getByRole('button', { name: /^Edit pesto stage for SYN-L001/ })).toContainText('Opinions');
+  await expect(page.locator(`${wide ? 'tr' : 'li'}[data-backlog-id="SYN-L001"]`).getByRole('combobox', { name: 'PESTO stage for SYN-L001' })).toHaveValue('Opinions');
 });
 
 test('a long post in the Content column expands in place instead of being cut off (CS-054)', async ({ page }) => {
