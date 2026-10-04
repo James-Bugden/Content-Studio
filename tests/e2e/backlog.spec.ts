@@ -600,9 +600,9 @@ test('PESTO is picked from a dropdown on a post in the Posts table and in the po
   const r = page.locator(`${wide ? 'tr' : 'li'}[data-backlog-id="SYN-L001"]`);
   const picker = r.getByRole('combobox', { name: 'PESTO stage for SYN-L001' });
   await expect(picker.locator('option')).toContainText(['No PESTO stage', 'Personal', 'Expertise', 'Social proof', 'Trending', 'Opinions']);
-  const write = page.waitForRequest((req) => req.url().includes('/api/library/SYN-L001/pesto') && req.method() === 'POST');
+  const write = page.waitForRequest((req) => req.url().includes('/api/library/SYN-L001/fields') && req.method() === 'POST');
   await picker.selectOption('Trending');
-  expect(((await write).postDataJSON() as { pesto: string }).pesto).toBe('Trending');
+  expect(((await write).postDataJSON() as { patch: Record<string, string> }).patch).toEqual({ pesto: 'Trending' });
   await expect(r.locator('[data-pesto-field] [role="status"]')).toHaveText('Saved');
 
   // The editor shows the saved stage and edits it against the new Sheet revision.
@@ -626,4 +626,21 @@ test('a long post in the Content column expands in place instead of being cut of
   await expect(post).toHaveAttribute('open', '');
   await expect(post.locator('p').getByText('End with a question, not a demand.')).toBeVisible();
   await expect(post.getByText('Show less')).toBeVisible();
+});
+
+test('the post editor saves a chosen hook to the Sheet under the hook alternatives (CS-056)', async ({ page }) => {
+  await page.goto('/backlog?post=SYN-L001');
+  const panel = page.getByRole('dialog');
+  await expect(panel.getByRole('heading', { name: 'Hook alternatives' })).toBeVisible();
+  const field = panel.getByLabel('Chosen hook');
+  await expect(field).toHaveValue('Most people negotiate the salary.');
+  await expect(panel.getByRole('button', { name: 'Save hook' })).toBeDisabled();
+  await field.fill('Negotiate the scope before the salary.');
+  const write = page.waitForRequest((req) => req.url().includes('/api/library/SYN-L001/fields') && req.method() === 'POST');
+  await panel.getByRole('button', { name: 'Save hook' }).click();
+  expect(((await write).postDataJSON() as { patch: Record<string, string> }).patch).toEqual({ currentHook: 'Negotiate the scope before the salary.' });
+  await expect(panel.getByLabel('Chosen hook')).toHaveValue('Negotiate the scope before the salary.');
+
+  await page.reload();
+  await expect(page.getByRole('dialog').getByLabel('Chosen hook')).toHaveValue('Negotiate the scope before the salary.');
 });

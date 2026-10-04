@@ -9,6 +9,7 @@ import { initialEditorText, PostEditor, type EditorSnapshot } from './post-edito
 import { QaPanel } from './qa-panel';
 import { ReviewActions } from '../review/review-actions';
 import { LibraryPestoField } from '../backlog/library-pesto-field';
+import { HookChoice } from './hook-choice';
 
 /**
  * Owns the editor's current text so the AI panels always bind to exactly what is
@@ -75,6 +76,19 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
         />
         {canEdit && snapshot.dirty ? <span className="text-xs text-ink-soft">Save the draft first to change PESTO.</span> : null}
       </div>
+      <HookChoice
+        key={`hook:${model.sheet.revision}`}
+        libraryId={model.libraryId}
+        alternatives={model.hookAlternatives}
+        currentHook={model.sheet.hook}
+        revision={snapshot.sheetRevision}
+        canEdit={canEdit}
+        blockedReason={snapshot.dirty ? 'Save the draft first; the hook saves to the same Sheet row.' : undefined}
+        onSaved={() => {
+          void reload(!focusMode);
+          if (focusMode) onSaved?.();
+        }}
+      />
       <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? (onSaved ?? (() => router.refresh())) : undefined} onSaveFailed={onSaveFailed} autoFocus={focusMode} />
       {reviewActions && canEdit ? (
         <ReviewActions
