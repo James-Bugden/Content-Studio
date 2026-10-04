@@ -10,6 +10,7 @@ import { QaPanel } from './qa-panel';
 import { ReviewActions } from '../review/review-actions';
 import { LibraryPestoField } from '../backlog/library-pesto-field';
 import { HookChoice } from './hook-choice';
+import { MismatchNotice } from './mismatch-notice';
 
 /**
  * Owns the editor's current text so the AI panels always bind to exactly what is
@@ -36,6 +37,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
     sheetRevision: initialModel.sheet.revision,
     sectionHash: initialModel.markdown.state === 'ok' ? initialModel.markdown.sectionHash : '',
     markdownOk: initialModel.markdown.state === 'ok',
+    mismatch: initialModel.mismatch,
   });
   const [reloadFailed, setReloadFailed] = useState(false);
   const onSnapshot = useCallback((s: EditorSnapshot) => setSnapshot(s), []);
@@ -108,6 +110,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} /></div></details>
         : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />}
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">Hook review</summary><div className="mt-3">{hookPanel()}</div></details> : hookPanel()}
+      {snapshot.mismatch ? <MismatchNotice sheetDraft={model.sheet.draft} canEdit={canEdit} onUseSheetVersion={() => setText(model.sheet.draft)} /> : null}
     </div>
   );
 

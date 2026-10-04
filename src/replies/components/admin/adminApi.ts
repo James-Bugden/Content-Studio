@@ -61,6 +61,7 @@ export const adminApi = {
     } satisfies Extract<LibraryPatchRequest, { action: 'withdraw' }>),
 
   listResources: () => send<{ resources: AdminResource[] }>('/api/replies/resources', 'GET'),
+  addSiteGuides: () => send<{ added: number; already_there: number }>('/api/replies/resources/site-guides', 'POST', {}),
   createResource: (body: ResourceInput) => send<{ id: string; version: number }>('/api/replies/resources', 'POST', body),
   updateResource: (id: string, expectedVersion: number, changes: Record<string, unknown>) =>
     send<{ id: string; version: number }>(`/api/replies/resources/${id}`, 'PATCH', {

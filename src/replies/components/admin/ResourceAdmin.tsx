@@ -394,6 +394,7 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
   const [mode, setMode] = useState<'closed' | 'add' | 'edit'>('closed');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [addingGuides, setAddingGuides] = useState(false);
 
   async function refresh() {
     const { resources } = await adminApi.listResources();
@@ -413,6 +414,20 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
     setMode('closed');
     setEditingId(null);
     setStatus(ADMIN.resources.saved);
+  }
+
+  async function addSiteGuides() {
+    setAddingGuides(true);
+    setStatus(null);
+    try {
+      const { added, already_there } = await adminApi.addSiteGuides();
+      await refresh();
+      setStatus(ADMIN.resources.siteGuidesAdded(added, already_there));
+    } catch {
+      setStatus(ADMIN.resources.siteGuidesFailed);
+    } finally {
+      setAddingGuides(false);
+    }
   }
 
   async function toggleActive(resource: AdminResource) {
@@ -456,14 +471,15 @@ export function ResourceAdmin({ initial }: { initial: AdminResource[] }) {
       ) : null}
 
       {mode === 'closed' ? (
-        <Button
-          variant="primary"
-          size="primary"
-          className="mb-3"
-          onClick={() => setMode('add')}
-        >
-          {ADMIN.resources.add}
-        </Button>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Button variant="primary" size="primary" onClick={() => setMode('add')}>
+            {ADMIN.resources.add}
+          </Button>
+          <Button variant="quiet" onClick={() => void addSiteGuides()} disabled={addingGuides}>
+            {addingGuides ? ADMIN.resources.addingSiteGuides : ADMIN.resources.addSiteGuides}
+          </Button>
+          <Meta>{ADMIN.resources.siteGuidesHint}</Meta>
+        </div>
       ) : null}
 
       {items.length === 0 ? (

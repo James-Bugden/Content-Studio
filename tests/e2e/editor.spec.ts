@@ -101,9 +101,16 @@ test('UX-06: a dirty draft survives a reload through tab-local recovery and asks
 test('a Sheet and Markdown mismatch is shown and can be reconciled explicitly', async ({ page }) => {
   await control(page.request, { kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Draft Content', value: 'Old Sheet mirror' });
   await page.goto('/review/SYN-L001');
-  await expect(page.getByText('The Sheet draft and the Markdown section differ.').first()).toBeVisible();
+  // The headline also appears in the review blockers, so find the notice by text only it has.
+  const notice = page.getByText('Compare first if you are unsure.');
+  await expect(notice).toBeVisible();
+  // CS-058: the notice sits below the copy and the review controls, not above the copy.
+  const copyBox = await editor(page).boundingBox();
+  const noticeBox = await notice.boundingBox();
+  expect(noticeBox!.y).toBeGreaterThan(copyBox!.y + copyBox!.height);
   await page.getByRole('button', { name: 'Make the Sheet match the Markdown' }).click();
   await expect(page.getByText(/mirrored to the Sheet|Already saved/)).toBeVisible();
+  await expect(notice).toBeHidden();
   const model = (await (await page.request.get('/api/library/SYN-L001/editor')).json()) as { model: { mismatch: boolean } };
   expect(model.model.mismatch).toBe(false);
 });

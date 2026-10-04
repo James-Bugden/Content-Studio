@@ -37,7 +37,7 @@ type Status =
   | { kind: 'error'; code: string; message: string };
 
 /** What the AI panels need to bind proposals to the exact text and revisions in the editor. */
-export type EditorSnapshot = { dirty: boolean; sheetRevision: string; sectionHash: string; markdownOk: boolean };
+export type EditorSnapshot = { dirty: boolean; sheetRevision: string; sectionHash: string; markdownOk: boolean; /** Sheet draft and Markdown section differ; the workspace shows the notice (CS-058). */ mismatch: boolean };
 
 /** Text the editor opens with: the canonical Markdown section when it loaded, else the Sheet mirror. */
 export function initialEditorText(model: EditorModel): string {
@@ -123,8 +123,8 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
   }, []);
 
   useEffect(() => {
-    onSnapshot?.({ dirty, sheetRevision, sectionHash, markdownOk });
-  }, [onSnapshot, dirty, sheetRevision, sectionHash, markdownOk]);
+    onSnapshot?.({ dirty, sheetRevision, sectionHash, markdownOk, mismatch });
+  }, [onSnapshot, dirty, sheetRevision, sectionHash, markdownOk, mismatch]);
 
   async function save() {
     if (!markdownOk) return;
@@ -263,22 +263,6 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         <InlineResult tone="warning">
           {markdownFailure(model.markdown)} Saving is disabled so the Sheet and Markdown cannot drift apart. Any Sheet draft shown below can still be copied.
         </InlineResult>
-      ) : null}
-
-      {mismatch ? (
-        <div className="rounded-md border border-line bg-paper p-3 text-sm">
-          <p className="font-semibold">The Sheet draft and the Markdown section differ.</p>
-          <p className="mt-1">The editor loaded the Markdown version, which is canonical. Saving will make the Sheet match it exactly. Compare first if you are unsure.</p>
-          <details className="mt-2">
-            <summary className="cursor-pointer">Show the Sheet version</summary>
-            <pre className="copy mt-2 rounded bg-card p-2 font-sans text-sm">{model.sheet.draft}</pre>
-            {canEdit ? (
-              <button type="button" className={`${buttonClass()} mt-2`} onClick={() => setText(model.sheet.draft)}>
-                Start from the Sheet version instead
-              </button>
-            ) : null}
-          </details>
-        </div>
       ) : null}
 
       <label htmlFor={textId} className="text-sm font-medium">
