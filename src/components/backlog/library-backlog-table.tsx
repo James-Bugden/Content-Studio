@@ -2,8 +2,10 @@ import { Fragment } from 'react';
 import type { LibraryRecord } from '@/domain/records';
 import { readableTitle } from '@/domain/display';
 import { groupBacklogRows, libraryBacklogStatus, type BacklogDirection, type BacklogGroup, type BacklogReadiness, type BacklogSort } from '@/domain/library-backlog';
+import { parseHookAlternatives } from '@/domain/hook-alternatives';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { PillarTag } from '../pillar-tag';
+import { LibraryPestoField } from './library-pesto-field';
 
 function statusTone(status: BacklogReadiness): string {
   if (status.tone === 'good') return 'bg-green-soft text-green';
@@ -25,7 +27,44 @@ function ReadinessExplanation({ status }: { status: BacklogReadiness }) {
   </details>;
 }
 
-type Row = Pick<LibraryRecord, 'row' | 'value'>;
+type Row = Pick<LibraryRecord, 'row' | 'value'> & { revision?: string };
+
+/**
+ * Post copy in a row (CS-054): the opening lines, then "Show full post" to read
+ * the rest in place, so long posts are never silently cut off. A native
+ * <details> keeps it keyboard operable without extra ARIA.
+ */
+function PostContent({ text }: { text: string }) {
+  if (!text.trim()) return <p className="mt-1 text-ink-soft">Open to read and edit the source post.</p>;
+  const long = text.length > 280 || text.split('\n').length > 5;
+  if (!long) return <p className="mt-1 whitespace-pre-line break-words text-ink-soft">{text}</p>;
+  return <details className="group mt-1">
+    <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+      <span className="line-clamp-5 whitespace-pre-line break-words text-ink-soft group-open:hidden">{text}</span>
+      <span className="inline-flex min-h-9 items-center text-xs font-medium text-primary underline underline-offset-2"><span className="group-open:hidden">Show full post</span><span className="hidden group-open:inline">Show less</span></span>
+    </summary>
+    <p className="whitespace-pre-line break-words text-ink-soft">{text}</p>
+  </details>;
+}
+
+/**
+ * Hook Alternatives as a short list (CS-054): score and template on one muted
+ * line, the hook itself clamped to two lines. The full text stays in the title
+ * tooltip and in the post editor, so the row height stays close to its neighbours.
+ */
+function HookAlternativesList({ raw }: { raw: string }) {
+  const items = parseHookAlternatives(raw);
+  if (items.length === 0) return <span className="text-ink-soft">—</span>;
+  return <ol className="flex flex-col gap-2">
+    {items.map((alt, i) => <li key={i} title={[alt.score, alt.template, alt.hook].filter(Boolean).join(' · ')} className="min-w-0">
+      {alt.score || alt.template ? <p className="flex min-w-0 items-baseline gap-1.5 text-xs text-ink-soft">
+        {alt.score ? <span className="shrink-0 font-semibold tabular-nums text-ink">{alt.score}</span> : null}
+        {alt.template ? <span className="truncate">{alt.template}</span> : null}
+      </p> : null}
+      <p className="line-clamp-2 break-words text-ink">{alt.hook}</p>
+    </li>)}
+  </ol>;
+}
 type Column = { label: string; sort?: BacklogSort; className?: string };
 
 /** Group heading text. The whole-result total is primary; the page count is named so it is not misread as the total. */
@@ -35,8 +74,10 @@ function GroupCount({ label, shown, total }: { label: string; shown: number; tot
 }
 
 /** Bounded rows, keeping the page light even when the Sheet holds thousands of posts. */
-export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showHooks = true, sort = 'sheet', dir = 'asc', group, groupTotals = {}, onSort }: {
+export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showHooks = true, sort = 'sheet', dir = 'asc', group, groupTotals = {}, onSort, canEdit = false, pestoOptions = [] }: {
   rows: Row[]; statuses?: Record<string, BacklogReadiness>; compact?: boolean; showHooks?: boolean;
+  /** Owner edits PESTO in place (CS-054); needs each row's revision. */
+  canEdit?: boolean; pestoOptions?: readonly string[];
   sort?: BacklogSort; dir?: BacklogDirection; group?: BacklogGroup; groupTotals?: Record<string, number>;
   /** Header click; the caller sorts the whole inventory server-side (CS-043). */
   onSort?: (key: BacklogSort) => void;
@@ -51,11 +92,14 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
   const statusOf = (record: Row) => statuses[record.value.libraryId] ?? fallbackStatus(libraryBacklogStatus(record));
   return (
     <div role="region" aria-label="Content Library posts" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-card">
-      <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[68rem]' : 'min-w-[52rem]'}`}>
+      {/* CS-054 widths: # fits four digits, Source and Hook Template read without
+          clipping, and Hook Alternatives gets room for its formatted list. */}
+      <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[96rem]' : 'min-w-[68rem]'}`}>
         <colgroup>
-          <col className="w-12" /><col className="w-36" /><col className="w-24" />
-          <col className="w-24" />{showHooks ? <><col className="w-36" /><col className="w-36" /></> : null}
-          <col /><col className="w-36" /><col className="w-20" />
+          <col className="w-16" /><col className="w-40" /><col className="w-24" />
+          <col className="w-32" />{showHooks ? <><col className="w-44" /><col className="w-72" /></> : null}
+          {/* Content takes whatever is left; the table's minimum keeps it at least ~24rem. */}
+          <col /><col className="w-36" /><col className="w-24" />
         </colgroup>
         <thead className="sticky top-0 bg-paper text-xs text-ink-soft">
           <tr className="border-b border-line">
@@ -83,16 +127,16 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
               return (
                 <tr key={item.libraryId} data-backlog-id={item.libraryId} className="border-b border-line align-top last:border-0 hover:bg-paper">
                   <td className={`${cell} tabular-nums text-ink-soft`}>{record.row}</td>
-                  <td className={`max-w-48 ${cell} font-medium`}><span title={item.contentSource || 'Uncategorised'} className="block truncate">{item.contentSource || 'Uncategorised'}</span></td>
+                  <td className={`${cell} font-medium`}><span title={item.contentSource || 'Uncategorised'} className="line-clamp-2 break-words">{item.contentSource || 'Uncategorised'}</span></td>
                   <td className={cell}>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</td>
-                  <td className={cell}><PillarTag value={item.pesto} /></td>
-                  {showHooks ? <><td className={`max-w-44 ${cell} break-words`}>{item.hookTemplate || '—'}</td>
-                  <td className={`max-w-48 ${cell} whitespace-pre-line break-words text-ink-soft`}>{item.hookAlternatives || '—'}</td></> : null}
-                  <td className={`min-w-64 max-w-md ${cell}`}>
+                  <td className={cell}>{canEdit && record.revision
+                    ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} />
+                    : <PillarTag value={item.pesto} />}</td>
+                  {showHooks ? <><td className={cell}><span title={item.hookTemplate || undefined} className="line-clamp-3 break-words">{item.hookTemplate || '—'}</span></td>
+                  <td className={cell}><HookAlternativesList raw={item.hookAlternatives} /></td></> : null}
+                  <td className={cell}>
                     <p className="line-clamp-2 break-words font-semibold text-ink">{title}</p>
-                    <p className="mt-1 line-clamp-2 whitespace-pre-line break-words text-ink-soft">
-                      {item.draftContent || 'Open to read and edit the source post.'}
-                    </p>
+                    <PostContent text={item.draftContent} />
                   </td>
                   <td className={`sticky right-20 z-10 border-l border-line bg-card ${cell}`}><ReadinessExplanation status={status} /></td>
                   <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
@@ -112,9 +156,11 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
             return <li key={item.libraryId} data-backlog-id={item.libraryId} className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><ReadinessExplanation status={status} /></div>
               <p className="text-base font-semibold">{title}</p>
-              <p className="line-clamp-3 whitespace-pre-line text-sm text-ink-soft">{item.draftContent || 'Open to read and edit the source post.'}</p>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span><PillarTag value={item.pesto} /><span>Hook template: {item.hookTemplate || '—'}</span></div>
-              {item.hookAlternatives ? <p className="line-clamp-2 whitespace-pre-line text-xs text-ink-soft">Alternatives: {item.hookAlternatives}</p> : null}
+              <div className="text-sm"><PostContent text={item.draftContent} /></div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span>
+                {canEdit && record.revision ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} /> : <PillarTag value={item.pesto} />}
+                <span>Hook template: {item.hookTemplate || '—'}</span></div>
+              {showHooks && item.hookAlternatives ? <details className="text-xs"><summary className="inline-flex min-h-11 cursor-pointer items-center font-medium text-ink-soft">Hook alternatives ({parseHookAlternatives(item.hookAlternatives).length})</summary><div className="pt-1 text-sm"><HookAlternativesList raw={item.hookAlternatives} /></div></details> : null}
               <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>
             </li>;
           })}

@@ -1,12 +1,12 @@
 import 'server-only';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { getOwnerSession, type OwnerSession } from '@/replies/lib/auth/owner';
+import { getOwnerSession, noSessionReason, type OwnerSession } from '@/replies/lib/auth/owner';
 import { isTestMode, TEST_OWNER_ID } from '@/replies/lib/server/test-mode';
 import { getStore } from '@/replies/lib/server/get-store';
 import { publicConfig } from '@/replies/lib/config/env';
 import { AppHeader } from '@/replies/components/replies/AppHeader';
-import { NAV, PAGES } from '@/replies/lib/workspace/copy';
+import { NAV, PAGES, RECORD } from '@/replies/lib/workspace/copy';
 import type { Progress } from '@/replies/lib/contracts/api';
 
 /**
@@ -30,14 +30,25 @@ export async function loadProgress(session: OwnerSession): Promise<Progress | nu
   return store.dailyCounts(publicConfig().timezone).catch(() => null);
 }
 
-export function SignedOutPage() {
+/**
+ * The page shown when there is no owner session. It names the real reason
+ * (CS-054): only a signed-out visitor is sent to sign in; a signed-in owner whose
+ * reply database is not configured is told that instead, since signing in again
+ * cannot fix it.
+ */
+export async function SignedOutPage({ signedOutText = PAGES.signedOut }: { signedOutText?: string } = {}) {
+  const reason = await noSessionReason();
   return (
       <section className="mx-auto max-w-[750px] px-4 py-16">
       <h1 className="text-xl font-semibold text-ink">{NAV.title}</h1>
-      <p className="mt-2 text-ink-soft">{PAGES.signedOut}</p>
-      <Link href="/login" className="mt-4 inline-block text-green underline">
-        {PAGES.signIn}
-      </Link>
+      {reason === 'not_configured' ? <p role="alert" className="mt-2 text-ink-soft">{RECORD.notConfigured}</p>
+        : reason === 'not_owner' ? <p className="mt-2 text-ink-soft">{RECORD.notOwner}</p>
+        : <>
+          <p className="mt-2 text-ink-soft">{signedOutText}</p>
+          <Link href="/login" className="mt-4 inline-block text-green underline">
+            {PAGES.signIn}
+          </Link>
+        </>}
       </section>
   );
 }

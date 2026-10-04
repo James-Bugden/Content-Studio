@@ -12,12 +12,15 @@ import { LibraryBacklogTable } from './library-backlog-table';
 type Props = {
   initial: BacklogResult;
   filters: Pick<LibraryBacklogFilters, 'source' | 'platform' | 'pesto' | 'status' | 'sort' | 'dir' | 'group'>;
+  /** Owner may edit PESTO in place (CS-054). */
+  canEdit?: boolean;
+  pestoOptions?: readonly string[];
 };
 
 
 
 /** Search is deliberately ephemeral: private post copy never goes in a URL. */
-export function LibraryBacklogExplorer({ initial, filters }: Props) {
+export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pestoOptions = [] }: Props) {
   const { source, platform, pesto, status, sort, dir, group } = filters;
   const router = useRouter();
   const pathname = usePathname() ?? '/backlog';
@@ -167,7 +170,7 @@ export function LibraryBacklogExplorer({ initial, filters }: Props) {
     </p>
     {error ? <p role="alert" className="text-sm text-block">Search could not load. Your search text is kept here. <button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button></p> : null}
     {search.trim() && (pending || loading || error) ? null : active.total === 0 ? <p role="status" className="rounded-lg border border-line bg-card p-4 text-sm">No posts match. Try a different source, status or search.</p>
-      : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks}
+      : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} canEdit={canEdit} pestoOptions={pestoOptions}
         sort={sort ?? 'sheet'} dir={dir ?? 'asc'} group={group} groupTotals={active.groupTotals} onSort={sortBy} />}
     {active.totalPages > 1 && !(search.trim() && (pending || loading || error)) ? <nav aria-label="Backlog pages" className="flex items-center justify-between text-sm">
       {search.trim() ? <button type="button" disabled={pending || active.page <= 1} onClick={() => { setPending(true); setSearchPage(active.page - 1); }} className="min-h-11 text-primary underline disabled:opacity-40">Previous page</button>

@@ -230,3 +230,33 @@ export async function applyBacklogEdit(repo: ContentRepository, actor: Actor, t:
   if (!result.ok) return { ok: false, code: result.code };
   return { ok: true, item: toBacklogItem(result.value), revision: result.value.revision, replayed: result.replayed };
 }
+
+/**
+ * PESTO edit on a Content Library post (CS-054): the Posts table and the post
+ * editor. Same envelope as every other guarded write: owner only, operation id,
+ * expected revision. Only the PESTO cell is written.
+ */
+export const libraryPestoEditSchema = z.object({
+  operationId: operationIdSchema,
+  libraryId: libraryIdSchema,
+  expectedRevision: revisionSchema,
+  pesto: z.string().max(200),
+}).strict();
+export type LibraryPestoEdit = z.infer<typeof libraryPestoEditSchema>;
+
+export type LibraryPestoOutcome =
+  | { ok: true; pesto: string; revision: string; replayed: boolean }
+  | { ok: false; code: ErrorCode };
+
+export async function applyLibraryPestoEdit(repo: ContentRepository, actor: Actor, t: LibraryPestoEdit): Promise<LibraryPestoOutcome> {
+  if (actor.role !== 'owner') return { ok: false, code: 'FORBIDDEN' };
+  const result = await repo.updateLibrary({
+    operationId: t.operationId,
+    actor,
+    target: { libraryId: t.libraryId },
+    expectedRevision: t.expectedRevision,
+    patch: { pesto: t.pesto.trim() },
+  });
+  if (!result.ok) return { ok: false, code: result.code };
+  return { ok: true, pesto: result.value.value.pesto, revision: result.value.revision, replayed: result.replayed };
+}

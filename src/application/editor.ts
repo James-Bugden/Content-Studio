@@ -41,6 +41,8 @@ export async function loadEditor(repo: ContentRepository, drive: DriveGateway, l
     targetPlatform: item.targetPlatform.ok ? item.targetPlatform.value : 'Unrecognised',
     reviewStatus: item.reviewStatus.ok ? item.reviewStatus.value : 'Unrecognised',
     sheet: { revision: record.revision, draft: item.draftContent, hook: item.currentHook },
+    pesto: item.pesto,
+    pestoOptions: [...new Set(library.map((r) => r.value.pesto.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     markdown: read.ok
       ? {
           state: 'ok',
