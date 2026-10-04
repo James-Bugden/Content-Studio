@@ -5,18 +5,22 @@ import { readableTitle } from '@/domain/display';
 import { EditorWorkspace } from '../editor/editor-workspace';
 import { StateView } from '../state-view';
 import { buttonClass } from '../button-styles';
-import { fetchEditor, type EditorLoad } from './editor-cache';
+import { fetchEditor, prefetchEditor, takePrefetchedEditor, type EditorLoad } from './editor-cache';
 
 type Load = { kind: 'loading' } | { kind: 'error'; message: string; rateLimited: boolean } | ({ kind: 'ready' } & EditorLoad);
 
 /**
  * The Backlog goes straight to the guarded copy editor, avoiding the heavier
  * board, scheduling and promotion reads needed by the general post panel.
- * For bulk passes (CS-047) it puts the cursor in the copy. A failed load offers
- * Try again in place (CS-051), so a brief Sheets slow-down costs one click.
+ * For bulk passes (CS-047) it uses a prefetched load when one is waiting, puts
+ * the cursor in the copy, and once open starts loading the next post on the
+ * current results page so Next is instant (restored in CS-053). A failed load
+ * offers Try again in place (CS-051), so a brief Sheets slow-down costs one click.
  */
-export function BacklogPostPanel({ libraryId, position, onSaved, onSaveFailed }: {
+export function BacklogPostPanel({ libraryId, nextId, position, onSaved, onSaveFailed }: {
   libraryId: string;
+  /** The following post on the current results page, prefetched once this one is open. */
+  nextId?: string | null;
   /** "12 of 340" style position in the current results, when known. */
   position?: string;
   onSaved?: () => void;
@@ -26,7 +30,8 @@ export function BacklogPostPanel({ libraryId, position, onSaved, onSaveFailed }:
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetchEditor(libraryId, controller.signal)
+    // A Try again never reuses a prefetch: it must be a fresh request.
+    ((attempt === 0 ? takePrefetchedEditor(libraryId) : null) ?? fetchEditor(libraryId, controller.signal))
       .then((ready) => { if (!controller.signal.aborted) setLoad({ kind: 'ready', ...ready }); })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -35,6 +40,11 @@ export function BacklogPostPanel({ libraryId, position, onSaved, onSaveFailed }:
       });
     return () => controller.abort();
   }, [libraryId, attempt]);
+
+  const ready = load.kind === 'ready';
+  useEffect(() => {
+    if (ready && nextId) prefetchEditor(nextId);
+  }, [ready, nextId]);
 
   if (load.kind === 'loading') return <StateView kind="loading" title="Loading the editor" />;
   if (load.kind === 'error') {
