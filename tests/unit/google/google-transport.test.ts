@@ -56,40 +56,46 @@ describe('service account tokens', () => {
 });
 
 describe('GoogleSheetTransport', () => {
-  it('starts values, formulas and link reads together for a large range', async () => {
-    const urls: string[] = [];
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
-    const impl = (async (url: string | URL) => {
-      const text = String(url);
-      if (text.includes('oauth2.googleapis.com')) return tokenOk();
-      urls.push(text);
-      await gate;
-      if (text.includes('valueRenderOption=FORMULA')) return jsonRes({ values: [['ID']] });
-      if (text.includes('valueRenderOption=FORMATTED_VALUE')) return jsonRes({ values: [['ID']] });
-      return jsonRes({ sheets: [] });
-    }) as typeof fetch;
-    const t = new GoogleSheetTransport('SYNTH_sheet_id_0000000000', new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
-    const read = t.readTab('Content Library', 'AG', { startRow: 1, maxRows: 500, formulas: true, links: true });
-    for (let i = 0; i < 20 && urls.length < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
-    const started = urls.length;
-    release();
-    await read;
-    expect(started).toBe(3);
-  });
-  it('reads a quoted, bounded range with values, formulas and links', async () => {
+  it('reads a page in one request: values, formulas and links from the same grid (CS-052)', async () => {
     const { impl, calls } = scripted([
       tokenOk,
-      () => jsonRes({ values: [['Library ID', 'State'], ['SYN-1', 'Editing']] }),
-      () => jsonRes({ values: [['Library ID', 'State'], ['SYN-1', '=A1']] }),
-      () => jsonRes({ sheets: [{ data: [{ rowData: [{ values: [{}, {}] }, { values: [{ hyperlink: 'https://drive.google.com/file/d/SYNTH_x_abcdefghijklmnop/view' }] }] }] }] }),
+      () => jsonRes({ sheets: [{ data: [{ rowData: [
+        { values: [{ formattedValue: 'Library ID', userEnteredValue: { stringValue: 'Library ID' } }, { formattedValue: 'State', userEnteredValue: { stringValue: 'State' } }] },
+        { values: [
+          { formattedValue: 'SYN-1', userEnteredValue: { stringValue: 'SYN-1' }, hyperlink: 'https://drive.google.com/file/d/SYNTH_x_abcdefghijklmnop/view' },
+          { formattedValue: 'Editing', userEnteredValue: { formulaValue: '=A1' } },
+          { formattedValue: '3', userEnteredValue: { numberValue: 3 } },
+          { formattedValue: 'TRUE', userEnteredValue: { boolValue: true } },
+          {},
+        ] },
+        { values: [{}, {}] },
+        {},
+      ] }] }] }),
     ]);
     const t = new GoogleSheetTransport('SYNTH_sheet_id_0000000000', new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
     const rows = await t.readTab("James's Library", 'AG', { startRow: 1, maxRows: 500, formulas: true, links: true });
-    expect(decodeURIComponent(calls[1]!.url)).toContain("'James''s Library'!A1:AG500");
-    expect(calls[1]!.url).toContain('valueRenderOption=FORMATTED_VALUE');
-    expect(calls[2]!.url).toContain('valueRenderOption=FORMULA');
-    expect(rows[1]).toEqual({ values: ['SYN-1', 'Editing'], formulas: ['SYN-1', '=A1'], links: ['https://drive.google.com/file/d/SYNTH_x_abcdefghijklmnop/view'] });
+    expect(calls).toHaveLength(2); // token + exactly one Sheets request
+    const url = decodeURIComponent(calls[1]!.url);
+    expect(url).toContain("ranges='James''s Library'!A1:AG500");
+    expect(url).toContain('formattedValue,userEnteredValue,hyperlink');
+    expect(rows).toHaveLength(2); // trailing empty rows dropped, so a short page still ends paging
+    expect(rows[1]).toEqual({
+      values: ['SYN-1', 'Editing', '3', 'TRUE'],
+      formulas: ['SYN-1', '=A1', 3, true],
+      links: ['https://drive.google.com/file/d/SYNTH_x_abcdefghijklmnop/view', null, null, null],
+    });
+  });
+
+  it('omits formulas and links when they were not asked for', async () => {
+    const { impl } = scripted([tokenOk, () => jsonRes({ sheets: [{ data: [{ rowData: [{ values: [{ formattedValue: 'ID', userEnteredValue: { stringValue: 'ID' } }] }] }] }] })]);
+    const t = new GoogleSheetTransport('SYNTH_sheet_id_0000000000', new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
+    expect(await t.readTab('Content Library', 'AG', { startRow: 2, maxRows: 1, formulas: false, links: false })).toEqual([{ values: ['ID'] }]);
+  });
+
+  it('an empty range reads as no rows', async () => {
+    const { impl } = scripted([tokenOk, () => jsonRes({ sheets: [{ data: [{}] }] })]);
+    const t = new GoogleSheetTransport('SYNTH_sheet_id_0000000000', new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
+    expect(await t.readTab('Content Library', 'AG', { startRow: 501, maxRows: 500, formulas: true, links: true })).toEqual([]);
   });
 
   it('writes named cells with RAW input so = is stored as text', async () => {
