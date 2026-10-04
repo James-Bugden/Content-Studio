@@ -66,6 +66,10 @@ export type EditorModel = {
   targetPlatform: string;
   reviewStatus: string;
   sheet: { revision: string; draft: string; hook: string };
+  /** PESTO stage (Sheet column), editable beside the copy (CS-054). */
+  pesto: string;
+  /** PESTO stages already used in the Library, offered as suggestions. */
+  pestoOptions: string[];
   markdown:
     | { state: 'ok'; body: string; sectionHash: string; fileRevision: string; modifiedTime: string; headingLine: string }
     | { state: 'unavailable'; reason: string; code: string };

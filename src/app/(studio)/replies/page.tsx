@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { Workspace } from '@/replies/components/replies/Workspace';
 import { getOwnerSession } from '@/replies/lib/auth/owner';
 import { getStore } from '@/replies/lib/server/get-store';
 import { isTestMode, TEST_OWNER_ID } from '@/replies/lib/server/test-mode';
 import { publicConfig } from '@/replies/lib/config/env';
-import { NAV, RECORD } from '@/replies/lib/workspace/copy';
+import { RECORD } from '@/replies/lib/workspace/copy';
+import { SignedOutPage } from '@/replies/components/admin/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,17 +22,7 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const session = isTestMode() ? await testSession() : await getOwnerSession();
 
-  if (!session) {
-    return (
-      <main className="mx-auto max-w-[750px] px-4 py-16">
-        <h1 className="text-xl font-semibold">{NAV.title}</h1>
-        <p className="mt-2 text-ink-soft">{RECORD.signedOut}</p>
-        <Link href="/login" className="mt-4 inline-block text-green underline">
-          Sign in
-        </Link>
-      </main>
-    );
-  }
+  if (!session) return <SignedOutPage signedOutText={RECORD.signedOut} />;
 
   const store = getStore(session);
   const [progress, hasEligibleFacts] = await Promise.all([

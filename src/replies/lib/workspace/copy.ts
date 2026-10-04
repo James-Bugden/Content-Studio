@@ -156,6 +156,8 @@ export const RECORD = {
   ideaFailed: "Couldn't save the idea. Your reply is still recorded.",
   next: 'Next reply',
   signedOut: 'Sign in to save your reply.',
+  notConfigured: 'Replies is not connected to its database yet, so nothing can be saved. Add the reply database settings (SUPABASE_READ_MODEL_URL and SUPABASE_READ_MODEL_SERVICE_KEY) to the production environment, then redeploy.',
+  notOwner: 'Replies is only available to the owner account.',
 } as const;
 
 export const NAV = {

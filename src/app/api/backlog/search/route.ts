@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const view = libraryBacklogView(library, parsed.data, readiness);
     if (parsed.data.status && !view.statusOptions.includes(parsed.data.status)) throw new AppError('VALIDATION_FAILED');
     return json({ ok: true, total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals,
-      rows: view.rows.map(({ row, value }) => ({ row, value })),
+      rows: view.rows.map(({ row, value, revision }) => ({ row, value, revision })),
       statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)])),
     });
   } catch (error) {

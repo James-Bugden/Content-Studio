@@ -8,6 +8,7 @@ import { HookPanel } from './hook-panel';
 import { initialEditorText, PostEditor, type EditorSnapshot } from './post-editor';
 import { QaPanel } from './qa-panel';
 import { ReviewActions } from '../review/review-actions';
+import { LibraryPestoField } from '../backlog/library-pesto-field';
 
 /**
  * Owns the editor's current text so the AI panels always bind to exactly what is
@@ -55,6 +56,25 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
 
   return (
     <div className="flex flex-col gap-6">
+      {/* CS-054: PESTO beside the copy. It writes the Sheet row, so it waits for
+          unsaved copy to be saved (the save is checked against the row revision),
+          then reloads the editor onto the new revision. */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-ink-soft">PESTO</span>
+        <LibraryPestoField
+          key={`${model.sheet.revision}:${model.pesto}`}
+          libraryId={model.libraryId}
+          value={model.pesto}
+          revision={snapshot.sheetRevision}
+          canEdit={canEdit && !snapshot.dirty}
+          suggestions={model.pestoOptions}
+          onSaved={() => {
+            void reload(!focusMode);
+            if (focusMode) onSaved?.();
+          }}
+        />
+        {canEdit && snapshot.dirty ? <span className="text-xs text-ink-soft">Save the draft first to change PESTO.</span> : null}
+      </div>
       <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? (onSaved ?? (() => router.refresh())) : undefined} onSaveFailed={onSaveFailed} autoFocus={focusMode} />
       {reviewActions && canEdit ? (
         <ReviewActions

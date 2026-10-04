@@ -23,6 +23,20 @@ export async function getOwnerSession(): Promise<OwnerSession | null> {
   return { userId: data, supabase };
 }
 
+/**
+ * Why there is no owner session, so the page can say the true thing (CS-054).
+ * A signed-in owner with no reply database configured used to be told to sign
+ * in, which sent them in a loop: signing in again cannot fix a missing setting.
+ */
+export type NoSessionReason = 'signed_out' | 'not_owner' | 'not_configured';
+
+export async function noSessionReason(): Promise<NoSessionReason> {
+  const actor = await getActor();
+  if (!actor) return 'signed_out';
+  if (actor.role !== 'owner') return 'not_owner';
+  return serverConfig().database.configured ? 'signed_out' : 'not_configured';
+}
+
 export async function requireOwner(): Promise<OwnerSession> {
   const session = await getOwnerSession();
   if (!session) throw new AppError('unauthenticated', 'Sign in to continue.');

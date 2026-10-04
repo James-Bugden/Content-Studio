@@ -6,7 +6,7 @@ import type { BacklogReadiness } from '@/domain/library-backlog';
 
 export type BacklogResult = {
   ok: true;
-  rows: Pick<LibraryRecord, 'row' | 'value'>[];
+  rows: Pick<LibraryRecord, 'row' | 'value' | 'revision'>[];
   statuses: Record<string, BacklogReadiness>;
   total: number;
   page: number;

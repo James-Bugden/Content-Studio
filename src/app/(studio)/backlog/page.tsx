@@ -91,7 +91,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         ]} variant="toolbar" trailing={<SortDirectionToggle />} />
         <LibraryBacklogExplorer
           initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
-          filters={filters} />
+          filters={filters} canEdit={actor.role === 'owner'} pestoOptions={view.pestoOptions} />
       </>
     );
   }
