@@ -26,6 +26,22 @@ import { fingerprint } from './hash';
  * only the copy is editable and the review metadata and markers are frame. A
  * heading that names the Library ID still wins when both exist.
  *
+ * Theme-bank files (CS-057) use a third layout: a post heading with a
+ * `Library ID: …` line directly under it, and the copy in a fenced block under a
+ * `### Working draft` heading:
+ *
+ *   ## 001. Some angle | LinkedIn
+ *   Library ID: BLIND-20260922-001-LI
+ *   …metadata, hook review…
+ *   ### Working draft
+ *   A note to the reviewer.
+ *   ```text
+ *   The post copy.
+ *   ```
+ *
+ * There the section is the text inside that fence (or the Working draft
+ * subsection when it has no fence), so notes and metadata stay frame.
+ *
  * Markdown is untrusted data: nothing here renders HTML, follows links or reads
  * instructions from the text.
  */
@@ -80,7 +96,10 @@ export function findSection(source: string, libraryId: string): SectionLookup {
   });
 
   const matches = headings.filter((h) => token.test(HEADING.exec(lines[h.index]!.text)![2]!));
-  if (matches.length === 0) return findMarkedSection(lines, headings, libraryId, source);
+  if (matches.length === 0) {
+    const marked = findMarkedSection(lines, headings, libraryId, source);
+    return marked.ok || marked.reason === 'duplicate' ? marked : findLabelledSection(lines, headings, libraryId, source);
+  }
   if (matches.length > 1) return { ok: false, reason: 'duplicate', count: matches.length };
 
   const head = matches[0]!;
@@ -171,6 +190,57 @@ function findMarkedSection(lines: Line[], headings: { index: number; level: numb
       bodyStart,
       bodyEnd,
     },
+  };
+}
+
+const LIBRARY_ID_LINE = /^\s*Library ID:\s*(\S+)\s*$/i;
+const WORKING_DRAFT = /draft/i;
+
+function sectionOf(lines: Line[], first: number, last: number, source: string, trim: boolean) {
+  if (trim) {
+    if (first <= last && lines[first]!.text.trim() === '') first += 1;
+    if (last >= first && lines[last]!.text.trim() === '') last -= 1;
+  }
+  if (first > last) {
+    const at = lines[first]?.start ?? source.length;
+    return { bodyStart: at, bodyEnd: at };
+  }
+  return { bodyStart: lines[first]!.start, bodyEnd: lines[last]!.end };
+}
+
+/** The Working draft copy of a post whose heading is followed by `Library ID: …` (CS-057). */
+function findLabelledSection(lines: Line[], headings: { index: number; level: number }[], libraryId: string, source: string): SectionLookup {
+  const owners = headings.filter((h, i) => {
+    const nextAny = headings[i + 1]?.index ?? lines.length;
+    for (let j = h.index + 1; j < nextAny; j += 1) {
+      const m = LIBRARY_ID_LINE.exec(lines[j]!.text);
+      if (m) return m[1] === libraryId;
+    }
+    return false;
+  });
+  if (owners.length === 0) return { ok: false, reason: 'missing', count: 0 };
+  if (owners.length > 1) return { ok: false, reason: 'duplicate', count: owners.length };
+  const owner = owners[0]!;
+  const end = headings.find((h) => h.index > owner.index && h.level <= owner.level)?.index ?? lines.length;
+  const drafts = headings.filter((h) => h.index > owner.index && h.index < end && WORKING_DRAFT.test(HEADING.exec(lines[h.index]!.text)![2]!));
+  if (drafts.length !== 1) return { ok: false, reason: drafts.length === 0 ? 'missing' : 'duplicate', count: drafts.length };
+  const draft = drafts[0]!;
+  const draftEnd = Math.min(end, headings.find((h) => h.index > draft.index && h.level <= draft.level)?.index ?? lines.length);
+
+  // Prefer the first fenced block inside Working draft: that is the copy itself.
+  let open = -1;
+  let close = -1;
+  for (let i = draft.index + 1; i < draftEnd; i += 1) {
+    if (!FENCE.test(lines[i]!.text)) continue;
+    if (open < 0) open = i;
+    else { close = i; break; }
+  }
+  if (open >= 0 && close < 0) return { ok: false, reason: 'missing', count: 0 };
+  const span = open >= 0 ? sectionOf(lines, open + 1, close - 1, source, false) : sectionOf(lines, draft.index + 1, draftEnd - 1, source, true);
+  const body = source.slice(span.bodyStart, span.bodyEnd);
+  return {
+    ok: true,
+    section: { libraryId, headingLine: lines[owner.index]!.text, level: draft.level, body, bodyHash: fingerprint(body), ...span },
   };
 }
 
