@@ -6,13 +6,46 @@ import type { CellWrite, ReadOptions, SheetTransport } from './sheet-transport';
 
 /**
  * Google Sheets REST transport (CS-003). Reads formatted values plus formulas and
- * hyperlinks for the bounded range; writes named cells with RAW input so a value
+ * hyperlinks for the bounded range in one request; writes named cells with RAW input so a value
  * that starts with `=` is stored as text, never evaluated (formula injection).
  */
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
+}
+
+type GridCell = {
+  formattedValue?: string;
+  userEnteredValue?: { formulaValue?: string; stringValue?: string; numberValue?: number; boolValue?: boolean; errorValue?: unknown };
+  hyperlink?: string;
+};
+
+function trimEnd<T>(cells: T[], empty: (cell: T) => boolean): T[] {
+  let n = cells.length;
+  while (n > 0 && empty(cells[n - 1]!)) n -= 1;
+  return cells.slice(0, n);
+}
+
+/**
+ * Shapes a grid read like the values API it replaced: trailing empty cells and
+ * rows are dropped (so a short page still ends paging), the formula column holds
+ * the formula text or the entered value, and links are index-aligned.
+ */
+export function gridRows(grid: readonly (readonly GridCell[])[], options: Pick<ReadOptions, 'formulas' | 'links'>): RawRow[] {
+  const blank = (c: GridCell) => (c.formattedValue ?? '') === '' && c.userEnteredValue?.formulaValue === undefined && !c.hyperlink;
+  const rows = trimEnd(grid.map((cells) => trimEnd([...cells], blank)), (cells) => cells.length === 0);
+  return rows.map((cells) => {
+    const entered = (c: GridCell) => {
+      const v = c.userEnteredValue;
+      return v?.formulaValue ?? v?.stringValue ?? v?.numberValue ?? v?.boolValue ?? '';
+    };
+    return {
+      values: cells.map((c) => c.formattedValue ?? ''),
+      ...(options.formulas ? { formulas: cells.map(entered) } : {}),
+      ...(options.links ? { links: cells.map((c) => c.hyperlink ?? null) } : {}),
+    };
+  });
 }
 
 export class GoogleSheetTransport implements SheetTransport {
@@ -32,32 +65,18 @@ export class GoogleSheetTransport implements SheetTransport {
   async readTab(tab: string, lastColumn: string, options: ReadOptions): Promise<RawRow[]> {
     const end = options.startRow + options.maxRows - 1;
     const range = `${quoteTab(tab)}!A${options.startRow}:${lastColumn}${end}`;
+    // CS-052: one request per page. Formatted values, formulas and hyperlinks
+    // all come from the same grid read, instead of three separate calls that
+    // each counted against Google's per-minute read quota.
+    const fields = 'sheets(data(rowData(values(formattedValue,userEnteredValue,hyperlink))))';
+    const url = `${API}/${encodeURIComponent(this.spreadsheetId)}?ranges=${encodeURIComponent(range)}&fields=${encodeURIComponent(fields)}`;
     return withReadRetry(async () => {
       const token = await this.auth();
-      const headers = { authorization: `Bearer ${token}` };
-      const base = `${API}/${encodeURIComponent(this.spreadsheetId)}/values/${encodeURIComponent(range)}`;
-      // These representations describe the same range and have no dependency
-      // on one another. Fetch them concurrently to avoid three network latencies
-      // for every page of the large Content Library.
-      const linkUrl = `${API}/${encodeURIComponent(this.spreadsheetId)}?ranges=${encodeURIComponent(range)}&fields=${encodeURIComponent('sheets(data(rowData(values(hyperlink))))')}`;
-      const [valuesRes, formulaRes, linkRes] = await Promise.all([
-        this.fetchImpl(`${base}?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`, { headers }),
-        options.formulas ? this.fetchImpl(`${base}?valueRenderOption=FORMULA&majorDimension=ROWS`, { headers }) : Promise.resolve(null),
-        options.links ? this.fetchImpl(linkUrl, { headers }) : Promise.resolve(null),
-      ]);
-      for (const response of [valuesRes, formulaRes, linkRes]) {
-        if (response && !response.ok) throw googleError(response.status, 'sheet');
-      }
-      const values = ((await valuesRes.json()) as { values?: unknown[][] }).values ?? [];
-      const formulas = formulaRes ? ((await formulaRes.json()) as { values?: unknown[][] }).values ?? [] : [];
-      const linkBody = linkRes ? (await linkRes.json()) as { sheets?: { data?: { rowData?: { values?: { hyperlink?: string }[] }[] }[] }[] } : null;
-      const links: (string | null)[][] = (linkBody?.sheets?.[0]?.data?.[0]?.rowData ?? []).map((r) => (r.values ?? []).map((v) => v.hyperlink ?? null));
-
-      return values.map((row, i) => ({
-        values: row,
-        ...(options.formulas ? { formulas: formulas[i] ?? [] } : {}),
-        ...(options.links ? { links: links[i] ?? [] } : {}),
-      }));
+      const response = await this.fetchImpl(url, { headers: { authorization: `Bearer ${token}` } });
+      if (!response.ok) throw googleError(response.status, 'sheet');
+      const body = (await response.json()) as { sheets?: { data?: { rowData?: { values?: GridCell[] }[] }[] }[] };
+      const grid = (body.sheets?.[0]?.data?.[0]?.rowData ?? []).map((r) => r.values ?? []);
+      return gridRows(grid, options);
     });
   }
 
