@@ -104,7 +104,11 @@ function build(): Services {
   const tokens = new ServiceAccountTokens(env.GOOGLE_SERVICE_ACCOUNT_EMAIL, env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
   services = {
     mode: 'live',
-    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, readCacheMs: 3000, libraryReadCacheMs: 15_000, readinessReadCacheMs: 15_000 }),
+    // CS-053: the Library and readiness tabs stay cached for a minute per server
+    // instance, so bulk editor opens do not re-read the Sheet. Writes clear the
+    // cache and every mutation re-reads fresh against the expected revision, so a
+    // stale display can be refused but never written over.
+    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, readCacheMs: 3000, libraryReadCacheMs: 60_000, readinessReadCacheMs: 60_000 }),
     drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
     typefully: createTypefullyGateway(env),

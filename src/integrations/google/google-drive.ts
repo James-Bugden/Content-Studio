@@ -17,6 +17,8 @@ const API = 'https://www.googleapis.com/drive/v3/files';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
 const FIELDS = 'id,mimeType,modifiedTime,version,size,trashed';
 const FILE_ID = /^[A-Za-z0-9_-]{10,200}$/;
+/** How many master files keep their text in memory between editor opens. */
+const TEXT_CACHE_FILES = 16;
 
 export class GoogleDriveGateway implements DriveGateway {
   constructor(
@@ -26,6 +28,14 @@ export class GoogleDriveGateway implements DriveGateway {
     /** Folder new visual assets are uploaded into (`CS_ASSET_FOLDER_ID`). */
     private readonly assetFolderId?: string,
   ) {}
+
+  /**
+   * CS-053: text keyed by file id and Drive `version`. Many posts share one master
+   * file, so working through the backlog re-downloads the same file on every open.
+   * The metadata read still runs every time; a changed version always downloads
+   * afresh, so a cached copy is never older than Drive's own revision.
+   */
+  private readonly textCache = new Map<string, { version: string; text: string }>();
 
   capability(): Capability {
     return { provider: 'drive', mode: 'live', state: this.writeEnabled ? 'ready' : 'read_only' };
@@ -55,11 +65,16 @@ export class GoogleDriveGateway implements DriveGateway {
     if (meta.trashed) throw new AppError('NOT_FOUND', { provider: 'drive', reason: 'trashed' });
     if (!/^text\/(markdown|plain|x-markdown)$/.test(meta.mimeType)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'not_text' });
     if (meta.size > 5_000_000) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'too_large' });
+    const cached = this.textCache.get(fileId);
+    if (cached && cached.version === meta.revision) return { text: cached.text, meta };
     const text = await withReadRetry(async () => {
       const res = await this.fetchImpl(`${API}/${fileId}?alt=media&supportsAllDrives=true`, { headers: await this.headers() });
       if (!res.ok) throw googleError(res.status, 'drive');
       return new TextDecoder('utf-8', { fatal: true }).decode(await res.arrayBuffer());
     });
+    this.textCache.delete(fileId);
+    this.textCache.set(fileId, { version: meta.revision, text });
+    if (this.textCache.size > TEXT_CACHE_FILES) this.textCache.delete(this.textCache.keys().next().value!);
     return { text, meta };
   }
 

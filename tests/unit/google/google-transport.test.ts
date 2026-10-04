@@ -171,6 +171,16 @@ describe('GoogleDriveGateway', () => {
     expect(calls).toHaveLength(0);
   });
 
+  it('reuses a master file\'s text while its Drive version is unchanged, and downloads again when it moves (CS-053)', async () => {
+    const text = (body: string) => () => new Response(body, { status: 200 });
+    const { impl, calls } = scripted([tokenOk, () => meta('3'), text('# v3'), () => meta('3'), () => meta('4'), text('# v4')]);
+    const d = new GoogleDriveGateway(new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
+    expect((await d.readText('SYNTH_md_abcdefghijklmnop')).text).toBe('# v3');
+    expect((await d.readText('SYNTH_md_abcdefghijklmnop')).text).toBe('# v3');
+    expect((await d.readText('SYNTH_md_abcdefghijklmnop')).text).toBe('# v4');
+    expect(calls.filter((c) => c.url.includes('alt=media'))).toHaveLength(2);
+  });
+
   it('refuses non-text files for readText', async () => {
     const { impl } = scripted([tokenOk, () => meta('3', { mimeType: 'application/pdf' })]);
     const d = new GoogleDriveGateway(new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
