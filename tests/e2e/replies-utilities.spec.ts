@@ -125,6 +125,29 @@ test.describe('facts', () => {
     await expect(row.getByText('Excluded from generation')).toBeVisible();
     await expect(row.getByText('Marked private, context only.')).toBeVisible();
   });
+  test('Edit opens the form in the row you clicked, focused, and the save is confirmed there', async ({ page }) => {
+    await page.goto('/replies/facts');
+
+    // The seed store has no facts, so make two and edit the lower one.
+    for (const text of ['Example first fact for the edit journey.', 'Example second fact for the edit journey.']) {
+      await page.getByRole('button', { name: 'Add fact', exact: true }).click();
+      await page.getByRole('textbox', { name: 'Fact' }).fill(text);
+      await page.getByRole('button', { name: 'Save fact' }).click();
+      await expect(page.getByText('Fact saved.')).toBeVisible();
+    }
+    const text = 'Example second fact for the edit journey.';
+    await page.locator('li').filter({ hasText: text }).getByRole('button', { name: 'Edit', exact: true }).click();
+
+    // The form replaced that row; it is not parked above the list.
+    const field = page.getByRole('textbox', { name: 'Fact' });
+    await expect(field).toBeFocused();
+    await expect(field).toHaveValue(text);
+    expect(await field.evaluate((el) => !!el.closest('li'))).toBe(true);
+
+    await page.getByRole('button', { name: 'Save fact' }).click();
+    await expect(page.getByRole('textbox', { name: 'Fact' })).toHaveCount(0);
+    await expect(page.getByText('Fact saved.')).toHaveCount(1);
+  });
 });
 
 test.describe('resources', () => {
@@ -180,6 +203,21 @@ test.describe('resources', () => {
     await expect(page.getByText('This changed somewhere else. Reload before saving.')).toBeVisible();
     // The typed title is still in the form; nothing was silently overwritten or lost.
     await expect(titleField).toHaveValue('Edited title that must not be lost');
+  });
+
+  test('Edit opens the form in the row you clicked, focused, and the save is confirmed there', async ({ page }) => {
+    await page.goto('/replies/resources');
+
+    const row = page.locator('li').filter({ hasText: 'Example cover letter guide' });
+    await row.getByRole('button', { name: 'Edit', exact: true }).click();
+
+    const title = page.getByRole('textbox', { name: /^Title/ }).first();
+    await expect(title).toBeFocused();
+    expect(await title.evaluate((el) => !!el.closest('li'))).toBe(true);
+
+    await page.getByRole('button', { name: /^Save/ }).first().click();
+    await expect(page.getByRole('textbox', { name: /^Title/ })).toHaveCount(0);
+    await expect(page.locator('li').filter({ hasText: 'Example cover letter guide' }).getByText(/saved/i)).toBeVisible();
   });
 });
 
