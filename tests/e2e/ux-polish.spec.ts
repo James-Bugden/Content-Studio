@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 async function checkAndCapture(page: Page, info: TestInfo, name: string) {
+  // Next streams the document title with the page: scan only the settled document.
+  await expect.poll(() => page.title(), { message: 'document title is set before the axe scan' }).not.toBe('');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
