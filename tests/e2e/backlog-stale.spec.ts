@@ -12,6 +12,7 @@ for (const code of ['RATE_LIMITED', 'PROVIDER_UNAVAILABLE']) {
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto('/backlog');
     const rows = page.locator('[data-backlog-id]:visible');
+    await expect(rows.first()).toBeVisible();
     const count = await rows.count();
     expect(count).toBeGreaterThan(0);
     await page.request.post('/api/test-control', { data: { kind: 'fail', provider: 'sheet', op: 'read', tab: 'Content Library', code } });
