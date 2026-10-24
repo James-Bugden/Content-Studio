@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { loadBoard } from '@/application/board';
 import { today as taipeiTodayForServer } from '@/application/schedule';
-import { ErrorState, PageHeader } from '@/components';
+import { ErrorState, PageHeader, StateView } from '@/components';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
 import { DayList } from '@/components/calendar/day-list';
 import { MonthGrid } from '@/components/calendar/month-grid';
@@ -50,10 +50,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   try {
     if (view === 'month') {
       const covers = thisWeek >= grid.first && addDays(thisWeek, 6) <= grid.days[grid.days.length - 1]!;
-      board = await loadBoard(repo, { from: grid.first, days: grid.days.length });
-      stripBoard = covers ? board : await loadBoard(repo, { from: thisWeek, days: 7 });
+      board = await loadBoard(repo, { from: grid.first, days: grid.days.length, requireSchedule: true });
+      stripBoard = covers ? board : await loadBoard(repo, { from: thisWeek, days: 7, requireSchedule: true });
     } else {
-      board = await loadBoard(repo, { from: week, days: 7 });
+      board = await loadBoard(repo, { from: week, days: 7, requireSchedule: true });
       stripBoard = board;
     }
   } catch (error) {
@@ -83,7 +83,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
       />
       <CalendarNav view={view} period={period} week={week} month={month} />
       <div className="mt-4">
-        {view === 'month' ? (
+        {board.slots.length === 0 ? <StateView kind="empty" nextStep={null} /> : view === 'month' ? (
           <MonthGrid grid={grid} today={board.today} slots={board.slots} />
         ) : (
           <>

@@ -25,12 +25,12 @@ function Stat({ label, value, note }: { label: string; value: number; note?: str
 
 const share = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : '0%');
 
-export function BacklogTotalsStrip({ initial }: { initial: BacklogTotals }) {
+export function BacklogTotalsStrip({ initial, readOnly = false }: { initial: BacklogTotals; readOnly?: boolean }) {
   const { totalsVersion } = useBacklogNavigation();
   const [fetched, setFetched] = useState<BacklogTotals | null>(null);
 
   useEffect(() => {
-    if (totalsVersion === 0) return;
+    if (readOnly || totalsVersion === 0) return;
     const controller = new AbortController();
     fetch('/api/backlog/totals', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
@@ -40,7 +40,7 @@ export function BacklogTotalsStrip({ initial }: { initial: BacklogTotals }) {
       // A failed re-read keeps showing the last numbers; the next save tries again.
       .catch(() => {});
     return () => controller.abort();
-  }, [totalsVersion]);
+  }, [totalsVersion, readOnly]);
 
   const { total, approved, queued } = fetched ?? initial;
   return (

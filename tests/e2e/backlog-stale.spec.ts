@@ -10,16 +10,28 @@ for (const code of ['RATE_LIMITED', 'PROVIDER_UNAVAILABLE']) {
   test(`${code}: last good Backlog is labelled, editing blocked, Retry restores editing`, async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/backlog');
+    await page.goto('/backlog?platform=X&sort=source&dir=desc');
     const rows = page.locator('[data-backlog-id]:visible');
     await expect(rows.first()).toBeVisible();
     const count = await rows.count();
     expect(count).toBeGreaterThan(0);
+    const editNames = await rows.getByRole('link', { name: /^Edit / }).evaluateAll((links) => links.map((link) => link.getAttribute('aria-label')));
     await page.request.post('/api/test-control', { data: { kind: 'fail', provider: 'sheet', op: 'read', tab: 'Content Library', code } });
-    await page.goto('/backlog?post=SYN-L001');
+    const reads: string[] = [];
+    page.on('request', (request) => {
+      if (/\/editor(?:\?|$)|\/api\/backlog\/(?:search|totals)/.test(request.url())) reads.push(request.url());
+    });
+    const staleUrl = '/backlog?platform=X&sort=source&dir=desc&post=SYN-L001';
+    await page.goto(staleUrl);
     await expect(page.getByRole('status').filter({ hasText: 'may be out of date' })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'may be out of date' })).toContainText(/as of \d{2}:\d{2} Taipei/);
+    await expect(page.getByRole('link', { name: 'Retry', exact: true })).toHaveAttribute('href', staleUrl);
     await expect(rows).toHaveCount(count);
-    await expect(page.getByRole('button', { name: 'Edit post' }).first()).toBeDisabled();
+    expect(await rows.getByRole('button', { name: /^Edit / }).evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')))).toEqual(editNames);
+    // Every disabled row action keeps exactly the same name as its live link.
+    const row = rows.first();
+    await expect(row.getByRole('button', { name: /^Edit / })).toHaveAttribute('aria-label', /^Edit .+/);
+    await expect(page.getByRole('button', { name: /^Edit / }).first()).toBeDisabled();
     await expect(page.getByRole('link', { name: /^Edit / })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /PESTO stage/ })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -36,8 +48,14 @@ for (const code of ['RATE_LIMITED', 'PROVIDER_UNAVAILABLE']) {
     if (code === 'RATE_LIMITED') await page.screenshot({ path: 'artifacts/stale-backlog-zoom.png', fullPage: true });
     await page.evaluate(() => { document.body.style.zoom = ''; });
     expect(errors).toEqual([]);
+    expect(reads).toEqual([]);
     await page.getByRole('link', { name: 'Retry', exact: true }).click();
     await expect(page.getByText(/Showing the last good read/)).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp('platform=X&sort=source&dir=desc&post=SYN-L001$'));
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /Post copy/ })).toBeVisible();
+    expect(reads.some((url) => /\/editor(?:\?|$)/.test(url))).toBe(true);
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.getByRole('link', { name: /^Edit / }).first()).toBeVisible();
   });
 }

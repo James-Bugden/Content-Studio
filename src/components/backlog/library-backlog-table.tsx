@@ -140,7 +140,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                     <PostContent text={item.draftContent} />
                   </td>
                   <td className={`sticky right-20 z-10 border-l border-line bg-card ${cell}`}><ReadinessExplanation status={status} /></td>
-                  <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}>{readOnly ? <button disabled className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}</td>
+                  <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}>{readOnly ? <button disabled aria-label={`Edit ${title}`} className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}</td>
                 </tr>
               );
             })}
@@ -162,7 +162,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                 {canEdit && !readOnly && record.revision ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} /> : <PillarTag value={item.pesto} />}
                 <span>Hook template: {item.hookTemplate || '—'}</span></div>
               {showHooks && item.hookAlternatives ? <details className="text-xs"><summary className="inline-flex min-h-11 cursor-pointer items-center font-medium text-ink-soft">Hook alternatives ({parseHookAlternatives(item.hookAlternatives).length})</summary><div className="pt-1 text-sm"><HookAlternativesList raw={item.hookAlternatives} /></div></details> : null}
-              {readOnly ? <button disabled className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}
+              {readOnly ? <button disabled aria-label={`Edit ${title}`} className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}
             </li>;
           })}
         </Fragment>)}

@@ -54,11 +54,15 @@ old and has valid headers. Selection makes no provider calls. A missing or older
 snapshot keeps the existing error screen; a genuinely empty cached Library is
 still visibly labelled stale. Repeated failures do not extend snapshot age.
 
-The warning uses the shared warning-result pattern and offers Retry. The stale
-inventory disables Edit post and inline PESTO edits and blocks URL-opened panels.
-It renders the bounded read-only table rather than starting private search or
-editor requests. Readiness is unknown where provider data is missing. Retry
-loads the page normally; a successful read restores editing. Other list pages,
+The warning uses the shared warning-result pattern, shows the snapshot's original
+read time as `as of HH:MM Taipei`, and offers Retry with the current query string.
+The server passes read-only state to the Backlog panel host, so a URL-opened post
+never mounts an editor while stale. Disabled Edit buttons retain their row names.
+The stale inventory disables inline PESTO edits and renders the bounded read-only
+table (or shared empty/no-match state), without search, editor or totals requests.
+Readiness is unknown where provider data is missing. Retry loads the page normally;
+a successful read restores editing. The five-minute cap and fallback codes are
+unchanged. Other list pages,
 Ideas and editor/API reads retain their existing failure behaviour. Mutation
 preconditions/readbacks still bypass the cache, invalidate last-good data with
 the same entries and never select fallback. No additional provider reads,
@@ -94,6 +98,42 @@ Calls when a provider failure also produces a mutation failure outcome.
 Counts are per process, within the existing bounded 500-event buffer;
 transport-internal HTTP retries are not separate repository calls. This lets
 #88/#93 compare logical read costs without introducing a new diagnostics surface.
+
+## CS-044: cache-only navigation counts (#93)
+
+Next up and Fix issues publish only their derived task/blocking totals after
+their existing reads complete. Navigation uses an authenticated, private/no-store
+endpoint that only inspects those totals and existing Library/Schedule cache
+witnesses. It never calls a loader, Sheet transport, Drive or Typefully. Cold,
+incomplete, invalidated, changed or older-than-15-second snapshots produce no
+badge; a successfully derived zero remains a real zero. Existing last-good
+snapshots also permit synthetic zero-retention mode without changing its reads.
+Existing thumbnail and prefetch reads that complete with byte-identical rows
+retain the source witness. Pending, failed or changed refreshes hide the total;
+identical refreshes never extend a derived total's original expiry. The counts
+context wraps only the navigation, keeping its asynchronous updates outside
+streamed page and editor hydration boundaries.
+
+An identical successful refresh updates the last-good read time used by the
+stale Backlog banner while retaining the count's source generation and original
+expiry. Failed refreshes advance neither time. Calendar requires a readable
+Schedule and clears its previous count before loading, so a provider failure
+cannot appear as an empty calendar or a known navigation total.
+
+Counts are best effort per server process. Next up becomes available after a
+board load; Fix issues after a complete reconciliation load. Visiting an unrelated
+page does not run either workflow just to populate a badge. The phone keeps its
+existing four tabs and displays Fix issues' badge in More. Browser expiry removes
+numbers even when the page remains open. Mutation code is unchanged; the existing
+cache invalidation makes its witnesses unavailable to subsequent navigation reads.
+Displayed totals above 999 use `999+` to fit the phone tab bar; derivation and the
+cache-only endpoint retain the exact number.
+
+`tests/unit/navigation-counts.test.ts` asserts zero extra adapter calls for cold,
+warm and expired navigation: a board plus reconciliation requires seven Sheet
+calls (three board tabs and four existing schema checks), and ten navigation
+reads add zero Sheet, Drive or Typefully calls. Route and component tests also
+cover authentication, private caching, unknown/zero display and expiry.
 
 ## Unchanged limits
 

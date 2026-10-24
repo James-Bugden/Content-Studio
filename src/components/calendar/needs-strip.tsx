@@ -1,6 +1,7 @@
 import type { SlotSummary } from '@/domain/board';
 import { formatDayShort } from '@/domain/calendar';
 import { StepButton } from '../panel/step-button';
+import { InlineResult } from '../inline-result';
 
 /**
  * "Needs you this week" (UX redesign): the week's slot steps due now or soon, one
@@ -25,9 +26,7 @@ export function NeedsStrip({ heading, emptyText, items }: { heading: string; emp
         {heading}
       </h2>
       {items.length === 0 ? (
-        <p className="mt-1 text-sm text-ink-soft">
-          <span aria-hidden="true">✓</span> {emptyText}
-        </p>
+        <div className="mt-1"><InlineResult tone="success">{emptyText}</InlineResult></div>
       ) : (
         <ul className="mt-2 flex flex-col divide-y divide-line">
           {tasks.map((s) => {
