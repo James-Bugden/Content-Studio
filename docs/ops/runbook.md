@@ -166,6 +166,11 @@ row data after a hand revert. Concurrent checks share one in-flight promise.
 A rate-limited Sheet check waits 60 seconds before retrying, even if an import
 completes in that window; other failed reads stay immediately retryable.
 A new save discards that cache.
+Phase C measurement must include a rate limit immediately before an import:
+the old overlay can remain for the full 60-second backoff and a save in that
+window can return `STALE_READ`. Measure the duration and refusals on the copied
+workbook/branch before deciding the backoff trade-off (#183); local tests do not
+accept it for live use.
 A successful later copy or typed import repairs representable values.
 In db-read, `refused_numeric` and `refused_size` rows are excluded from accepted
 import counts and counted in the named exception ledger; other rows continue.
@@ -304,3 +309,11 @@ The in-process parity/timing display alone cannot satisfy a seven-day gate.
 No live exit number is inferred from unit or browser test counts. Missing,
 skipped or failed observations are not passes; Phase C and production MIG-11
 remain incomplete until the above private owner/live evidence exists.
+### Review follow-up flake watch (#183)
+
+`sweep-fault-375` once failed on `/reconcile` with a CONFLICT fault during
+Drive reads in #180, then passed when only failed jobs were rerun. This is
+Sheet-mode behavior; it is not evidence against or for DB-read acceptance.
+Watch the next applicable CI runs. If it recurs, retain the exact SHA, browser
+trace and fault seed, reproduce and diagnose before rerunning; a rerun alone
+does not resolve recurrence. No speculative flake fix is included here.

@@ -20,6 +20,7 @@ describe('read-only PostgREST transport', () => {
       return Response.json(rows);
     });
     expect(await new SupabaseContentDb({ ...options, fetch: request }).latestImportId()).toBe(rows[0]?.operation_id ?? null);
+    expect(new Headers(request.mock.calls[0]![1]?.headers).has('Prefer')).toBe(false);
     expect(request).toHaveBeenCalledOnce();
   });
   it.each([{ rows: [{ operation_id: null }] }, { rows: [{}] }, { rows: [{ operation_id: '' }] }])('rejects malformed import identities: $rows', async ({ rows }) => {
