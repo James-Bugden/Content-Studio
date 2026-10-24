@@ -13,6 +13,8 @@ vi.mock('@/lib/auth/config', () => ({ auth: async () => null }));
 
 const testAuth = await import('@/app/api/test-auth/route');
 const renderRoute = await import('@/app/api/library/[libraryId]/render/route');
+const scheduleAssetRoute = await import('@/app/api/schedule/[contentId]/asset/route');
+const testControl = await import('@/app/api/test-control/route');
 const visualRoute = await import('@/app/api/library/[libraryId]/visual/route');
 const { TEST_COOKIE_NAME } = await import('@/lib/auth/test-cookie');
 const { resetServices } = await import('@/application/container');
@@ -68,6 +70,35 @@ describe('GET /api/library/[id]/render', () => {
     expect((await get('SYN-L012', 'r01')).status).toBe(400);
     expect((await get('SYN-L001')).status).toBe(404);
     expect((await get('SYN-L007')).status).toBe(422);
+  });
+});
+
+describe('GET /api/schedule/[contentId]/asset', () => {
+  const getAsset = (contentId = '2026-10-01-MAIN-X') => scheduleAssetRoute.GET(new Request('http://localhost:3000/api/schedule/asset'), { params: Promise.resolve({ contentId }) });
+  async function setImage(value: string) {
+    expect((await testControl.POST(new Request('http://localhost:3000/api/test-control', { method: 'POST', body: JSON.stringify({ kind: 'schedule_edit', contentId: '2026-10-01-MAIN-X', header: 'Image File', value }) }))).status).toBe(200);
+  }
+  it('requires the existing session, validates identity and refuses missing assets', async () => {
+    expect((await getAsset()).status).toBe(401);
+    await signIn('viewer');
+    expect((await getAsset('../private')).status).toBe(400);
+    expect((await getAsset()).status).toBe(404);
+    expect((await getAsset('2026-10-30-MAIN-X')).status).toBe(404);
+  });
+  it('streams only validated Schedule image bytes to the viewer with private sandbox headers', async () => {
+    await signIn('viewer');
+    await setImage('SYNTH_asset_researched_range_r02.png');
+    const res = await getAsset();
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    expect(res.headers.get('cache-control')).toBe('private, max-age=60');
+    expect(res.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+    expect(res.headers.get('content-disposition')).toBe('inline');
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('location')).toBeNull();
+    expect([...new Uint8Array(await res.arrayBuffer()).slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    await setImage('SYNTH_asset_script.svg');
+    expect((await getAsset()).status).toBe(400);
   });
 });
 

@@ -143,6 +143,8 @@ export type PublishedRowView = {
   draftId: string;
   finalContent: string;
   visualVersion: string;
+  imageSrc?: string | null;
+  imageAlt?: string;
   publishedAt: string;
   publishedAtTaipei: string | null;
   postLink: string;
@@ -180,6 +182,8 @@ export function publishedRowView(p: ScheduledPost, revision: string, nowMs: numb
     draftId: p.typefullyDraftId,
     finalContent: p.finalContent,
     visualVersion: p.visual.version,
+    imageSrc: p.visual.imageFile.trim() ? `/api/schedule/${encodeURIComponent(p.contentId)}/asset` : null,
+    imageAlt: p.visual.altText,
     publishedAt: p.publishedAt,
     publishedAtTaipei: p.publishedAt ? formatTaipei(p.publishedAt) : null,
     postLink: p.postLink,

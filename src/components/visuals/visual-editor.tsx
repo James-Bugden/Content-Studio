@@ -9,6 +9,7 @@ import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
 import { InlineResult } from '../inline-result';
 import { GateChip } from '../status';
+import { TransferImage } from '../image-transfer';
 import { useDirtyGuard } from '../use-dirty-guard';
 
 /**
@@ -258,6 +259,10 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
         )}
       </section>
 
+      {item.decision === 'screenshot' && item.hasFile ? (
+        <TransferImage src={`/api/library/${encodeURIComponent(item.libraryId)}/asset?m=${item.fileHash}`} filename={item.slug} alt={item.altText || 'Post image'} className="w-full max-w-sm rounded-md border border-line" />
+      ) : null}
+
       {/* Decision */}
       <section aria-labelledby="decision-h" className="rounded-lg border border-line bg-card p-4">
         <h2 id="decision-h" className="text-base font-semibold">
@@ -420,8 +425,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
             {liveSrc ? (
               <figure className="flex flex-col gap-1">
                 <figcaption className="text-xs text-ink-soft">Draft preview of the brief as typed (not a revision; nothing saved)</figcaption>
-                {/* eslint-disable-next-line @next/next/no-img-element -- private no-store preview; next/image would proxy and cache it */}
-                <img src={liveSrc} alt={brief.altText || 'Draft preview'} width={240} height={Math.round((240 * canvasFor(form.placement).height) / 1080)} className="border border-line" />
+                <TransferImage filename={`${item.slug}-draft`} src={liveSrc} alt={brief.altText || 'Draft preview'} width={240} height={Math.round((240 * canvasFor(form.placement).height) / 1080)} className="border border-line" />
               </figure>
             ) : null}
 
@@ -490,10 +494,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
               <p className="mt-1 text-xs text-ink-soft">Check it at full size and at both phone widths before approving. Approval belongs to this exact revision only.</p>
               <figure className="mt-4 flex flex-col gap-1">
                 <figcaption className="text-sm font-medium">Full size ({canvas.width} x {canvas.height} px)</figcaption>
-                <div tabIndex={0} role="region" aria-label="Full-size preview (scrolls)" className="max-h-[36rem] max-w-full overflow-auto rounded-md border border-line bg-paper">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- private no-store preview; next/image would proxy and cache it */}
-                  <img src={previewSrc} alt={item.altText} width={canvas.width} height={canvas.height} className="block max-w-none" />
-                </div>
+                <TransferImage filename={item.slug} src={previewSrc} alt={item.altText} width={canvas.width} height={canvas.height} className="block max-w-none" frame={{ tabIndex: 0, role: 'region', 'aria-label': 'Full-size preview (scrolls)', className: 'max-h-[36rem] max-w-full overflow-auto rounded-md border border-line bg-paper' }} />
                 <a href={previewSrc} target="_blank" rel="noopener noreferrer" className="text-sm underline">
                   Open full size in a new tab
                 </a>
@@ -504,8 +505,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
                     <figure key={w} className="flex flex-col gap-1" data-phone-width={w}>
                       <figcaption className="text-sm font-medium">Phone width {w} px</figcaption>
                       <div className="bg-paper ring-1 ring-line" style={{ width: w }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element -- private no-store preview; next/image would proxy and cache it */}
-                        <img src={previewSrc} alt={`${item.altText} (at ${w} px)`} width={w} height={Math.round((w * canvas.height) / canvas.width)} className="block" />
+                        <TransferImage filename={item.slug} src={previewSrc} alt={`${item.altText} (at ${w} px)`} width={w} height={Math.round((w * canvas.height) / canvas.width)} className="block" />
                       </div>
                     </figure>
                   ))}

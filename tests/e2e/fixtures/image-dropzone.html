@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Image drop test</title>
+<style>#drop { width: 240px; height: 120px; border: 1px solid; }</style>
+<div id="drop">Drop an image here</div><output id="result"></output>
+<script>
+const zone = document.querySelector('#drop');
+zone.addEventListener('dragover', event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; });
+zone.addEventListener('drop', async event => {
+  event.preventDefault();
+  const files = await Promise.all([...event.dataTransfer.files].map(async file => ({
+    name: file.name, type: file.type, size: file.size, isFile: file instanceof File,
+    signature: [...new Uint8Array(await file.arrayBuffer()).slice(0, 8)]
+  })));
+  document.querySelector('#result').textContent = JSON.stringify(files);
+});
+</script></html>
