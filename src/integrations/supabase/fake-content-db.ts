@@ -49,6 +49,7 @@ const position = (a: { source_sheet_row: number | null }, b: { source_sheet_row:
 export class FakeContentDb implements ContentDb {
   readonly mode = 'fake' as const;
   private readonly seed: ContentDbSeed;
+  private importId: string | null = null;
   constructor(seed: ContentDbSeed = syntheticContentDbSeed(), private readonly version: unknown = CONTENT_STUDIO_SCHEMA_VERSION) { this.seed = structuredClone(seed); }
   private faults: { op: 'read' | 'write'; code: ErrorCode; times: number }[] = [];
   readonly history: { operation_id: string; target_kind: ContentTarget; target_id: string; before_image: ContentPostRow | ContentScheduleRow | null; row_version_before: string | null; changed_fields: string[] }[] = [];
@@ -78,7 +79,11 @@ export class FakeContentDb implements ContentDb {
     return structuredClone(row);
   }
   snapshot(): ContentDbSeed { return structuredClone(this.seed); }
-  replaceSnapshot(seed: ContentDbSeed) { Object.assign(this.seed, structuredClone(seed)); }
+  replaceSnapshot(seed: ContentDbSeed, importId?: string) {
+    Object.assign(this.seed, structuredClone(seed));
+    if (importId !== undefined) this.importId = importId;
+  }
+  async latestImportId() { this.check('read'); return this.importId; }
   async writeThrough(write: ContentWrite) { return this.mutate('copy', write); }
   async applyPatch(write: ContentWrite) { return this.mutate('patch', write); }
   async insertQueueIdea(write: ContentWrite) { return this.mutate('queue', write); }
