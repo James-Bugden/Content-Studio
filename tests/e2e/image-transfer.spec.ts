@@ -14,47 +14,40 @@ test.beforeEach(async ({ page }) => {
   expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
 });
 
-test('VIS/SEC: native drag has only a PNG File; cross-frame receipt is a known Chromium limitation', async ({ page }) => {
+test('VIS/SEC: native dragstart has only a PNG File and no URLs or tokens', async ({ page }) => {
   await page.goto('/visuals/SYN-L012');
   const image = page.getByRole('region', { name: 'Full-size preview (scrolls)', exact: true }).locator('img');
   await expect(image.locator('..')).toHaveAttribute('draggable', 'true');
-  await page.route('**/__image-dropzone', route => route.fulfill({ contentType: 'text/html', path: 'tests/e2e/fixtures/image-dropzone.html' }));
-  await page.evaluate(() => {
-    const frame = document.createElement('iframe');
-    frame.src = '/__image-dropzone';
-    frame.title = 'Test image receiver';
-    frame.style.cssText = 'position:fixed;bottom:0;left:0;width:280px;height:180px;z-index:9999;background:white';
-    document.body.append(frame);
-  });
-  const target = page.frameLocator('iframe[title="Test image receiver"]');
-  await expect(target.locator('#drop')).toBeVisible();
   await image.evaluate(img => {
     img.ownerDocument.addEventListener('dragstart', event => {
       // Document bubbling runs after React's root listener, while the native
       // store is still readable in dragstart (not after its protected mode).
-        const dt = (event as DragEvent).dataTransfer!;
-        document.documentElement.dataset.drag = JSON.stringify({
-          types: [...dt.types],
-          items: [...dt.items].map(item => ({ kind: item.kind, type: item.type, name: item.getAsFile()?.name })),
-          strings: [...dt.types].filter(type => type !== 'Files').map(type => dt.getData(type)),
-        });
+      const dt = (event as DragEvent).dataTransfer!;
+      document.documentElement.dataset.drag = JSON.stringify({
+        types: [...dt.types],
+        items: [...dt.items].map(item => ({ kind: item.kind, type: item.type, name: item.getAsFile()?.name })),
+        strings: [...dt.types].filter(type => type !== 'Files').map(type => dt.getData(type)),
+      });
     }, { once: true });
   });
-  // Real mouse drag: exercise Chromium's native data store and actual drop.
-  await image.dragTo(target.locator('#drop'), { sourcePosition: { x: 100, y: 100 } });
+  // Exercise the native dragstart store, then cancel. Native cross-frame/site
+  // receipt is an owner T4 check: docs/testing/image-transfer.md.
+  await image.hover({ position: { x: 100, y: 100 } });
+  const start = await image.boundingBox();
+  expect(start).not.toBeNull();
+  try {
+    await page.mouse.down();
+    await page.mouse.move(start!.x + 130, start!.y + 130, { steps: 10 });
+    await expect(page.locator('html')).toHaveAttribute('data-drag');
+  } finally {
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+  }
   const drag = JSON.parse((await page.locator('html').getAttribute('data-drag'))!);
   expect(drag.types).toEqual(['Files']);
   expect(drag.strings).toEqual([]);
   expect(drag.items).toEqual([{ kind: 'file', type: 'image/png', name: 'researched-range-1.png' }]);
   expect(JSON.stringify(drag)).not.toMatch(/https?:|blob:|data:|\/api\/|drive\.google|token|bearer/i);
-  await expect(target.locator('#result')).not.toBeEmpty();
-  const received = JSON.parse((await target.locator('#result').textContent())!);
-  // Keep the actual native acceptance assertion red/expected-failing, rather
-  // than claiming a dispatched event proves cross-site uploads work. If Chrome
-  // starts forwarding generated files this becomes an unexpected pass.
-  test.fail(true, 'Chromium strips the generated File during native cross-frame drop. Copy/Download are required; T4 external composers remain unverified.');
-  expect(received).toEqual([expect.objectContaining({ name: 'researched-range-1.png', type: 'image/png', isFile: true, signature: PNG })]);
-  expect(received[0].size).toBeGreaterThan(1000);
 });
 
 test('VIS: controlled dropzone event receives the actual prepared PNG File (not native cross-site proof)', async ({ page }) => {
@@ -66,14 +59,22 @@ test('VIS: controlled dropzone event receives the actual prepared PNG File (not 
     img.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
     return dataTransfer;
   });
+  const preparedFile = await transfer.evaluateHandle(dt => dt.files[0]);
   // setContent keeps this document's realm and File, but replaces the app with
   // the test-only receiving page. This is explicitly a controlled-event test.
   await page.setContent(await readFile('tests/e2e/fixtures/image-dropzone.html', 'utf8'));
+  await page.locator('#drop').evaluate((zone, file) => {
+    zone.addEventListener('drop', event => {
+      document.documentElement.dataset.sameFile = String((event as DragEvent).dataTransfer!.files[0] === file);
+    }, { once: true });
+  }, preparedFile);
   await page.locator('#drop').dispatchEvent('drop', { dataTransfer: transfer });
+  await expect(page.locator('html')).toHaveAttribute('data-same-file', 'true');
   await expect(page.locator('#result')).not.toBeEmpty();
   const received = JSON.parse((await page.locator('#result').textContent())!);
   expect(received).toEqual([expect.objectContaining({ name: 'researched-range-1.png', type: 'image/png', isFile: true, signature: PNG })]);
   expect(received[0].size).toBeGreaterThan(1000);
+  await preparedFile.dispose();
   await transfer.dispose();
 });
 
