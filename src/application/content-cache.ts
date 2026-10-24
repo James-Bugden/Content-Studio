@@ -1,3 +1,4 @@
+import 'server-only';
 /** Phase C keeps authority display caches short in both fake and live compositions. */
 export const DB_READ_CACHE_TTL_MS = 3_000;
 export function contentSheetCacheOptions(store: 'sheet' | 'db-shadow' | 'db-read' | 'db', mode: 'fake' | 'live') {
