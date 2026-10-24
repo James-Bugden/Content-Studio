@@ -1,6 +1,10 @@
 -- CS-055 / DB-1. Apply this file explicitly, never a repository-wide db push.
 -- Additive schema only: no runtime cutover, import or provider calls.
 
+-- Keep creation and deny-by-default ACL/RLS changes atomic even under psql
+-- without --single-transaction. Any error must roll back the whole migration.
+begin;
+
 create table public.content_studio_posts (
   collection text not null check (collection in ('library', 'queue')),
   library_id text not null check (library_id <> ''),
@@ -53,7 +57,7 @@ create table public.content_studio_posts (
 
 create table public.content_studio_schedule (
   content_id text primary key check (content_id <> ''),
-  parent_content_id text references public.content_studio_schedule(content_id) deferrable initially deferred,
+  parent_content_id text check (parent_content_id <> content_id) references public.content_studio_schedule(content_id) deferrable initially deferred,
   posted boolean not null default false,
   date text not null default '',
   platform text not null default '',
@@ -82,12 +86,12 @@ create table public.content_studio_schedule (
   final_synced_hash text not null default '',
   published_at timestamptz,
   post_link text not null default '',
-  views integer,
-  likes integer,
-  reposts integer,
-  replies integer,
-  bookmarks integer,
-  new_followers integer,
+  views integer check (views >= 0),
+  likes integer check (likes >= 0),
+  reposts integer check (reposts >= 0),
+  replies integer check (replies >= 0),
+  bookmarks integer check (bookmarks >= 0),
+  new_followers integer check (new_followers >= 0),
   analytics_synced_at timestamptz,
   visual_source text not null default '',
   image_status text not null default '',
@@ -221,6 +225,7 @@ begin
      or p_actor_hash is null or p_actor_hash !~ '^[0-9a-f]{64}$'
      or p_target_id is null or length(p_target_id) not between 1 and 500
      or p_data is null or jsonb_typeof(p_data) <> 'object' or p_data = '{}'
+     or octet_length(p_data::text) > 262144
      or (p_expected_version is not null and p_expected_version < 1) then
     raise exception 'invalid mutation envelope' using errcode = '22023';
   end if;
@@ -337,7 +342,9 @@ begin
     values (p_operation_id,p_actor_hash,p_target_kind,p_target_id,coalesce(fields, array[]::text[]),
       encode(sha256(convert_to(before_row::text, 'UTF8')), 'hex'),
       encode(sha256(convert_to(coalesce(after_row,before_row)::text, 'UTF8')), 'hex'),outcome);
-  if p_mode <> 'import' then
+  -- Match the Sheet repository: only successful outcomes consume an operation
+  -- ID. Failed attempts remain audited and re-execute on retry with fresh state.
+  if p_mode <> 'import' and code is null then
     insert into public.content_studio_operations
       (operation_id,patch_hash,target_kind,target_id,actor_hash,result)
       values (p_operation_id,p_patch_hash,p_target_kind,p_target_id,p_actor_hash,response);
@@ -482,3 +489,5 @@ begin
   end loop;
 end;
 $$;
+
+commit;

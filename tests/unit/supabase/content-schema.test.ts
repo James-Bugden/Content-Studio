@@ -48,6 +48,10 @@ beforeAll(async () => {
   for (const file of ['20260925030000_sheet_read_model.sql', MIGRATION]) {
     if (file === MIGRATION) {
       relationsBefore = (await db.raw.query<{ relname: string }>(`select relname from pg_class where relnamespace='public'::regnamespace`)).rows.map(r => r.relname);
+      // Hosted Supabase grants these on new objects; denial must depend on the
+      // migration revokes, rather than PGlite's otherwise restrictive defaults.
+      await db.raw.exec(`alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+        alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;`);
     }
     await db.raw.exec(readFileSync(join(process.cwd(), 'supabase/migrations', file), 'utf8'));
   }
@@ -58,6 +62,47 @@ beforeEach(async () => {
 });
 
 describe('MIG-06 typed schema/version contract', () => {
+  it('executes the documented Phase A drop list and preserves pre-existing objects', async () => {
+    const scratch = await createTestDatabase();
+    const catalog = () => scratch.raw.query(`select 'relation' as kind,relname as name from pg_class where relnamespace='public'::regnamespace
+      union all select 'function',oid::regprocedure::text from pg_proc where pronamespace='public'::regnamespace order by kind,name`).then(r => r.rows);
+    try {
+      const before = await catalog();
+      await scratch.raw.exec(readFileSync(join(process.cwd(), 'supabase/migrations/20260925030000_sheet_read_model.sql'), 'utf8'));
+      const withReadModel = await catalog();
+      expect(withReadModel.length).toBeGreaterThan(before.length);
+      await scratch.raw.exec(readFileSync(join(process.cwd(), 'supabase/migrations', MIGRATION), 'utf8'));
+      const adr = readFileSync(join(process.cwd(), 'docs/decisions/0002-content-authority-in-postgres.md'), 'utf8');
+      const rollback = /```sql\r?\n([\s\S]*?)```/.exec(adr)?.[1];
+      expect(rollback).toBeDefined();
+      await scratch.raw.exec(rollback!);
+      expect(await catalog()).toEqual(withReadModel);
+    } finally {
+      await scratch.close();
+    }
+  });
+
+  it('rolls back object creation on a late migration failure without a transactional runner', async () => {
+    const scratch = await createTestDatabase();
+    try {
+      await scratch.raw.exec(`alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+        alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;`);
+      const sql = readFileSync(join(process.cwd(), 'supabase/migrations', MIGRATION), 'utf8');
+      const aclOffset = sql.indexOf('-- Explicit ACLs,');
+      expect(aclOffset).toBeGreaterThan(0);
+      // Send creation and the fault as separate commands. A single multi-SQL
+      // exec would implicitly transact the batch and hide a missing BEGIN.
+      await scratch.raw.exec(sql.slice(0, aclOffset));
+      expect(sqlState(await expectRejection(scratch.raw.exec('select 1 / 0')))).toBe('22012');
+      // Like psql after an error, end the failed transaction before inspecting.
+      await scratch.raw.exec('rollback');
+      expect((await scratch.raw.query(`select relname from pg_class where relnamespace='public'::regnamespace and relname like 'content_studio_%'`)).rows).toHaveLength(0);
+      expect((await scratch.raw.query(`select proname from pg_proc where pronamespace='public'::regnamespace and proname like 'content_studio_%'`)).rows).toHaveLength(0);
+    } finally {
+      await scratch.close();
+    }
+  });
+
   it('matches the compiled version; refuses missing, malformed and mismatched versions as SCHEMA_DRIFT', async () => {
     const version = (await rows('schema_version'))[0]!.version;
     expect(version).toBe(CONTENT_STUDIO_SCHEMA_VERSION);
@@ -117,6 +162,23 @@ describe('MIG-06 typed schema/version contract', () => {
     expect(await rows('ready_queue')).toHaveLength(1);
     expect(await rows('queue_summary')).toEqual([{ content_source: 'Synthetic source', master_link: 'https://example.com/master', count: 2 }]);
   });
+
+  it.each(['parent_content_id', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'new_followers'])('rejects invalid schedule %s without partial writes', async field => {
+    await copy('schedule-seed', { content: 'Synthetic schedule' }, null, 'schedule', 'SYN-X');
+    const data = { [field]: field === 'parent_content_id' ? 'SYN-X' : -1 };
+    expect(sqlState(await expectRejection(patch('invalid-schedule', data, 1, hash, 'schedule', 'SYN-X')))).toBe('23514');
+    expect((await rows('schedule'))[0]).toMatchObject({ row_version: 1, [field]: null });
+    for (const table of ['operations', 'audit_events', 'row_history']) expect(await rows(table)).toHaveLength(1);
+  });
+
+  it('accepts zero and unavailable schedule metrics', async () => {
+    const metrics = { views: 0, likes: 0, reposts: 0, replies: 0, bookmarks: 0, new_followers: 0 };
+    await copy('zero-metrics', metrics, null, 'schedule', 'SYN-X');
+    expect((await rows('schedule'))[0]).toMatchObject(metrics);
+    const unavailable = Object.fromEntries(Object.keys(metrics).map(key => [key, null]));
+    expect(await patch('unavailable-metrics', unavailable, 1, hash, 'schedule', 'SYN-X')).toMatchObject({ ok: true, revision: 2 });
+    expect((await rows('schedule'))[0]).toMatchObject(unavailable);
+  });
 });
 
 describe('MIG-07 atomic CAS and durable ledger; MIG-08 redaction/history', () => {
@@ -153,12 +215,39 @@ describe('MIG-07 atomic CAS and durable ledger; MIG-08 redaction/history', () =>
     expect(await patch('present')).toMatchObject({ ok: true, steps: [{ state: 'already_applied' }], revision: 2 });
     expect((await rows('posts'))[0]!.draft_content).toBe('Synthetic new copy');
     expect(await rows('row_history')).toHaveLength(1);
-    expect(await rows('operations')).toHaveLength(3);
+    expect(await rows('operations')).toHaveLength(2);
   });
 
-  it('returns not_found, and does not treat a missing version as permission to insert via patch', async () => {
-    expect(await patch('missing', { draft_content: 'Synthetic' }, 1, hash, 'library', 'SYN-NONE')).toMatchObject({ ok: false, code: 'NOT_FOUND', revision: null });
+  it('audits NOT_FOUND without consuming the operation ID; retry succeeds after the row exists', async () => {
+    const retry = () => patch('missing', { draft_content: 'Synthetic' }, 1, hash, 'library', 'SYN-NONE');
+    expect(await retry()).toMatchObject({ ok: false, code: 'NOT_FOUND', revision: null });
     expect(await rows('posts')).toHaveLength(1);
+    expect(await rows('operations')).toHaveLength(0);
+    expect((await rows('audit_events'))[0]).toMatchObject({ operation_id: 'missing', outcome: 'not_found' });
+    await copy('create-missing', { draft_content: 'Synthetic created later' }, null, 'library', 'SYN-NONE');
+    const result = await retry();
+    expect(result).toMatchObject({ ok: true, revision: 2 });
+    expect(await retry()).toEqual(result);
+    expect((await rows('posts')).find(row => row.library_id === 'SYN-NONE')).toMatchObject({ draft_content: 'Synthetic', row_version: 2 });
+    expect((await rows('operations')).filter(row => row.operation_id === 'missing')).toHaveLength(1);
+    expect((await rows('audit_events')).filter(row => row.operation_id === 'missing').map(row => row.outcome)).toEqual(['not_found', 'applied']);
+  });
+
+  it('retries a stale patch with a fresh version, then replays success and rejects hash reuse', async () => {
+    await patch();
+    const data = { draft_content: 'Synthetic retry' };
+    expect(await patch('retry-stale', data)).toMatchObject({ ok: false, code: 'STALE_READ', revision: 2 });
+    expect((await rows('operations')).filter(row => row.operation_id === 'retry-stale')).toHaveLength(0);
+    const result = await patch('retry-stale', data, 2);
+    expect(result).toMatchObject({ ok: true, revision: 3 });
+    // A later edit makes both the old precondition and stored result outdated.
+    // Replaying still returns that stored success without applying again.
+    await patch('later-edit', { draft_content: 'Synthetic later edit' }, 3);
+    expect(await patch('retry-stale', data)).toEqual(result);
+    expect(await patch('retry-stale', { draft_content: 'Different' }, 4, otherHash)).toMatchObject({ code: 'CONFLICT', steps: [{ reason: 'operation_reused_with_different_patch' }] });
+    expect((await rows('posts'))[0]).toMatchObject({ draft_content: 'Synthetic later edit', row_version: 4 });
+    expect((await rows('operations')).find(row => row.operation_id === 'retry-stale')!.result).toEqual(result);
+    expect((await rows('audit_events')).filter(row => row.operation_id === 'retry-stale').map(row => row.outcome)).toEqual(['stale', 'applied']);
   });
 
   it.each(['history','audit','ledger'])('rolls back CAS and all partial rows when the %s write fails', async (stage) => {
@@ -202,6 +291,18 @@ describe('MIG-07 atomic CAS and durable ledger; MIG-08 redaction/history', () =>
 });
 
 describe('queue insertion, write-through and atomic typed import', () => {
+  it('does not consume a queue operation ID on conflict; retry re-examines the row', async () => {
+    const insert = () => db.asService(q => rpc(q, 'insert_queue_idea', ['queue-retry', hash, actor, 'SYN-Q001', { draft_content: 'Synthetic idea' }]));
+    await copy('queue-existing', { draft_content: 'Synthetic conflicting idea' }, null, 'queue', 'SYN-Q001');
+    expect(await insert()).toMatchObject({ ok: false, code: 'CONFLICT' });
+    expect((await rows('operations')).filter(row => row.operation_id === 'queue-retry')).toHaveLength(0);
+    await patch('queue-edit', { draft_content: 'Synthetic idea' }, 1, otherHash, 'queue', 'SYN-Q001');
+    const result = await insert();
+    expect(result).toMatchObject({ ok: true, steps: [{ state: 'already_applied' }], revision: 2 });
+    expect(await insert()).toEqual(result);
+    expect((await rows('audit_events')).filter(row => row.operation_id === 'queue-retry').map(row => row.outcome)).toEqual(['conflict', 'already_applied']);
+  });
+
   it('inserts queue ideas idempotently, records an insert history, and never replaces a colliding ID', async () => {
     const insert = (op = 'queue', patchHash = hash, data: unknown = { draft_content: 'Synthetic idea' }) =>
       db.asService(q => rpc(q, 'insert_queue_idea', [op, patchHash, actor, 'SYN-Q001', data]));
@@ -224,6 +325,7 @@ describe('queue insertion, write-through and atomic typed import', () => {
 
   it('updates Sheet fingerprint/position metadata without invalidating an editor of identical content', async () => {
     await seed();
+    expect(await copy('metadata-stale', { sheet_revision: '2222222222222222', source_sheet_row: 5 }, 9)).toMatchObject({ ok: false, code: 'STALE_READ', revision: 1 });
     expect(await copy('metadata', { sheet_revision: '2222222222222222', source_sheet_row: 5 })).toMatchObject({ ok: true, revision: 1 });
     expect((await rows('posts'))[0]).toMatchObject({ row_version: 1, sheet_revision: '2222222222222222', source_sheet_row: 5 });
     expect(await patch('editor-open-before-copy')).toMatchObject({ ok: true, revision: 2 });
@@ -236,6 +338,15 @@ describe('queue insertion, write-through and atomic typed import', () => {
     const hashes = Object.fromEntries(Object.keys(counts).map(k => [k, hash]));
     return db.asService(q => rpc(q, 'import_run', [op, patchHash, actor, counts, hashes, exceptions, items]));
   };
+
+  it.each(['copy', 'import'])('bounds total UTF-8 JSON size in %s, including nested passthrough', async mode => {
+    const data = { passthrough: { nested: Array.from({ length: 300 }, () => '界'.repeat(400)) } };
+    expect(JSON.stringify(data).length).toBeLessThan(262144);
+    expect(Buffer.byteLength(JSON.stringify(data), 'utf8')).toBeGreaterThan(262144);
+    const attempt = mode === 'copy' ? copy('oversized', data, null) : batch([item('SYN-L001', data)], 'oversized');
+    expect(sqlState(await expectRejection(attempt))).toBe('22023');
+    for (const table of ['posts', 'operations', 'audit_events', 'row_history', 'import_runs']) expect(await rows(table)).toHaveLength(0);
+  });
 
   it('imports all typed collections atomically, supports child-before-parent and records redacted run evidence', async () => {
     const items = [item('SYN-L001', { draft_content: 'Synthetic imported' }),
@@ -332,6 +443,10 @@ describe('MIG-04 every new object is server-only', () => {
           from pg_class c where c.relnamespace='public'::regnamespace and c.relname=any($1)`, [relations]);
         expect(privileges.rows).toHaveLength(relations.length);
         for (const p of privileges.rows) expect(p.allowed).toBe(false);
+        const sequencePrivileges = await q.query<{ allowed: boolean }>(`select has_sequence_privilege(current_user,c.oid,'USAGE,SELECT,UPDATE') as allowed
+          from pg_class c where c.relnamespace='public'::regnamespace and c.relname=any($1)`, [sequences.map(s => `content_studio_${s}`)]);
+        expect(sequencePrivileges.rows).toHaveLength(sequences.length);
+        for (const p of sequencePrivileges.rows) expect(p.allowed).toBe(false);
       });
       expect((await rows('posts'))[0]!.draft_content).toBe('Synthetic original copy');
       expect(await rows('operations')).toHaveLength(0);
