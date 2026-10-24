@@ -1,5 +1,8 @@
 # Content Studio runbook
 
+DB-6 remains **pending cutover**. See [write-cutover, backups and exact rollback](database-write-cutover.md)
+for Phase D/E gates and the local-only implementation boundary.
+
 Operational reference for CS-017 (observability and recovery) and CS-019 (deployment). Values here are names and thresholds only; no private identifiers.
 
 ## Where to look first

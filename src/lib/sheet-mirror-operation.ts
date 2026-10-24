@@ -52,6 +52,9 @@ async function execute(trigger: Trigger, requestId: string): Promise<RunResult> 
 
 /** A second click is an explicit no-op; errors release the guard for retry. */
 export async function runConfiguredSheetMirror(trigger: Trigger): Promise<RunResult> {
+  // Neither the typed importer nor the legacy mirror may read/copy Sheet
+  // authority after write cutover, even when legacy mirror flags remain set.
+  if (serverEnv().CS_CONTENT_STORE === 'db') throw new AppError('FORBIDDEN', { reason: 'imports_disabled_in_db_mode' });
   if (trigger.kind === 'owner' && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trigger.idempotencyKey)) {
     throw new AppError('VALIDATION_FAILED', { reason: 'import_idempotency_key' });
   }
