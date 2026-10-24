@@ -50,8 +50,8 @@ export default defineConfig({
     reducedMotion: 'reduce',
   },
   projects: [
-    { name: 'w375', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts', '**/content-parity.spec.ts', ...(process.env.CS_E2E_CONTENT_STORE === 'db-read' ? [] : ['**/content-read-cutover.spec.ts'])], use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
-    { name: 'w1280', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts', '**/content-parity.spec.ts', ...(process.env.CS_E2E_CONTENT_STORE === 'db-read' ? [] : ['**/content-read-cutover.spec.ts'])], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
+    { name: 'w375', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts', '**/content-parity.spec.ts', ...(process.env.CS_E2E_CONTENT_STORE === 'db' ? [] : ['**/content-write-cutover.spec.ts']), ...(process.env.CS_E2E_CONTENT_STORE === 'db-read' ? [] : ['**/content-read-cutover.spec.ts'])], use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
+    { name: 'w1280', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts', '**/content-parity.spec.ts', ...(process.env.CS_E2E_CONTENT_STORE === 'db' ? [] : ['**/content-write-cutover.spec.ts']), ...(process.env.CS_E2E_CONTENT_STORE === 'db-read' ? [] : ['**/content-read-cutover.spec.ts'])], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
     ...[375, 1280].flatMap((width, index) => ['routes', 'faults'].map((group, offset) => ({
       name: group === 'routes' ? `sweep-${width}` : `sweep-fault-${width}`,
       testMatch: group === 'routes' ? '**/sweep.spec.ts' : '**/sweep-faults.spec.ts',

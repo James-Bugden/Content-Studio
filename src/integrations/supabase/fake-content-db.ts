@@ -6,6 +6,7 @@ import { discoverHeaders, LIBRARY_HEADERS, SCHEDULE_HEADERS } from '@/domain/she
 import { toLibraryRecord, toScheduleRecord } from '@/domain/mapping';
 import { contentColumn, sha256 } from './content-repository';
 import { CONTENT_STUDIO_SCHEMA_VERSION } from './content-schema';
+import type { ContentBackupSnapshot } from '@/application/content-backup';
 
 export type ContentDbSeed = { posts: ContentPostRow[]; schedule: ContentScheduleRow[]; settings: ContentSettingRow[] };
 const numeric = new Set(['hookScore', 'contentAngle', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers']);
@@ -79,6 +80,16 @@ export class FakeContentDb implements ContentDb {
     return structuredClone(row);
   }
   snapshot(): ContentDbSeed { return structuredClone(this.seed); }
+  /** One synchronous snapshot turn, including the durable replay/history data. */
+  async backupSnapshot(): Promise<ContentBackupSnapshot> {
+    const at = '2026-10-01T00:00:00+00:00';
+    const meta = (row: object & { row_version?: string | number }) => ({ created_at: at, updated_at: at, created_by_op: null,
+      updated_by_op: null, sheet_revision: null, exported_sheet_revision: null, ...row, row_version: Number(row.row_version ?? 1) });
+    return structuredClone({ posts: this.seed.posts.map(meta), schedule: this.seed.schedule.map(meta), workflow_settings: this.seed.settings.map(meta),
+      row_history: this.history.map((h, i) => ({ history_id: i + 1, at, ...h, before_image: h.before_image ? meta(h.before_image) : null, row_version_before: h.row_version_before === null ? null : Number(h.row_version_before) })), audit_events: this.audit.map((a, i) => ({ event_id: i + 1, at, ...a })),
+      operations: [...this.operations].map(([operation_id, op]) => ({ operation_id, patch_hash: op.write.patchHash, actor_hash: op.write.actorHash,
+        target_kind: op.write.kind, target_id: op.write.id, mode: op.mode, result: op.result, created_at: at })) });
+  }
   replaceSnapshot(seed: ContentDbSeed, importId?: string) {
     Object.assign(this.seed, structuredClone(seed));
     if (importId !== undefined) this.importId = importId;

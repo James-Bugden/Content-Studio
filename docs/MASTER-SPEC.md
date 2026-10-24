@@ -273,6 +273,14 @@ Do not dual-write Content records. The `content_studio_*` Supabase namespace is 
 
 ## 12. Recommended execution order
 
+DB-6 status: **pending cutover**, local fake/PGlite implementation only. The
+runtime still defaults to `sheet` and refuses live database modes. No database
+or workbook was changed. Keep the authority table above operative until the
+Phase D gates in [the write-cutover runbook](ops/database-write-cutover.md) are
+met and the exact deployed flip is recorded; only then record "cut over on
+<date>". Supabase plan backups require explicit owner confirmation; the private
+history export is an additional safeguard, not proof of plan backups.
+
 1. Planning/foundation: [CS-001](https://github.com/James-Bugden/Content-Studio/issues/2) -> [CS-002](https://github.com/James-Bugden/Content-Studio/issues/3), then [CS-003](https://github.com/James-Bugden/Content-Studio/issues/4), [CS-004](https://github.com/James-Bugden/Content-Studio/issues/5), [CS-005](https://github.com/James-Bugden/Content-Studio/issues/6) and [CS-006](https://github.com/James-Bugden/Content-Studio/issues/7) behind the shared contracts.
 2. Core review slice: [CS-007](https://github.com/James-Bugden/Content-Studio/issues/8) -> [CS-008](https://github.com/James-Bugden/Content-Studio/issues/9) -> [CS-009](https://github.com/James-Bugden/Content-Studio/issues/10) -> [CS-010](https://github.com/James-Bugden/Content-Studio/issues/11) -> [CS-011](https://github.com/James-Bugden/Content-Studio/issues/12).
 3. Visual and handoff: [CS-012](https://github.com/James-Bugden/Content-Studio/issues/13) -> [CS-013](https://github.com/James-Bugden/Content-Studio/issues/14).
