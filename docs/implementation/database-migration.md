@@ -772,3 +772,12 @@ Owner-only items:
 Everything else, including filing DB-1 to DB-8, implementation, tests,
 reviews, T0–T3 and the per-phase T4 smoke, is routine engineering work under
 the default autonomy in AGENTS.md.
+
+### CS-059g pending latest-import index
+
+Before live `db-read`, rehearse the new migration
+`20261025000200_content_import_runs_at_index.sql` for latest-import ordering
+(`at DESC, operation_id DESC`). This new file sorts after all existing
+migrations; none of the existing migration files was changed. It is unapplied
+in this work and has never been applied live. See the explicit owner/live gates
+in [the operations runbook](../ops/runbook.md#explicit-ownerlive-gates-carried-from-183184-186).

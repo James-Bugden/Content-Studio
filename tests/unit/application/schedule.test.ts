@@ -287,3 +287,27 @@ it('CS-059c: promotion options are chronological even when Sheet rows are revers
   expect(times).toEqual([...times].sort());
   expect(usable[0]?.contentId).toBe('2026-10-01-MAIN-LI');
 });
+
+it.each(['2026-10-01', '2026-10-02'])('CS-059g: confirm refuses a slot elapsed since preview on %s', async day => {
+  const p = await previewPromotion(repo, 'SYN-L005', '2026-10-01-MAIN-LI');
+  if (!p.ok) throw new Error('preview');
+  process.env.CS_FAKE_TODAY = day; process.env.CS_FAKE_TIME = '21:01';
+  expect(await promote(repo, owner, { operationId: 'synthetic-expired-confirm', libraryId: 'SYN-L005', contentId: p.contentId, expectedLibraryRevision: p.libraryRevision, expectedScheduleRevision: p.scheduleRevision })).toMatchObject({ ok: false, code: 'VALIDATION_FAILED' });
+  expect(await previewPromotion(repo, 'SYN-L005', p.contentId)).toMatchObject({ ok: false, code: 'VALIDATION_FAILED' });
+  expect(sheet.writes).toHaveLength(0);
+});
+it('CS-059g: initial preview is exactly the first usable slot with matching revisions', async () => {
+  const ctx = await promotionContext(repo, 'SYN-L005');
+  const first = ctx.options.find(o => o.ok)!;
+  expect(ctx.initialPreview).toEqual(await previewPromotion(repo, 'SYN-L005', first.contentId));
+});
+it('CS-059g: non-ready post has no initial preview even with a valid slot plan', async () => {
+  const library = await repo.listLibrary();
+  const ready = library.find(r => r.value.libraryId === 'SYN-L005')!;
+  ready.value.queueForSchedule = false;
+  vi.spyOn(repo, 'listLibrary').mockResolvedValue(library);
+  const ctx = await promotionContext(repo, 'SYN-L005');
+  expect(ctx.group).not.toBe('ready');
+  expect(ctx.options.some(o => o.ok)).toBe(true);
+  expect(ctx.initialPreview).toBeNull();
+});
