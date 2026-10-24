@@ -34,7 +34,7 @@ const rawCell = (raw: RawRow, column: number): ExportCell => {
   return { value: cellText(raw.values[column]), ...(formula.startsWith('=') ? { formula } : {}), ...(link ? { link } : {}) };
 };
 const different = (a: Record<string, ExportCell>, b: Record<string, ExportCell>) => [...new Set([...Object.keys(a), ...Object.keys(b)])]
-  .filter(k => canonicalJson(a[k] ?? { value: '' }) !== canonicalJson(b[k] ?? { value: '' })).sort();
+  .filter(k => canonicalJson([a[k]]) !== canonicalJson([b[k]])).sort();
 
 /** Uses the actual adapter renderers, including every Typefully stamp/metric. */
 export async function contentExportRows(db: ContentDb): Promise<ExportRow[]> {
@@ -229,7 +229,8 @@ export class ContentExporter {
         if (fields.length) differences.push({ kind, id, fields, reason: 'export_mismatch', since: this.now() });
       }
     }
-    const report = { at: this.now(), exact: differences.length === 0, counts, dbHash: mirrorHash(dbProjection), sheetHash: mirrorHash(sheetProjection), differences };
+    const dbHash = mirrorHash(dbProjection), sheetHash = mirrorHash(sheetProjection);
+    const report = { at: this.now(), exact: differences.length === 0 && dbHash === sheetHash, counts, dbHash, sheetHash, differences };
     this.journal.reports.push(report);
     return report;
   }

@@ -75,6 +75,13 @@ describe('MIG-12 one-way stable-ID export', () => {
     expect((await exporter.run()).exact).toBe(false);
     expect(exporter.journal.issues.get(exportKey('library', 'SYN-L001'))!.reason).toBe('export_mismatch');
   });
+  it('never calls differing inventory hashes exact when an unknown empty column appears', async () => {
+    const { sheet, exporter } = setup(); await exporter.run();
+    sheet.rawTab(SHEET_TABS.library.name)[0]!.push({ value: 'Synthetic added blank column' });
+    const parity = await exporter.parity();
+    expect(parity.dbHash).not.toBe(parity.sheetHash); expect(parity.exact).toBe(false);
+    expect(parity.differences[0]!.fields).toContain('Synthetic added blank column');
+  });
   it('requires explicit authenticated, idempotent resolution with both current tokens; retry cannot overwrite a later edit', async () => {
     const { db, sheet, exporter } = setup(); await exporter.run();
     const tab = SHEET_TABS.library.name, grid = sheet.rawTab(tab), col = Object.keys(LIBRARY_HEADERS).indexOf('draftContent');
