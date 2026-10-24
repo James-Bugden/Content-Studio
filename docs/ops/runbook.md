@@ -4,7 +4,7 @@ Operational reference for CS-017 (observability and recovery) and CS-019 (deploy
 
 ## Where to look first
 
-1. **Reconcile** (`/reconcile`): every disagreement between the Sheet, Drive, schedule lineage and recent operations, rebuilt from the sources on each load, plus active alerts and per-adapter call, error and latency figures for the current server instance.
+1. **Fix issues** (`/reconcile`): every disagreement between the Sheet, Drive, schedule lineage and recent operations, rebuilt from the sources on each load, plus active alerts and per-adapter call, error and latency figures for the current server instance.
 2. **Health** (`/api/health`): commit SHA, data mode and capability state per provider. No content, ids or secrets.
 3. **Runtime logs** (Vercel project logs): one JSON line per telemetry event. Fields are a closed schema: `name`, `adapter`, `outcome`, `operationId`, `latencyMs`, `retries`, `targetHash` (hash of the Sheet id, never the id), `code`, `httpStatus`, `facts` (short tokens only; URLs, paths and long digit runs are redacted).
 
@@ -24,6 +24,16 @@ Log-based alerts on the hosting platform should match `"code":"SCHEMA_DRIFT"`, `
 ## Failure-injection catalogue
 
 Each failure below is reproducible in fake mode (unit tests or `/api/test-control` in e2e mode) and has a documented, tested outcome.
+
+`POST /api/test-auth` and `POST /api/test-control` return HTTP 404 in production. Both
+handlers are guarded by `testAuthEnabled`: fake data, `CS_TEST_MODE=e2e`, and
+`VERCEL_ENV` other than `production`. The production route exclusions and the
+policy's fake/e2e production denial are asserted in `tests/unit/auth/policy.test.ts`.
+
+The existing CI workflow also runs weekly on `main` (Monday 03:17 UTC). Inspect the
+scheduled run's verify and browser job results in GitHub Actions for dependency or
+test rot. This uses synthetic providers without secrets; it does not probe live
+provider health. See [ci.yml](../../.github/workflows/ci.yml).
 
 | Failure | How it is injected | Expected outcome | Evidence |
 | --- | --- | --- | --- |
@@ -51,4 +61,4 @@ Each failure below is reproducible in fake mode (unit tests or `/api/test-contro
 
 ## Rollback (CS-019)
 
-Rollback restores the previous verified **app deployment and configuration** only. It never deletes, restores or rewrites Sheet, Drive or Typefully content. Steps are recorded in CS-019 once the Vercel project exists.
+Rollback restores the previous verified **app deployment and configuration** only. It never deletes, restores or rewrites Sheet, Drive or Typefully content. Follow the rollback steps in [the deployment guide](deploy.md#rollback-dep-07).
