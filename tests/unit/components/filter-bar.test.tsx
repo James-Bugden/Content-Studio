@@ -96,19 +96,19 @@ describe('direct filter chips (CS-059c)', () => {
     nav.params = new URLSearchParams('status=ready&page=3');
     const chips = filters.map((f) => f.key === 'platform' ? { ...f, control: 'chips' as const } : f);
     const { rerender } = render(<FilterBar filters={chips} />);
-    fireEvent.click(screen.getByRole('button', { name: 'X', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^X$/ }));
     expect(nav.push.mock.calls[0]?.[0]).toBe('/review?platform=X&status=ready');
     nav.params = new URLSearchParams('platform=X&status=ready');
     rerender(<FilterBar filters={chips} />);
-    expect(screen.getByRole('button', { name: 'X', exact: true }).getAttribute('aria-pressed')).toBe('true');
-    fireEvent.click(screen.getByRole('button', { name: 'X', exact: true }));
+    expect(screen.getByRole('button', { name: /^X$/ }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: /^X$/ }));
     expect(nav.push.mock.calls[1]?.[0]).toBe('/review?status=ready');
   });
 
   it('keeps the dirty editor guard for a chip click', () => {
     setDirty('editor', true);
     render(<FilterBar filters={[{ ...filters[0]!, control: 'chips' }]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Threads', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^Threads$/ }));
     expect(nav.push).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Leave and discard changes' }));
     expect(nav.push.mock.calls[0]?.[0]).toBe('/review?platform=Threads');
