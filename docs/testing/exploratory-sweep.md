@@ -1,11 +1,16 @@
 # Automated exploratory sweep (#163)
 
-The `sweep-375` and `sweep-1280` Playwright projects run only
-`tests/e2e/sweep.spec.ts`. The existing journey projects exclude that file.
-CI runs both sweep widths on one free `ubuntu-latest` runner, with two workers,
-one server process per width, no retries and a 240-second global browser budget. Each
-file/project remains serial; mutable fakes are never shared between workers. Installation
-and the production build are separate preparation steps. The existing browser
+The `sweep-375`/`sweep-1280` route projects run `tests/e2e/sweep.spec.ts`; the
+`sweep-fault-375`/`sweep-fault-1280` projects run `sweep-faults.spec.ts`. Both use
+the same detectors in `sweep-checks.ts`. Existing journey projects exclude both.
+CI runs all four groups on one free `ubuntu-latest` runner, with four workers,
+one server process per group, no retries and a 240-second global browser budget.
+This PC uses two workers to respect its 16 GB memory limit. Each file/project
+remains serial; mutable fakes are never shared between workers. The
+sweep reuses the synthetic production bundle already built by `verify`, downloaded
+with the runner's existing GitHub CLI and a read-only automatic job token. No
+repository secret or extra action/dependency is needed. Installation is a separate
+preparation step. The existing browser
 aggregate requires the sweep and all four journey shards to pass.
 
 All accounts, provider adapters, edits and screenshots are synthetic. These
@@ -56,9 +61,11 @@ allow-listed. Two browser/framework diagnostics have narrow exceptions:
 
 - Chromium's exact unused-preload performance warning for the three same-origin
   shipped Inter weights (400/500/600); individual routes need not use every weight.
-- `net::ERR_ABORTED` on Next's speculative RSC GETs with prefetch headers, or exact
-  RSC requests marked as cancelled by an intentional navigation. API/document
-  failures and unsolicited aborts have no exception.
+- `net::ERR_ABORTED` on same-origin fetch GETs for known studio page paths, with
+  both the RSC header and `_rsc` query marker. Next cancels superseded prefetch
+  and panel-navigation streams even after a transition commits. API/document
+  failures, non-page paths, HTTP errors and every other failure reason have no
+  exception. A mutation with identical RSC markers on an API path must fail.
 
 Chromium's generic HTTP diagnostic is allowed
 only when its exact pathname and status match an explicitly expected fault
@@ -88,7 +95,7 @@ Example commands on this PC (all heavy commands use the shared queue):
 ```bash
 bash ~/bin/heavy npm run build
 bash ~/bin/heavy node scripts/verify-sweep.mjs
-CS_E2E_PREBUILT=1 CS_SWEEP_ISOLATED=1 CS_E2E_PORT=3263 bash ~/bin/heavy npx playwright test sweep.spec.ts --project=sweep-375 --project=sweep-1280 --reporter=list,./tests/e2e/sweep-reporter.ts
+CS_E2E_PREBUILT=1 CS_SWEEP_ISOLATED=1 CS_E2E_PORT=3263 bash ~/bin/heavy npx playwright test sweep --project=sweep-375 --project=sweep-1280 --project=sweep-fault-375 --project=sweep-fault-1280 --reporter=list,./tests/e2e/sweep-reporter.ts
 CS_E2E_PREBUILT=1 CS_E2E_PORT=3263 CS_SWEEP_MUTATION=overflow bash ~/bin/heavy npx playwright test sweep.spec.ts --project=sweep-375 --grep 'mutation proof: overflow' --reporter=list,./tests/e2e/sweep-reporter.ts
 ```
 

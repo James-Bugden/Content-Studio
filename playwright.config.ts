@@ -7,13 +7,13 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.CS_E2E_PORT ?? 3200);
 const SWEEP_ISOLATED = process.env.CS_SWEEP_ISOLATED === '1';
 if (SWEEP_ISOLATED && process.env.CS_E2E_PREBUILT !== '1') {
-  throw new Error('Build once before starting the two isolated sweep servers (CS_E2E_PREBUILT=1).');
+  throw new Error('Build once before starting the isolated sweep servers (CS_E2E_PREBUILT=1).');
 }
 
 function server(port: number) {
   return {
-    // Each sweep width has its own process and mutable fake adapters. Two
-    // workers share a runner, never a test-control reset or provider fault.
+    // Each width/group has its own process and mutable fake adapters. Workers
+    // share a runner, never a test-control reset or provider fault.
     command: `${process.env.CS_E2E_PREBUILT === '1' ? '' : 'npm run build && '}npm run start -- --port ${port} --hostname 127.0.0.1`,
     url: `http://127.0.0.1:${port}/api/health`,
     reuseExistingServer: SWEEP_ISOLATED ? false : !process.env.CI,
@@ -34,7 +34,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: SWEEP_ISOLATED ? 2 : 1,
+  workers: SWEEP_ISOLATED ? (process.env.CI ? 4 : 2) : 1,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   timeout: 60_000,
   expect: { timeout: 10_000 },
@@ -46,16 +46,16 @@ export default defineConfig({
     reducedMotion: 'reduce',
   },
   projects: [
-    { name: 'w375', testIgnore: '**/sweep.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
-    { name: 'w1280', testIgnore: '**/sweep.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
-    ...[375, 1280].map((width) => ({
-      name: `sweep-${width}`,
-      testMatch: '**/sweep.spec.ts',
+    { name: 'w375', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts'], use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
+    { name: 'w1280', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts'], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
+    ...[375, 1280].flatMap((width, index) => ['routes', 'faults'].map((group, offset) => ({
+      name: group === 'routes' ? `sweep-${width}` : `sweep-fault-${width}`,
+      testMatch: group === 'routes' ? '**/sweep.spec.ts' : '**/sweep-faults.spec.ts',
       // Thousands of keyboard/axe DOM snapshots are expensive; per-check JSON
       // and failure screenshots provide sweep evidence without recording them.
       use: { ...devices['Desktop Chrome'], viewport: { width, height: 900 }, trace: 'off' as const,
-        ...(SWEEP_ISOLATED ? { baseURL: `http://127.0.0.1:${PORT + (width === 1280 ? 1 : 0)}` } : {}) },
-    })),
+        ...(SWEEP_ISOLATED ? { baseURL: `http://127.0.0.1:${PORT + index * 2 + offset}` } : {}) },
+    }))),
   ],
-  webServer: SWEEP_ISOLATED ? [server(PORT), server(PORT + 1)] : server(PORT),
+  webServer: SWEEP_ISOLATED ? [0, 1, 2, 3].map((offset) => server(PORT + offset)) : server(PORT),
 });

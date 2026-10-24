@@ -9,7 +9,7 @@ await readFile('.next/BUILD_ID', 'utf8'); // require an already-verified product
 const dir = path.resolve('sweep-report/validation');
 await mkdir(dir, { recursive: true });
 const cli = path.resolve('node_modules/@playwright/test/cli.js');
-const baseArgs = ['test', 'sweep.spec.ts', '--reporter=list,./tests/e2e/sweep-reporter.ts'];
+const baseArgs = ['test', 'sweep', '--reporter=list,./tests/e2e/sweep-reporter.ts'];
 const env = { ...process.env, CS_E2E_PREBUILT: '1', CS_SWEEP_ISOLATED: '1', CS_E2E_PORT: process.env.CS_E2E_PORT ?? '3263' };
 delete env.CS_SWEEP_MUTATION;
 const evidence = { runs: [], mutations: [], status: 'running' };
@@ -35,7 +35,7 @@ async function run(name, args, overrides = {}) {
 try {
   let firstHash;
   for (let index = 1; index <= 3; index++) {
-    const { report, result } = await run(`run-${index}`, ['--project=sweep-375', '--project=sweep-1280']);
+    const { report, result } = await run(`run-${index}`, ['--project=sweep-375', '--project=sweep-1280', '--project=sweep-fault-375', '--project=sweep-fault-1280']);
     evidence.runs.push(result);
     await save();
     if (result.exitCode !== 0 || report.status !== 'passed') throw new Error(`Full sweep ${index} failed; inspect ${dir}`);
