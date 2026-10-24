@@ -16,9 +16,10 @@ import { today } from './schedule';
 import { reconcileRecord } from './typefully';
 import type { ContentParityJournal } from './content-parity';
 import { fixIssuesCount, rememberNavigationCount } from './navigation-counts';
-import type { ContentWriteCutover } from './content-export';
+import type { ContentWriteCutover, ExportIssue } from './content-export';
 import { exportKey } from './content-export';
 import type { BackupJournal } from './content-backup';
+import { isAppError } from '@/domain/errors';
 
 /**
  * Reconciliation centre (CS-017).
@@ -99,24 +100,32 @@ export async function buildReconcileReport(
   const unreadable: string[] = [];
   if (options.contentCutover) {
     const exporter = options.contentCutover.exporter;
+    const mismatches = new Map<string, ExportIssue>();
     try {
       // Fresh inspection does not write. A hand edit appears even before repair.
       const parity = await exporter.parity();
       for (const issue of parity.differences) {
         if (exporter.journal.issues.get(exportKey(issue.kind, issue.id))?.reason === 'export_lag') continue;
-        items.push(item('export_mismatch', 'blocking', 'Sheet export differs; row preserved',
-          [`${issue.kind}: ${issue.fields.join(', ')}. Review the direction in the cutover runbook; no automatic overwrite.`], [issue.id], { label: 'Review' }));
-      }
-      for (const issue of exporter.journal.issues.values()) {
-        if (issue.reason !== 'export_lag') continue;
-        const age = now - issue.since;
-        if (age >= 900_000) items.push(item('export_lag', age >= 3600_000 ? 'blocking' : 'attention', 'Sheet export is behind',
-          [`${Math.floor(age / 60000)} minutes since the first failed export.`], [issue.id], { label: 'Retry' }));
+        mismatches.set(exportKey(issue.kind, issue.id), issue);
       }
       const comparison = exporter.comparison(now, options.contentCutover.mutationCount);
       items.push(item('export_parity', parity.exact ? 'attention' : 'blocking', parity.exact ? 'Sheet export matches the database' : 'Sheet export parity is blocked',
         [`${Object.values(parity.counts).reduce((n, c) => n + c, 0)} rows; exact fields: ${parity.exact}. ${comparison.daily.filter(d => d.green).length}/14 complete days green; ${comparison.mutationCount}/50 mutations. Daily lag p95 must be at most 15 minutes; no failure may remain for an hour. Local instance evidence only; live cutover remains pending.`], [], { label: 'Review' }));
-    } catch { unreadable.push('Sheet export parity'); }
+    } catch (error) {
+      unreadable.push('Sheet export parity');
+      if (isAppError(error) && error.details.reason === 'duplicate_export_id') items.push(item('export_mismatch', 'blocking', 'Duplicate Sheet export IDs',
+        [`${error.details.kind}: duplicate stable IDs prevent export and rollback. Fix the duplicate in the Sheet.`], [], { label: 'Review' }));
+    }
+    for (const [key, issue] of exporter.journal.issues) if (issue.reason === 'export_mismatch' && !mismatches.has(key)) mismatches.set(key, issue);
+    for (const issue of mismatches.values()) items.push(item('export_mismatch', 'blocking', 'Sheet export differs; row preserved',
+      [`${issue.kind}: ${issue.fields.join(', ')}. Review the direction in the cutover runbook; no automatic overwrite.`], [issue.id], { label: 'Review' }));
+    for (const issue of exporter.journal.issues.values()) {
+      const since = issue.reason === 'export_lag' ? issue.since : issue.lagSince;
+      if (since === undefined) continue;
+      const age = now - since;
+      if (age >= 900_000) items.push(item('export_lag', age >= 3600_000 ? 'blocking' : 'attention', 'Sheet export is behind',
+        [`${Math.floor(age / 60000)} minutes since the first failed export.`], [issue.id], { label: 'Retry' }));
+    }
     const last = options.backupJournal?.lastVerified;
     if (!last || now - last.verifiedAt > 36 * 3600_000 || options.backupJournal?.failureSince !== null) items.push(item('backup_fresh', 'attention', 'Verified backup needs attention',
       [last ? 'Last verified backup is older than 36 hours or a later backup failed.' : 'No verified backup has been recorded. Supabase plan backups still require owner confirmation.'], [], { label: 'Review' }));

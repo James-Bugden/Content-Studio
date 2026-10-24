@@ -1,8 +1,35 @@
-import { describe, expect, it } from 'vitest';
-import { createContentBackup, retainedBackups, type VerifiedBackup, type BackupJournal } from '@/application/content-backup';
+import { describe, expect, it, vi } from 'vitest';
+import { BACKUP_TABLES, createContentBackup, verifyContentBackup, retainedBackups, type VerifiedBackup, type BackupJournal } from '@/application/content-backup';
 import { FakePrivateBackupFolder, emptyBackupSnapshot } from '@/integrations/supabase/fake-content-backup';
+import { AppError } from '@/domain/errors';
 
 describe('private backup archive contract', () => {
+  it.each(['manifest', ...BACKUP_TABLES])('verifies the uploaded %s at creation before advancing backup freshness', async target => {
+    const folder = new FakePrivateBackupFolder(), journal: BackupJournal = { lastVerified: null, failureSince: null };
+    const source = { snapshot: async () => emptyBackupSnapshot() };
+    const previous = await createContentBackup(source, folder, journal, 1000);
+    const read = folder.read.bind(folder), create = folder.create.bind(folder);
+    let corruptId = '';
+    vi.spyOn(folder, 'create').mockImplementation(async (name, mime, bytes) => {
+      const id = await create(name, mime, bytes);
+      if (name.endsWith(target === 'manifest' ? '-manifest.json' : `-${target.replaceAll('_', '-')}.jsonl.gz`)) corruptId = id;
+      return id;
+    });
+    vi.spyOn(folder, 'read').mockImplementation(async id => {
+      const bytes = await read(id);
+      return id === corruptId ? new Uint8Array([...bytes, 0]) : bytes;
+    });
+    await expect(createContentBackup(source, folder, journal, 2000)).rejects.toMatchObject({ code: 'CONFLICT', details: { reason: 'backup_integrity' } });
+    expect(corruptId).not.toBe(''); expect(journal.lastVerified).toBe(previous); expect(journal.failureSince).toBe(2000);
+  });
+  it('checks private-folder authorization at verification even with an independently readable folder port', async () => {
+    const folder = new FakePrivateBackupFolder(), journal: BackupJournal = { lastVerified: null, failureSince: null };
+    const backup = await createContentBackup({ snapshot: async () => emptyBackupSnapshot() }, folder, journal);
+    const read = vi.fn(folder.read.bind(folder));
+    const unsafeFolder = { create: folder.create.bind(folder), read, assertPrivate: async () => { throw new AppError('FORBIDDEN'); } };
+    await expect(verifyContentBackup(unsafeFolder, backup.manifestId, backup.manifestHash)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(read).not.toHaveBeenCalled();
+  });
   it('uses immutable new files each run and supports empty six-table snapshots', async () => {
     const folder = new FakePrivateBackupFolder(), journal: BackupJournal = { lastVerified: null, failureSince: null };
     const source = { snapshot: async () => emptyBackupSnapshot() };

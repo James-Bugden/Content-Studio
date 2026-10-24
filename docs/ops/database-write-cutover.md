@@ -66,6 +66,23 @@ never replace formulas. A formula/rich-link display RAW cannot reproduce stays
 blocking, not exact. Ordinary repair uses one inventory read per collection
 plus fresh reads/read-back for changed rows; unchanged repairs write nothing.
 
+Checkbox updates and appends share the Sheet repository's RAW serializer:
+`Queue for Schedule` and `Posted` are booleans, never the text `TRUE`/`FALSE`.
+Export parity and the fake transport retain that entered type, so identical
+formatted checkbox text alone cannot pass. A DB-origin Replies idea has no
+ownership of unknown Queue columns it never carried; these are excluded from
+that row's comparison projection. Imported rows still compare every retained
+passthrough column, including blanks and lost values. Checkpoints still cover
+the whole exported Sheet row so later unknown-column hand edits block writes.
+
+Text starting with `=` is currently refused by export as a named blocking
+`export_mismatch` before any cells in that row are written. RAW prevents formula
+evaluation, but the current formula projection cannot distinguish entered text
+from formula syntax reliably. Resolve/change that authoritative value through
+the normal audited patch flow; do not prepend an apostrophe to the DB copy or
+claim byte-equal export. Supporting this text requires a separately tested
+entered-value representation at the transport boundary.
+
 Before writing a changed row, compare its fresh Sheet fingerprint against the
 checkpoint. A mismatch skips the **whole row**, preserving all Sheet cells,
 and raises blocking `export_mismatch` with the stable ID and differing header
@@ -89,6 +106,9 @@ Resolution is an explicit owner decision, never part of repair:
    authorize the export baseline as in step 2. Never run imports in `db` mode.
 
 Persist checkpoints before restart. Discarding them is not conflict recovery.
+Provider failures preserve a known blocking mismatch and its field names while
+also tracking export lag. Reconciliation continues to show both even if fresh
+inspection fails. Duplicate stable Sheet IDs produce an explicit blocking item.
 
 ## Daily comparison ledger
 
@@ -108,6 +128,12 @@ across instances/restarts, and count successful distinct mutations durably.
 Local instance summaries cannot meet the live time gate. Every production
 comparison-period measurement is currently **not measured**.
 
+Reconciliation page loads inspect parity within the exporter's single flight
+without adding comparison samples. Only export/repair completion samples feed
+the ledger. A day with no lag observation still cannot be green, even if it had
+no mutations; this conservative policy is unchanged and needs an explicit
+measurement design before live use.
+
 ## Private backup and restore drill
 
 `ContentBackupSource.snapshot()` must read posts, schedule, workflow_settings,
@@ -123,6 +149,11 @@ uploads preserve the previous verified backup. Keep 30 daily archives plus the
 first verified archive per Taipei month for twelve months (`retainedBackups`).
 Deletion is deliberately unwired; review a retention list before introducing a
 private delete port. Until then archives remain longer, never removed early.
+
+Backup verification currently accepts only the compiled Content schema version.
+A future schema bump must add a versioned archive reader/restore migration and
+prove old archives remain restorable before deployment. This round does not
+change the archive format or authorize a schema bump.
 
 Restore steps:
 

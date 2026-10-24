@@ -5,6 +5,7 @@ import { canonicalJson, mirrorHash } from './sheet-mirror';
 import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 import type { SheetTransport, CellWrite } from '@/integrations/google/sheet-transport';
 import { MAX_TAB_ROWS } from '@/integrations/google/sheet-transport';
+import { sheetCellValue } from '@/integrations/google/sheet-cell';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
 import { cellText, rowRevision, type RawRow } from '@/domain/mapping';
 import { fingerprintValues } from '@/domain/hash';
@@ -12,10 +13,10 @@ import { AppError } from '@/domain/errors';
 import { operationIdSchema, type Actor } from '@/domain/mutation';
 
 export type ExportKind = 'library' | 'queue' | 'schedule' | 'workflow_settings';
-export type ExportCell = { value: string; formula?: string; link?: string };
-export type ExportRow = { kind: ExportKind; id: string; version: string; importedRevision: string | null; cells: Record<string, ExportCell> };
+export type ExportCell = { value: string; formula?: string; link?: string; type?: 'boolean' };
+export type ExportRow = { kind: ExportKind; id: string; version: string; importedRevision: string | null; dbOrigin?: boolean; cells: Record<string, ExportCell> };
 export type ExportCheckpoint = { fingerprint: string; cells: Record<string, ExportCell>; version: string; at: number };
-export type ExportIssue = { kind: ExportKind; id: string; fields: string[]; since: number; reason: 'export_mismatch' | 'export_lag' };
+export type ExportIssue = { kind: ExportKind; id: string; fields: string[]; since: number; reason: 'export_mismatch' | 'export_lag'; lagSince?: number };
 export type ExportParity = { at: number; exact: boolean; counts: Record<ExportKind, number>; dbHash: string; sheetHash: string; differences: ExportIssue[] };
 
 /** Private durable implementation required before live wiring. Checkpoints must
@@ -31,7 +32,8 @@ const revision = (raw: RawRow, width: number) => fingerprintValues([rowRevision(
 const rawCell = (raw: RawRow, column: number): ExportCell => {
   const formula = cellText(raw.formulas?.[column]);
   const link = raw.links?.[column] || (/^=HYPERLINK\(\s*"([^"]+)"/i.exec(formula)?.[1]);
-  return { value: cellText(raw.values[column]), ...(formula.startsWith('=') ? { formula } : {}), ...(link ? { link } : {}) };
+  return { value: cellText(raw.values[column]), ...(formula.startsWith('=') ? { formula } : {}), ...(link ? { link } : {}),
+    ...(typeof raw.formulas?.[column] === 'boolean' ? { type: 'boolean' as const } : {}) };
 };
 const different = (a: Record<string, ExportCell>, b: Record<string, ExportCell>) => [...new Set([...Object.keys(a), ...Object.keys(b)])]
   .filter(k => canonicalJson([a[k]]) !== canonicalJson([b[k]])).sort();
@@ -49,14 +51,16 @@ export async function contentExportRows(db: ContentDb): Promise<ExportRow[]> {
       const source = raw.find(r => ('library_id' in r ? r.library_id : r.content_id) === id)!;
       const headers: Record<string, string> = kind === 'schedule' ? SCHEDULE_HEADERS : LIBRARY_HEADERS;
       const cells = Object.fromEntries(Object.entries(record.cells).map(([field, value]) => [headers[field]!, {
-        value, ...((record.links as Record<string, string>)[field] ? { link: (record.links as Record<string, string>)[field] } : {}),
+        value, ...(typeof sheetCellValue(headers[field]!, value) === 'boolean' ? { type: 'boolean' as const } : {}),
+        ...((record.links as Record<string, string>)[field] ? { link: (record.links as Record<string, string>)[field] } : {}),
       }]));
       for (const item of Object.values(record.passthrough ?? {})) {
         const p = item as { header: string; value: string; formula?: string; link?: string };
         if (typeof p.header !== 'string' || p.header in cells) throw new AppError('SCHEMA_DRIFT');
         cells[p.header] = { value: p.value, ...(p.formula?.startsWith('=') ? { formula: p.formula } : {}), ...(p.link ? { link: p.link } : {}) };
       }
-      rows.push({ kind, id, version: String(source.row_version), importedRevision: source.sheet_revision, cells });
+      rows.push({ kind, id, version: String(source.row_version), importedRevision: source.sheet_revision,
+        dbOrigin: kind === 'queue' && source.source_sheet_row === null && source.sheet_revision === null, cells });
     }
   }
   rows.push(...settings.map(r => ({ kind: 'workflow_settings' as const, id: r.setting, version: String(r.row_version ?? 1), importedRevision: null,
@@ -87,12 +91,16 @@ export class ContentExporter {
     const headers = rows[headerIndex]!.values.map(cellText);
     if (new Set(headers.filter(Boolean)).size !== headers.filter(Boolean).length) throw new AppError('SCHEMA_DRIFT');
     const data = rows.slice(headerIndex + 1).map((raw, i) => ({ raw, row: headerIndex + i + 2, id: cellText(raw.values[headers.indexOf(idHeader)]) })).filter(r => r.id);
-    if (new Set(data.map(r => r.id)).size !== data.length) throw new AppError('SCHEMA_DRIFT');
+    if (new Set(data.map(r => r.id)).size !== data.length) throw new AppError('SCHEMA_DRIFT', { reason: 'duplicate_export_id', kind });
     return { spec, headers, data };
   }
   private observed(raw: RawRow, headers: string[]) { return Object.fromEntries(headers.flatMap((h, i) => h ? [[h, rawCell(raw, i)]] : [])); }
   private issue(row: ExportRow, fields: string[], reason: ExportIssue['reason']) {
     const key = exportKey(row.kind, row.id), old = this.journal.issues.get(key);
+    if (reason === 'export_lag' && old?.reason === 'export_mismatch') {
+      old.lagSince ??= this.now();
+      return old;
+    }
     const issue: ExportIssue = { kind: row.kind, id: row.id, fields, since: old?.since ?? this.now(), reason };
     this.journal.issues.set(key, issue);
     return issue;
@@ -149,13 +157,18 @@ export class ContentExporter {
         this.pending.set(key, this.pending.get(key) ?? this.now());
         const { spec, headers, data } = await this.tab(row.kind);
         if (Object.keys(row.cells).some(h => !headers.includes(h))) { this.issue(row, ['@headers'], 'export_mismatch'); continue; }
+        // A leading '=' is RAW text, but the formula projection cannot yet
+        // distinguish it from an actual formula. Refuse explicitly rather than
+        // creating a permanently unwritable exported cell.
+        const formulaText = Object.entries(row.cells).filter(([, c]) => c.value.startsWith('=') && !c.formula).map(([h]) => h);
+        if (formulaText.length) { this.issue(row, formulaText, 'export_mismatch'); continue; }
         const current = data.find(r => r.id === row.id);
         if (!current) {
           // Only a genuinely new Queue idea can be appended. A missing exported
           // row is a deletion conflict, never a license to recreate it.
           if (row.kind !== 'queue' || row.importedRevision || checkpoint) { this.issue(row, ['@missing'], 'export_mismatch'); continue; }
           if (Object.values(row.cells).some(c => c.formula || c.link && c.link !== c.value)) { this.issue(row, ['@links'], 'export_mismatch'); continue; }
-          await this.sheet.appendRow(spec.name, 'ZZ', headers.map(h => row.cells[h]?.value ?? ''));
+          await this.sheet.appendRow(spec.name, 'ZZ', headers.map(h => sheetCellValue(h, row.cells[h]?.value ?? '')));
         } else {
           const actual = this.observed(current.raw, headers);
           const fingerprint = revision(current.raw, headers.length);
@@ -163,7 +176,7 @@ export class ContentExporter {
             this.issue(row, Object.keys(row.cells).filter(h => (row.cells[h]?.link ?? '') !== (actual[h]?.link ?? '')), 'export_mismatch'); continue;
           }
           if (checkpoint ? fingerprint !== checkpoint.fingerprint || different(checkpoint.cells, actual).length > 0
-            : row.importedRevision ? fingerprint !== row.importedRevision : different(row.cells, actual).length > 0) {
+            : row.importedRevision ? fingerprint !== row.importedRevision : different(row.cells, this.ownedCells(row, actual)).length > 0) {
             this.issue(row, different(checkpoint?.cells ?? row.cells, actual).length ? different(checkpoint?.cells ?? row.cells, actual) : ['@fingerprint'], 'export_mismatch'); continue;
           }
           const writes: CellWrite[] = [];
@@ -172,7 +185,7 @@ export class ContentExporter {
             // Preserve formulas and rich hyperlinks. RAW cannot change their
             // display and target independently; an impossible export blocks parity.
             if (existing.formula || wanted.formula || wanted.link && wanted.link !== wanted.value) continue;
-            if (different({ cell: wanted }, { cell: existing }).length) writes.push({ row: current.row, column, value: wanted.value });
+            if (different({ cell: wanted }, { cell: existing }).length) writes.push({ row: current.row, column, value: sheetCellValue(header, wanted.value) });
           }
           if (writes.length) await this.sheet.writeCells(spec.name, writes);
         }
@@ -181,7 +194,7 @@ export class ContentExporter {
         const actual = this.observed(readback.raw, fresh.headers);
         // Keep formulas in the precondition checkpoint; parity compares their
         // display/links to the DB, never demands conversion to plain values.
-        const fields = this.parityFields(row.cells, actual);
+        const fields = this.parityFields(row.cells, this.ownedCells(row, actual));
         if (fields.length) { this.issue(row, fields, 'export_mismatch'); continue; }
         this.journal.checkpoints.set(key, { fingerprint: revision(readback.raw, fresh.headers.length), cells: actual, version: row.version, at: this.now() });
         this.lagSamples.push({ at: this.now(), lagMs: this.now() - this.pending.get(key)! });
@@ -191,7 +204,7 @@ export class ContentExporter {
         this.journal.issues.delete(key);
       } catch { this.issue(row, ['@provider'], 'export_lag'); }
     }
-    return this.parity();
+    return this.measureParity(true);
   }
   comparison(now = this.now(), mutationCount = 0) {
     const day = 86400_000, today = Math.floor((now + 8 * 3600_000) / day) * day - 8 * 3600_000;
@@ -209,11 +222,23 @@ export class ContentExporter {
     return { daily, mutationCount, ready: mutationCount >= 50 && daily.every(d => d.green), scope: 'this server instance; live gates pending' as const };
   }
   private parityFields(expected: Record<string, ExportCell>, actual: Record<string, ExportCell>) {
-    const display = (cells: Record<string, ExportCell>) => Object.fromEntries(Object.entries(cells).map(([h, c]) => [h, { value: c.value, ...(c.link ? { link: c.link } : {}) }]));
+    const display = (cells: Record<string, ExportCell>) => Object.fromEntries(Object.entries(cells).map(([h, c]) => [h, { value: c.value, ...(c.link ? { link: c.link } : {}), ...(c.type ? { type: c.type } : {}) }]));
     return different(display(expected), display(actual));
   }
+  /** DB-origin ideas never owned unknown Sheet columns. Imported rows retain
+   * full passthrough comparison, including detection of a lost blank/value. */
+  private ownedCells(row: ExportRow, actual: Record<string, ExportCell>) {
+    return row.dbOrigin ? Object.fromEntries(Object.entries(actual).filter(([h]) => h in row.cells)) : actual;
+  }
+  /** Read-only inspection shares the export single flight, without feeding the
+   * comparison ledger. Only completed export/repair runs record samples. */
+  parity(): Promise<ExportParity> {
+    const next = this.tail.then(() => this.measureParity());
+    this.tail = next.catch(() => {});
+    return next;
+  }
   /** Fresh exact inventory, including unexpected Sheet IDs; no representation exceptions. */
-  async parity(): Promise<ExportParity> {
+  private async measureParity(sample = false): Promise<ExportParity> {
     const rows = await contentExportRows(this.db), differences: ExportIssue[] = [], dbProjection: unknown[] = [], sheetProjection: unknown[] = [];
     const counts = { library: 0, queue: 0, schedule: 0, workflow_settings: 0 };
     for (const kind of Object.keys(counts) as ExportKind[]) {
@@ -221,8 +246,9 @@ export class ContentExporter {
       counts[kind] = expected.length;
       for (const id of [...new Set([...expected.map(r => r.id), ...tab.data.map(r => r.id)])].sort()) {
         const wanted = expected.find(r => r.id === id), current = tab.data.find(r => r.id === id);
-        const project = (cells: Record<string, ExportCell>) => Object.fromEntries(Object.entries(cells).map(([h, c]) => [h, { value: c.value, ...(c.link ? { link: c.link } : {}) }]));
-        const actual = current ? this.observed(current.raw, tab.headers) : null;
+        const project = (cells: Record<string, ExportCell>) => Object.fromEntries(Object.entries(cells).map(([h, c]) => [h, { value: c.value, ...(c.link ? { link: c.link } : {}), ...(c.type ? { type: c.type } : {}) }]));
+        const observed = current ? this.observed(current.raw, tab.headers) : null;
+        const actual = wanted && observed ? this.ownedCells(wanted, observed) : observed;
         if (wanted) dbProjection.push({ kind, id, cells: project(wanted.cells) });
         if (actual) sheetProjection.push({ kind, id, cells: project(actual) });
         const fields = !wanted ? ['@unexpected'] : !actual ? ['@missing'] : this.parityFields(wanted.cells, actual);
@@ -231,7 +257,7 @@ export class ContentExporter {
     }
     const dbHash = mirrorHash(dbProjection), sheetHash = mirrorHash(sheetProjection);
     const report = { at: this.now(), exact: differences.length === 0 && dbHash === sheetHash, counts, dbHash, sheetHash, differences };
-    this.journal.reports.push(report);
+    if (sample) this.journal.reports.push(report);
     return report;
   }
 }

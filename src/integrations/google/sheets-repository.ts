@@ -30,6 +30,7 @@ import { parseQueueSummary, parseWorkflowSettings } from '@/domain/settings';
 import { emit, targetHash, timed } from '@/observability/events';
 import type { ContentRepository, QueueIdeaCreate, SchemaStatus } from '@/application/ports';
 import { MAX_TAB_ROWS, PAGE_ROWS, type CellWrite, type SheetTransport } from './sheet-transport';
+import { sheetCellValue } from './sheet-cell';
 
 /**
  * Sheet-backed ContentRepository (CS-003).
@@ -344,7 +345,7 @@ export class SheetsContentRepository implements ContentRepository {
 
     const values: (string | boolean)[] = Array.from({ length: before.index.width }, () => '');
     for (const [field, value] of Object.entries(expected) as [LibraryField, string][]) {
-      values[before.index.columns[field]] = field === 'queueForSchedule' ? value === 'TRUE' : value;
+      values[before.index.columns[field]] = sheetCellValue(LIBRARY_HEADERS[field], value);
     }
 
     try {
@@ -491,7 +492,7 @@ export class SheetsContentRepository implements ContentRepository {
       const writes: CellWrite[] = changed.map(([field, value]) => ({
         row: current.row,
         column: read.index.columns[field],
-        value: isCheckboxField(field) ? value === 'TRUE' : value,
+        value: sheetCellValue(headers[field], value),
       }));
       try {
         await timed(
@@ -553,10 +554,6 @@ export class SheetsContentRepository implements ContentRepository {
     this.ops.set(opId, { patchHash, result });
     if (this.ops.size > OP_CACHE_MAX) this.ops.delete(this.ops.keys().next().value!);
   }
-}
-
-function isCheckboxField(field: string): boolean {
-  return field === 'queueForSchedule' || field === 'posted';
 }
 
 function uniqueBy<R>(all: R[], idOf: (r: R) => string, id: string): R {
