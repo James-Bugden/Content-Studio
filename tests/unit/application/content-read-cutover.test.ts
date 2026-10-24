@@ -242,3 +242,15 @@ it('MIG-11 rollback ignores an unavailable or contradictory DB for EVERY read an
   await services.repo.getQueue('IDEA-BL-0001'); await services.repo.getSchedule('2026-10-02-MAIN-X');
   for (const spy of spies) expect(spy).not.toHaveBeenCalled();
 });
+
+it('configured import always captures the fresh Sheet instead of its DB read model', async () => {
+  vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', 'db-read'); resetEnvCache(); resetServices();
+  const services = getServices(), sheet = services.fakes!.sheet;
+  const before = await services.repo.getLibrary('SYN-L001');
+  const column = sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.currentHook);
+  sheet.externalEdit(SHEET_TABS.library.name, before.row, column, 'Fresh synthetic Sheet hook');
+  const dbReadModel = vi.spyOn(services.repo, 'listLibrary').mockRejectedValue(new Error('import must ignore the DB read model'));
+  await expect(runConfiguredSheetMirror({ kind: 'scheduled' })).resolves.toMatchObject({ status: 'completed' });
+  expect(dbReadModel).not.toHaveBeenCalled();
+  expect((await services.repo.getLibrary('SYN-L001')).cells.currentHook).toBe('Fresh synthetic Sheet hook');
+});
