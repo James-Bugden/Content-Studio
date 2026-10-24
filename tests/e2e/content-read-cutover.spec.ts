@@ -30,7 +30,7 @@ test('MIG-11 N1/N2: ordinary lag and refused rows have truthful row-specific rec
   await control({ kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Hook Score', value: '8/10' });
   await control({ kind: 'sheet_edit', libraryId: 'SYN-L002', header: 'Draft Content', value: 'Synthetic hand-edited import lag' });
   await page.goto('/reconcile');
-  const pending = page.locator('[data-reconcile-kind="refresh_pending"]');
+  const pending = page.locator('[data-reconcile-kind="refresh_pending"] article');
   await expect(pending).toHaveCount(2);
   await expect(pending.filter({ hasText: 'SYN-L001:' })).toContainText('Copy refused (refused_numeric)');
   await expect(pending.filter({ hasText: 'SYN-L002:' })).toContainText('behind the Sheet');
@@ -44,9 +44,7 @@ test('MIG-11 N1/N2: ordinary lag and refused rows have truthful row-specific rec
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/cutover-refused-${test.info().project.name}.png`, fullPage: true });
   await page.goto('/review/SYN-L002');
-  await page.getByText('Show the Sheet version', { exact: true }).click();
-  await expect(page.getByText('Synthetic hand-edited import lag', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Start from the Sheet version instead' }).click();
+  // This fixture has no Markdown section, so its editor opens the Sheet copy.
   await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic hand-edited import lag');
 });
 
@@ -66,7 +64,7 @@ test('MIG-11: Sheet save succeeds during copy failure, next import repairs the v
   await page.screenshot({ path: `test-results/cutover-save-${test.info().project.name}.png`, fullPage: true });
   await page.goto('/reconcile');
   await expect(page.getByText('Store mode: db-read. Sheet remains authoritative.')).toBeVisible();
-  const pending = page.locator('[data-reconcile-kind="refresh_pending"]');
+  const pending = page.locator('[data-reconcile-kind="refresh_pending"] article');
   await expect(pending).toContainText('SYN-L001: database refresh pending');
   expect((await new AxeBuilder({ page }).include('[data-reconcile-kind="refresh_pending"]').analyze()).violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
