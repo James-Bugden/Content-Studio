@@ -164,7 +164,10 @@ function extras<F extends string>(index: HeaderIndex<F>, raw: RawRow) {
     const direct = raw.links?.[column];
     if (typeof direct === 'string' && direct !== '') links[field] = direct;
   }
-  return { links, formulaFields };
+  const passthrough = Object.fromEntries(index.passthrough.map(({ header, column }) => [String(column), {
+    header, value: cellText(raw.values[column]), formula: cellText(raw.formulas?.[column]), link: raw.links?.[column] ?? '',
+  }]));
+  return { links, formulaFields, passthrough };
 }
 
 /** The revision also covers formulas, so a formula edit is detected even when its display value is unchanged. */

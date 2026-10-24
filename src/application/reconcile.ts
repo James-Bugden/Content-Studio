@@ -14,6 +14,8 @@ import { addDays, parseContentId } from '@/domain/schedule';
 import type { ContentRepository, DriveGateway, TypefullyGateway } from './ports';
 import { today } from './schedule';
 import { reconcileRecord } from './typefully';
+import type { ContentParityJournal } from './content-parity';
+import { fixIssuesCount, rememberNavigationCount } from './navigation-counts';
 
 /**
  * Reconciliation centre (CS-017).
@@ -25,6 +27,8 @@ import { reconcileRecord } from './typefully';
  */
 export type ReconcileKind =
   | 'schema_drift'
+  | 'import_lag'
+  | 'content_parity'
   | 'provider_config'
   | 'markdown_mismatch'
   | 'markdown_missing'
@@ -80,8 +84,9 @@ export async function buildReconcileReport(
   repo: ContentRepository,
   drive: DriveGateway,
   now = Date.now(),
-  options: { typefully?: TypefullyGateway; today?: string } = {},
+  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal } = {},
 ): Promise<ReconcileReport> {
+  rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
   const unreadable: string[] = [];
 
@@ -123,6 +128,8 @@ export async function buildReconcileReport(
   } catch {
     unreadable.push('Content Schedule');
   }
+
+  const navigationSnapshots = repo.navigationSnapshots?.();
 
   // Sheet vs Markdown, reading each master file once.
   const byFile = new Map<string, LibraryRecord[]>();
@@ -246,9 +253,19 @@ export async function buildReconcileReport(
     );
   }
 
+  if (options.contentParity) {
+    const parity = options.contentParity.summary(Math.max(now, options.contentParity.samples.at(-1)?.at ?? now));
+    if (parity.lagMs === null || parity.lagMs >= 900_000 || parity.failureSince !== null) {
+      const blocking = parity.lagMs === null || parity.lagMs >= 3600_000 || parity.failureSince !== null && now - parity.failureSince >= 3600_000;
+      items.push(item('import_lag', blocking ? 'blocking' : 'attention', 'Content import needs attention',
+        [parity.lagMs === null ? 'No completed typed import recorded.' : `Last imported snapshot: ${Math.floor(parity.lagMs / 60000)} minutes ago.`, 'Retry the scheduled import; the Sheet remains authoritative.'], [], { label: 'Configure' }));
+    }
+    if (parity.collections.some(c => c.blocking > 0)) items.push(item('content_parity', 'blocking', 'Sheet and database comparison found differences',
+      parity.collections.filter(c => c.blocking).map(c => `${c.collection}: ${c.blocking} blocking differences.`), [], { label: 'Review' }));
+  }
   const order: Record<ReconcileItem['severity'], number> = { blocking: 0, attention: 1 };
   items.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind));
-  return {
+  const report: ReconcileReport = {
     items,
     alerts: evaluateAlerts(events, stale.length, now),
     events: summariseEvents(events),
@@ -256,4 +273,6 @@ export async function buildReconcileReport(
     checkedAt: new Date(now).toISOString(),
     unreadable,
   };
+  rememberNavigationCount(repo, 'fixIssues', fixIssuesCount(report), navigationSnapshots);
+  return report;
 }

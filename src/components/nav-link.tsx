@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { GuardedLink } from './guarded-link';
+import { NavigationBadge } from './navigation-counts';
 
 /**
  * Primary navigation item (CS-006, UX-01, UX-04; CS-042).
@@ -28,6 +29,7 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
       ].join(' ')}
     >
       {children}
+      <NavigationBadge href={href} />
     </GuardedLink>
   );
 }

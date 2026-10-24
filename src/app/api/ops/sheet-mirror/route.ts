@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     await requireMutation(request);
-    return json({ ok: true, ...(await runConfiguredSheetMirror()) });
+    return json({ ok: true, ...(await runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: request.headers.get('Idempotency-Key') ?? '' })) });
   } catch (error) {
     return errorResponse(error);
   }

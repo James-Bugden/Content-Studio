@@ -20,6 +20,8 @@ function server(port: number) {
     timeout: 300_000,
     env: {
       CS_DATA_MODE: 'fake',
+      CS_CONTENT_STORE: 'sheet',
+      CS_E2E_PORT: String(port),
       CS_TEST_MODE: 'e2e',
       CS_FAKE_TODAY: '2026-09-30',
       AI_PROVIDER: 'fake',
@@ -46,8 +48,8 @@ export default defineConfig({
     reducedMotion: 'reduce',
   },
   projects: [
-    { name: 'w375', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts'], use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
-    { name: 'w1280', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts'], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
+    { name: 'w375', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts', '**/content-parity.spec.ts'], use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
+    { name: 'w1280', testIgnore: ['**/sweep.spec.ts', '**/sweep-faults.spec.ts', '**/content-parity.spec.ts'], use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
     ...[375, 1280].flatMap((width, index) => ['routes', 'faults'].map((group, offset) => ({
       name: group === 'routes' ? `sweep-${width}` : `sweep-fault-${width}`,
       testMatch: group === 'routes' ? '**/sweep.spec.ts' : '**/sweep-faults.spec.ts',
@@ -56,6 +58,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width, height: 900 }, trace: 'off' as const,
         ...(SWEEP_ISOLATED ? { baseURL: `http://127.0.0.1:${PORT + index * 2 + offset}` } : {}) },
     }))),
+    ...[375, 1280].map(width => ({ name: `shadow-w${width}`, testMatch: '**/content-parity.spec.ts', use: { ...devices['Desktop Chrome'], baseURL: `http://127.0.0.1:${PORT + 1}`, viewport: { width, height: width === 375 ? 812 : 900 } } })),
   ],
-  webServer: SWEEP_ISOLATED ? [0, 1, 2, 3].map((offset) => server(PORT + offset)) : server(PORT),
+  webServer: SWEEP_ISOLATED ? [0, 1, 2, 3].map((offset) => server(PORT + offset)) : { ...server(PORT), command: 'node scripts/e2e-servers.mjs', url: `http://127.0.0.1:${PORT + 1}/api/health`, reuseExistingServer: false },
 });

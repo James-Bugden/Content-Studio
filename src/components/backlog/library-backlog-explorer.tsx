@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { nextHeaderSort, type BacklogSort, type LibraryBacklogFilters } from '@/domain/library-backlog';
 import { useLeaveConfirmation } from '../leave-confirm';
@@ -21,8 +21,15 @@ type Props = {
 
 
 
+const subscribeHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
+
 /** Search is deliberately ephemeral: private post copy never goes in a URL. */
 export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pestoOptions = [], emptyLibrary = false }: Props) {
+  // Like the post editor, accept input only once React can retain it. A full
+  // pagination navigation can show the server-rendered field before hydration.
+  const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
   const { source, platform, pesto, status, sort, dir, group } = filters;
   const router = useRouter();
   const pathname = usePathname() ?? '/backlog';
@@ -159,7 +166,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
   return <section aria-label="Browse Content Library" className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">
       <label htmlFor="library-search" className="text-sm font-medium">Find a post</label>
-      <input ref={searchInput} id="library-search" type="search" aria-keyshortcuts="/" value={search} maxLength={120}
+      <input ref={searchInput} id="library-search" type="search" aria-keyshortcuts="/" value={search} maxLength={120} readOnly={!hydrated}
         onChange={(event) => { setSearch(event.target.value); setSearchPage(1); setResult(null); setPending(Boolean(event.target.value.trim())); setError(false); }}
         placeholder="Search title, hook, content or source" className="min-h-11 min-w-64 flex-1 rounded-md border border-line bg-card px-3 text-sm" />
     </div>

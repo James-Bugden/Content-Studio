@@ -116,7 +116,7 @@ jobs:
         env:
           CS_SHOT_DIR: ${{ runner.temp }}/screens
           CS_SHOT_REPLIES_ONLY: '1'
-        run: npm run test:e2e -- --project=w375 --project=w1280 --shard=${{ matrix.shard }}/4
+        run: npm run test:e2e -- --project=w375 --project=w1280 --project=shadow-w375 --project=shadow-w1280 --shard=${{ matrix.shard }}/4
 
       # These contain only synthetic fake-provider pages, never owner data.
       - name: Upload Replies visual evidence

@@ -302,7 +302,8 @@ skipped or inconclusive measurement is not green.
 - Exit: three consecutive full imports with identical stable-ID sets to the
   Sheet, per-collection count equality, and every field equal except entries
   recorded in the exception ledger (allowed classes: formula display values,
-  Sheet number formatting such as `1,234`, trailing whitespace). No unclassified
+  Sheet number formatting (including leading zeros/spaces), trailing whitespace,
+  blank booleans, boolean aliases, timestamp formatting; ADR-0002 NOTES). No unclassified
   mismatch.
 - Rollback: set `CS_CONTENT_STORE=sheet` (already the value); truncate the
   tables. Nothing in the app depends on them yet.
@@ -313,7 +314,9 @@ skipped or inconclusive measurement is not green.
 - Work: `db-shadow` reads the DB on roughly 10 percent of list requests and on
   every `/reconcile` load, compares records field by field after the adapter
   (so links, revision-independent cells and view models are compared, not raw
-  rows), and emits only `collection`, `field`, `kind` and a short fingerprint.
+  rows), and emits one content-free aggregate event per collection observation.
+  Blank checkboxes and FALSE are explicitly named semantic equivalents; all
+  other classified text differences still count against field equality.
   The Sheet is read exactly as today; the sample bounds the extra DB reads and
   comparison cost, not Sheet quota.
 - Exit: over 7 consecutive days or at least 200 compared requests, whichever is
@@ -447,6 +450,17 @@ underneath `repo.updateSchedule` does.
   scan no longer costs Sheet quota, so it can run on every `/reconcile` load.
 
 ## 6. Test strategy
+
+DB-4 review round 1: repository Playwright config builds one synthetic artifact
+and starts separate Sheet (3200) and db-shadow (3201) servers. Existing journeys
+stay on Sheet; `content-parity.spec.ts` runs in shadow-w375/shadow-w1280 projects,
+with a Sheet inactive-state check in w375/w1280. All projects participate in the
+same four CI shards and the existing aggregate requires every shard. This is
+Phase A/B evidence only; MIG-14's full db-mode mutation journeys still belong to
+the later write-adapter/cutover work. Instance-scoped parity never authorizes a
+read flip. Review-round representation classes and hash privacy limits are in
+ADR-0002 NOTES.
+
 
 - **T0**: (1) the migration and every RPC run under PGlite (already a dev
   dependency for Replies tests): schema version, compare-and-set, ledger
@@ -713,7 +727,7 @@ secret scan, e2e matrix (store mode `sheet` run is removed).
 | --- | --- |
 | Shared Supabase project with Replies: a bad migration or paused project affects both | Additive, prefixed, explicitly applied migration; PGlite tests; Supabase branch for T3; project tier that does not auto-pause (owner). |
 | Hidden hand edits to the Sheet after the freeze | The exporter's fingerprint precondition skips the row and raises a blocking `export_mismatch`; nothing is overwritten until the owner chooses a direction on `/reconcile`. The freeze is an assurance, not a control. |
-| Import exception ledger hides a real difference | Only three named classes are allowed; anything else blocks. Classes are listed in the report. |
+| Import exception ledger hides a real difference | Only the named classes in ADR-0002 NOTES are allowed; anything else blocks. Classes are listed in the report. |
 | Write-through gap in phase C shows a stale row for seconds | `refresh_pending` state; the mutation response already carries the new record. |
 | Lost Drive revision history if section 3 (b) is accepted | DB row history per operation; weekly and daily exports; the decision is James's. |
 | The service key leaks to preview | Production-target-only variables; preview runs the fake DB; `check:env` test asserts it. |

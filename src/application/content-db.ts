@@ -31,7 +31,7 @@ export type ContentSummaryRow = {
   count: number;
   counts: Record<string, number | null>;
 };
-export type ContentSettingRow = { setting: string; value: string; notes: string; source_sheet_row: number | null };
+export type ContentSettingRow = { setting: string; value: string; notes: string; source_sheet_row: number | null; row_version?: number | string };
 
 /** Read-only DB-2 boundary. Mutation/RPC methods are introduced by DB-3. */
 export interface ContentDb {
