@@ -88,6 +88,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
   const [sheetRevision, setSheetRevision] = useState(model.sheet.revision);
   const [sectionHash, setSectionHash] = useState(model.markdown.state === 'ok' ? model.markdown.sectionHash : '');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const notifySaved = useRef(false);
   const [restored, setRestored] = useState<string | null>(null);
   const opRef = useRef<{ id: string; text: string } | null>(null);
   const [mismatch, setMismatch] = useState(model.mismatch);
@@ -126,6 +127,14 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
     onSnapshot?.({ dirty, sheetRevision, sectionHash, markdownOk, mismatch });
   }, [onSnapshot, dirty, sheetRevision, sectionHash, markdownOk, mismatch]);
 
+  // useDirtyGuard's effect runs first, so guarded navigation sees the committed
+  // saved state. Animation frames cannot guarantee React has published it.
+  useEffect(() => {
+    if (status.kind !== 'saved' || !notifySaved.current) return;
+    notifySaved.current = false;
+    onSaved?.();
+  }, [status, onSaved]);
+
   async function save() {
     if (!markdownOk) return;
     const ok = await attemptSave();
@@ -152,8 +161,8 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       setSectionHash(body.value.sectionHash);
       clearRecovery(ns, model.libraryId);
       setMismatch(false);
+      notifySaved.current = true;
       setStatus({ kind: 'saved', replayed: body.replayed });
-      onSaved?.();
       return true;
     }
     if (res.status === 401) {

@@ -87,9 +87,10 @@ describe('GoogleSheetTransport', () => {
   });
 
   it('omits formulas and links when they were not asked for', async () => {
-    const { impl } = scripted([tokenOk, () => jsonRes({ sheets: [{ data: [{ rowData: [{ values: [{ formattedValue: 'ID', userEnteredValue: { stringValue: 'ID' } }] }] }] }] })]);
+    const { impl, calls } = scripted([tokenOk, () => jsonRes({ sheets: [{ data: [{ rowData: [{ values: [{ formattedValue: 'ID', userEnteredValue: { stringValue: 'ID' } }] }] }] }] })]);
     const t = new GoogleSheetTransport('SYNTH_sheet_id_0000000000', new ServiceAccountTokens('svc@example.com', pem, impl), false, impl);
     expect(await t.readTab('Content Library', 'AG', { startRow: 2, maxRows: 1, formulas: false, links: false })).toEqual([{ values: ['ID'] }]);
+    expect(new URL(calls[1]!.url).searchParams.get('fields')).toBe('sheets(data(rowData(values(formattedValue))))');
   });
 
   it('an empty range reads as no rows', async () => {
