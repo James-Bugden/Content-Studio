@@ -345,9 +345,12 @@ skipped or inconclusive measurement is not green.
   importing other rows. Unknown differences and CAS conflicts still fail closed.
   An overlay retires when its fingerprint is copied or the DB matches the
   current Sheet fingerprint, even after a newer edit. Pending reads avoid
-  repeated full-tab authority checks for an unchanged DB pair:
+  repeated full-tab authority checks for unchanged DB/import tokens:
   each saved overlay remembers its successfully checked `(row_version,
-  sheet_revision)` pair; either token changing rechecks, and failed reads retry.
+  sheet_revision, latest completed import operation ID)` tuple; any token
+  changing rechecks, including unchanged-row imports after a hand revert.
+  Concurrent checks share one promise. Rate-limited checks retry after 60
+  seconds; other failed reads retry on the next request.
   Ordinary import lag never
   installs an app-save overlay. The 60-second Library cache is reduced to the
   shared `DB_READ_CACHE_TTL_MS` (3 seconds) in both compositions.

@@ -157,8 +157,12 @@ reads until the DB has that Sheet fingerprint or a fingerprint matching the
 current Sheet row. The pre-save DB version is retained; a version advance alone
 does not prove repair. Pending checks use a fresh full-tab Sheet read to locate
 the row, at most once per saved overlay and successfully checked DB
-`(row_version, sheet_revision)` pair. Either token changing triggers a new
-check; a failed Sheet read stays retryable. A new save discards that cache.
+`(row_version, sheet_revision, latest completed import operation ID)` tuple.
+Any token changing triggers a new check, including an import that changes no
+row data after a hand revert. Concurrent checks share one in-flight promise.
+A rate-limited Sheet check waits 60 seconds before retrying, even if an import
+completes in that window; other failed reads stay immediately retryable.
+A new save discards that cache.
 A successful later copy or typed import repairs representable values.
 In db-read, `refused_numeric` and `refused_size` rows are excluded from accepted
 import counts and counted in the named exception ledger; other rows continue.

@@ -35,7 +35,7 @@ export class FakeContentImportStore implements ContentImportStore {
       if (at < 0) rows.push(after); else rows[at] = after;
     }
     // Publish only after the entire batch has succeeded. Missing rows stay visible to parity.
-    this.reader.replaceSnapshot({ posts: next.posts as ContentPostRow[], schedule: next.schedule as ContentScheduleRow[], settings: next.settings as ContentSettingRow[] });
+    this.reader.replaceSnapshot({ posts: next.posts as ContentPostRow[], schedule: next.schedule as ContentScheduleRow[], settings: next.settings as ContentSettingRow[] }, e.operationId);
     this.operations.set(e.operationId, identity);
   }
 }

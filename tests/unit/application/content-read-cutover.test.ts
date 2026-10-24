@@ -36,6 +36,7 @@ class SqlDb extends FakeContentDb {
   override async getSchedule(id: string) { return (await this.rows<ContentScheduleRow>('select * from content_studio_schedule where content_id=$1', [id]))[0] ?? null; }
   override async listPosts(kind: ContentCollection | 'ready') { return this.rows<ContentPostRow>(kind === 'ready' ? 'select * from content_studio_ready_queue' : 'select * from content_studio_posts where collection=$1', kind === 'ready' ? [] : [kind]); }
   override async listSchedule() { return this.rows<ContentScheduleRow>('select * from content_studio_schedule'); }
+  override async latestImportId() { return (await this.rows<{ operation_id: string }>('select operation_id from content_studio_import_runs order by at desc,operation_id desc limit 1'))[0]?.operation_id ?? null; }
   override async writeThrough(w: ContentWrite) {
     // Exercise the production HTTP method against SQL by NAMED arguments,
     // including the real function catalog's parameter contract.
@@ -127,6 +128,118 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
     if (mode === 'fake') db.externalEdit('library', ids.library, { current_hook: 'Concurrent snapshot' });
     else await pg.query('update content_studio_posts set current_hook=$1,row_version=row_version+1 where collection=$2 and library_id=$3', ['Concurrent snapshot', 'library', ids.library]);
   };
+  it('P3: an unchanged import retires a warmed failed-copy overlay after a hand revert', async () => {
+    await importSheet();
+    const before = await repo.getLibrary(ids.library), original = await db.getPost('library', ids.library);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    expect((await write('library', before.revision, 'App save R1')).ok).toBe(true);
+    await repo.listLibrary();
+    expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+    editSheet('draftContent', before.value.draftContent, before.row);
+    await importSheet();
+    expect(await db.getPost('library', ids.library)).toEqual(original);
+    const served = await repo.getLibrary(ids.library);
+    expect(served.value.draftContent).toBe(before.value.draftContent);
+    expect(served.revision).toBe(before.revision);
+    expect((await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!.revision).toBe(before.revision);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+    expect((await write('library', served.revision, 'Next save', 'synthetic_after_revert')).ok).toBe(true);
+  });
+  it('P4: clearing a refused score back to blank retires its warmed overlay after an unchanged import', async () => {
+    const initial = await repo.getLibrary(ids.library);
+    editSheet('hookScore', '', initial.row);
+    await importSheet();
+    const before = await repo.getLibrary(ids.library), original = await db.getPost('library', ids.library);
+    expect(original!.hook_score).toBeNull();
+    const saved = await repo.updateLibrary({ operationId: 'synthetic_refused_blank_score', actor: owner,
+      target: { libraryId: ids.library }, expectedRevision: before.revision, patch: { hookScore: '8/10' } });
+    expect(saved).toMatchObject({ ok: true, steps: expect.arrayContaining([expect.objectContaining({ step: 'refresh_pending' })]) });
+    expect((await repo.getLibrary(ids.library)).cells.hookScore).toBe('8/10');
+    editSheet('hookScore', '', before.row);
+    await importSheet();
+    expect(await db.getPost('library', ids.library)).toEqual(original);
+    const served = (await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!;
+    expect(served.cells.hookScore).toBe('');
+    expect(served.revision).toBe(before.revision);
+    expect((await repo.getLibrary(ids.library)).cells.hookScore).toBe('');
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+  });
+  it('F2: rate-limited pending checks wait a minute before retrying, even across imports', async () => {
+    const before = await repo.getLibrary(ids.library);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Pending throttled copy');
+    const now = Date.now(), clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const get = sheet.getLibrary.bind(sheet);
+    const authority = vi.spyOn(sheet, 'getLibrary').mockImplementation((...args) => {
+      transport.failNext({ op: 'read', tab: SHEET_TABS.library.name, code: 'RATE_LIMITED' });
+      return get(...args);
+    });
+    const reads = transport.reads;
+    for (let i = 0; i < 5; i++) {
+      expect((await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!.value.draftContent).toBe('Pending throttled copy');
+    }
+    expect(authority).toHaveBeenCalledTimes(1);
+    expect(transport.reads - reads).toBe(1);
+    authority.mockImplementation(get);
+    editSheet('draftContent', before.value.draftContent, before.row);
+    await importSheet();
+    clock.mockReturnValue(now + 59_999);
+    await repo.listLibrary();
+    expect(authority).toHaveBeenCalledTimes(1);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+    clock.mockReturnValue(now + 60_000);
+    await repo.listLibrary();
+    expect(authority).toHaveBeenCalledTimes(2);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+  });
+  it('F1: each unchanged import permits only one Sheet recheck for a still-refused row', async () => {
+    const before = await repo.getLibrary(ids.library);
+    const saved = await repo.updateLibrary({ operationId: 'synthetic_refused_read_bound', actor: owner,
+      target: { libraryId: ids.library }, expectedRevision: before.revision, patch: { hookScore: '8/10' } });
+    expect(saved.ok).toBe(true);
+    const original = await db.getPost('library', ids.library);
+    for (let run = 0; run < 3; run++) {
+      if (run) await importSheet();
+      const reads = transport.reads;
+      for (let i = 0; i < 10; i++) {
+        expect((await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!.cells.hookScore).toBe('8/10');
+      }
+      expect(transport.reads - reads).toBe(1);
+      expect(await db.getPost('library', ids.library)).toEqual(original);
+      expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+    }
+  });
+  it('F1: an import-identity read failure cannot reuse an old mismatched check', async () => {
+    await importSheet();
+    const before = await repo.getLibrary(ids.library);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Pending identity outage');
+    await repo.listLibrary();
+    editSheet('draftContent', before.value.draftContent, before.row);
+    await importSheet();
+    vi.spyOn(db, 'latestImportId').mockRejectedValueOnce(new Error('synthetic identity read outage'));
+    expect((await repo.getLibrary(ids.library)).revision).toBe(before.revision);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+  });
+  it('F3: concurrent first lists share one in-flight pending authority check', async () => {
+    const before = await repo.getLibrary(ids.library);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Pending parallel copy');
+    const get = sheet.getLibrary.bind(sheet);
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const authority = vi.spyOn(sheet, 'getLibrary').mockImplementation(async (...args) => { await held; return get(...args); });
+    const reads = transport.reads;
+    const lists = Array.from({ length: 5 }, () => repo.listLibrary());
+    try {
+      await vi.waitFor(() => expect(authority).toHaveBeenCalledTimes(1));
+      // Give every caller a chance to enter while the authority request is held.
+      await new Promise(resolve => setTimeout(resolve, 20));
+      expect(authority).toHaveBeenCalledTimes(1);
+    } finally { release(); await Promise.all(lists); }
+    for (const rows of await Promise.all(lists)) expect(rows.find(r => r.value.libraryId === ids.library)!.value.draftContent).toBe('Pending parallel copy');
+    expect(transport.reads - reads).toBe(1);
+  });
   it.each(['library', 'queue', 'schedule'] as const)('CS-059b: repeated %s get/list checks read the Sheet once per pending DB pair', async kind => {
     const before = await read(kind);
     vi.spyOn(db, 'writeThrough').mockRejectedValue(new Error('synthetic outage'));

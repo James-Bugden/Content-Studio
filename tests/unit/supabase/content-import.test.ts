@@ -151,6 +151,23 @@ describe('MIG-09 typed complete imports', () => {
     await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).resolves.toBeDefined();
     expect(apply).toHaveBeenCalledTimes(2);
   });
+  it('publishes a new import identity only after success, including no-op runs, and preserves it on replay', async () => {
+    const repo = sheet(), store = new FakeContentImportStore();
+    const envelope = async () => buildTypedImport(await buildSheetMirrorSnapshot(repo, { sourceKey: 'synthetic_workbook' }), await importVersions(store.db), actor);
+    expect(await store.db.latestImportId()).toBeNull();
+    const first = await envelope();
+    await store.applyImport(first);
+    expect(await store.db.latestImportId()).toBe(first.operationId);
+    const before = store.db.snapshot(), next = await envelope();
+    store.failNext = true;
+    await expect(store.applyImport(next)).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+    expect(await store.db.latestImportId()).toBe(first.operationId);
+    await store.applyImport(next);
+    expect(store.db.snapshot()).toEqual(before);
+    expect(await store.db.latestImportId()).toBe(next.operationId);
+    await store.applyImport(first);
+    expect(await store.db.latestImportId()).toBe(next.operationId);
+  });
   it('captures versions before Sheet reads and fails atomically on a late conflict', async () => {
     const store = new FakeContentImportStore();
     const versions = await importVersions(store.db), source = await snapshot();
