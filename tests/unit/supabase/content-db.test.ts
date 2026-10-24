@@ -10,6 +10,22 @@ const serviceKey = 'SYNTHETIC_SERVICE_KEY_ONLY';
 const options = { url, serviceKey };
 
 describe('read-only PostgREST transport', () => {
+  it.each([{ rows: [] }, { rows: [{ operation_id: 'synthetic_import_latest' }] }])('reads only the latest committed import identity: $rows', async ({ rows }) => {
+    const request = vi.fn<typeof fetch>(async (input, init) => {
+      const target = new URL(String(input));
+      expect(target.pathname).toBe('/rest/v1/content_studio_import_runs');
+      expect(Object.fromEntries(target.searchParams)).toEqual({ select: 'operation_id', order: 'at.desc,operation_id.desc', offset: '0', limit: '1' });
+      expect(init).toMatchObject({ method: 'GET', cache: 'no-store', headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+      // Even a nonempty page without count metadata must not fetch the history.
+      return Response.json(rows);
+    });
+    expect(await new SupabaseContentDb({ ...options, fetch: request }).latestImportId()).toBe(rows[0]?.operation_id ?? null);
+    expect(request).toHaveBeenCalledOnce();
+  });
+  it.each([{ rows: [{ operation_id: null }] }, { rows: [{}] }, { rows: [{ operation_id: '' }] }])('rejects malformed import identities: $rows', async ({ rows }) => {
+    const db = new SupabaseContentDb({ ...options, fetch: vi.fn(async () => Response.json(rows)) });
+    await expect(db.latestImportId()).rejects.toMatchObject({ code: 'SCHEMA_DRIFT' });
+  });
   it('continues through a hosted row cap, requests stable order, credentials and timeout', async () => {
     const seed = syntheticContentDbSeed();
     const source = await new FakeContentDb(seed).listPosts('library');

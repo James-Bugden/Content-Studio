@@ -19,11 +19,11 @@ export class SupabaseContentDb implements ContentDb {
     }
     this.base = options.url.replace(/\/$/, '');
   }
-  private async select<T>(table: string, params: Record<string, string>): Promise<T[]> {
+  private async select<T>(table: string, params: Record<string, string>, firstOnly = false): Promise<T[]> {
     const rows: T[] = [];
     for (;;) {
       try {
-        const query = new URLSearchParams({ select: '*', ...params, offset: String(rows.length), limit: '1000' });
+        const query = new URLSearchParams({ select: '*', ...params, offset: String(rows.length), limit: firstOnly ? '1' : '1000' });
         const response = await (this.options.fetch ?? fetch)(`${this.base}/rest/v1/content_studio_${table}?${query}`, {
           method: 'GET', cache: 'no-store', signal: AbortSignal.timeout(this.options.timeoutMs ?? 10_000),
           headers: { apikey: this.options.serviceKey, Authorization: `Bearer ${this.options.serviceKey}`, Prefer: 'count=exact' },
@@ -32,6 +32,7 @@ export class SupabaseContentDb implements ContentDb {
         const page: unknown = await response.json();
         if (!Array.isArray(page) || page.some(row => row === null || typeof row !== 'object' || Array.isArray(row))) throw new AppError('SCHEMA_DRIFT', { provider: 'db', kind: 'response' });
         rows.push(...page as T[]);
+        if (firstOnly) return rows;
         const total = response.headers.get('content-range')?.split('/')[1];
         if (total && /^\d+$/.test(total) && rows.length >= Number(total)) return rows;
         if (page.length === 0) {
@@ -92,6 +93,12 @@ export class SupabaseContentDb implements ContentDb {
     throw new AppError('PROVIDER_UNAVAILABLE', { provider: 'db', reason: 'revision_unavailable' });
   }
   async schemaVersion() { const rows = await this.select<{ version: unknown }>('schema_version', { singleton: 'eq.true' }); return rows.length === 1 ? rows[0]!.version : null; }
+  async latestImportId() {
+    const rows = await this.select<{ operation_id: unknown }>('import_runs', { select: 'operation_id', order: 'at.desc,operation_id.desc' }, true);
+    if (!rows.length) return null;
+    if (rows.length !== 1 || typeof rows[0]!.operation_id !== 'string' || !rows[0]!.operation_id) throw new AppError('SCHEMA_DRIFT', { provider: 'db', kind: 'import_identity' });
+    return rows[0]!.operation_id;
+  }
   listPosts(collection: ContentCollection | 'ready') {
     return this.select<ContentPostRow>(collection === 'ready' ? 'ready_queue' : 'posts', {
       ...(collection === 'ready' ? {} : { collection: `eq.${collection}` }), order: 'source_sheet_row.asc.nullslast,library_id.asc',

@@ -165,11 +165,11 @@ jobs:
         run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name sweep-server --dir "$RUNNER_TEMP/sweep-server"
       - name: Extract verified synthetic server
         run: tar -xf "$RUNNER_TEMP/sweep-server/sweep-server.tar"
-      - name: Run DB-read cutover journeys
+      - name: Run DB-read cutover and health smoke journeys
         env:
           CS_E2E_PREBUILT: '1'
           CS_E2E_CONTENT_STORE: db-read
-        run: npm run test:e2e -- tests/e2e/content-read-cutover.spec.ts --project=w375 --project=w1280
+        run: npm run test:e2e -- tests/e2e/content-read-cutover.spec.ts tests/e2e/smoke.spec.ts --project=w375 --project=w1280
       - name: Upload synthetic cutover evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

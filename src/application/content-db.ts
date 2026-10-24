@@ -47,6 +47,8 @@ export type ContentWriteResult = {
 export interface ContentDb {
   readonly mode: 'fake' | 'live';
   schemaVersion(): Promise<unknown>;
+  /** Visible only after the atomic import commits; null before the first import. */
+  latestImportId(): Promise<string | null>;
   listPosts(collection: ContentCollection | 'ready'): Promise<ContentPostRow[]>;
   getPost(collection: ContentCollection, id: string): Promise<ContentPostRow | null>;
   listSchedule(): Promise<ContentScheduleRow[]>;
