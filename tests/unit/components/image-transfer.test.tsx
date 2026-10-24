@@ -123,7 +123,7 @@ it('leaves the polite status unchanged when the user cancels Share, but reports 
   await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Image could not be shared'));
 });
 
-it.each(['pointerEnter', 'focus', 'touchStart', 'click'] as const)('prepares a thumbnail only on %s, once, with its slug', async event => {
+it.each(['pointerEnter', 'touchStart', 'click'] as const)('prepares a thumbnail only on %s, once, with its slug', async event => {
   const view = render(<PostThumb thumb={{ src: '/api/library/SYN-L012/render', filename: 'A synthetic lesson', contentId: 'SYN-L012', label: 'Approved', tone: 'done' }} />);
   const img = view.container.querySelector('img')!;
   Object.defineProperties(img, { complete: { value: true }, naturalWidth: { value: 1080 }, naturalHeight: { value: 1080 } });

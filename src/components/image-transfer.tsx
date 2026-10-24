@@ -126,10 +126,7 @@ function PreparedImage({ filename = '', contentId, actions = true, preparation =
 
   const picture = (
     <div className={actions ? undefined : "size-full"} draggable={!!file}
-      role={preparation === 'interaction' ? 'img' : undefined}
-      tabIndex={preparation === 'interaction' ? 0 : undefined}
-      aria-label={preparation === 'interaction' ? 'Post image; open the post for Copy image and Download.' : undefined}
-      onPointerEnter={prepareOnIntent} onFocus={prepareOnIntent} onTouchStart={prepareOnIntent} onClick={prepareOnIntent}
+      onPointerEnter={prepareOnIntent} onTouchStart={prepareOnIntent} onClick={prepareOnIntent}
       onDragStart={e => {
       // Never allow the native image drag's text/html or URL fallback, including
       // when the browser cannot add files. No DownloadURL or bearer blob URL.
