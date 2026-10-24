@@ -94,6 +94,15 @@ settle, within the existing per-test and global ceilings. A failed wait lists
 pending request methods/paths rather than only their count. A held-read mutation
 proves that an unresolved request still fails; the longer wait is not a bypass.
 
+Pending reads belong to their document. A main-frame document request arms a
+reset at the replacement document's commit, so an old-document read that starts
+between `navigate()` and that commit cannot keep its successor busy. Chromium
+can omit terminal events for these superseded reads. Same-document history/RSC
+transitions do not reset the inventory. The document-ownership regression holds
+an old read across replacement, then proves that a held read in the current
+document still fails readiness after a history transition. Diagnostics retain
+their existing strict failure rules.
+
 ## Reports and detector mutations
 
 The CI `exploratory-sweep` artifact contains `sweep-report/coverage.json`, a

@@ -40,10 +40,14 @@ test('CS-059c: Backlog platform is one click and filtered idea groups open autom
   await expect(page).not.toHaveURL(/platform=/);
 
   await page.goto('/backlog?view=ideas');
-  const groups = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /ideas?\)/ }) });
+  const groups = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /\(\d+ ideas?\)/ }) });
+  // The synthetic Queue has two source groups, both targeting LinkedIn.
+  // Assert the inventory so an empty collection cannot pass the open checks.
+  await expect(groups).toHaveCount(2);
   await expect(groups.first()).not.toHaveAttribute('open');
-  await page.getByRole('group', { name: 'Platform', exact: true }).getByRole('button', { name: 'X', exact: true }).click();
-  await expect(page).toHaveURL(/platform=X/);
+  await page.getByRole('group', { name: 'Platform', exact: true }).getByRole('button', { name: 'LinkedIn', exact: true }).click();
+  await expect(page).toHaveURL(/platform=LinkedIn/);
+  await expect(groups).toHaveCount(2);
   await expect(groups.first()).toHaveAttribute('open', '');
   for (const group of await groups.all()) await expect(group).toHaveAttribute('open', '');
   await checkAndCapture(page, info, 'backlog-ideas-filtered');
@@ -51,12 +55,27 @@ test('CS-059c: Backlog platform is one click and filtered idea groups open autom
 
 test('CS-059c: Posts common filters are visible, compose, and remain removable', async ({ page }, info) => {
   await page.goto('/review');
-  const disclosure = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^Filters/ }) });
+  // The summary includes a decorative arrow before its visible label.
+  const disclosure = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /Filters/ }) });
   await expect(disclosure).not.toHaveAttribute('open');
   const platform = page.getByRole('group', { name: 'Target platform', exact: true });
   const review = page.getByRole('group', { name: 'Review status', exact: true });
-  await platform.getByRole('button', { name: 'LinkedIn', exact: true }).click();
-  await review.getByRole('button', { name: 'Not reviewed', exact: true }).click();
+  // Keep the first RSC navigation in flight: the second click must compose
+  // with the pending selection, rather than with the previous committed URL.
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/review?**', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().headers().rsc === '1' && url.searchParams.get('target') === 'LinkedIn' && !url.searchParams.has('review')) await pending;
+    await route.continue();
+  });
+  try {
+    const firstNavigation = page.waitForRequest((request) => new URL(request.url()).searchParams.get('target') === 'LinkedIn');
+    await platform.getByRole('button', { name: 'LinkedIn', exact: true }).click();
+    await firstNavigation;
+    await expect(platform.getByRole('button', { name: 'LinkedIn', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await review.getByRole('button', { name: 'Not reviewed', exact: true }).click();
+  } finally { release(); }
   await expect(page).toHaveURL(/target=LinkedIn/);
   await expect(page).toHaveURL(/review=Pending/);
   await expect(disclosure).not.toHaveAttribute('open');

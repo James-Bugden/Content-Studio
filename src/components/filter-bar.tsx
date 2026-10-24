@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { startTransition, useId, useOptimistic } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLeaveConfirmation } from './leave-confirm';
 import { buttonClass } from './button-styles';
@@ -47,15 +47,21 @@ export function FilterBar({ filters, variant = 'panel', trailing }: { filters: F
   const router = useRouter();
   const pathname = usePathname() ?? '';
   const searchParams = useSearchParams();
-  const current = new URLSearchParams(searchParams?.toString() ?? '');
+  const [query, setQuery] = useOptimistic(searchParams?.toString() ?? '');
+  const current = new URLSearchParams(query);
   const { guard, dialog } = useLeaveConfirmation();
   const baseId = useId();
 
   const active = filters.filter((f) => sanitiseFilterValue(f, current.get(f.key)) !== '');
 
   const go = (change: { key: string; value: string } | 'clear') => {
-    const url = `${pathname}${nextFilterQuery(filters, current, change)}`;
-    guard(() => router.push(url, { scroll: false }));
+    const next = nextFilterQuery(filters, current, change);
+    // Compose rapid chip clicks while the server is still rendering the first
+    // navigation. The committed URL takes over when the transition finishes.
+    guard(() => startTransition(() => {
+      setQuery(next.replace(/^\?/, ''));
+      router.push(`${pathname}${next}`, { scroll: false });
+    }));
   };
 
   return (
