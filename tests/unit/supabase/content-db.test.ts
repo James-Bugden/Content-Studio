@@ -43,7 +43,7 @@ describe('read-only PostgREST transport', () => {
     await expect(new SupabaseContentDb({ ...options, fetch: vi.fn(async () => Response.json({ secret: serviceKey })) }).listSchedule()).rejects.toMatchObject({ code: 'SCHEMA_DRIFT' });
   });
   it('refuses untrusted URL targets and short keys', () => {
-    for (const url of ['https://example.com', 'https://synthetic-db.supabase.co/path', 'https://synthetic-db.supabase.co@evil.test']) expect(() => new SupabaseContentDb({ url, serviceKey })).toThrow();
+    for (const url of ['https://example.com', 'https://synthetic-db.supabase.co/path', 'https://synthetic-db.supabase.co.evil.test']) expect(() => new SupabaseContentDb({ url, serviceKey })).toThrow();
     expect(() => new SupabaseContentDb({ url, serviceKey: 'short' })).toThrow();
   });
   it('rehydrates typed UTC timestamps and hash stamps without losing zero/null metrics', async () => {
