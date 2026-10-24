@@ -97,7 +97,14 @@ export class AppError extends Error {
 }
 
 export function isAppError(value: unknown): value is AppError {
-  return value instanceof AppError;
+  if (value instanceof AppError) return true;
+  // Next can compile the adapter and SSR graphs with separate AppError class
+  // identities. Accept only an actual Error with our closed code vocabulary and
+  // details shape; arbitrary provider objects must still become UNKNOWN.
+  return value instanceof Error && value.name === 'AppError' &&
+    'code' in value && typeof value.code === 'string' &&
+    (ERROR_CODES as readonly string[]).includes(value.code) &&
+    'details' in value && value.details !== null && typeof value.details === 'object' && !Array.isArray(value.details);
 }
 
 export function toAppError(error: unknown): AppError {
