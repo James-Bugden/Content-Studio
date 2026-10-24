@@ -1,3 +1,4 @@
+import { TransferImage } from '../image-transfer';
 import type { Thumb } from '@/domain/next-steps';
 
 /**
@@ -32,8 +33,7 @@ export function PlatformPreview({ platform, text, thumb }: { platform: string; t
         <p className="mt-3 text-sm text-ink-soft">No copy yet.</p>
       )}
       {thumb?.src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- same-origin, auth-gated, sandboxed image route
-        <img src={thumb.src} alt="" className="mt-3 w-full rounded-lg border border-line" />
+        <TransferImage filename={thumb.filename} contentId={thumb.contentId ?? thumb.src.split('/')[3]} src={thumb.src} alt="" className="mt-3 w-full rounded-lg border border-line" />
       ) : null}
       <p className="mt-2 text-xs text-ink-soft">{thumb ? `Image: ${thumb.label}` : 'No image'}</p>
     </article>

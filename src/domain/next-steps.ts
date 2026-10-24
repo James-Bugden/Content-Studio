@@ -19,9 +19,15 @@ export type Thumb = {
   src: string | null;
   label: string;
   tone: ThumbTone;
+  filename?: string;
+  contentId?: string;
 };
 
-export function thumbFor(libraryId: string, item: Pick<LibraryItem, 'visual'>): Thumb {
+export function thumbFor(libraryId: string, item: Pick<LibraryItem, 'visual' | 'slug'>): Thumb {
+  return { ...visualThumb(libraryId, item), filename: item.slug, contentId: libraryId };
+}
+
+function visualThumb(libraryId: string, item: Pick<LibraryItem, 'visual'>): Thumb {
   const v = item.visual;
   const id = encodeURIComponent(libraryId);
   const approval = visualApprovalState(v);
