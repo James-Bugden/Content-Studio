@@ -14,7 +14,7 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   try {
     requireCronSecret(request, serverEnv().CRON_SECRET);
-    return json({ ok: true, ...(await runConfiguredSheetMirror()) });
+    return json({ ok: true, ...(await runConfiguredSheetMirror({ kind: 'scheduled' })) });
   } catch (error) {
     return errorResponse(error);
   }

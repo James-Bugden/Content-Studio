@@ -111,6 +111,8 @@ export type SheetRecord<T, F extends string> = {
   links: Partial<Record<F, string>>;
   /** Fields whose cell holds a formula. These are never written. */
   formulaFields: F[];
+  /** Import/export metadata; never included in public telemetry. */
+  passthrough?: Record<string, unknown>;
 };
 
 export type LibraryRecord = SheetRecord<LibraryItem, LibraryField>;
@@ -121,6 +123,8 @@ export type QueueSummaryRow = { source: string; counts: Record<string, number | 
 export type SlotPolicy = { platform: Platform; slot: Slot; time: string | 'TBD' };
 
 export type WorkflowSettings = {
+  /** Original rows retained for typed import; semantic settings below stay normalized. */
+  sourceRows?: { setting: string; value: string; notes: string; row: number }[];
   timezone: string;
   slots: SlotPolicy[];
   /** Raw key/value pairs from Workflow Settings. */

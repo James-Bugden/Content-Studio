@@ -68,7 +68,7 @@ export function redactFacts(facts: TelemetryEvent['facts']): TelemetryEvent['fac
   const out: Record<string, string | number | boolean> = {};
   for (const [key, value] of Object.entries(facts)) {
     if (!SAFE_FACT.test(key)) continue;
-    if (typeof value === 'string') out[key] = SAFE_VALUE.test(value) && !LONG_DIGITS.test(value) ? value : '[redacted]';
+    if (typeof value === 'string') out[key] = key === 'fingerprint' && /^[0-9a-f]{16}$/.test(value) || SAFE_VALUE.test(value) && !LONG_DIGITS.test(value) ? value : '[redacted]';
     else if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;
     else if (typeof value === 'boolean') out[key] = value;
   }
