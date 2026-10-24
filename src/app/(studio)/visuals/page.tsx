@@ -61,7 +61,7 @@ export default async function VisualsPage() {
                 Needs a decision or review <span className="text-ink-soft tabular-nums">({open.length})</span>
               </h2>
               {open.length === 0 ? (
-                <p className="mt-2 text-sm text-ink-soft">Every item has a complete, approved visual decision.</p>
+                <div className="mt-2"><StateView kind="empty" title="Every item has a complete, approved visual decision." nextStep={null} /></div>
               ) : (
                 <ul className="mt-3 flex flex-col gap-3">
                   {open.map((item) => (
@@ -76,13 +76,13 @@ export default async function VisualsPage() {
               <h2 id="done-h" className="text-lg font-semibold">
                 Decided and approved <span className="text-ink-soft tabular-nums">({done.length})</span>
               </h2>
-              <ul className="mt-3 flex flex-col gap-3">
+              {done.length === 0 ? <div className="mt-2"><StateView kind="empty" nextStep={null} /></div> : <ul className="mt-3 flex flex-col gap-3">
                 {done.map((item) => (
                   <li key={item.libraryId}>
                     <VisualRow item={item} />
                   </li>
                 ))}
-              </ul>
+              </ul>}
             </section>
           </>
         )}

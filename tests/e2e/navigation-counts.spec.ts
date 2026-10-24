@@ -39,3 +39,24 @@ test('CS-044: unavailable/cold count renders no number and no nav error', async 
   await expect(page.getByRole('heading', { name: 'Next up', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Primary' }).locator('[data-nav-count]')).toHaveCount(0);
 });
+
+test('CS-044: 1,100 items display as 999+ and fit the phone tab bar', async ({ page }, testInfo) => {
+  await page.route('**/api/navigation-counts', (route) => route.fulfill({
+    json: { nextUp: 1100, fixIssues: 1100, expiresAt: Date.now() + 15_000 },
+  }));
+  await page.goto('/dev/states');
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  const badge = nav.locator('[data-nav-count="/"]');
+  await expect(badge).toHaveText('999+');
+  await expect(badge).toBeInViewport();
+  // Check the badge fits its own tab, as well as the overall viewport.
+  expect(await badge.evaluate((element) => {
+    const badgeRect = element.getBoundingClientRect();
+    const tabRect = element.closest('li')!.getBoundingClientRect();
+    return badgeRect.left >= tabRect.left && badgeRect.right <= tabRect.right;
+  })).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('navigation-999-plus.png') });
+  if ((page.viewportSize()?.width ?? 1280) < 768) await nav.getByText('More', { exact: true }).click();
+  await expect(nav.locator('[data-nav-count="/reconcile"]:visible')).toHaveText('999+');
+});

@@ -210,14 +210,14 @@ export class SheetsContentRepository implements ContentRepository {
   }
 
   /** Explicit read-only recovery; ordinary reads and mutation reads never fall back. */
-  lastGoodLibrary(error: unknown): LibraryRecord[] | null {
+  lastGoodLibrary(error: unknown): { rows: LibraryRecord[]; readAt: number } | null {
     if (!isAppError(error) || (error.code !== 'RATE_LIMITED' && error.code !== 'PROVIDER_UNAVAILABLE')) return null;
     const snapshot = this.readCache.get('library:true')?.lastGood;
     if (!snapshot || Date.now() - snapshot.at >= LAST_GOOD_MAX_AGE_MS) return null;
     const found = discoverHeaders(LIBRARY_HEADERS, snapshot.rows[0]?.values ?? []);
     if (!found.ok) return null;
-    return snapshot.rows.flatMap((raw, i) => i === 0 || raw.values.every((v) => cellText(v).trim() === '')
-      ? [] : [toLibraryRecord(found.index, raw, i + 1)]);
+    return { readAt: snapshot.at, rows: snapshot.rows.flatMap((raw, i) => i === 0 || raw.values.every((v) => cellText(v).trim() === '')
+      ? [] : [toLibraryRecord(found.index, raw, i + 1)]) };
   }
 
   async getLibrary(libraryId: string): Promise<LibraryRecord> {

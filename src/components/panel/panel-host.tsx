@@ -13,22 +13,31 @@ import { useBacklogNavigation } from '../backlog/backlog-navigation';
 import { isTypingTarget } from '../keyboard';
 import { buttonClass } from '../button-styles';
 import { LIBRARY_BACKLOG_PAGE_SIZE } from '@/domain/library-backlog';
+import { InlineResult } from '../inline-result';
+import { StateView } from '../state-view';
+
+/** Backlog owns its host so its server read decides whether a panel may mount. */
+export function StudioPanelHost() {
+  const pathname = usePathname();
+  return pathname === '/backlog' ? null : <PanelHost />;
+}
 
 /**
- * Side-panel host (UX redesign). Mounted once in the studio layout. When the URL
+ * Side-panel host (UX redesign). Backlog mounts it with the server's read-only
+ * decision; other routes share the layout host. When the URL
  * carries `?post=<Library ID>`, `?slot=<Content ID>` or `?queue=<Library ID>`, a
  * panel slides in from the right (full screen on a phone) so a post, a
  * schedule slot or a backlog idea can be read, edited and (for a post or slot)
  * approved and scheduled without leaving the page. Native <dialog>: focus is
  * trapped, Escape closes, and unsaved edits are guarded before closing.
  */
-export function PanelHost() {
+export function PanelHost({ readOnly = false }: { readOnly?: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const ref = useRef<HTMLDialogElement>(null);
   const navigationEpoch = useRef(0);
-  const { readOnly, navigation, setSearch, setSearchPage, setResult, refreshTotals } = useBacklogNavigation();
+  const { navigation, setSearch, setSearchPage, setResult, refreshTotals } = useBacklogNavigation();
   const [moving, setMoving] = useState(false);
   const [navigationError, setNavigationError] = useState('');
   const [failedDirection, setFailedDirection] = useState<-1 | 1>(1);
@@ -187,6 +196,7 @@ export function PanelHost() {
         ref={ref}
         onKeyDown={onPanelKeyDown}
         aria-labelledby="panel-title"
+        aria-label={post ? 'Post' : slot ? 'Schedule slot' : 'Backlog idea'}
         onCancel={(e) => {
           e.preventDefault();
           close();
@@ -211,8 +221,8 @@ export function PanelHost() {
                 <span aria-hidden="true">✕</span> Close
               </button>
             </div>
-            {moving ? <p role="status" className="px-4 py-2 text-sm">Loading adjacent post…</p> : null}
-            {navigationError ? <p role="alert" className="px-4 py-2 text-sm text-block">{navigationError} <button type="button" className="font-semibold underline" onClick={() => moveTo(failedDirection)}>Try again</button></p> : null}
+            {moving ? <StateView kind="loading" title="Loading adjacent post…" /> : null}
+            {navigationError ? <InlineResult tone="error">{navigationError} <button type="button" className="min-h-11 font-semibold underline" onClick={() => moveTo(failedDirection)}>Try again</button></InlineResult> : null}
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               {post && pathname === '/backlog' ? <BacklogPostPanel key={post} libraryId={post} nextId={nextOnPage} position={position} onSaved={onDraftSaved} onSaveFailed={onDraftSaveFailed} /> : null}
               {post && pathname !== '/backlog' ? <PostPanel key={post} libraryId={post} /> : null}

@@ -94,7 +94,7 @@ describe('test-mode switches', () => {
   it('production disables test auth even with fake data and e2e mode', () => {
     // Exercise the policy directly: serverEnv separately refuses fake production.
     expect(testAuthEnabled({
-      CS_DATA_MODE: 'fake', CS_TEST_MODE: 'e2e', VERCEL_ENV: 'production',
+      CS_DATA_MODE: 'fake', CS_CONTENT_STORE: 'sheet', CS_TEST_MODE: 'e2e', VERCEL_ENV: 'production',
       APP_TIMEZONE: 'Asia/Taipei', GOOGLE_WRITE_ENABLED: 'false',
       SUPABASE_READ_MODEL_MODE: 'off', AI_PROVIDER: 'fake',
     })).toBe(false);

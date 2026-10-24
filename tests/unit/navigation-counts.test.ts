@@ -7,6 +7,7 @@ import { SheetsContentRepository } from '@/integrations/google/sheets-repository
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 import { FakeTypefullyGateway } from '@/integrations/typefully/fake-gateway';
 import { SHEET_TABS } from '@/domain/sheet-schema';
+import { AppError } from '@/domain/errors';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -65,6 +66,36 @@ describe('CS-044 cache-only navigation counts', () => {
     const report = await buildReconcileReport(repo, drive);
     expect(report.unreadable.length).toBeGreaterThan(0);
     expect(cachedNavigationCounts(repo).fixIssues).toBeNull();
+  });
+
+  it('fails visibly for Calendar and clears a previously known count when Schedule is unreadable', async () => {
+    const { sheet, repo } = setup(0);
+    const board = await loadBoard(repo);
+    expect(cachedNavigationCounts(repo).nextUp).toBe(nextUpCount(board));
+    sheet.failNext({ op: 'read', tab: SHEET_TABS.schedule.name, code: 'PROVIDER_UNAVAILABLE' });
+    await expect(loadBoard(repo, { requireSchedule: true })).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+    const reads = sheet.reads;
+    expect(cachedNavigationCounts(repo).nextUp).toBeNull();
+    expect(sheet.reads).toBe(reads);
+  });
+
+  it('retains identical count witnesses while stale recovery reports the latest successful read time', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100);
+    const { sheet, repo } = setup(0);
+    await loadBoard(repo);
+    const witness = repo.navigationSnapshots();
+    const expiry = cachedNavigationCounts(repo).expiresAt;
+    now.mockReturnValue(1_100);
+    const library = await repo.listLibrary();
+    expect(repo.navigationSnapshots()?.sources).toEqual(witness?.sources);
+    expect(cachedNavigationCounts(repo).expiresAt).toBe(expiry);
+    sheet.failNext({ op: 'read', tab: SHEET_TABS.library.name, code: 'RATE_LIMITED' });
+    now.mockReturnValue(2_100);
+    await expect(repo.listLibrary()).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    const reads = sheet.reads;
+    expect(repo.lastGoodLibrary(new AppError('RATE_LIMITED'))).toEqual({ rows: library, readAt: 1_100 });
+    expect(cachedNavigationCounts(repo).nextUp).toBeNull();
+    expect(sheet.reads).toBe(reads);
   });
 
   it('existing mutation invalidation removes badges without adding a read or changing writes', async () => {

@@ -26,8 +26,6 @@ export type BacklogNavigation = {
 };
 
 const Context = createContext<{
-  readOnly: boolean;
-  setReadOnly: (value: boolean) => void;
   navigation: BacklogNavigation | null;
   setNavigation: (navigation: BacklogNavigation | null) => void;
   search: string;
@@ -42,14 +40,13 @@ const Context = createContext<{
 } | null>(null);
 
 export function BacklogNavigationProvider({ children }: { children: React.ReactNode }) {
-  const [readOnly, setReadOnly] = useState(false);
   const [navigation, setNavigation] = useState<BacklogNavigation | null>(null);
   const [search, setSearch] = useState('');
   const [searchPage, setSearchPage] = useState(1);
   const [result, setResult] = useState<{ key: string; data: BacklogResult } | null>(null);
   const [totalsVersion, setTotalsVersion] = useState(0);
   const refreshTotals = useCallback(() => setTotalsVersion((v) => v + 1), []);
-  return <Context.Provider value={{ readOnly, setReadOnly, navigation, setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult, totalsVersion, refreshTotals }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ navigation, setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult, totalsVersion, refreshTotals }}>{children}</Context.Provider>;
 }
 
 export function useBacklogNavigation() {

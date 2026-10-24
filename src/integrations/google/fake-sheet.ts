@@ -122,7 +122,10 @@ export class FakeSheetTransport implements SheetTransport {
     if (!found.ok) return;
     const { reviewStatus, queueForSchedule } = found.index.columns;
     const rows = lib.slice(1).filter((r) => r[reviewStatus]?.value === 'Approved' && r[queueForSchedule]?.value === 'TRUE');
-    this.tabs.set(SHEET_TABS.readyQueue.name, [lib[0] ?? [], ...rows.map((r) => r.map((c) => ({ value: c.value })))]);
+    // A derived cell retains its hyperlink target, not its source formula.
+    this.tabs.set(SHEET_TABS.readyQueue.name, [lib[0] ?? [], ...rows.map((r) => r.map((c) => ({
+      value: c.value, link: c.link ?? (c.formula ? /^=HYPERLINK\(\s*"([^"]+)"/i.exec(c.formula)?.[1] : undefined),
+    })))]);
   }
 }
 
