@@ -7,6 +7,7 @@ import { z } from 'zod';
  */
 const schema = z.object({
   CS_DATA_MODE: z.enum(['fake', 'live']).default('fake'),
+  CS_CONTENT_STORE: z.enum(['sheet', 'db-shadow', 'db-read', 'db']).default('sheet'),
   APP_BASE_URL: z.string().url().optional(),
   APP_TIMEZONE: z.literal('Asia/Taipei').default('Asia/Taipei'),
   AUTH_SECRET: z.string().min(32).optional(),
@@ -57,6 +58,11 @@ export function serverEnv(): ServerEnv {
   }
   if (parsed.data.CS_DATA_MODE === 'fake' && parsed.data.VERCEL_ENV === 'production') {
     throw new Error('CS_DATA_MODE=fake is refused in production');
+  }
+  // DB-2 is a read-only synthetic integration, not a phase cutover. DB-4/5/6
+  // remove the corresponding gate only after their deployment evidence exists.
+  if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE !== 'sheet') {
+    throw new Error('CS_CONTENT_STORE database modes are not enabled for live data');
   }
   if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off') {
     const missing = [

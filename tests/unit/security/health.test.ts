@@ -16,6 +16,8 @@ const SENTINELS = {
   CS_SHEET_ID: 'SYNTH_sheet_id_sentinel_0000000',
   TYPEFULLY_API_KEY: 'CS_SENTINEL_typefully',
   TYPEFULLY_SOCIAL_SET_ID: 'CS_SENTINEL_social_set',
+  SUPABASE_READ_MODEL_URL: 'https://synthetic-health-db.supabase.co',
+  SUPABASE_READ_MODEL_SERVICE_KEY: 'CS_SENTINEL_db_service_key',
 };
 
 const saved = { ...process.env };
@@ -43,6 +45,7 @@ describe('OBS-01 health output', () => {
     const body = JSON.parse(text) as { capabilities: { provider: string; state: string }[] };
     expect(body.capabilities.find((c) => c.provider === 'sheet')?.state).toBe('read_only');
     expect(body.capabilities.find((c) => c.provider === 'typefully')?.state).toBe('ready');
+    expect(body.capabilities.find((c) => c.provider === 'db')?.state).toBe('not_configured');
   });
 
   it('refuses fake mode in production', async () => {
