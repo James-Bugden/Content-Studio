@@ -1,7 +1,7 @@
 import 'server-only';
 import { AppError } from '@/domain/errors';
 
-/** DB-1 contract only. Runtime repository wiring belongs to DB-2/DB-3. */
+/** Compiled typed Content schema contract, checked before every database read. */
 export const CONTENT_STUDIO_SCHEMA_VERSION = 1;
 
 export function assertContentSchemaVersion(actual: unknown): void {

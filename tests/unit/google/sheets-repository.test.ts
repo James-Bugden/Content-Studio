@@ -226,7 +226,13 @@ describe('fixtures: pagination, empty queue, settings', () => {
   });
 
   it('queue summary counts come from the Sheet', async () => {
-    const q = await repo.queueSummary();
+    // Deliberately independent counts prove the Sheet adapter reads the tab,
+    // rather than recomputing it from the current post fixture.
+    const summary = new SheetsContentRepository(new FakeSheetTransport({ [SHEET_TABS.queueSummary.name]: [
+      { values: ['Content Source', 'Total', 'Queued', 'Master Markdown'] },
+      { values: ['Synthetic Negotiation Handbook', '12', '4', 'Open master'], links: [null, null, null, 'https://drive.google.com/file/d/SYNTH_master/view'] },
+    ] }));
+    const q = await summary.queueSummary();
     expect(q[0]).toMatchObject({ source: 'Synthetic Negotiation Handbook', counts: { Total: 12, Queued: 4 } });
     expect(q[0]!.masterLink).toMatch(/^https:\/\/drive\.google\.com\//);
   });

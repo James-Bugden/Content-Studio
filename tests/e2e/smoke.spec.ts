@@ -4,10 +4,18 @@ test('health reports commit and capabilities only, never cached', async ({ reque
   const res = await request.get('/api/health');
   expect(res.ok()).toBe(true);
   expect(res.headers()['cache-control']).toContain('no-store');
-  const body = (await res.json()) as { ok: boolean; mode: string; capabilities: { provider: string; state: string }[] };
+  const body = (await res.json()) as { ok: boolean; commit: string; mode: string; capabilities: { provider: string; state: string; mode: string }[] };
+  expect(Object.keys(body).sort()).toEqual(['capabilities', 'commit', 'mode', 'ok']);
+  expect(body.commit).toEqual(expect.any(String));
+  expect(body.commit.length).toBeGreaterThan(0);
   expect(body.ok).toBe(true);
   expect(body.mode).toBe('fake');
   expect(body.capabilities.map((c) => c.provider).sort()).toEqual(['ai', 'auth', 'drive', 'sheet', 'typefully']);
+  for (const capability of body.capabilities) {
+    expect(Object.keys(capability).sort()).toEqual(['mode', 'provider', 'state']);
+    expect(capability.state).toBe('ready');
+    expect(capability.mode).toBe('fake');
+  }
 });
 
 test('security headers are present on pages', async ({ request }) => {

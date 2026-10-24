@@ -7,6 +7,8 @@ import { GoogleSheetTransport } from '@/integrations/google/google-sheet';
 import { GoogleDriveGateway } from '@/integrations/google/google-drive';
 import { ServiceAccountTokens } from '@/integrations/google/service-account';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
+import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
+import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 import { AnthropicAiGateway } from '@/integrations/ai/anthropic-gateway';
 import { FakeAiGateway, UnconfiguredAiGateway } from '@/integrations/ai/fake-gateway';
 import { FakeTypefullyGateway, UnconfiguredTypefullyGateway } from '@/integrations/typefully/fake-gateway';
@@ -84,7 +86,9 @@ function build(): Services {
     const typefully = createTypefullyGateway(env);
     services = {
       mode: 'fake',
-      repo: new SheetsContentRepository(sheet),
+      repo: env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read'
+        ? new SupabaseContentRepository(new FakeContentDb(), env.CS_CONTENT_STORE)
+        : new SheetsContentRepository(sheet),
       drive,
       ai,
       typefully,
