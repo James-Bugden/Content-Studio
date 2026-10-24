@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { resetEnvCache } from '@/lib/env';
+import { fakeContentDatabaseCapability } from '@/application/capabilities';
 
 /**
  * OBS-01: health output carries commit and capability states only. Every
@@ -54,7 +55,18 @@ describe('OBS-01 health output', () => {
     const { text } = await health();
     for (const value of Object.values(SENTINELS)) expect(text).not.toContain(value);
     const body = JSON.parse(text);
-    expect(body.capabilities.find((c: { provider: string }) => c.provider === 'db')).toMatchObject({ state: store === 'db' ? 'ready' : 'read_only', mode: 'fake' });
+    expect(body.capabilities.find((c: { provider: string }) => c.provider === 'db')).toMatchObject({ state: 'ready', mode: 'fake' });
+    if (store === 'db-read') expect(body.capabilities.find((c: { provider: string }) => c.provider === 'db').detail).toContain('Derived database copy; Sheet remains authoritative');
+    // Live db-read must carry that authority label too when wiring is enabled;
+    // today the live-start gate still refuses every DB mode.
+  });
+
+  it.each(['sheet', 'db-shadow'])('truthfully reports the inactive/read-only database in %s', async store => {
+    Object.assign(process.env, { CS_DATA_MODE: 'fake', CS_CONTENT_STORE: store }); resetEnvCache();
+    const body = JSON.parse((await health()).text);
+    const db = body.capabilities.find((c: { provider: string }) => c.provider === 'db');
+    expect(db).toBeUndefined(); // Inactive DBs are not advertised as the active store.
+    expect(fakeContentDatabaseCapability(store as 'sheet' | 'db-shadow')).toMatchObject({ state: store === 'sheet' ? 'not_configured' : 'read_only', detail: 'Derived database copy; Sheet remains authoritative' });
   });
 
   it('refuses fake mode in production', async () => {

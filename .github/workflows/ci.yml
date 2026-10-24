@@ -137,6 +137,50 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  browser-db-read:
+    name: db-read cutover (both widths)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: verify
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Download verified synthetic server
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name sweep-server --dir "$RUNNER_TEMP/sweep-server"
+      - name: Extract verified synthetic server
+        run: tar -xf "$RUNNER_TEMP/sweep-server/sweep-server.tar"
+      - name: Run DB-read cutover journeys
+        env:
+          CS_E2E_PREBUILT: '1'
+          CS_E2E_CONTENT_STORE: db-read
+        run: npm run test:e2e -- tests/e2e/content-read-cutover.spec.ts --project=w375 --project=w1280
+      - name: Upload synthetic cutover evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: db-read-cutover
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: warn
+
   browser-sweep:
     name: exploratory sweep (both widths)
     runs-on: ubuntu-latest
@@ -185,13 +229,14 @@ jobs:
     name: deterministic browser journeys
     runs-on: ubuntu-latest
     if: always()
-    needs: [browser-shard, browser-sweep]
+    needs: [browser-shard, browser-sweep, browser-db-read]
     steps:
       - name: Require every browser shard to pass
         env:
           SHARD_RESULT: ${{ needs.browser-shard.result }}
           SWEEP_RESULT: ${{ needs.browser-sweep.result }}
-        run: test "$SHARD_RESULT" = success && test "$SWEEP_RESULT" = success
+          DB_READ_RESULT: ${{ needs.browser-db-read.result }}
+        run: test "$SHARD_RESULT" = success && test "$SWEEP_RESULT" = success && test "$DB_READ_RESULT" = success
 
   dependency-review:
     name: dependency review

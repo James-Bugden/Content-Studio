@@ -3,15 +3,14 @@ import { assertImportMode, type ContentImportStore, type ImportEnvelope } from '
 import type { ContentPostRow, ContentScheduleRow, ContentSettingRow } from '@/application/content-db';
 import { mirrorHash } from '@/application/sheet-mirror';
 import { AppError } from '@/domain/errors';
-import { FakeContentDb, syntheticContentDbSeed, type ContentDbSeed } from './fake-content-db';
+import { FakeContentDb, syntheticContentDbSeed } from './fake-content-db';
 
 /** Separate import fake; DB-3 owns FakeContentDb's interactive mutation path. */
 export class FakeContentImportStore implements ContentImportStore {
-  private seed: ContentDbSeed;
   private reader: FakeContentDb;
   private operations = new Map<string, string>();
   failNext = false;
-  constructor(seed = syntheticContentDbSeed()) { this.seed = structuredClone(seed); this.reader = new FakeContentDb(seed); }
+  constructor(seed = syntheticContentDbSeed(), db?: FakeContentDb) { this.reader = db ?? new FakeContentDb(seed); }
   get db() { return this.reader; }
   async applyImport(e: ImportEnvelope) {
     assertImportMode();
@@ -21,7 +20,7 @@ export class FakeContentImportStore implements ContentImportStore {
     const old = this.operations.get(e.operationId);
     if (old) { if (old !== identity) throw new AppError('CONFLICT'); return; }
     if (this.failNext) { this.failNext = false; throw new AppError('PROVIDER_UNAVAILABLE'); }
-    const next = structuredClone(this.seed);
+    const next = this.reader.snapshot();
     for (const r of e.rows) {
       const group = r.target_kind === 'schedule' ? next.schedule : r.target_kind === 'workflow_settings' ? next.settings : next.posts;
       const key = r.target_kind === 'schedule' ? 'content_id' : r.target_kind === 'workflow_settings' ? 'setting' : 'library_id';
@@ -36,8 +35,7 @@ export class FakeContentImportStore implements ContentImportStore {
       if (at < 0) rows.push(after); else rows[at] = after;
     }
     // Publish only after the entire batch has succeeded. Missing rows stay visible to parity.
-    this.seed = next;
-    this.reader = new FakeContentDb({ posts: next.posts as ContentPostRow[], schedule: next.schedule as ContentScheduleRow[], settings: next.settings as ContentSettingRow[] });
+    this.reader.replaceSnapshot({ posts: next.posts as ContentPostRow[], schedule: next.schedule as ContentScheduleRow[], settings: next.settings as ContentSettingRow[] });
     this.operations.set(e.operationId, identity);
   }
 }

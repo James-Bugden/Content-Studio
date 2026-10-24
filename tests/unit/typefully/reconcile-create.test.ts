@@ -3,7 +3,7 @@ import { setTelemetrySink } from '@/observability/events';
 import { createDraft, createIdempotencyKey, linkDraft, reconcile } from '@/application/typefully';
 import { NOW, captureTelemetry, owner, setup as setupStore, viewer } from './harness';
 
-describe.each(['sheet', 'db'] as const)('%s repository', mode => {
+describe.each(['sheet', 'db', 'db-read'] as const)('%s repository', mode => {
 const setup = (extra: Parameters<typeof setupStore>[0] = []) => setupStore(extra, mode);
 
 beforeEach(() => {
@@ -128,7 +128,7 @@ describe('TYPE-02: at most one provider draft and one linked row', () => {
     const before = tf.all().length;
     const r = await createDraft(repo, tf, owner, await input(LI2, 'op_create_li2'), { now: NOW });
     expect(r.ok).toBe(true);
-    expect(r.steps).toContainEqual(expect.objectContaining({step:'link Schedule row',provider:mode,status:'done'}));
+    expect(r.steps).toContainEqual(expect.objectContaining({step:'link Schedule row',provider:mode === 'db' ? 'db' : 'sheet',status:'done'}));
     const created = tf.all().slice(before);
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ platform: 'LinkedIn', text: 'Old post using a screenshot.', status: 'Planned', scheduledAt: '2026-10-02T13:00:00.000Z' });
@@ -154,7 +154,7 @@ describe('TYPE-02: at most one provider draft and one linked row', () => {
     const second = await createDraft(repo, tf, owner, i, { now: NOW });
     expect(first.ok).toBe(true);
     expect(second).toMatchObject({ ok: true, replayed: true });
-    expect(second.steps).toContainEqual(expect.objectContaining({step:'link Schedule row',provider:mode,status:'skipped_already_applied'}));
+    expect(second.steps).toContainEqual(expect.objectContaining({step:'link Schedule row',provider:mode === 'db' ? 'db' : 'sheet',status:'skipped_already_applied'}));
     expect(tf.all().length - before).toBe(1);
   });
 
@@ -192,7 +192,7 @@ describe('TYPE-02: at most one provider draft and one linked row', () => {
     sheet.failNext({ op: 'write', code: 'PROVIDER_UNAVAILABLE' });
     const partial = await createDraft(repo, tf, owner, i, { now: NOW });
     expect(partial).toMatchObject({ ok: false, code: 'PARTIAL_FAILURE' });
-    expect(partial.steps).toContainEqual(expect.objectContaining({provider:mode,status:'failed'}));
+    expect(partial.steps).toContainEqual(expect.objectContaining({provider:mode === 'db' ? 'db' : 'sheet',status:'failed'}));
     const draftId = !partial.ok ? (partial.details?.draftId as string) : '';
     expect(draftId).toMatch(/^SYNTH-TF-/);
     const retry = await createDraft(repo, tf, owner, i, { now: NOW });

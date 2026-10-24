@@ -73,7 +73,7 @@ export default async function EditorPage({ params }: { params: Promise<{ library
             <dd>{model.reviewStatus === 'Pending' ? 'Not reviewed' : model.reviewStatus}</dd>
             <dt className="mt-2 text-ink-soft">Visual</dt>
             <dd>{model.visual}</dd>
-            <dt className="mt-2 text-ink-soft">Sheet revision</dt>
+            <dt className="mt-2 text-ink-soft">Content revision</dt>
             <dd className="font-mono text-xs">{model.sheet.revision}</dd>
             <dt className="mt-2 text-ink-soft">Markdown</dt>
             <dd className="text-xs">

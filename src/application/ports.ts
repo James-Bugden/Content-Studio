@@ -30,23 +30,29 @@ export type QueueIdeaCreate = {
 
 export interface ContentRepository {
   capability(): Capability;
+  /** Write authority can differ from the read provider during Phase C. */
+  mutationProvider?(): 'sheet' | 'db';
+  authorityLibrary?(id: string): Promise<LibraryRecord>;
+  pendingRefresh?(kind: 'library' | 'queue' | 'schedule', id: string): boolean;
+  refreshPending?(): Promise<{ kind: 'library' | 'queue' | 'schedule'; id: string; operationId?: string; source: 'save' | 'import'; refusal?: 'refused_numeric' | 'refused_size' }[]>;
   schema(): Promise<SchemaStatus>;
   listLibrary(): Promise<LibraryRecord[]>;
   /** Recent cached rows for an explicitly labelled read-only list after a transient failure. */
   lastGoodLibrary?(error: unknown): { rows: LibraryRecord[]; readAt: number } | null;
   /** Cache-only witnesses for disposable navigation counts; never starts a read. */
   navigationSnapshots?(): { sources: readonly number[]; expiresAt: number } | null;
-  getLibrary(libraryId: string): Promise<LibraryRecord>;
+  /** Authority verification can bypass disposable Sheet display caches. */
+  getLibrary(libraryId: string, fresh?: boolean): Promise<LibraryRecord>;
   /** Content Queue: same headers/shape as Content Library, a second writable tab of idea-stage rows. */
   listQueue(): Promise<LibraryRecord[]>;
-  getQueue(libraryId: string): Promise<LibraryRecord>;
+  getQueue(libraryId: string, fresh?: boolean): Promise<LibraryRecord>;
   updateQueue(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>>;
   /** Appends one idea to the existing Content Queue schema. Never adds or renames a Sheet column. */
   createQueueIdea(m: QueueIdeaCreate): Promise<MutationResult<LibraryRecord>>;
   /** Reads the derived Ready Queue tab. Never written. */
   listReadyQueue(): Promise<LibraryRecord[]>;
   listSchedule(): Promise<ScheduleRecord[]>;
-  getSchedule(contentId: string): Promise<ScheduleRecord>;
+  getSchedule(contentId: string, fresh?: boolean): Promise<ScheduleRecord>;
   queueSummary(): Promise<QueueSummaryRow[]>;
   workflowSettings(): Promise<WorkflowSettings>;
   updateLibrary(m: MutationEnvelope<{ libraryId: string }, LibraryPatch>): Promise<MutationResult<LibraryRecord>>;

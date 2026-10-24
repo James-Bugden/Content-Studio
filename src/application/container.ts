@@ -1,4 +1,6 @@
 import 'server-only';
+import { ContentReadCutoverRepository } from './content-read-cutover';
+import { contentSheetCacheOptions } from './content-cache';
 import { AppError } from '@/domain/errors';
 import { serverEnv } from '@/lib/env';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
@@ -32,6 +34,7 @@ export type Services = {
   /** Optional: when Typefully is down or unconfigured, manual scheduling keeps working. */
   typefully: TypefullyGateway;
   contentImport?: ContentImportStore;
+  importRepo?: ContentRepository;
   contentParity?: ContentParityJournal;
   reconcileRepo?: ContentRepository;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
@@ -91,11 +94,11 @@ function build(): Services {
     const ai = createAiGateway(env);
     const typefully = createTypefullyGateway(env);
     const db = new FakeContentDb();
+    const sheetRepo = new SheetsContentRepository(sheet, { writable: true, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'fake') });
     services = {
       mode: 'fake',
-      repo: env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read'
-        ? new SupabaseContentRepository(db, env.CS_CONTENT_STORE)
-        : new SheetsContentRepository(sheet),
+      repo: env.CS_CONTENT_STORE === 'db-read' ? new ContentReadCutoverRepository(sheetRepo, db)
+        : env.CS_CONTENT_STORE === 'db' ? new SupabaseContentRepository(db) : sheetRepo,
       drive,
       ai,
       typefully,
@@ -107,6 +110,11 @@ function build(): Services {
         ...(typefully instanceof FakeTypefullyGateway ? { typefully } : {}),
       },
     };
+    if (env.CS_CONTENT_STORE === 'db-read') {
+      services.contentImport = new FakeContentImportStore(undefined, db);
+      services.importRepo = new SheetsContentRepository(sheet);
+      services.contentParity = new ContentParityJournal();
+    }
     if (env.CS_CONTENT_STORE === 'db-shadow') {
       const contentImport = new FakeContentImportStore();
       const contentParity = new ContentParityJournal();
@@ -134,7 +142,7 @@ function build(): Services {
     // instance, so bulk editor opens do not re-read the Sheet. Writes clear the
     // cache and every mutation re-reads fresh against the expected revision, so a
     // stale display can be refused but never written over.
-    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, readCacheMs: 3000, libraryReadCacheMs: 60_000, readinessReadCacheMs: 60_000 }),
+    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'live') }),
     drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
     typefully: createTypefullyGateway(env),

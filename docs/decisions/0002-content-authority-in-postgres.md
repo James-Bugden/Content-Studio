@@ -157,3 +157,54 @@ private history/backup exporter remains DB-6 work.
   ledger remain the cross-instance safeguards. A retry after an instance restart
   with a changed snapshot fails closed as CONFLICT rather than overwriting data.
   This is not a distributed job scheduler or permission to flip reads.
+
+## DB-5 local Phase C contract (no live cutover)
+
+`ContentReadCutoverRepository` composes DB reads with Sheet-only authoritative
+mutations. Imported/read-through tokens are Sheet fingerprints. Successful
+Sheet read-backs alone reach `write_through`, with a separate hashed operation
+ID and the DB version observed before the Sheet mutation; failed derived copies
+cannot fail the mutation. DB-read imports are now explicitly allowed at both
+the snapshot builder and writer boundaries, and capture **Sheet** snapshots,
+never their own DB-served data. Imports remain forbidden under DB authority.
+The fake importer shares the actual mutation store and preserves its reader
+identity, so scheduled repair is exercised through the container, not a separate
+fake snapshot. Schema/default/live-start gates remain unchanged.
+
+The `refresh_pending` step survives the draft and Typefully sagas and is visible
+beside the returned saved text. The disposable per-instance overlay stores the
+DB version observed before the Sheet save. It clears on its own copied Sheet
+fingerprint, or when the DB fingerprint matches a fresh authority read (including
+a newer Sheet edit imported later). A version advance alone is insufficient:
+an overlapping import can contain an older snapshot. Metadata-only imports can
+repair the fingerprint without advancing the version. Only pending rows can add
+this bounded authority read during ordinary get/list verification.
+Explicit reconciliation re-reads the Sheet collections and reconstructs lag
+items even after restart; unreadable sources mean unknown. It never installs
+an overlay or invents a save operation for ordinary import lag. Its live quota
+and latency cost must be measured at the
+Phase C exit, not inferred from synthetic tests. Cross-instance stale displays
+remain possible until repair, with Sheet preconditions protecting every save.
+
+DB-3's carried editor wording item is addressed: save/conflict messages and
+hook/mismatch controls use the selected write authority. `db-read` correctly
+continues to say Sheet; `db` says database. Existing JSON `sheet` revision/draft
+field names are retained for client compatibility, without implying authority.
+DB-3's integer, timestamp and aggregate-size differences remain explicit copy
+failures, never reasons to veto or coerce a Sheet write. In db-read, a refused
+integer or oversized row is omitted from the import's accepted rows/counts and
+recorded once as `refused_numeric` (column field) or `refused_size` (`@row`) in
+the private exception ledger. Other rows still import atomically. Reconcile
+shows a blocking row-specific refusal requiring source/limit correction; another
+import alone is not promised to repair it. Unknown differences, integrity and
+CAS failures still abort the batch; db-shadow retains its fail-closed behavior.
+Both unapplied RPC definitions accept these named classes; no live SQL was run.
+JSONB separator overhead is included in the preflight byte cap. The
+fake Schedule seed now fingerprints formula-aware raw rows exactly as the Sheet
+reader does; the previous fixture token mismatch would have made every initial
+DB-served Schedule save stale.
+
+See [the Phase C runbook](../ops/runbook.md#phase-c-content-read-cutover-db-5--mig-11)
+for rollback, copied-workbook/Supabase-branch rehearsal, exact-SHA T4 smoke and
+seven-day measurements. No live database, production flag, deployment, hosted
+security proof, T3/T4 rehearsal or Phase C exit is claimed by this local change.

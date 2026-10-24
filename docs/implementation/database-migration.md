@@ -339,8 +339,14 @@ skipped or inconclusive measurement is not green.
   DB in the same request (`write_through` RPC, idempotent by operation id,
   content-identical guard). If that copy fails the mutation still succeeds,
   the row is marked `refresh_pending`, the UI shows the returned record, and
-  the next scheduled import repairs it. The 60-second Library cache is reduced
-  to 3 seconds.
+  the next scheduled import repairs representable values. A refused integer or
+  oversized row remains a blocking pending item until its value or copy limit is
+  corrected; db-read imports count/classify it in the exception ledger and keep
+  importing other rows. Unknown differences and CAS conflicts still fail closed.
+  An overlay retires when its fingerprint is copied or the DB matches the
+  current Sheet fingerprint, even after a newer edit. Ordinary import lag never
+  installs an app-save overlay. The 60-second Library cache is reduced to the
+  shared `DB_READ_CACHE_TTL_MS` (3 seconds) in both compositions.
 - Exit: 7 days; zero Sheets `RATE_LIMITED` events on reads; zero `STALE_READ`
   refusals whose `sheet_revision` was older than the last completed import at
   request time (that is, none caused by lag rather than by a genuine

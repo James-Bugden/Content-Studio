@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildTypedImport, classifyDifference, importVersions, runTypedImport } from '@/application/content-import';
+import { buildTypedImport, classifyDifference, importVersions, runTypedImport, typedContentRow } from '@/application/content-import';
+import type { LibraryRecord } from '@/domain/records';
 import { buildSheetMirrorSnapshot, evidenceHash, mirrorHash } from '@/application/sheet-mirror';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
@@ -15,6 +16,19 @@ const actor = mirrorHash('synthetic-import-actor');
 const sheet = () => new SheetsContentRepository(new FakeSheetTransport());
 const snapshot = () => buildSheetMirrorSnapshot(sheet(), { sourceKey: 'synthetic_workbook' });
 describe('MIG-09 typed complete imports', () => {
+  it('N1: includes jsonb separator overhead when refusing a boundary-size row, leaving the batch usable', async () => {
+    vi.stubEnv('CS_CONTENT_STORE', 'db-read');
+    const source = await snapshot(), post = source.rows.find(r => r.collection === 'library')!;
+    const record = post.payload as LibraryRecord;
+    record.passthrough = { synthetic: { header: 'Synthetic', value: '', formula: '', link: '' } };
+    const row = typedContentRow('library', post.stableId, record);
+    (record.passthrough.synthetic as { value: string }).value = 'x'.repeat(262_143 - Buffer.byteLength(JSON.stringify(row)));
+    expect(Buffer.byteLength(JSON.stringify({ ...row, passthrough: record.passthrough }))).toBe(262_143);
+    post.rowHash = mirrorHash(record);
+    const e = buildTypedImport(source, new Map(), actor);
+    expect(e.rows.some(r => r.target_kind === 'library' && r.target_id === post.stableId)).toBe(false);
+    expect(e.exceptions.filter(e => e.class === 'refused_size')).toHaveLength(1);
+  });
   it.each([
     ['views', '007', 7, 'number_formatting'], ['views', ' 12', 12, 'number_formatting'],
     ['views', '1,234', 1234, 'number_formatting'], ['posted', '', false, 'blank_boolean'],
@@ -37,7 +51,7 @@ describe('MIG-09 typed complete imports', () => {
     row.rowHash = mirrorHash(row.payload);
     expect(() => buildTypedImport(source, new Map(), actor)).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }));
   });
-  it.each(['sheet', 'db-read', 'db', ''])('refuses imports in %s before reads or writes, including direct store calls', async mode => {
+  it.each(['sheet', 'db', ''])('refuses imports in %s before reads or writes, including direct store calls', async mode => {
     const source = await snapshot(), store = new FakeContentImportStore();
     const envelope = buildTypedImport(source, new Map(), actor);
     const read = vi.spyOn(store.db, 'listPosts');

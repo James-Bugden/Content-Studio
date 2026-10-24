@@ -1,3 +1,5 @@
+import { ContentReadCutoverRepository } from '@/application/content-read-cutover';
+import { typedContentRow } from '@/application/content-import';
 import type { ContentRepository } from '@/application/ports';
 import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
 import { SupabaseContentRepository, contentPatch, contentColumn } from '@/integrations/supabase/content-repository';
@@ -16,12 +18,13 @@ export const SCHEDULE = SHEET_TABS.schedule.name;
 /** Before every synthetic slot, so planned times are in the future. */
 export const NOW = () => new Date('2026-09-30T00:00:00Z');
 
-export function setup(extra: SyntheticTypefullyDraft[] = [], mode: 'sheet' | 'db' = 'sheet') {
+export function setup(extra: SyntheticTypefullyDraft[] = [], mode: 'sheet' | 'db' | 'db-read' = 'sheet') {
   const sheet = new FakeSheetTransport();
   const db = new FakeContentDb();
-  const repo: ContentRepository = mode === 'db' ? new SupabaseContentRepository(db) : new SheetsContentRepository(sheet);
+  const authority = new SheetsContentRepository(sheet);
+  const repo: ContentRepository = mode === 'db' ? new SupabaseContentRepository(db) : mode === 'db-read' ? new ContentReadCutoverRepository(authority, db) : authority;
   const store = {
-    get writes() { return mode === 'sheet' ? sheet.writes : db.history.filter(h => h.target_kind === 'schedule').map(h => ({ tab: SCHEDULE, writes: h.changed_fields.map(f => ({ column: SCHEDULE_ORDER.findIndex(field => contentColumn(field) === (f === 'final_synced_hash' ? 'final_synced_at' : f)) })) })); },
+    get writes() { return mode !== 'db' ? sheet.writes : db.history.filter(h => h.target_kind === 'schedule').map(h => ({ tab: SCHEDULE, writes: h.changed_fields.map(f => ({ column: SCHEDULE_ORDER.findIndex(field => contentColumn(field) === (f === 'final_synced_hash' ? 'final_synced_at' : f)) })) })); },
     failNext(fault: Parameters<FakeSheetTransport['failNext']>[0]) { if (mode === 'db') db.failNext({ op: fault.op, code: fault.code, times: fault.times }); else sheet.failNext(fault); },
   };
   const tf = new FakeTypefullyGateway([...SYNTH_TYPEFULLY_DRAFTS, ...extra], NOW);
@@ -29,7 +32,14 @@ export function setup(extra: SyntheticTypefullyDraft[] = [], mode: 'sheet' | 'db
   const edit = async (contentId: string, field: ScheduleField, value: string) => {
     const r = await row(contentId);
     if (mode === 'db') db.externalEdit('schedule', contentId, contentPatch({ [field]: value }));
-    else sheet.externalEdit(SCHEDULE, r.row, SCHEDULE_ORDER.indexOf(field), value);
+    else {
+      sheet.externalEdit(SCHEDULE, r.row, SCHEDULE_ORDER.indexOf(field), value);
+      if (mode === 'db-read') {
+        const row = await authority.getSchedule(contentId);
+        const copied = await db.writeThrough({ operationId: `synthetic_external_${db.history.length}`, patchHash: 'a'.repeat(64), actorHash: 'b'.repeat(64), kind: 'schedule', id: contentId, expectedVersion: String((await db.getSchedule(contentId))!.row_version), data: typedContentRow('schedule', contentId, row) });
+        if (!copied.ok) throw new Error('synthetic fixture copy failed');
+      }
+    }
   };
   const input = async (contentId: string, operationId: string) => ({ operationId, contentId, expectedRevision: (await row(contentId)).revision });
   return { sheet: store, db, repo, tf, row, edit, input };

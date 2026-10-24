@@ -29,6 +29,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
   onSaveFailed?: () => void;
 }) {
   const router = useRouter();
+  const contentStore = initialModel.contentProvider === 'db' ? 'database' : 'Sheet';
   const [model, setModel] = useState(initialModel);
   const [text, setText] = useState(() => initialEditorText(initialModel));
   const [editorKey, setEditorKey] = useState(0);
@@ -81,11 +82,12 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       <HookChoice
         key={`hook:${model.sheet.revision}`}
         libraryId={model.libraryId}
+        contentStore={contentStore}
         alternatives={model.hookAlternatives}
         currentHook={model.sheet.hook}
         revision={snapshot.sheetRevision}
         canEdit={canEdit}
-        blockedReason={snapshot.dirty ? 'Save the draft first; the hook saves to the same Sheet row.' : undefined}
+        blockedReason={snapshot.dirty ? `Save the draft first; the hook saves to the same ${contentStore} row.` : undefined}
         onSaved={() => {
           void reload(!focusMode);
           if (focusMode) onSaved?.();
@@ -110,12 +112,13 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} /></div></details>
         : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />}
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">Hook review</summary><div className="mt-3">{hookPanel()}</div></details> : hookPanel()}
-      {snapshot.mismatch ? <MismatchNotice sheetDraft={model.sheet.draft} canEdit={canEdit} onUseSheetVersion={() => setText(model.sheet.draft)} /> : null}
+      {snapshot.mismatch ? <MismatchNotice contentStore={contentStore} sheetDraft={model.sheet.draft} canEdit={canEdit} onUseSheetVersion={() => setText(model.sheet.draft)} /> : null}
     </div>
   );
 
   function hookPanel() {
     return <HookPanel
+        contentStore={contentStore}
         libraryId={model.libraryId}
         platform={model.targetPlatform}
         currentHook={model.sheet.hook}

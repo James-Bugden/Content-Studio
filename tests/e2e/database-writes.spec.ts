@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
-const store = process.env.CS_CONTENT_STORE === 'db' ? 'db' : 'sheet';
+const store = (process.env.CS_E2E_CONTENT_STORE ?? process.env.CS_CONTENT_STORE) === 'db' ? 'db' : 'sheet';
 async function control(request: APIRequestContext, data: object) {
   expect((await request.post('/api/test-control', { data })).status()).toBe(200);
 }
@@ -20,6 +20,7 @@ test.afterEach(async ({ page }, info) => {
 
 test('DRV-03/04: save with a failed store step retries the same operation and preserves exact copy', async ({ page }) => {
   await page.goto('/review/SYN-L001');
+  await expect(page.getByText('Content revision', { exact: true })).toBeVisible();
   const exact = 'Synthetic DB saga 漢字 🙂\n\n  exact spacing   ';
   await page.getByLabel(/Post copy/).fill(exact);
   await failWrite(page.request);
@@ -29,7 +30,7 @@ test('DRV-03/04: save with a failed store step retries the same operation and pr
   expect(partial).toMatchObject({ ok: false, code: 'PARTIAL_FAILURE', steps: [{ provider: 'drive', status: 'done' }, { provider: store, status: 'failed' }] });
   await expect(page.getByText('Some steps still need to run')).toBeVisible();
   await page.getByRole('button', { name: /Retry/ }).click();
-  await expect(page.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
+  await expect(page.getByText(`Saved to the master Markdown and mirrored to the ${store === 'db' ? 'database' : 'Sheet'}.`)).toBeVisible();
   const { model } = await (await page.request.get('/api/library/SYN-L001/editor')).json();
   expect(model.sheet.draft).toBe(exact); expect(model.markdown.body).toBe(exact);
   await page.reload();

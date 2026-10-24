@@ -405,12 +405,12 @@ begin
   end if;
   if exists (select 1 from jsonb_array_elements(p_exceptions) e
     where jsonb_typeof(e) <> 'object' or e ->> 'class' is null
-      or e ->> 'class' not in ('formula_display','number_formatting','trailing_whitespace','blank_boolean','boolean_formatting','timestamp_formatting')
+      or e ->> 'class' not in ('formula_display','number_formatting','trailing_whitespace','blank_boolean','boolean_formatting','timestamp_formatting','refused_numeric','refused_size')
       or not (e ?& array['class','collection','field','hash'])
       or e - array['class','collection','field','hash'] <> '{}'
       or e ->> 'hash' is null or e ->> 'hash' !~ '^[0-9a-f]{64}$'
       or e ->> 'collection' is null or e ->> 'collection' not in ('library','queue','schedule','workflow_settings')
-      or e ->> 'field' is null or not exists (
+      or e ->> 'field' is null or not (e ->> 'class' = 'refused_size' and e ->> 'field' = '@row') and not exists (
         select 1 from pg_attribute a where a.attnum > 0 and not a.attisdropped
           and a.attrelid = (case e ->> 'collection'
             when 'schedule' then 'public.content_studio_schedule'

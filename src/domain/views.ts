@@ -60,6 +60,8 @@ export type ReviewQueue = {
 };
 
 export type EditorModel = {
+  contentProvider?: 'sheet' | 'db';
+  refreshPending?: boolean;
   libraryId: string;
   slug: string;
   source: string;

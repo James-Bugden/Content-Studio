@@ -59,8 +59,8 @@ export function serverEnv(): ServerEnv {
   if (parsed.data.CS_DATA_MODE === 'fake' && parsed.data.VERCEL_ENV === 'production') {
     throw new Error('CS_DATA_MODE=fake is refused in production');
   }
-  // DB-2 is a read-only synthetic integration, not a phase cutover. DB-4/5/6
-  // remove the corresponding gate only after their deployment evidence exists.
+  // Local DB adapters are exercised with fakes/PGlite only. The owner/live
+  // rehearsal and deployment evidence must precede a separately reviewed gate change.
   if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE !== 'sheet') {
     throw new Error('CS_CONTENT_STORE database modes are not enabled for live data');
   }

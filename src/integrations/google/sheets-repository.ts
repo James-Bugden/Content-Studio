@@ -194,8 +194,8 @@ export class SheetsContentRepository implements ContentRepository {
     return { ok: tabs.every((t) => t.ok), tabs };
   }
 
-  async listLibrary(): Promise<LibraryRecord[]> {
-    const { index, rows } = await this.readTab('library', LIBRARY_HEADERS);
+  async listLibrary(fresh = false): Promise<LibraryRecord[]> {
+    const { index, rows } = await this.readTab('library', LIBRARY_HEADERS, fresh);
     return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
   }
 
@@ -220,18 +220,18 @@ export class SheetsContentRepository implements ContentRepository {
       ? [] : [toLibraryRecord(found.index, raw, i + 1)]) };
   }
 
-  async getLibrary(libraryId: string): Promise<LibraryRecord> {
-    const all = await this.listLibrary();
+  async getLibrary(libraryId: string, fresh = false): Promise<LibraryRecord> {
+    const all = await this.listLibrary(fresh);
     return uniqueBy(all, (r) => r.value.libraryId, libraryId);
   }
 
-  async listQueue(): Promise<LibraryRecord[]> {
-    const { index, rows } = await this.readTab('queue', LIBRARY_HEADERS);
+  async listQueue(fresh = false): Promise<LibraryRecord[]> {
+    const { index, rows } = await this.readTab('queue', LIBRARY_HEADERS, fresh);
     return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
   }
 
-  async getQueue(libraryId: string): Promise<LibraryRecord> {
-    const all = await this.listQueue();
+  async getQueue(libraryId: string, fresh = false): Promise<LibraryRecord> {
+    const all = await this.listQueue(fresh);
     return uniqueBy(all, (r) => r.value.libraryId, libraryId);
   }
 
@@ -240,13 +240,13 @@ export class SheetsContentRepository implements ContentRepository {
     return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
   }
 
-  async listSchedule(): Promise<ScheduleRecord[]> {
-    const { index, rows } = await this.readTab('schedule', SCHEDULE_HEADERS);
+  async listSchedule(fresh = false): Promise<ScheduleRecord[]> {
+    const { index, rows } = await this.readTab('schedule', SCHEDULE_HEADERS, fresh);
     return rows.map(({ raw, row }) => toScheduleRecord(index, raw, row));
   }
 
-  async getSchedule(contentId: string): Promise<ScheduleRecord> {
-    const all = await this.listSchedule();
+  async getSchedule(contentId: string, fresh = false): Promise<ScheduleRecord> {
+    const all = await this.listSchedule(fresh);
     return uniqueBy(all, (r) => r.value.contentId, contentId);
   }
 

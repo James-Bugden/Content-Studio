@@ -24,7 +24,7 @@ async function execute(trigger: Trigger, requestId: string): Promise<RunResult> 
     assertImportMode();
     try {
       const versions = await importVersions(services.contentImport.db);
-      const snapshot = await buildSheetMirrorSnapshot(services.repo, { sourceKey, runId: requestId });
+      const snapshot = await buildSheetMirrorSnapshot(services.importRepo ?? services.repo, { sourceKey, runId: requestId });
       const typed = buildTypedImport(snapshot, versions, evidenceHash(['content-import', trigger.kind, sourceKey]));
       // Durable ledger identity records the non-personal trigger class and configured
       // source key. The owner request key is reused on network retries.
@@ -46,7 +46,7 @@ async function execute(trigger: Trigger, requestId: string): Promise<RunResult> 
     throw new AppError('CONFIG_MISSING', { provider: 'supabase' });
   }
   const store = new SupabaseSheetMirrorStore({ url: env.SUPABASE_READ_MODEL_URL, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY });
-  const result = await store.applySnapshot(await buildSheetMirrorSnapshot(services.repo, { sourceKey, runId: requestId }));
+  const result = await store.applySnapshot(await buildSheetMirrorSnapshot(services.importRepo ?? services.repo, { sourceKey, runId: requestId }));
   return { status: result.replayed ? 'replayed' : 'completed', runId: result.runId, snapshotHash: result.snapshotHash };
 }
 
