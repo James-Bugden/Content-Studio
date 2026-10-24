@@ -9,6 +9,10 @@ import { readFileSync } from 'node:fs';
 const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
 
 describe('DEP-01 deterministic clean-checkout pipeline', () => {
+  it('runs the existing pipeline weekly on the default branch (main)', () => {
+    expect(ci).toMatch(/^  schedule:\n    - cron: '17 3 \* \* 1'$/m);
+  });
+
   it('installs from the lockfile and runs typecheck, lint, tests and a production build', () => {
     for (const step of ['npm ci', 'npm run typecheck', 'npm run lint', 'npm test', 'npm run build', 'npm run test:e2e']) {
       expect(ci).toContain(step);
