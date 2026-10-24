@@ -28,6 +28,22 @@ Native `<img draggable>` URL-based behaviour must not be substituted for the
 File-only handler: the issue's acceptance criterion requires no image URL or
 token in dragged data, even if an asset URL requires the owner's session.
 
+## Fix-round behaviour to check
+
+- Published list cards show no image and make no image-byte requests. Open the
+  existing Published detail page for the recorded Schedule image and its actions.
+- Calendar, backlog, home, queue and review thumbnails do not encode a PNG on
+  load. Pointer entry, keyboard focus, touch or click starts preparation. Drag
+  becomes available after preparation; open the post for Copy image/Download.
+- Visuals has one action group and one polite transfer status per distinct saved
+  image, on the full-size preview. Phone-width copies only display the image.
+  The live brief preview cannot copy, download or drag: only saved Library or
+  Schedule images are transferable. Saving/rendering remains the existing flow.
+- Downloads use the Library slug. A non-ASCII or empty slug uses the unique
+  Library content ID; Schedule has no slug field, so its detail uses Content ID.
+- When Copy is unsupported, a visible status explanation also describes the
+  disabled button. Download stays available. Cancelling Share shows no error.
+
 ## Candidate and procedure
 
 Use synthetic images only. Fill in the exact deployed candidate commit/build
@@ -40,10 +56,12 @@ is claimed by the local build/fix rounds.
 - Date / tester: **pending**
 
 1. Sign in as owner. Open a Visuals SVG-only preview, then a post with a finished
-   raster image in Ready/Schedule and Published. Check the intended image is
+   raster image in Ready/Schedule and Published detail. Check the intended image is
    shown, actions enable after preparation, and downloaded output is PNG with a
    sensible `-1.png` name. Repeat transfer checks for both SVG-derived and
-   finished raster PNGs.
+   finished raster PNGs. Check a zh-TW slug falls back to its unique content ID,
+   the Published list requests no images, thumbnails prepare only on interaction,
+   and the unsaved live preview offers no transfers.
 2. Open an empty composer in the target app. Try a real mouse drag from the image
    into its upload area. Record whether a visible image attachment arrives;
    `dragstart` alone is not success. Where possible, repeat in a separate tab and
@@ -55,7 +73,9 @@ is claimed by the local build/fix rounds.
    image-capable destination and check arrival; cancel posting. Record when
    Share is absent or the app rejects it, and check Download as fallback.
 5. Check keyboard focus and activation for Copy image/Download. Check the
-   375 px layout has no document overflow. Do not store private post content,
+   375 px layout has no document overflow. In a browser without clipboard-image
+   support, check the visible explanation and its accessible description. Cancel
+   Share and check that no failure is announced. Do not store private post content,
    owner identifiers, session cookies or production screenshots as evidence.
 
 ## Results table for the PR

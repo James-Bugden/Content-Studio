@@ -10,6 +10,13 @@ async function control(page: Page, data: Record<string, unknown>) {
 }
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const toBlob = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (...args) {
+      document.documentElement.dataset.pngEncodes = String(Number(document.documentElement.dataset.pngEncodes ?? 0) + 1);
+      return toBlob.apply(this, args);
+    };
+  });
   await control(page, { kind: 'reset' });
   expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
 });
@@ -84,6 +91,19 @@ test('VIS: real clipboard image/png, PNG download and keyboard actions', async (
   const actions = page.getByRole('region', { name: 'Full-size preview (scrolls)', exact: true }).locator('..').getByRole('group', { name: 'Image actions' });
   const copy = actions.getByRole('button', { name: 'Copy image', exact: true });
   await expect(copy).toBeEnabled();
+  await expect(page.getByRole('group', { name: 'Image actions' })).toHaveCount(1);
+  await expect(actions.locator('..').getByRole('status')).toHaveCount(1);
+  await expect(page.locator('html')).toHaveAttribute('data-png-encodes', '1');
+  const phonePreviews = page.getByRole('region', { name: 'Phone width previews (scrolls sideways)' });
+  await expect(phonePreviews.getByRole('group', { name: 'Image actions' })).toHaveCount(0);
+  await expect(phonePreviews.locator('img')).toHaveCount(2);
+  for (const image of await phonePreviews.locator('img').all()) {
+    await expect(image.locator('..')).toHaveAttribute('draggable', 'false');
+  }
+  const live = page.locator('figure').filter({ hasText: 'Draft preview of the brief as typed' });
+  await expect(live.getByRole('group', { name: 'Image actions' })).toHaveCount(0);
+  await expect(live.locator('img').locator('..')).toHaveAttribute('draggable', 'false');
+  await expect(live).toContainText('Only saved Library or Schedule images');
   await copy.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText('Image copied. Paste it into the composer.').first()).toBeVisible();
@@ -107,6 +127,8 @@ test('VIS: real clipboard image/png, PNG download and keyboard actions', async (
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
   expect(results.violations).toEqual([]);
   await page.getByRole('region', { name: 'Full-size preview (scrolls)', exact: true }).locator('..').screenshot({ path: info.outputPath('image-actions.png') });
+  await phonePreviews.screenshot({ path: info.outputPath('phone-previews.png') });
+  await live.screenshot({ path: info.outputPath('live-preview.png') });
 });
 
 test('finished asset in the post panel downloads PNG; Share is file-only when supported', async ({ page }) => {
@@ -124,18 +146,54 @@ test('finished asset in the post panel downloads PNG; Share is file-only when su
   const downloadEvent = page.waitForEvent('download');
   await preview.getByRole('button', { name: 'Download', exact: true }).click();
   const download = await downloadEvent;
-  expect(download.suggestedFilename()).toBe('syn-l009-1.png');
+  expect(download.suggestedFilename()).toBe('offer-email-teardown-1.png');
   expect([...(await readFile((await download.path())!)).subarray(0, 8)]).toEqual(PNG);
   await preview.getByRole('button', { name: 'Share', exact: true }).click();
-  expect(JSON.parse((await page.locator('html').getAttribute('data-share'))!)).toEqual({ keys: ['files'], name: 'syn-l009-1.png', type: 'image/png' });
+  expect(JSON.parse((await page.locator('html').getAttribute('data-share'))!)).toEqual({ keys: ['files'], name: 'offer-email-teardown-1.png', type: 'image/png' });
 });
 
-test('Published uses its Schedule image and the new route keeps authentication', async ({ page }) => {
+test('Published list never fetches images; existing detail uses its Schedule image and keeps authentication', async ({ page }) => {
   const id = '2026-10-01-MAIN-X';
   await control(page, { kind: 'schedule_edit', contentId: id, header: 'Image File', value: asset });
+  const reads: string[] = [];
+  page.on('request', request => { if (/\/api\/schedule\/[^/]+\/asset/.test(request.url())) reads.push(request.url()); });
+  await page.goto('/published');
+  await expect(page.getByRole('link', { name: `Published details for ${id}` })).toBeVisible();
+  await expect(page.locator('img[src*="/api/schedule/"]')).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'Image actions' })).toHaveCount(0);
+  expect(reads).toEqual([]);
   await page.goto(`/published/${id}`);
   await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled();
+  expect(reads).toHaveLength(1);
   expect((await page.request.get(`/api/schedule/${id}/asset`)).headers()['content-type']).toBe('image/png');
   await page.request.post('/api/test-auth', { data: { as: 'none' } });
   expect((await page.request.get(`/api/schedule/${id}/asset`)).status()).toBe(401);
+});
+
+test('backlog thumbnails encode only on intent and use unique content IDs for zh-TW slugs', async ({ page }) => {
+  await control(page, { kind: 'sheet_edit', libraryId: 'SYN-L009', header: 'Image File', value: asset });
+  await control(page, { kind: 'sheet_edit', libraryId: 'SYN-L009', header: 'Post / Slug', value: '求職技巧' });
+  await page.goto('/review');
+  const image = page.locator('[data-library-id="SYN-L009"]:visible img').first();
+  await expect(image).toBeVisible();
+  await image.evaluate(async img => { await (img as HTMLImageElement).decode(); });
+  expect(await page.locator('html').getAttribute('data-png-encodes')).toBeNull();
+  await expect(image.locator('..')).toHaveAttribute('draggable', 'false');
+  await image.hover();
+  await expect(image.locator('..')).toHaveAttribute('draggable', 'true');
+  await expect(page.locator('html')).toHaveAttribute('data-png-encodes', '1');
+  const name = await image.evaluate(img => {
+    const dataTransfer = new DataTransfer();
+    img.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
+    return dataTransfer.files[0]?.name;
+  });
+  expect(name).toBe('syn-l009-1.png');
+  const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  expect(accessibility.violations).toEqual([]);
+  await page.goto('/review?post=SYN-L009');
+  const preview = page.getByRole('article', { name: 'Preview on LinkedIn' });
+  await expect(preview.getByRole('button', { name: 'Download', exact: true })).toBeEnabled();
+  const downloaded = page.waitForEvent('download');
+  await preview.getByRole('button', { name: 'Download', exact: true }).click();
+  expect((await downloaded).suggestedFilename()).toBe('syn-l009-1.png');
 });

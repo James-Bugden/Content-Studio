@@ -57,7 +57,7 @@ export function PublishedCard({ row, canEdit, detailLink = true }: { row: Publis
         <CopyHeading className="border-b border-line bg-paper px-3 py-2 text-sm font-semibold">Final Content</CopyHeading>
         <div className="copy px-3 py-2 text-sm">{row.finalContent === '' ? <span className="text-ink-soft">Empty</span> : row.finalContent}</div>
       </section>
-      {row.imageSrc ? <TransferImage src={row.imageSrc} filename={row.contentId} alt={row.imageAlt || "Post image"} className="w-full rounded-lg border border-line" /> : null}
+      {!detailLink && row.imageSrc ? <TransferImage src={row.imageSrc} contentId={row.contentId} alt={row.imageAlt || "Post image"} className="w-full rounded-lg border border-line" /> : null}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[16rem] text-left text-sm">
           <caption className="sr-only">Metrics for {row.contentId}</caption>

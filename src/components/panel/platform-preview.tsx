@@ -33,7 +33,7 @@ export function PlatformPreview({ platform, text, thumb }: { platform: string; t
         <p className="mt-3 text-sm text-ink-soft">No copy yet.</p>
       )}
       {thumb?.src ? (
-        <TransferImage filename={thumb.src.split("/")[3]} src={thumb.src} alt="" className="mt-3 w-full rounded-lg border border-line" />
+        <TransferImage filename={thumb.filename} contentId={thumb.contentId ?? thumb.src.split('/')[3]} src={thumb.src} alt="" className="mt-3 w-full rounded-lg border border-line" />
       ) : null}
       <p className="mt-2 text-xs text-ink-soft">{thumb ? `Image: ${thumb.label}` : 'No image'}</p>
     </article>
