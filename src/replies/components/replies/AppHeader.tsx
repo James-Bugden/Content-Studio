@@ -22,9 +22,9 @@ export function AppHeader({ progress }: { progress: Progress | null }) {
   return (
     <header className="border-b border-hairline bg-paper px-4 py-3">
       <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-2">
-        <Link href="/replies" className="text-[0.9375rem] font-semibold text-ink">
+        <h1><Link href="/replies" className="text-[0.9375rem] font-semibold text-ink">
           {NAV.title}
-        </Link>
+        </Link></h1>
         <nav aria-label={NAV.menu} className="flex flex-wrap gap-3 text-meta">
           <Link href="/replies/library" className="text-ink-soft hover:text-ink">
             {NAV.library}

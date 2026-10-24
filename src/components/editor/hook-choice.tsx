@@ -55,7 +55,7 @@ export function HookChoice({ libraryId, alternatives, currentHook, revision, can
 
   return (
     <section aria-labelledby={`hooks-${libraryId}`} className="flex flex-col gap-3">
-      <h3 id={`hooks-${libraryId}`} className="text-sm font-semibold">Hook alternatives</h3>
+      <h2 id={`hooks-${libraryId}`} className="text-sm font-semibold">Hook alternatives</h2>
       {items.length === 0 ? <StateView kind="empty" title="No alternatives in the Sheet for this post." nextStep={null} /> : (
         <ol className="flex flex-col gap-2">
           {items.map((alt, i) => (

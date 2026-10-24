@@ -52,9 +52,9 @@ function percent(n: number): string {
 function Pane({ label, hint, text }: { label: string; hint: string; text: string }) {
   return (
     <section aria-label={label} className="flex min-w-0 flex-col rounded-md border border-line bg-card">
-      <h4 className="border-b border-line bg-paper px-3 py-2 text-sm font-semibold">
+      <h3 className="border-b border-line bg-paper px-3 py-2 text-sm font-semibold">
         {label} <span className="font-normal text-ink-soft">({hint})</span>
-      </h4>
+      </h3>
       <div className="copy min-h-20 px-3 py-2 text-sm" data-pane={label}>
         {text === '' ? <span className="text-ink-soft">Empty</span> : text}
       </div>

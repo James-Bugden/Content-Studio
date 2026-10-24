@@ -128,11 +128,11 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
         </div>
         <div className="min-w-0 flex-1">
           <header className="flex flex-wrap items-start justify-between gap-2">
-            <h3 id={`card-${card.libraryId}`} className="min-w-0 text-base font-semibold">
+            <h2 id={`card-${card.libraryId}`} className="min-w-0 text-base font-semibold">
               <GuardedLink href={`/review/${encodeURIComponent(card.libraryId)}`} className="underline decoration-line underline-offset-4 hover:decoration-ink">
                 {title}
               </GuardedLink>
-            </h3>
+            </h2>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-full border border-line bg-paper px-2 py-0.5 text-xs font-medium">{platformName(card.targetPlatform)}</span>
               {card.queued === true ? <span className="rounded-full border border-line bg-paper px-2 py-0.5 text-xs font-medium">Queued</span> : null}
