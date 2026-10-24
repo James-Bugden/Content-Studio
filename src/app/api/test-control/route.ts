@@ -37,7 +37,7 @@ const typefullyAction = z.discriminatedUnion('type', [
 
 const bodySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('reset') }),
-  z.object({ kind: z.literal('seed_library_pages') }),
+  z.object({ kind: z.literal('seed_library_pages'), total: z.number().int().min(100).max(2000).optional() }),
   z.object({
     kind: z.literal('fail'),
     provider: z.enum(['sheet', 'drive']),
@@ -71,8 +71,8 @@ export async function POST(request: Request) {
   const fakes = getServices().fakes;
   if (!fakes) return new Response('Not found', { status: 404 });
   if (body.kind === 'seed_library_pages') {
-    const rows = largeLibraryRows(45).slice(1);
     const grid = fakes.sheet.rawTab(SHEET_TABS.library.name);
+    const rows = largeLibraryRows(body.total === undefined ? 45 : Math.max(0, body.total - (grid.length - 1))).slice(1);
     for (const row of rows) grid.push(row.values.map((value, index) => {
       const formula = row.formulas?.[index];
       return { value: String(value ?? ''), ...(typeof formula === 'string' && formula.startsWith('=') ? { formula } : {}) };

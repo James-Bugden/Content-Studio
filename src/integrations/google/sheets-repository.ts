@@ -53,6 +53,8 @@ const OP_CACHE_MAX = 500;
 type OpRecord = { patchHash: string; result: MutationResult<unknown> };
 
 type TabRead<F extends string> = { index: HeaderIndex<F>; rows: { raw: RawRow; row: number }[] };
+type ReadEntry = { expiresAt: number | null; rows: Promise<RawRow[]>; lastGood?: { rows: RawRow[]; at: number } };
+const LAST_GOOD_MAX_AGE_MS = 5 * 60_000;
 
 export class SheetsContentRepository implements ContentRepository {
   private readonly ops = new Map<string, OpRecord>();
@@ -69,7 +71,7 @@ export class SheetsContentRepository implements ContentRepository {
    * seconds, and every write reads fresh and clears the cache, so a write never
    * compares against a cached revision.
    */
-  private readonly readCache = new Map<string, { expiresAt: number | null; rows: Promise<RawRow[]> }>();
+  private readonly readCache = new Map<string, ReadEntry>();
 
   private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<RawRow[]> {
     // Filter/search/editor navigation shares a short-lived Library snapshot.
@@ -87,17 +89,20 @@ export class SheetsContentRepository implements ContentRepository {
     const hit = this.readCache.get(key);
     if (hit && (hit.expiresAt === null || Date.now() < hit.expiresAt)) return hit.rows;
     const rows = this.readAll(tabKey, withExtras);
-    const entry = { expiresAt: null as number | null, rows };
+    const entry: ReadEntry = { expiresAt: null, rows, lastGood: hit?.lastGood };
     this.readCache.set(key, entry);
     // In-flight de-duplication is independent of retention. A slow provider
     // request stays shared until it settles, even if it outlasts the TTL.
-    void rows.then(() => {
+    void rows.then((snapshot) => {
       if (this.readCache.get(key) !== entry) return;
-      if (ttl > 0) entry.expiresAt = Date.now() + ttl;
-      else this.readCache.delete(key);
+      entry.lastGood = { rows: snapshot, at: Date.now() };
+      entry.expiresAt = Date.now() + ttl;
     }, () => {
       // An old rejected read must not evict a post-invalidation replacement.
-      if (this.readCache.get(key) === entry) this.readCache.delete(key);
+      if (this.readCache.get(key) === entry) {
+        if (entry.lastGood) entry.expiresAt = 0;
+        else this.readCache.delete(key);
+      }
     });
     return rows;
   }
@@ -184,6 +189,17 @@ export class SheetsContentRepository implements ContentRepository {
   async listLibrary(): Promise<LibraryRecord[]> {
     const { index, rows } = await this.readTab('library', LIBRARY_HEADERS);
     return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
+  }
+
+  /** Explicit read-only recovery; ordinary reads and mutation reads never fall back. */
+  lastGoodLibrary(error: unknown): LibraryRecord[] | null {
+    if (!isAppError(error) || (error.code !== 'RATE_LIMITED' && error.code !== 'PROVIDER_UNAVAILABLE')) return null;
+    const snapshot = this.readCache.get('library:true')?.lastGood;
+    if (!snapshot || Date.now() - snapshot.at >= LAST_GOOD_MAX_AGE_MS) return null;
+    const found = discoverHeaders(LIBRARY_HEADERS, snapshot.rows[0]?.values ?? []);
+    if (!found.ok) return null;
+    return snapshot.rows.flatMap((raw, i) => i === 0 || raw.values.every((v) => cellText(v).trim() === '')
+      ? [] : [toLibraryRecord(found.index, raw, i + 1)]);
   }
 
   async getLibrary(libraryId: string): Promise<LibraryRecord> {

@@ -41,6 +41,29 @@ the issue/spec's older 15-second setting is exercised in unit tests. Fake mode
 retains no completed results, preserving deterministic external-edit and
 failure-injection journeys, but now coalesces concurrent reads.
 
+## CS-046: last-good Backlog recovery (#127)
+
+The same cache entries now retain a last successful complete tab snapshot after
+display expiry or failure. Expired entries still call the provider on the next
+normal read; rejected promises are never served as cache hits. Fake mode still
+has zero normal display retention, so injected failures reach the provider.
+
+Backlog posts alone explicitly select the cached Library snapshot after
+`RATE_LIMITED` or `PROVIDER_UNAVAILABLE`, provided it is less than five minutes
+old and has valid headers. Selection makes no provider calls. A missing or older
+snapshot keeps the existing error screen; a genuinely empty cached Library is
+still visibly labelled stale. Repeated failures do not extend snapshot age.
+
+The warning uses the shared warning-result pattern and offers Retry. The stale
+inventory disables Edit post and inline PESTO edits and blocks URL-opened panels.
+It renders the bounded read-only table rather than starting private search or
+editor requests. Readiness is unknown where provider data is missing. Retry
+loads the page normally; a successful read restores editing. Other list pages,
+Ideas and editor/API reads retain their existing failure behaviour. Mutation
+preconditions/readbacks still bypass the cache, invalidate last-good data with
+the same entries and never select fallback. No additional provider reads,
+persistent cache, or writable authority is introduced.
+
 ## Before/after fake transport counts (PR evidence)
 
 Baseline: `de41746` (the branch base). Synthetic default tabs fit in one 500-row
