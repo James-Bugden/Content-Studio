@@ -72,7 +72,7 @@ test('2,000 posts keep the DOM bounded with global search, filters, sort and edi
   await expect(page.getByLabel('Find a post')).toBeFocused();
 
   await page.getByLabel('Find a post').fill('');
-  await page.getByLabel('Platform', { exact: true }).selectOption('X');
+  await page.getByRole('group', { name: 'Platform', exact: true }).getByRole('button', { name: 'X', exact: true }).click();
   await page.getByLabel('Sort', { exact: true }).selectOption('');
   await page.getByRole('button', { name: /Switch to descending/ }).click();
   await expect(visibleRows.first()).toHaveAttribute('data-backlog-id', 'SYN-B1988');

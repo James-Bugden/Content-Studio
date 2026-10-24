@@ -28,9 +28,10 @@ test('the post panel previews, approves and queues without leaving the page', as
 test('a Ready post can be scheduled from the panel', async ({ page }) => {
   await page.goto('/review?post=SYN-L005');
   const panel = page.getByRole('dialog');
-  await panel.getByRole('button', { name: /Thu 1 Oct · 21:00/ }).click();
+  // Preview and confirm are available without a slot-selection click.
+  await expect(panel.getByRole('button', { name: 'Thu 1 Oct \u00b7 21:00', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(panel.getByText('These cells will be written to the Schedule. Nothing else changes.')).toBeVisible();
-  await panel.getByRole('button', { name: /Confirm and write to 2026-10-01-MAIN-LI/ }).click();
+  await panel.getByRole('button', { name: /Confirm and write to Thu 1 Oct \u00b7 21:00/ }).click();
   await expect(panel.getByText(/Scheduled into 2026-10-01-MAIN-LI/)).toBeVisible();
 });
 
@@ -39,7 +40,7 @@ test('an open slot is filled from the calendar panel', async ({ page }) => {
   const panel = page.getByRole('dialog');
   await expect(panel.getByRole('heading', { name: 'Fill this slot' })).toBeVisible();
   await panel.getByRole('listitem').filter({ hasText: /counteroffer/i }).getByRole('button', { name: 'Use this' }).click();
-  await panel.getByRole('button', { name: /Confirm and write to 2026-10-01-MAIN-LI/ }).click();
+  await panel.getByRole('button', { name: /Confirm and write to Thu 1 Oct \u00b7 21:00/ }).click();
   await expect(panel.getByText(/Scheduled into 2026-10-01-MAIN-LI/)).toBeVisible();
 });
 

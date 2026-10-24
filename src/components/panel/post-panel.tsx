@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { slotLabel } from '@/domain/slot-label';
 import type { PostPanelData } from '@/domain/board';
 import type { Gate } from '@/domain/gates';
 import { approvalBlockers } from '@/domain/approval';
@@ -46,6 +47,21 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const previewRequest = useRef(0);
+  const pickSlot = useCallback(async (contentId: string) => {
+    const request = ++previewRequest.current;
+    setPreview(null);
+    const res = await fetch(`/api/schedule/promote/preview?libraryId=${encodeURIComponent(libraryId)}&contentId=${encodeURIComponent(contentId)}`, { credentials: 'same-origin' }).catch(() => null);
+    const body = await res?.json().catch(() => null);
+    if (request === previewRequest.current) setPreview(body ?? { ok: false });
+  }, [libraryId]);
+  const firstSlot = load.state === 'ok' ? load.data.slotOptions[0]?.contentId : undefined;
+  useEffect(() => {
+    let active = true;
+    if (firstSlot) queueMicrotask(() => { if (active) void pickSlot(firstSlot); });
+    const requests = previewRequest;
+    return () => { active = false; requests.current++; };
+  }, [firstSlot, pickSlot]);
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/panel/post/${encodeURIComponent(libraryId)}`, { credentials: 'same-origin' }).catch(() => null);
@@ -66,6 +82,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
   const { data } = load;
   const { summary, card, model, canEdit } = data;
   const step = summary.step;
+  const previewSlot = preview?.ok ? data.slotOptions.find((o) => o.contentId === preview.contentId) : undefined;
 
   async function transition(action: Transition) {
     setBusy(true);
@@ -82,12 +99,6 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
     const why = body.blockers?.map((b) => b.message).join(' ');
     setResult({ tone: body.code === 'STALE_READ' ? 'warning' : 'error', text: body.code === 'STALE_READ' ? 'This post changed in the Sheet. The latest version is loaded; check it and try again.' : why || body.message || 'Not done. Nothing was written.' });
     await refresh();
-  }
-
-  async function pickSlot(contentId: string) {
-    setPreview(null);
-    const res = await fetch(`/api/schedule/promote/preview?libraryId=${encodeURIComponent(libraryId)}&contentId=${encodeURIComponent(contentId)}`, { credentials: 'same-origin' });
-    setPreview((await res.json().catch(() => ({ ok: false }))) as Preview);
   }
 
   const approvalBlocked = approvalBlockers(card.gates.blockers).length > 0;
@@ -180,8 +191,8 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
             <ul className="mt-2 flex flex-wrap gap-2">
               {data.slotOptions.map((o) => (
                 <li key={o.contentId}>
-                  <button type="button" className={buttonClass(preview && preview.ok && preview.contentId === o.contentId ? 'primary' : 'secondary')} onClick={() => void pickSlot(o.contentId)}>
-                    {new Date(`${o.isoDate}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })} · {o.time}
+                  <button type="button" aria-pressed={Boolean(preview?.ok && preview.contentId === o.contentId)} className={buttonClass(preview && preview.ok && preview.contentId === o.contentId ? 'primary' : 'secondary')} onClick={() => void pickSlot(o.contentId)}>
+                    {slotLabel(o.isoDate, o.time)}
                   </button>
                 </li>
               ))}
@@ -199,7 +210,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
                     </li>
                   ))}
                 </ul>
-                <PromoteConfirm libraryId={libraryId} contentId={preview.contentId} libraryRevision={preview.libraryRevision} scheduleRevision={preview.scheduleRevision} />
+                {previewSlot ? <PromoteConfirm key={`${preview.contentId}-${preview.libraryRevision}-${preview.scheduleRevision}`} slotLabel={slotLabel(previewSlot.isoDate, previewSlot.time)} libraryId={libraryId} contentId={preview.contentId} libraryRevision={preview.libraryRevision} scheduleRevision={preview.scheduleRevision} /> : null}
               </div>
             ) : (
               <InlineResult tone="warning">{preview.problems?.join(' ') || preview.message || 'This slot cannot be used.'}</InlineResult>

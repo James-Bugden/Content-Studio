@@ -1,6 +1,5 @@
-import { StateView } from '@/components/state-view';
+import { RouteLoading } from '@/components/route-loading';
 
-/** Shared, explicitly labelled loading state for studio routes. */
-export default function StudioLoading() {
-  return <StateView kind="loading" />;
+export default function Loading() {
+  return <RouteLoading title="Next up" />;
 }

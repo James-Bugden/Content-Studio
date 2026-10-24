@@ -57,7 +57,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const lane = filters.lane ?? 'all';
   const legacy = (LEGACY_LANES as readonly string[]).includes(lane) ? (lane as (typeof LEGACY_LANES)[number]) : null;
   const layout = params.layout === 'cards' ? 'cards' : 'table';
-  const activeFilters = (['src', 'target', 'from', 'review', 'copyright', 'duplicate', 'queue'] as const).filter((k) => filters[k] !== undefined).length;
+  const activeFilters = (['src', 'from', 'copyright', 'duplicate', 'queue'] as const).filter((k) => filters[k] !== undefined).length;
   const hrefWith = (change: Record<string, string | null>) => {
     const next = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) if (typeof v === 'string' && !(k in change) && k !== 'post' && k !== 'slot' && !(k === 'layout' && v !== 'cards')) next.set(k, v);
@@ -143,6 +143,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           ) : null}
         </nav>
 
+        <FilterBar variant="toolbar" filters={[
+          { key: 'target', label: 'Target platform', control: 'chips', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
+          { key: 'review', label: 'Review status', control: 'chips', options: REVIEW_STATUSES.map((s) => ({ value: s, label: s === 'Pending' ? 'Not reviewed' : s })) },
+        ]} />
+
         <details open={activeFilters > 0} className="group rounded-lg border border-line bg-card px-4">
           <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold marker:hidden [&::-webkit-details-marker]:hidden">
             <span aria-hidden="true" className="mr-2 inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">
@@ -154,9 +159,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <FilterBar
           filters={[
             { key: 'src', label: 'Source', options: queue.sources.map((s) => ({ value: s.key, label: s.label })) },
-            { key: 'target', label: 'Target platform', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
             { key: 'from', label: 'Source platform', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
-            { key: 'review', label: 'Review status', options: REVIEW_STATUSES.map((s) => ({ value: s, label: s === 'Pending' ? 'Not reviewed' : s })) },
             { key: 'copyright', label: 'Copyright QA', options: COPYRIGHT_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
             { key: 'duplicate', label: 'Duplicate QA', options: DUPLICATE_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
             {

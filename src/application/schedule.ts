@@ -138,7 +138,7 @@ export async function promotionContext(repo: ContentRepository, libraryId: strin
       problems: plan.ok ? [] : plan.problems,
     });
   }
-  options.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || slotOrder(a.slot) - slotOrder(b.slot));
+  options.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || a.time.localeCompare(b.time) || slotOrder(a.slot) - slotOrder(b.slot));
   return { library: record, gates: ready.gates.blockers, group: ready.group, alreadyScheduled: ready.scheduledAs, options };
 }
 

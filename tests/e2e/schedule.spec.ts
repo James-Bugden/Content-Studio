@@ -40,7 +40,7 @@ test('SCHED-02: preview lists every written cell, confirm writes into the slot',
   await expect(table.getByRole('rowheader', { name: 'Hook', exact: true })).toBeVisible();
   await expect(table.getByRole('rowheader', { name: 'Source MD / Drive Link' })).toBeVisible();
   await expect(table.getByRole('rowheader', { name: 'Content ID' })).toHaveCount(0);
-  await page.getByRole('button', { name: /Confirm and write to 2026-10-01-MAIN-LI/ }).click();
+  await page.getByRole('button', { name: /Confirm and write to Thu 1 Oct \u00b7 21:00/ }).click();
   await expect(page.getByText(/Scheduled into 2026-10-01-MAIN-LI/)).toBeVisible();
 
   await page.goto('/schedule?week=2026-10-01');

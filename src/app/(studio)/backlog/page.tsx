@@ -102,7 +102,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><span aria-current="page" className="font-semibold">Posts ({library.length})</span><a className="text-primary underline" href="/backlog?view=ideas">Ideas in Content Queue</a></nav>
         <FilterBar filters={[
           { key: 'source', label: 'Source', options: view.sources.map((s) => ({ value: s, label: s })) },
-          { key: 'platform', label: 'Platform', options: view.platforms.map((p) => ({ value: p, label: p })) },
+          { key: 'platform', label: 'Platform', control: 'chips', options: view.platforms.map((p) => ({ value: p, label: p })) },
           { key: 'pesto', label: 'PESTO', options: view.pestoOptions.map((s) => ({ value: s, label: s })) },
           { key: 'status', label: 'Status', options: view.statusOptions.map((s) => ({ value: s, label: s })) },
           { key: 'group', label: 'Group', allLabel: 'None', options: BACKLOG_GROUP_OPTIONS },
@@ -133,12 +133,12 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
       <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><a className="text-primary underline" href="/backlog">Content Library posts</a><span aria-current="page" className="font-semibold">Ideas ({queue.length})</span></nav>
       <FilterBar filters={[
         { key: 'source', label: 'Content Source', options: options.sources.map((s) => ({ value: s, label: s })) },
-        { key: 'platform', label: 'Platform', options: options.platforms.map((p) => ({ value: p, label: p })) },
+        { key: 'platform', label: 'Platform', control: 'chips', options: options.platforms.map((p) => ({ value: p, label: p })) },
         { key: 'approved', label: 'Approved', options: [{ value: 'yes', label: 'Approved' }, { value: 'no', label: 'Not yet approved' }] },
       ]} />
       {total === 0 ? <StateView kind={queue.length ? 'no_match' : 'empty'} detail={queue.length ? 'No ideas match these filters.' : 'The Content Queue is empty.'} nextStep={queue.length ? undefined : null} /> :
         <ul className="flex flex-col gap-3">{groups.map((group) => <li key={group.source}>
-          <details className="group rounded-lg border border-line bg-card"><summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 px-4 py-2 text-sm marker:hidden [&::-webkit-details-marker]:hidden"><span aria-hidden="true" className="inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">▸</span><span className="font-semibold">{group.source}</span><span className="text-ink-soft">({group.total} {group.total === 1 ? 'idea' : 'ideas'})</span></summary>
+          <details key={`${group.source}-${filters.source ?? ''}-${filters.platform ?? ''}-${filters.approved ?? ''}`} open={Boolean(filters.source || filters.platform || filters.approved !== undefined)} className="group rounded-lg border border-line bg-card"><summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 px-4 py-2 text-sm marker:hidden [&::-webkit-details-marker]:hidden"><span aria-hidden="true" className="inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">▸</span><span className="font-semibold">{group.source}</span><span className="text-ink-soft">({group.total} {group.total === 1 ? 'idea' : 'ideas'})</span></summary>
             <BacklogGroupTable source={group.source} canEdit={actor.role === 'owner'} pestoOptions={options.pestoStages} hookTemplateOptions={options.hookTemplates} items={group.items.map((item) => ({ libraryId: item.libraryId, revision: item.revision, hook: item.hook, reviewStatus: item.reviewStatus, pesto: item.pesto, platform: item.platform, hookTemplate: item.hookTemplate }))} />
           </details>
         </li>)}</ul>}

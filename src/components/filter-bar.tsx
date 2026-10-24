@@ -15,7 +15,7 @@ import { buttonClass } from './button-styles';
  * this control. Changing a filter while an editor is dirty asks first.
  */
 export type FilterOption = { value: string; label: string };
-export type FilterDef = { key: string; label: string; options: FilterOption[]; allLabel?: string };
+export type FilterDef = { key: string; label: string; options: FilterOption[]; allLabel?: string; control?: 'chips' };
 
 /** Only values present in the option list survive. */
 export function sanitiseFilterValue(filter: FilterDef, value: string | null): string {
@@ -66,6 +66,21 @@ export function FilterBar({ filters, variant = 'panel', trailing }: { filters: F
     >
       {filters.map((filter) => {
         const id = `${baseId}-${filter.key}`;
+        if (filter.control === 'chips') {
+          const selected = sanitiseFilterValue(filter, current.get(filter.key));
+          return (
+            <div key={filter.key} role="group" aria-label={filter.label} className="flex max-w-full flex-wrap items-center gap-1.5 text-sm">
+              <span className="text-ink-soft">{filter.label}</span>
+              {[{ value: '', label: filter.allLabel ?? 'All' }, ...filter.options].map((option) => (
+                <button key={option.value} type="button" aria-pressed={selected === option.value}
+                  className={`${buttonClass('secondary', 'sm')} min-h-11 ${selected === option.value ? 'border-ink bg-primary-soft font-semibold' : ''}`}
+                  onClick={() => go({ key: filter.key, value: selected === option.value ? '' : option.value })}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          );
+        }
         return (
           <div
             key={filter.key}

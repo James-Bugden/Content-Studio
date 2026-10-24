@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { loadCalendar, previewPromotion, promote, promotionContext } from '@/application/schedule';
@@ -237,4 +237,16 @@ describe('calendar', () => {
     const oct2x = cal.days.find((d) => d.isoDate === '2026-10-02')!.cells.find((c) => c.contentId === '2026-10-02-MAIN-X')!;
     expect(oct2x.zh).toBe('stale');
   });
+});
+
+
+it('CS-059c: promotion options are chronological even when Sheet rows are reversed', async () => {
+  const rows = await repo.listSchedule();
+  vi.spyOn(repo, 'listSchedule').mockResolvedValue([...rows].reverse());
+  const context = await promotionContext(repo, 'SYN-L005');
+  const usable = context.options.filter((o) => o.ok);
+  expect(usable.length).toBeGreaterThan(1);
+  const times = usable.map((o) => `${o.isoDate}T${o.time}`);
+  expect(times).toEqual([...times].sort());
+  expect(usable[0]?.contentId).toBe('2026-10-01-MAIN-LI');
 });

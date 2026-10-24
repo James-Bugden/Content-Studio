@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { slotLabel } from '@/domain/slot-label';
 import type { SlotPanelData } from '@/domain/board';
 import { buttonClass } from '../button-styles';
 import { GuardedLink } from '../guarded-link';
@@ -140,7 +141,7 @@ export function SlotPanel({ contentId }: { contentId: string }) {
                     </li>
                   ))}
                 </ul>
-                {picked ? <PromoteConfirm libraryId={picked} contentId={contentId} libraryRevision={preview.libraryRevision} scheduleRevision={preview.scheduleRevision} /> : null}
+                {picked ? <PromoteConfirm key={`${picked}-${preview.libraryRevision}-${preview.scheduleRevision}`} slotLabel={slotLabel(slot.isoDate, slot.time)} libraryId={picked} contentId={contentId} libraryRevision={preview.libraryRevision} scheduleRevision={preview.scheduleRevision} /> : null}
               </div>
             ) : (
               <div className="mt-3">

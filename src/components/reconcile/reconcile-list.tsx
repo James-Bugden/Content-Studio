@@ -95,7 +95,7 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
                           {i.title}
                         </h3>
                         <p className="text-sm text-ink-soft">{i.facts.join(' ')}</p>
-                        {i.operationId ? <p className="text-xs text-ink-soft">Operation {i.operationId}</p> : null}
+                        {i.operationId ? <details className="text-xs text-ink-soft"><summary className="min-h-11 cursor-pointer py-3">Operation</summary><p className="break-all">{i.operationId}</p></details> : null}
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {i.action.href ? (
