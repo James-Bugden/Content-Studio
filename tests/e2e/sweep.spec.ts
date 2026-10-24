@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
 import { ERROR_CODES } from '../../src/domain/errors';
 import { navigate, control, signIn, observe, settled, overflow, axe, keyboard, escapeDialog, designatedState, noWrites, guardedDraft, noDeadEnd, monkey, report, ROUTES, FAULTS } from './sweep-checks';
 
@@ -37,8 +36,11 @@ test('sweep inventory matches navigation and injectable fault vocabulary', async
   const coverage = report(page, info, 'owner');
   try {
     await coverage.check('(coverage contract)', 'inventory', async () => {
-      const shell = await readFile('src/components/app-shell.tsx', 'utf8');
-      const nav = [...shell.matchAll(/href: '([^']+)'/g)].map((match) => match[1]);
+      await signIn(page, 'owner');
+      await navigate(page, '/');
+      await settled(page);
+      const nav = await page.getByRole('navigation', { name: 'Primary', exact: true })
+        .getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('href')));
       expect(nav.length).toBeGreaterThan(0);
       expect(nav.filter((route) => !ROUTES.some((covered) => covered === route)), 'new nav route needs sweep coverage').toEqual([]);
       expect(FAULTS.map(([code]) => code).sort()).toEqual([...ERROR_CODES].sort());
