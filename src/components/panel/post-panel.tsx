@@ -258,7 +258,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
             <dd>{summary.source}</dd>
             <dt className="text-ink-soft">Scheduled as</dt>
             <dd className="font-mono">{summary.scheduledAs.join(', ') || 'Not yet'}</dd>
-            <dt className="text-ink-soft">Sheet revision</dt>
+            <dt className="text-ink-soft">Content revision</dt>
             <dd className="font-mono text-xs">{model.sheet.revision}</dd>
             <dt className="text-ink-soft">Markdown</dt>
             <dd className="text-xs">{model.markdown.state === 'ok' ? `rev ${model.markdown.fileRevision}` : `Unavailable (${model.markdown.reason.replace(/_/g, ' ')})`}</dd>
