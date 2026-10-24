@@ -33,6 +33,53 @@ async function save(repo: SupabaseContentRepository | ContentWriteCutover['repo'
 }
 
 describe('MIG-12 one-way stable-ID export', () => {
+  it('CS-059d: parity blocks an unknown-column hand edit on a DB-created idea', async () => {
+    const seed = syntheticContentDbSeed(), sheet = new FakeSheetTransport();
+    const grid = sheet.rawTab(SHEET_TABS.queue.name), column = grid[0]!.length;
+    grid[0]!.push({ value: 'Synthetic extra' });
+    for (const row of grid.slice(1)) row.push({ value: '' });
+    for (const row of seed.posts.filter(r => r.collection === 'queue')) {
+      row.passthrough = { [column]: { header: 'Synthetic extra', value: '', formula: '', link: '' } };
+      const raw = grid.find(r => r.some(c => c.value === row.library_id))!;
+      row.sheet_revision = fingerprintValues([rowRevision(raw.map(c => c.value), column + 1), rowRevision(raw.map(c => c.formula ?? c.value), column + 1)]);
+    }
+    const db = new FakeContentDb(seed), exporter = new ContentExporter(db, sheet, { checkpoints: new Map(), issues: new Map(), reports: [] });
+    const cutover = new ContentWriteCutover(new SupabaseContentRepository(db), exporter), repo = cutover.repo;
+    expect((await exporter.run()).exact).toBe(true);
+    expect((await repo.createQueueIdea({ operationId: 'synthetic-unknown-edit', actor, libraryId: 'SYN-UNKNOWN-EDIT', sourcePlatform: 'X', currentHook: 'Synthetic', draftContent: 'Synthetic' })).ok).toBe(true);
+    expect((await exporter.parity()).exact).toBe(true);
+    const row = grid.findIndex(r => r.some(c => c.value === 'SYN-UNKNOWN-EDIT')) + 1;
+    sheet.externalEdit(SHEET_TABS.queue.name, row, column, 'Synthetic hand edit');
+    // Inspection alone must expose the conflict, before repair records it.
+    const parity = await exporter.parity();
+    expect(parity.exact).toBe(false);
+    expect(parity.differences).toContainEqual(expect.objectContaining({ id: 'SYN-UNKNOWN-EDIT', fields: ['Synthetic extra'] }));
+    await exporter.run();
+    const report = await buildReconcileReport(repo, new FakeDriveGateway(), Date.now(), { contentCutover: cutover });
+    expect(report.items.find(i => i.kind === 'export_parity')!.title).toBe('Sheet export parity is blocked');
+    await expect(cutover.rollbackToSheet(vi.fn())).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(grid[row - 1]![column]!.value).toBe('Synthetic hand edit');
+  });
+  it('CS-059d: duplicate IDs create one lag item for the affected tab and recover after removal', async () => {
+    const now = 1_800_000_000_000, { sheet, exporter, repo, cutover } = setup(() => now); await exporter.run();
+    const grid = sheet.rawTab(SHEET_TABS.queue.name); grid.push(structuredClone(grid[1]!));
+    await expect(exporter.run()).rejects.toMatchObject({ code: 'SCHEMA_DRIFT', details: { reason: 'duplicate_export_id' } });
+    const report = await buildReconcileReport(repo, new FakeDriveGateway(), now + 3600_000, { contentCutover: cutover });
+    expect(report.items.filter(i => i.kind === 'export_lag')).toHaveLength(1);
+    expect(report.items.filter(i => i.title === 'Duplicate Sheet export IDs')).toHaveLength(1);
+    grid.pop();
+    expect((await exporter.run()).exact).toBe(true);
+    expect(exporter.journal.issues.size).toBe(0);
+  });
+  it('CS-059d: an unknown Queue Posted column stays blank text on append', async () => {
+    const { sheet, exporter, repo } = setup(); await exporter.run();
+    const grid = sheet.rawTab(SHEET_TABS.queue.name), column = grid[0]!.length;
+    grid[0]!.push({ value: 'Posted' });
+    const append = vi.spyOn(sheet, 'appendRow');
+    expect((await repo.createQueueIdea({ operationId: 'synthetic-posted-extra', actor, libraryId: 'SYN-POSTED-EXTRA', sourcePlatform: 'X', currentHook: 'Synthetic', draftContent: 'Synthetic' })).ok).toBe(true);
+    expect(append.mock.calls[0]![2][column]).toBe('');
+    expect(grid.at(-1)![column]!.value).toBe('');
+  });
   it('distinguishes boolean checkbox bytes from identical formatted text in parity and the Ready Queue', async () => {
     const { sheet, exporter } = setup(); await exporter.run();
     const tab = SHEET_TABS.library.name, grid = sheet.rawTab(tab), col = grid[0]!.findIndex(c => c.value === 'Queue for Schedule');
@@ -137,10 +184,14 @@ describe('MIG-12 one-way stable-ID export', () => {
     expect(report.items).toContainEqual(expect.objectContaining({ kind: 'export_mismatch', severity: 'blocking', title: 'Duplicate Sheet export IDs' }));
   });
   it('refuses DB text starting with equals as a named blocking field without writing it', async () => {
-    const { sheet, repo, exporter } = setup(); await exporter.run(); const count = sheet.writes.length;
+    const { sheet, repo, exporter, cutover } = setup(); await exporter.run(); const count = sheet.writes.length;
     expect((await save(repo, 'synthetic-formula-text', '=Synthetic text')).ok).toBe(true);
     expect(sheet.writes).toHaveLength(count);
     expect(exporter.journal.issues.get(exportKey('library', 'SYN-L001'))).toMatchObject({ reason: 'export_mismatch', fields: ['Draft Content'] });
+    const report = await buildReconcileReport(repo, new FakeDriveGateway(), Date.now(), { contentCutover: cutover });
+    expect(report.items.find(i => i.kind === 'export_mismatch' && i.stableIds.includes('SYN-L001'))!.facts.join(' ')).toContain('Change authoritative value');
+    expect((await save(repo, 'synthetic-formula-recovery', 'Synthetic replacement')).ok).toBe(true);
+    expect(exporter.journal.issues.has(exportKey('library', 'SYN-L001'))).toBe(false);
   });
   it('exports an approve-and-queue patch as real RAW checkboxes and updates the derived Ready Queue', async () => {
     const { repo, sheet, exporter } = setup(); await exporter.run();
