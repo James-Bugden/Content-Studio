@@ -9,6 +9,17 @@ import { readFileSync } from 'node:fs';
 const ci = readFileSync('.github/workflows/ci.yml', 'utf8');
 
 describe('DEP-01 deterministic clean-checkout pipeline', () => {
+  it('gates merge on the DB-write journey at both widths using the verified synthetic build on Ubuntu', () => {
+    const job = ci.match(/^  browser-db-write:\n([\s\S]*?)(?=^  [\w-]+:)/m)?.[1];
+    expect(job).toBeDefined();
+    for (const required of ['runs-on: ubuntu-latest', 'needs: verify', 'contents: read', 'actions: read',
+      '--name sweep-server', "CS_E2E_PREBUILT: '1'", 'CS_E2E_CONTENT_STORE: db\n',
+      'tests/e2e/content-write-cutover.spec.ts --project=w375 --project=w1280']) expect(job).toContain(required);
+    const aggregate = ci.match(/^  browser:\n([\s\S]*?)(?=^  [\w-]+:)/m)![1]!;
+    expect(aggregate).toContain('browser-db-write]');
+    expect(aggregate).toContain('DB_WRITE_RESULT: ${{ needs.browser-db-write.result }}');
+    expect(aggregate).toContain('test "$DB_WRITE_RESULT" = success');
+  });
   it('runs the existing pipeline weekly on the default branch (main)', () => {
     expect(ci).toMatch(/^  schedule:\n    - cron: '17 3 \* \* 1'$/m);
   });

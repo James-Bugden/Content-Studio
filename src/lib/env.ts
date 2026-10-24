@@ -8,6 +8,7 @@ import { z } from 'zod';
 const schema = z.object({
   CS_DATA_MODE: z.enum(['fake', 'live']).default('fake'),
   CS_CONTENT_STORE: z.enum(['sheet', 'db-shadow', 'db-read', 'db']).default('sheet'),
+    CS_CONTENT_WRITE_ENABLED: z.enum(['true', 'false']).optional(),
   APP_BASE_URL: z.string().url().optional(),
   APP_TIMEZONE: z.literal('Asia/Taipei').default('Asia/Taipei'),
   AUTH_SECRET: z.string().min(32).optional(),

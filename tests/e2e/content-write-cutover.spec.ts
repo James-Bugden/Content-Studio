@@ -1,0 +1,33 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+
+test('MIG-12: DB save exports, Sheet hand edit is preserved and shown as a blocking field conflict', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const control = async (data: object) => expect((await page.request.post('/api/test-control', { data })).status()).toBe(200);
+  await control({ kind: 'reset' });
+  expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
+  await page.goto('/review/SYN-L001');
+  await page.getByLabel(/Post copy/).fill('Synthetic first DB export with exact spaces  ');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Saved to the master Markdown and mirrored to the database.')).toBeVisible();
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic first DB export with exact spaces  ');
+  await page.goto('/reconcile');
+  await expect(page.getByText('Store mode: db.', { exact: false })).toContainText('Database is authoritative');
+  await expect(page.locator('[data-reconcile-kind="export_parity"]')).toContainText('Sheet export matches the database');
+  await expect(page.locator('[data-reconcile-kind="backup_fresh"]')).toContainText('No verified backup');
+  await expect(page.getByRole('button', { name: 'Run content import' })).toHaveCount(0);
+  await control({ kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Draft Content', value: 'Synthetic preserved Sheet hand edit  ' });
+  await page.goto('/review/SYN-L001');
+  await page.getByLabel(/Post copy/).fill('Synthetic second DB save');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Saved to the master Markdown and mirrored to the database.')).toBeVisible();
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic second DB save');
+  await page.goto('/reconcile');
+  const conflict = page.locator('[data-reconcile-kind="export_mismatch"]');
+  await expect(conflict).toContainText('blocking'); await expect(conflict).toContainText('Draft Content');
+  await expect(conflict).toContainText('row preserved');
+  expect((await new AxeBuilder({ page }).include('[data-reconcile-kind="export_mismatch"]').analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `test-results/write-cutover-${test.info().project.name}.png`, fullPage: true });
+  expect(errors).toEqual([]);
+});

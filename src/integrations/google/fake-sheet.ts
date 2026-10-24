@@ -9,7 +9,8 @@ import {
   syntheticScheduleRows,
   syntheticSettingsRows,
 } from '@/fixtures/synthetic';
-import { SHEET_TABS, LIBRARY_HEADERS, discoverHeaders } from '@/domain/sheet-schema';
+import { SHEET_TABS, LIBRARY_HEADERS, SCHEDULE_HEADERS, discoverHeaders } from '@/domain/sheet-schema';
+import { cellText } from '@/domain/mapping';
 import type { CellWrite, ReadOptions, SheetTransport } from './sheet-transport';
 
 /**
@@ -20,7 +21,7 @@ import type { CellWrite, ReadOptions, SheetTransport } from './sheet-transport';
  * `Ready Queue` is recomputed from `Content Library` on every read, mirroring the
  * live sheet where it is a formula view.
  */
-type Cell = { value: string; formula?: string; link?: string };
+type Cell = { value: string; formula?: string; link?: string; entered?: string | boolean };
 
 export type FakeFailure = { op: 'read' | 'write'; tab?: string; code: ErrorCode; times?: number };
 
@@ -44,9 +45,12 @@ export class FakeSheetTransport implements SheetTransport {
       [SHEET_TABS.settings.name]: syntheticSettingsRows(),
       ...seed,
     } as Record<string, RawRow[]>;
-    for (const [tab, rows] of Object.entries(initial)) this.tabs.set(tab, rows.map(toCells));
+    for (const [tab, rows] of Object.entries(initial)) {
+      const header = rows.find(r => r.values.includes('Library ID') || r.values.includes('Content ID'));
+      this.tabs.set(tab, rows.map(row => toCells(row, header?.values)));
+    }
     this.readyQueuePinned = Boolean(seed?.[SHEET_TABS.readyQueue.name]);
-    if (!this.readyQueuePinned) this.tabs.set(SHEET_TABS.readyQueue.name, syntheticReadyQueueRows().map(toCells));
+    if (!this.readyQueuePinned) this.tabs.set(SHEET_TABS.readyQueue.name, syntheticReadyQueueRows().map(row => toCells(row)));
   }
 
   failNext(failure: FakeFailure): void {
@@ -84,7 +88,7 @@ export class FakeSheetTransport implements SheetTransport {
     const slice = grid.slice(options.startRow - 1, options.startRow - 1 + options.maxRows);
     return slice.map((cells) => ({
       values: cells.map((c) => c.value),
-      ...(options.formulas ? { formulas: cells.map((c) => c.formula ?? c.value) } : {}),
+      ...(options.formulas ? { formulas: cells.map((c) => c.formula ?? c.entered ?? c.value) } : {}),
       ...(options.links ? { links: cells.map((c) => c.link ?? null) } : {}),
     }));
   }
@@ -98,7 +102,7 @@ export class FakeSheetTransport implements SheetTransport {
       while (grid.length < w.row) grid.push([]);
       const r = grid[w.row - 1]!;
       while (r.length <= w.column) r.push({ value: '' });
-      r[w.column] = { value: typeof w.value === 'boolean' ? (w.value ? 'TRUE' : 'FALSE') : w.value };
+      r[w.column] = { value: cellText(w.value), entered: w.value };
     }
     this.writes.push({ tab, writes });
   }
@@ -108,7 +112,7 @@ export class FakeSheetTransport implements SheetTransport {
     this.maybeFail('write', tab);
     const grid = this.tabs.get(tab);
     if (!grid) throw new AppError('SCHEMA_DRIFT', { provider: 'sheet', missingTab: true });
-    grid.push(values.map((value) => ({ value: typeof value === 'boolean' ? (value ? 'TRUE' : 'FALSE') : value })));
+    grid.push(values.map((value) => ({ value: cellText(value), entered: value })));
     this.writes.push({
       tab,
       writes: values.map((value, column) => ({ row: grid.length, column, value })),
@@ -121,7 +125,7 @@ export class FakeSheetTransport implements SheetTransport {
     const found = discoverHeaders(LIBRARY_HEADERS, header);
     if (!found.ok) return;
     const { reviewStatus, queueForSchedule } = found.index.columns;
-    const rows = lib.slice(1).filter((r) => r[reviewStatus]?.value === 'Approved' && r[queueForSchedule]?.value === 'TRUE');
+    const rows = lib.slice(1).filter((r) => r[reviewStatus]?.value === 'Approved' && r[queueForSchedule]?.entered === true);
     // A derived cell retains its hyperlink target, not its source formula.
     this.tabs.set(SHEET_TABS.readyQueue.name, [lib[0] ?? [], ...rows.map((r) => r.map((c) => ({
       value: c.value, link: c.link ?? (c.formula ? /^=HYPERLINK\(\s*"([^"]+)"/i.exec(c.formula)?.[1] : undefined),
@@ -129,12 +133,17 @@ export class FakeSheetTransport implements SheetTransport {
   }
 }
 
-function toCells(row: RawRow): Cell[] {
+function toCells(row: RawRow, headers?: readonly unknown[]): Cell[] {
   return row.values.map((value, i) => {
     const formula = row.formulas?.[i];
     const link = row.links?.[i];
     return {
-      value: String(value ?? ''),
+      value: cellText(value),
+      // Synthetic formatted fixtures model actual checkbox cells. Subsequent
+      // RAW string writes remain strings and must not pass boolean comparisons.
+      ...(typeof value === 'boolean' ? { entered: value }
+        : (headers?.[i] === LIBRARY_HEADERS.queueForSchedule || headers?.[i] === SCHEDULE_HEADERS.posted) && ['TRUE', 'FALSE'].includes(String(value))
+          ? { entered: value === 'TRUE' } : {}),
       ...(typeof formula === 'string' && formula.startsWith('=') ? { formula } : {}),
       ...(typeof link === 'string' && link ? { link } : {}),
     };

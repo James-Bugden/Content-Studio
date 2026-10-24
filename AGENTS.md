@@ -21,6 +21,10 @@ isolated branch/worktree or managed isolated checkout.
 Pending cutover: the Sheet authority is being replaced in phases by Postgres
 (Supabase) per `docs/implementation/database-migration.md`. Until a phase is
 flipped in production the list above stands; each flip updates this note.
+DB-6 export/backup/rollback code is exercised with fakes and PGlite only;
+cutover is still pending. Live database modes remain explicitly refused until
+the owner/live gates in `docs/ops/database-write-cutover.md` are evidenced.
+Record a cutover date only after an actual production flip.
 
 Do not create a parallel source of truth.
 
