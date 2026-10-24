@@ -42,15 +42,17 @@ export function parseWorkflowSettings(rows: readonly (readonly unknown[])[]): Wo
   const rawNotes: Record<string, string> = {};
   const problems: string[] = [];
   const slots: SlotPolicy[] = [];
+  const sourceRows: NonNullable<WorkflowSettings['sourceRows']> = [];
   const headerAt = rows.findIndex((r) => String(r[0] ?? '').trim() === 'Setting' && String(r[1] ?? '').trim() === 'Value');
   if (headerAt < 0) {
     return { timezone: 'Asia/Taipei', slots: [], raw, rawNotes, problems: ['Workflow Settings has no Setting/Value header'] };
   }
-  for (const row of rows.slice(headerAt + 1)) {
+  for (const [offset, row] of rows.slice(headerAt + 1).entries()) {
     const key = String(row[0] ?? '').trim();
     const value = String(row[1] ?? '').trim();
     const note = String(row[2] ?? '').trim();
     if (!key) continue;
+    sourceRows.push({ setting: String(row[0] ?? ''), value: String(row[1] ?? ''), notes: String(row[2] ?? ''), row: headerAt + offset + 2 });
     raw[key] = value;
     rawNotes[key] = note;
     const m = SLOT_KEY.exec(key);
@@ -71,7 +73,7 @@ export function parseWorkflowSettings(rows: readonly (readonly unknown[])[]): Wo
   }
   const tz = raw['Timezone'] ?? 'Asia/Taipei';
   if (tz !== 'Asia/Taipei') problems.push('Only Asia/Taipei is supported');
-  return { timezone: 'Asia/Taipei', slots, raw, rawNotes, problems };
+  return { timezone: 'Asia/Taipei', slots, raw, rawNotes, problems, sourceRows };
 }
 
 export function slotPolicy(settings: WorkflowSettings, platform: Platform, slot: Slot): SlotPolicy | null {

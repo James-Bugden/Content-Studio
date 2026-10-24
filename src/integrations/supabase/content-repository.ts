@@ -60,7 +60,7 @@ export class SupabaseContentRepository implements ContentRepository {
     row = validateContentRow(row);
     const c = cells(LIBRARY_HEADERS, row);
     return { value: toLibraryItem(c), cells: c, row: row.source_sheet_row ?? 0,
-      revision: this.revision(row, 'content_studio_posts', `${row.collection}:${c.libraryId}`), formulaFields: [],
+      revision: this.revision(row, 'content_studio_posts', `${row.collection}:${c.libraryId}`), formulaFields: [], passthrough: row.passthrough,
       links: { ...(row.source_markdown_url ? { sourceMarkdown: row.source_markdown_url } : {}),
         ...(row.source_master_file_url ? { sourceMasterFile: row.source_master_file_url } : {}),
         ...(row.image_file_url ? { imageFile: row.image_file_url } : {}) } };
@@ -69,7 +69,7 @@ export class SupabaseContentRepository implements ContentRepository {
     row = validateContentRow(row);
     const c = cells(SCHEDULE_HEADERS, row);
     return { value: toScheduledPost(c), cells: c, row: row.source_sheet_row ?? 0,
-      revision: this.revision(row, 'content_studio_schedule', c.contentId), formulaFields: [],
+      revision: this.revision(row, 'content_studio_schedule', c.contentId), formulaFields: [], passthrough: row.passthrough,
       links: { ...(row.source_link_url ? { sourceLink: row.source_link_url } : {}), ...(row.image_file_url ? { imageFile: row.image_file_url } : {}) } };
   }
   listLibrary() { return this.listPosts('library'); }

@@ -9,6 +9,9 @@ import { ServiceAccountTokens } from '@/integrations/google/service-account';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
 import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
+import { FakeContentImportStore } from '@/integrations/supabase/fake-content-import';
+import { ContentParityJournal, shadowContentRepository } from './content-parity';
+import type { ContentImportStore } from './content-import';
 import { AnthropicAiGateway } from '@/integrations/ai/anthropic-gateway';
 import { FakeAiGateway, UnconfiguredAiGateway } from '@/integrations/ai/fake-gateway';
 import { FakeTypefullyGateway, UnconfiguredTypefullyGateway } from '@/integrations/typefully/fake-gateway';
@@ -28,6 +31,9 @@ export type Services = {
   ai: AiGateway;
   /** Optional: when Typefully is down or unconfigured, manual scheduling keeps working. */
   typefully: TypefullyGateway;
+  contentImport?: ContentImportStore;
+  contentParity?: ContentParityJournal;
+  reconcileRepo?: ContentRepository;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
   fakes?: { sheet: FakeSheetTransport; db: FakeContentDb; drive: FakeDriveGateway; ai?: FakeAiGateway; typefully?: FakeTypefullyGateway };
 };
@@ -101,6 +107,20 @@ function build(): Services {
         ...(typefully instanceof FakeTypefullyGateway ? { typefully } : {}),
       },
     };
+    if (env.CS_CONTENT_STORE === 'db-shadow') {
+      const contentImport = new FakeContentImportStore();
+      const contentParity = new ContentParityJournal();
+      // Resolve the reader for each call: a successful import replaces the fake's snapshot atomically.
+      const db = new Proxy({} as ContentRepository, { get: (_, property) => (...args: unknown[]) => {
+        const repository = new SupabaseContentRepository(contentImport.db, 'db-read');
+        return Reflect.get(repository, property).apply(repository, args);
+      } });
+      const sheetRepo = services.repo;
+      services.repo = shadowContentRepository(sheetRepo, db, contentParity);
+      services.reconcileRepo = shadowContentRepository(sheetRepo, db, contentParity, () => true);
+      services.contentImport = contentImport;
+      services.contentParity = contentParity;
+    }
     return services;
   }
   if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || !env.CS_SHEET_ID) {

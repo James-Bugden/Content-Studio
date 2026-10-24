@@ -52,7 +52,11 @@ describe.each(factories)('MIG-14 reads: %s', (_name, create) => {
     // summary tab; DB-4's real-Sheet parity report is the acceptance check.
     const repo = create();
     expect(await repo.schema()).toMatchObject({ ok: true });
-    expect(await repo.workflowSettings()).toEqual(await sheet().workflowSettings());
+      // sourceRows is import-only metadata; DB row positions are not Sheet positions.
+      const { sourceRows: dbRows, ...dbSettings } = await repo.workflowSettings();
+      const { sourceRows: sheetRows, ...sheetSettings } = await sheet().workflowSettings();
+      expect(dbRows).toBeDefined(); expect(sheetRows).toBeDefined();
+      expect(dbSettings).toEqual(sheetSettings);
     expect(await repo.queueSummary()).toEqual(await sheet().queueSummary());
     expect((await repo.queueSummary())[0]!.counts).toHaveProperty('Needs Fix');
   });

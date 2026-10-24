@@ -23,19 +23,21 @@ export default defineConfig({
     reducedMotion: 'reduce',
   },
   projects: [
-    { name: 'w375', use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
-    { name: 'w1280', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
+    { name: 'w375', testIgnore: '**/content-parity.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 375, height: 812 } } },
+    { name: 'w1280', testIgnore: '**/content-parity.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 900 } } },
+    ...[375, 1280].map(width => ({ name: `shadow-w${width}`, testMatch: '**/content-parity.spec.ts', use: { ...devices['Desktop Chrome'], baseURL: 'http://127.0.0.1:3201', viewport: { width, height: width === 375 ? 812 : 900 } } })),
   ],
   webServer: {
     // Bind explicitly to loopback. Besides keeping the synthetic test server
     // private, this avoids Next.js enumerating host network interfaces in
     // restricted CI/container runtimes where that syscall is unavailable.
-    command: `npm run build && npm run start -- --port ${PORT} --hostname 127.0.0.1`,
-    url: `http://127.0.0.1:${PORT}/api/health`,
-    reuseExistingServer: !process.env.CI,
+    command: 'node scripts/e2e-servers.mjs',
+    url: 'http://127.0.0.1:3201/api/health',
+    reuseExistingServer: false,
     timeout: 300_000,
     env: {
       CS_DATA_MODE: 'fake',
+      CS_CONTENT_STORE: 'sheet',
       CS_TEST_MODE: 'e2e',
       CS_FAKE_TODAY: '2026-09-30',
       AI_PROVIDER: 'fake',

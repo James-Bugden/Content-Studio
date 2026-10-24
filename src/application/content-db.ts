@@ -31,7 +31,7 @@ export type ContentSummaryRow = {
   count: number;
   counts: Record<string, number | null>;
 };
-export type ContentSettingRow = { setting: string; value: string; notes: string; source_sheet_row: number | null };
+export type ContentSettingRow = { setting: string; value: string; notes: string; source_sheet_row: number | null; row_version?: number | string };
 
 export type ContentTarget = ContentCollection | 'schedule';
 export type ContentWrite = {

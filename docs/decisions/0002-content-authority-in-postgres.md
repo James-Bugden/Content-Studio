@@ -32,7 +32,7 @@ The SQL result contains only `{ok, code, steps, revision}`. `steps[0].state` is 
 
 A namespaced transaction advisory lock serializes the small owner-only corpus, including simultaneous first deliveries and imports. Indexed primary-key row locks and compare-and-set updates enforce expected_version. Updates save full before-images, changed field names and SHA-256 before/after hashes; inserts save null before-images. Audit and operation results contain no copy. Any error in history, audit, ledger or deferred lineage validation rolls back all row changes. No-op patches do not bump versions or add history. A content-changing import/copy bumps the version; an identical content copy changing only Sheet fingerprint/row position preserves it, with metadata changes still recorded in history.
 
-Write-through/import expected_version asserts the version observed before the Sheet read; null asserts row absence. A copy is already_applied regardless of that precondition only when every supplied field equals its stored typed value, including any supplied sheet_revision and source_sheet_row. A difference in either metadata field still requires the matching expected_version, although applying metadata-only changes preserves row_version. A stale changed row is refused, never overwritten. Import rows are `{target_kind, target_id, expected_version, row}`; counts and SHA-256 hashes cover exactly the four typed collections. Duplicate stable targets and unknown exception classes are rejected. Exception entries contain only `{class, collection, field, hash}`, with classes `formula_display`, `number_formatting`, `trailing_whitespace`. Imports atomically upsert, support child-before-parent schedule lineage and use one enclosing operation ledger entry. Full-row construction, snapshot hashes, parity classification, scheduling and handling rows absent from a snapshot belong to DB-4; this RPC does not delete absent rows or declare parity passed.
+Write-through/import expected_version asserts the version observed before the Sheet read; null asserts row absence. A copy is already_applied regardless of that precondition only when every supplied field equals its stored typed value, including any supplied sheet_revision and source_sheet_row. A difference in either metadata field still requires the matching expected_version, although applying metadata-only changes preserves row_version. A stale changed row is refused, never overwritten. Import rows are `{target_kind, target_id, expected_version, row}`; counts and SHA-256 hashes cover exactly the four typed collections. Duplicate stable targets and unknown exception classes are rejected. Exception entries contain only `{class, collection, field, hash}`, with classes `formula_display`, `number_formatting`, `trailing_whitespace`, `blank_boolean`, `boolean_formatting`, `timestamp_formatting`. Imports atomically upsert, support child-before-parent schedule lineage and use one enclosing operation ledger entry. Full-row construction, snapshot hashes, parity classification, scheduling and handling rows absent from a snapshot belong to DB-4; this RPC does not delete absent rows or declare parity passed.
 
 The shared `content_studio_mutate` implementation is also service-role-only. Its internal import mode participates in the enclosing import transaction and ledger rather than deriving child operation IDs that could collide with other operations. Service role is already trusted with direct table DML; this helper is not a new user authorization boundary.
 
@@ -105,3 +105,36 @@ hashes become at most 12-character hashes, field names use a compiled allowlist,
 and raw identifiers, URLs, timestamps and copy are omitted. Private database
 history and audit tables retain their operational identifiers. The scheduled
 private history/backup exporter remains DB-6 work.
+
+- DB-4 review round 1 ? representation exceptions: the unapplied DB-1 SQL
+  allowlist also accepts `blank_boolean`, `boolean_formatting` and
+  `timestamp_formatting`. Blank Posted/Queue-for-Schedule cells become false
+  with `blank_boolean`; other accepted boolean spellings are named separately.
+  `number_formatting` includes leading zeros and ASCII spaces as well as commas.
+  Timestamp instants may render in Taipei, but every changed cell is named;
+  ambiguous multi-delimiter sync stamps block the whole import. Setting keys
+  requiring trimming block rather than silently changing identity.
+- DB-4 review round 1 ? parity: unknown-column passthrough is compared and
+  returned by the typed reader. Only Next Action, Image Next Action and Has
+  Image permit removal of one terminal ASCII-space suffix with at most one
+  newline. Post copy (including hooks) is exact. Classified differences remain
+  unequal fields for the 99.9% gate, except the explicitly named blank-checkbox
+  equivalence (blank to FALSE only), which is counted separately in the UI; formula display belongs only to the import
+  ledger, never a parity equivalence. Measured empty collections are vacuously
+  equal and shown as n/a; missing/failed observations are still blocking.
+- DB-4 review round 1 ? privacy and scope: parity fingerprints and exception
+  hashes use HMAC-SHA256 with the existing server-only AUTH_SECRET; sessions
+  without it use an ephemeral process key. Key rotation changes evidence tokens.
+  Canonical snapshot/collection hashes remain unsalted integrity checks over
+  complete envelopes, not anonymization: protect reconcile/import-ledger access
+  as owner/viewer data, and never publish production hashes. Telemetry emits one
+  aggregate event per collection observation, without row/field fingerprints.
+- DB-4 review round 1 ? scheduling: imports are allowed only in db-shadow,
+  including the writer boundary. Durable typed operation IDs encode trigger
+  class (owner/scheduled), the configured non-personal source key and request
+  UUID; actor hashes bind trigger class and source with the same private key.
+  Owner requests send an Idempotency-Key UUID. The active-run guard and bounded
+  completed-request cache are per server instance; SQL locks, CAS and the durable
+  ledger remain the cross-instance safeguards. A retry after an instance restart
+  with a changed snapshot fails closed as CONFLICT rather than overwriting data.
+  This is not a distributed job scheduler or permission to flip reads.

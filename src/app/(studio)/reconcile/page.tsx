@@ -7,6 +7,8 @@ import { isAppError } from '@/domain/errors';
 import { requireActor } from '@/lib/auth';
 import { summariseBacklogTimings } from '@/observability/alerts';
 import { recentEvents } from '@/observability/events';
+import { serverEnv } from '@/lib/env';
+import { ContentImportButton } from '@/components/reconcile/content-import-button';
 
 export const metadata: Metadata = { title: 'Reconcile | Content Studio' };
 export const dynamic = 'force-dynamic';
@@ -16,11 +18,11 @@ export const dynamic = 'force-dynamic';
  * this instance's redacted telemetry on every load. Nothing here stores content.
  */
 export default async function ReconcilePage() {
-  await requireActor('viewer');
+  const actor = await requireActor('viewer');
   let report: ReconcileReport;
   try {
-    const { repo, drive, typefully } = getServices();
-    report = await buildReconcileReport(repo, drive, undefined, { typefully });
+    const { repo, reconcileRepo, drive, typefully, contentParity } = getServices();
+    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity });
   } catch (error) {
     return (
       <>
@@ -30,12 +32,31 @@ export default async function ReconcilePage() {
     );
   }
   const checked = new Date(report.checkedAt).toLocaleString('en-GB', { timeZone: 'Asia/Taipei' });
+  const parity = getServices().contentParity?.summary();
 
   return (
     <>
       <PageHeader title="Fix issues" description={`Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <CapabilityBanner capabilities={report.capabilities} />
+        <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
+          <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
+          <p>Store mode: {serverEnv().CS_CONTENT_STORE}. Sheet remains authoritative.</p>
+          {parity ? <>
+            <p>{parity.sampleCount} compared requests · {parity.daysGreen} complete days green · import lag p95: {parity.lagP95 === null ? 'not measured' : `${Math.round(parity.lagP95 / 60000)} min`}.</p>
+            <p>{parity.ready ? 'Shadow thresholds met in this instance.' : 'Shadow thresholds not yet met.'} Evidence covers {parity.scope}; a restart loses this measurement window. This is not permission to switch reads; durable deployment evidence and the phase gates are still required.</p>
+            <ul>{parity.collections.map(c => <li key={c.collection}>{c.collection}: ID sets {c.idsEqual === null ? 'not measured' : c.idsEqual ? 'equal' : 'differ'}; fields {c.fieldsNA ? 'n/a (empty collection)' : c.fieldEquality === null ? 'not measured' : `${c.fieldEquality.toFixed(2)}% equal`}; {c.samples} samples{c.blankBooleans ? `; ${c.blankBooleans} named blank-checkbox equivalents` : ''}.</li>)}</ul>
+            {parity.lastRun ? <details className="mt-3"><summary className="cursor-pointer py-2">Last import counts, hashes and exceptions</summary>
+              <p className="break-all text-sm">Snapshot: {parity.lastRun.snapshotHash}</p>
+              <ul className="text-sm">{Object.entries(parity.lastRun.counts).map(([collection, count]) => <li key={collection} className="break-all">{collection}: {count} rows · {parity.lastRun!.hashes[collection as keyof typeof parity.lastRun.hashes]}</li>)}</ul>
+              <p>{parity.lastRun.exceptions.length} classified exceptions.</p>
+              <div role="region" aria-label="Import exception ledger" tabIndex={0} className="max-h-64 overflow-y-auto">
+                <ul className="text-sm">{parity.lastRun.exceptions.map((e, i) => <li key={i} className="break-all">{e.collection}.{e.field}: {e.class} · {e.hash}</li>)}</ul>
+              </div>
+            </details> : null}
+            {actor.role === 'owner' ? <ContentImportButton /> : null}
+          </> : <p>Typed import and shadow comparison are inactive. No parity measurements recorded.</p>}
+        </section>
 
         {report.alerts.length > 0 ? (
           <section aria-labelledby="alerts-h">

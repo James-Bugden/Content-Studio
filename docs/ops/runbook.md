@@ -59,6 +59,75 @@ provider health. See [ci.yml](../../.github/workflows/ci.yml).
 - Drive keeps its own revision history. If the documented residual race (see `docs/implementation/atomicity.md`) ever loses an edit to another section, restore it from Drive's version history.
 - Durable audit evidence is provider revision history (Sheet version history, Drive revisions, Typefully) plus these redacted logs. An append-only audit tab in the workbook is a separate, owner-approved enhancement and is not created automatically.
 
+## Typed import and shadow parity (CS-058 / DB-4)
+
+DB-4 is preparation only: `CS_CONTENT_STORE` still defaults to `sheet`;
+live database modes remain rejected by environment validation. Production does
+not construct the typed import client. Do not apply migrations, enable a live
+importer or advance a phase on the strength of synthetic evidence.
+
+In `CS_DATA_MODE=fake` with `CS_CONTENT_STORE=db-shadow`, the existing owner
+POST `/api/ops/sheet-mirror` and cron GET
+`/api/ops/sheet-mirror/reconcile` run the typed importer. Cron requires the
+existing `Authorization: Bearer <CRON_SECRET>` check; the owner route requires
+owner authorization and same origin. `/reconcile` offers **Run content import**
+and displays the last run's counts, collection hashes and named exceptions.
+Existing Sheet-mode mirror behavior is unchanged. No schedule is registered by
+this change; the future approved schedule is every 15 minutes (see deploy.md).
+
+Every run captures database versions before reading the Sheet, builds one
+complete `buildSheetMirrorSnapshot`, then submits one atomic `import_run`.
+The canonical SHA-256 binds counts, collection hashes, typed rows (including
+version preconditions) and exceptions. Failed reads never submit a batch;
+failed imports retry from fresh versions and a new complete snapshot on the
+next run. A delivery retry of an existing envelope retains its operation ID
+and hash. DB-1 upserts only: absent rows are retained and reported as extra
+IDs, never silently retired, including on incomplete reads. Retirement needs
+a separately reviewed protocol before any real-data phase gate.
+
+Import ledger classes are only `formula_display`, `number_formatting` and
+`trailing_whitespace`. Formula display text is preserved, including links;
+the formula marker does not excuse different text. Numeric text such as
+`1,234` becomes integer 1234. Other conversion failures block the run. Unknown
+Sheet columns retain header, column position, value, formula and link in
+passthrough. Workflow settings preserve original values, notes and Sheet row
+positions while the normal settings parser still supplies normalized views.
+
+Shadow list requests sample with `Math.random() < 0.1`; `/reconcile` forces
+comparison of its existing Library and Schedule reads. No extra Sheet reads
+are made for comparison. Other collections are measured when their list is
+requested (or during import snapshot construction). DB work starts alongside
+the Sheet read, with a 500 ms comparison budget; failure/timeout records an
+unknown/blocking comparison and still returns the Sheet result. The current
+read port cannot cancel a timed-out DB request; the explicit live client's
+per-request network timeout remains a second bound before future wiring.
+
+Compare stable-ID sets, revision-independent cells, links and domain values.
+Ready Queue revisions intentionally differ and are excluded. A Sheet summary
+source with no Queue rows is named `zero_row_source`; it still fails the ID-set
+gate. No summary equality is inferred from synthetic agreement with the SQL
+view. Any unclassified difference is blocking. Telemetry differences contain
+only collection, field, kind and a short fingerprint, without copy, IDs or URLs.
+
+`import_lag` is attention at 15 minutes and blocking at 60 minutes; a missing
+successful import is blocking/unknown. An unrepaired import failure becomes
+blocking after one hour. Lag is measured from the completed snapshot's read
+start, not the end of its upload. Reports calculate ID equality, per-collection
+field equality, compared-list sample count, nearest-rank lag p95 and complete
+UTC days green from recorded samples. Metrics cover seven completed days plus
+today, or the latest 200 requests when that is longer. Repaired failures over
+an hour remain red in that measurement window. Unmeasured collections remain unknown.
+Phase B requires **both** seven consecutive green days and 200 compared
+requests: 100% ID sets, at least 99.9% fields per collection, no unclassified
+differences, lag p95 no more than 15 minutes, no unrepaired failure over an hour.
+
+Current fake telemetry is bounded to 10,000 samples / 30 days and scoped to one
+server instance; a restart discards it. It is explicitly labelled on the page
+and cannot evidence a production phase exit. Durable cross-instance telemetry,
+three full real-data Phase A imports, real summary parity and hosted security
+checks remain prerequisites to live enablement. Rollback is `CS_CONTENT_STORE=sheet`;
+the Sheet remains authoritative throughout this work.
+
 ## Rollback (CS-019)
 
 Rollback restores the previous verified **app deployment and configuration** only. It never deletes, restores or rewrites Sheet, Drive or Typefully content. Follow the rollback steps in [the deployment guide](deploy.md#rollback-dep-07).
