@@ -269,6 +269,8 @@ Use the Content Studio Vercel project with preview and production environments. 
 
 Do not dual-write Content records. The `content_studio_*` Supabase namespace is an optional read model only; Sheet writes remain authoritative. Reply tables are a separate authority for Replies and are never joined into Content snapshot tables. Any future Content authority cutover still requires parity reports, explicit approval, rollback and history export.
 
+**Pending cutover (2026-10-24).** The Sheet authority above is being replaced in phases by a Postgres authority in the same Supabase project; the design, phase gates, thresholds and rollback are in `docs/implementation/database-migration.md`. Until a phase flips in production, the paragraph above and sections 2, 5 and 7 remain the operative contract. Each flipped phase updates this note with its date and store mode.
+
 ## 12. Recommended execution order
 
 1. Planning/foundation: [CS-001](https://github.com/James-Bugden/Content-Studio/issues/2) -> [CS-002](https://github.com/James-Bugden/Content-Studio/issues/3), then [CS-003](https://github.com/James-Bugden/Content-Studio/issues/4), [CS-004](https://github.com/James-Bugden/Content-Studio/issues/5), [CS-005](https://github.com/James-Bugden/Content-Studio/issues/6) and [CS-006](https://github.com/James-Bugden/Content-Studio/issues/7) behind the shared contracts.
