@@ -34,3 +34,5 @@ next-env.d.ts
 
 # Design scratch space (wireframe skill output), not app code
 wireframe/
+# Synthetic sweep artifacts (uploaded by CI).
+sweep-report/

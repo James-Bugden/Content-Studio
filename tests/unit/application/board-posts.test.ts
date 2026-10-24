@@ -9,6 +9,12 @@ beforeAll(() => {
 });
 
 describe('Next up and Posts tell the same story (UX redesign)', () => {
+  it.each(['RATE_LIMITED', 'PROVIDER_UNAVAILABLE', 'SCHEMA_DRIFT', 'STALE_READ'] as const)('never presents an unreadable Schedule as an empty board: %s (#172)', async (code) => {
+    const sheet = new FakeSheetTransport();
+    sheet.failNext({ op: 'read', tab: 'Content Schedule', code });
+    await expect(loadBoard(new SheetsContentRepository(sheet), { requireSchedule: true })).rejects.toMatchObject({ code });
+  });
+
   it('Calendar requires readable Schedule data; Library-only board views can still load', async () => {
     const transport = new FakeSheetTransport();
     const repo = new SheetsContentRepository(transport);

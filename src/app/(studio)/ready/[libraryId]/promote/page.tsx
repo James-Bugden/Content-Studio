@@ -30,7 +30,7 @@ export default async function PromotePage({
       Back to the ready queue
     </GuardedLink>
   );
-  if (actor.role !== 'owner') return <ErrorState code="FORBIDDEN" action={back} />;
+  if (actor.role !== 'owner') return <><PageHeader title="Promote post" /><ErrorState code="FORBIDDEN" action={back} /></>;
   if (!libraryIdSchema.safeParse(libraryId).success) return <ErrorState code="NOT_FOUND" action={back} />;
 
   const { repo } = getServices();
