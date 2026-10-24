@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import type { StepResult } from '@/domain/mutation';
 import type { EditorModel } from '@/domain/views';
 import { newOperationId, postJson } from '@/lib/client/api';
@@ -74,7 +74,14 @@ export type PostEditorProps = {
   autoFocus?: boolean;
 };
 
+const subscribeHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
+
 export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false }: PostEditorProps) {
+  // SSR copy is readable immediately, but input must wait until React owns the
+  // textarea. Otherwise hydration can reset a selection during a fill/keystroke.
+  const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
   const textId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const initialBase = initialEditorText(model);
@@ -295,7 +302,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
           setText(e.target.value);
           if (status.kind === 'saved') setStatus({ kind: 'idle' });
         }}
-        readOnly={!canEdit}
+        readOnly={!canEdit || !hydrated}
         spellCheck
         lang="en-GB"
         rows={Math.min(24, Math.max(8, text.split('\n').length + 2))}

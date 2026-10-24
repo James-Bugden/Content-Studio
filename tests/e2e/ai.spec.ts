@@ -28,6 +28,30 @@ test.beforeEach(async ({ page }) => {
   await signInAs(page.request, 'owner');
 });
 
+test('the server-rendered draft waits for hydration before accepting edits (CS-058b)', async ({ page }) => {
+  let releaseScripts!: () => void;
+  const scripts = new Promise<void>((resolve) => { releaseScripts = resolve; });
+  await page.route('**/_next/static/**/*.js', async (route) => {
+    await scripts;
+    await route.continue();
+  });
+  const before = await editorModel(page);
+  try {
+    await page.goto('/review/SYN-L001', { waitUntil: 'commit' });
+    await expect(editor(page)).toBeVisible();
+    await expect(editor(page)).toHaveValue(before.markdown.body);
+    // The visible SSR textarea must not accept input before React owns it.
+    await expect(editor(page)).not.toBeEditable();
+  } finally {
+    releaseScripts();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
+  await expect(editor(page)).toBeEditable();
+  await editor(page).fill(QA_TEXT);
+  await expect(editor(page)).toHaveValue(QA_TEXT);
+  await expect(page.getByText('Unsaved changes, kept in this tab until you save')).toBeVisible();
+});
+
 test('ENQA-01/02: a British spelling finding applies only its range, and Save persists it', async ({ page }) => {
   await page.goto('/review/SYN-L001');
   await editor(page).fill(QA_TEXT);

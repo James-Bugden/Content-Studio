@@ -516,12 +516,15 @@ test('keyboard review: / focuses search, J/K and arrows move posts, Ctrl+S saves
   const panel = page.getByRole('dialog').first();
   const copy = panel.getByRole('textbox', { name: /Post copy/ });
   const close = panel.getByRole('button', { name: 'Close' });
-  await expect(copy).toBeVisible();
-  for (const [key, id] of [['j', secondId], ['k', firstId], ['ArrowDown', secondId], ['ArrowUp', firstId]] as const) {
+  await expect(copy).toBeFocused();
+  for (const [key, id, position] of [['j', secondId, 2], ['k', firstId, 1], ['ArrowDown', secondId, 2], ['ArrowUp', firstId, 1]] as const) {
     await close.focus();
     await page.keyboard.press(key);
     await expect(page).toHaveURL(new RegExp(`post=${id}`));
-    await expect(copy).toBeVisible();
+    // The URL can update while the previous editor is still visible. Wait for
+    // the selected post and its mount-time focus before moving focus to Close.
+    await expect(panel.getByText(new RegExp(`^${position} of \\d+ ·`))).toBeVisible();
+    await expect(copy).toBeFocused();
   }
 
   // Typing never triggers single-key shortcuts.

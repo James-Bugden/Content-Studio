@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { PostEditor } from '@/components/editor/post-editor';
 import { isAnyDirty, resetDirtyStoreForTests } from '@/components/dirty-store';
 import type { EditorModel } from '@/domain/views';
@@ -42,6 +43,17 @@ afterEach(() => {
 });
 
 describe('PostEditor save notification (CS-050)', () => {
+  it('keeps server-rendered copy read-only until hydration, then permits owner edits', () => {
+    const html = document.createElement('div');
+    html.innerHTML = renderToString(<PostEditor model={model} canEdit ns="synthetic" />);
+    expect(html.querySelector('textarea')?.readOnly).toBe(true);
+
+    const { rerender } = render(<PostEditor model={model} canEdit ns="synthetic" />);
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(false);
+    rerender(<PostEditor model={model} canEdit={false} ns="synthetic" />);
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
+  });
+
   it('notifies once per save, after the saved copy is committed to the leave guard', async () => {
     const complete = pendingSave();
     const dirtyWhenSaved: boolean[] = [];
