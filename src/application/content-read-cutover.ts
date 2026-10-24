@@ -11,7 +11,9 @@ import { typedContentRow, copyRefusal } from './content-import';
 import { mirrorHash } from './sheet-mirror';
 
 type Record = LibraryRecord | ScheduleRecord;
-type Pending = { kind: ContentTarget; id: string; operationId: string; record: Record; expectedVersion: string | null };
+type Pending = { kind: ContentTarget; id: string; operationId: string; record: Record; expectedVersion: string | null;
+  checkedDb?: { version: string; revision: string | null; importId: string | null };
+  retryAfter?: number; checking?: Promise<void> };
 
 /** Phase C only. DB failures can never veto a Sheet write or authorize one. */
 export class ContentReadCutoverRepository implements ContentRepository {
@@ -30,18 +32,42 @@ export class ContentReadCutoverRepository implements ContentRepository {
   schema() { return this.reader.schema(); }
   private key(kind: ContentTarget, id: string) { return `${kind}:${id}`; }
   private async verifyPending() {
+    // An import can leave both row tokens unchanged (e.g. a hand revert to the
+    // stored Sheet value). Its committed identity still permits one new check.
+    // A failed metadata read must not make an old mismatch cache authoritative.
+    const importId = this.pending.size ? await this.db.latestImportId().catch(() => undefined) : null;
     for (const [key, entry] of this.pending) {
-      const row = await (entry.kind === 'schedule' ? this.db.getSchedule(entry.id) : this.db.getPost(entry.kind, entry.id)).catch(() => null);
-      if (!row || entry.expectedVersion !== null && BigInt(row.row_version) < BigInt(entry.expectedVersion)) continue;
-      // Advancing past the version observed BEFORE the save is not sufficient:
-      // a raced import can contain an older Sheet snapshot. Confirm the current
-      // Sheet token when a newer import/copy supersedes the overlay (including
-      // metadata-only imports, which intentionally do not bump row_version).
-      const revision = row.sheet_revision === entry.record.revision ? entry.record.revision
-        : (await this.authority(entry.kind, entry.id).catch(() => null))?.revision;
-      if (row.sheet_revision === revision && this.pending.get(key) === entry) this.pending.delete(key);
+      // Share the whole check, including the DB read, for this exact save entry.
+      // A replacement save owns a separate promise and cannot be cleared by it.
+      const checking = entry.checking ??= this.verifyEntry(key, entry, importId);
+      try { await checking; } finally { if (entry.checking === checking) entry.checking = undefined; }
     }
     return [...this.pending.values()].map(({ kind, id, operationId }) => ({ kind, id, operationId, source: 'save' as const }));
+  }
+  private async verifyEntry(key: string, entry: Pending, importId: string | null | undefined) {
+    const row = await (entry.kind === 'schedule' ? this.db.getSchedule(entry.id) : this.db.getPost(entry.kind, entry.id)).catch(() => null);
+    if (!row || entry.expectedVersion !== null && BigInt(row.row_version) < BigInt(entry.expectedVersion)) return;
+    // Advancing past the version observed BEFORE the save is not sufficient:
+    // a raced import can contain an older Sheet snapshot. Confirm the current
+    // Sheet token, including for metadata-only and unchanged imports.
+    const version = String(row.row_version);
+    if (row.sheet_revision === entry.record.revision) {
+      if (this.pending.get(key) === entry) this.pending.delete(key);
+      return;
+    }
+    if (Date.now() < (entry.retryAfter ?? 0)) return;
+    if (importId !== undefined && entry.checkedDb?.version === version
+      && entry.checkedDb.revision === row.sheet_revision && entry.checkedDb.importId === importId) return;
+    let revision: string;
+    try { revision = (await this.authority(entry.kind, entry.id)).revision; }
+    catch (error) {
+      // Sheets does not expose Retry-After here. Bound quota retries to once a
+      // minute; other transient failures remain retryable on the next request.
+      if (isAppError(error) && error.code === 'RATE_LIMITED') entry.retryAfter = Date.now() + 60_000;
+      return;
+    }
+    if (importId !== undefined) entry.checkedDb = { version, revision: row.sheet_revision, importId };
+    if (row.sheet_revision === revision && this.pending.get(key) === entry) this.pending.delete(key);
   }
   private authority(kind: ContentTarget, id: string) { return kind === 'schedule' ? this.sheet.getSchedule(id, true) : kind === 'library' ? this.sheet.getLibrary(id, true) : this.sheet.getQueue(id, true); }
   async refreshPending() {

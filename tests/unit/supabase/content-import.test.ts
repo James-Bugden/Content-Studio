@@ -16,6 +16,21 @@ const actor = mirrorHash('synthetic-import-actor');
 const sheet = () => new SheetsContentRepository(new FakeSheetTransport());
 const snapshot = () => buildSheetMirrorSnapshot(sheet(), { sourceKey: 'synthetic_workbook' });
 describe('MIG-09 typed complete imports', () => {
+  it('CS-059b / R05: db-read aborts the entire import on an unclassified conversion failure', async () => {
+    vi.stubEnv('CS_CONTENT_STORE', 'db-read');
+    const repo = sheet(), store = new FakeContentImportStore();
+    const rows = await repo.listLibrary();
+    // A malformed boolean is neither a numeric nor size refusal. Keep the
+    // identity and snapshot hashes valid so failure reaches row conversion.
+    rows[0]!.cells.queueForSchedule = 'synthetic-unknown-boolean';
+    rows[1]!.cells.draftContent = 'Synthetic change that must not be imported';
+    vi.spyOn(repo, 'listLibrary').mockResolvedValue(rows);
+    const apply = vi.spyOn(store, 'applyImport');
+    const before = await store.db.listPosts('library');
+    await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(apply).not.toHaveBeenCalled();
+    expect(await store.db.listPosts('library')).toEqual(before);
+  });
   it('N1: includes jsonb separator overhead when refusing a boundary-size row, leaving the batch usable', async () => {
     vi.stubEnv('CS_CONTENT_STORE', 'db-read');
     const source = await snapshot(), post = source.rows.find(r => r.collection === 'library')!;
@@ -135,6 +150,23 @@ describe('MIG-09 typed complete imports', () => {
     await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).rejects.toThrow();
     await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).resolves.toBeDefined();
     expect(apply).toHaveBeenCalledTimes(2);
+  });
+  it('publishes a new import identity only after success, including no-op runs, and preserves it on replay', async () => {
+    const repo = sheet(), store = new FakeContentImportStore();
+    const envelope = async () => buildTypedImport(await buildSheetMirrorSnapshot(repo, { sourceKey: 'synthetic_workbook' }), await importVersions(store.db), actor);
+    expect(await store.db.latestImportId()).toBeNull();
+    const first = await envelope();
+    await store.applyImport(first);
+    expect(await store.db.latestImportId()).toBe(first.operationId);
+    const before = store.db.snapshot(), next = await envelope();
+    store.failNext = true;
+    await expect(store.applyImport(next)).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+    expect(await store.db.latestImportId()).toBe(first.operationId);
+    await store.applyImport(next);
+    expect(store.db.snapshot()).toEqual(before);
+    expect(await store.db.latestImportId()).toBe(next.operationId);
+    await store.applyImport(first);
+    expect(await store.db.latestImportId()).toBe(next.operationId);
   });
   it('captures versions before Sheet reads and fails atomically on a late conflict', async () => {
     const store = new FakeContentImportStore();
