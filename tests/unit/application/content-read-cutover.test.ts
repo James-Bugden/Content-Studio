@@ -209,8 +209,8 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
       expect(repo.pendingRefresh('library', ids.library)).toBe(true);
     }
   });
-  it('F1: an import-identity read failure cannot reuse an old mismatched check', async () => {
-    await importSheet();
+  it.each([true, false])('F1: an import-identity read failure cannot reuse an old mismatched check (import before save: %s)', async imported => {
+    if (imported) await importSheet();
     const before = await repo.getLibrary(ids.library);
     vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
     await write('library', before.revision, 'Pending identity outage');

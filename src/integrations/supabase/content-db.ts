@@ -27,7 +27,7 @@ export class SupabaseContentDb implements ContentDb {
         const query = new URLSearchParams({ select: '*', ...params, offset: String(rows.length), limit: firstOnly ? '1' : '1000' });
         const response = await (this.options.fetch ?? fetch)(`${this.base}/rest/v1/content_studio_${table}?${query}`, {
           method: 'GET', cache: 'no-store', signal: AbortSignal.timeout(this.options.timeoutMs ?? 10_000),
-          headers: { apikey: this.options.serviceKey, Authorization: `Bearer ${this.options.serviceKey}`, Prefer: 'count=exact' },
+          headers: { apikey: this.options.serviceKey, Authorization: `Bearer ${this.options.serviceKey}`, ...(!firstOnly ? { Prefer: 'count=exact' } : {}) },
         });
         if (!response.ok) throw new AppError(response.status === 429 ? 'RATE_LIMITED' : 'PROVIDER_UNAVAILABLE', { provider: 'db', httpStatus: response.status });
         const page: unknown = await response.json();

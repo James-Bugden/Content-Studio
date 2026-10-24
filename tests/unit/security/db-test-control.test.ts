@@ -5,12 +5,21 @@ import { resetEnvCache } from '@/lib/env';
 
 const post = (data: object) => POST(new Request('http://localhost/api/test-control', { method: 'POST', body: JSON.stringify(data) }));
 beforeEach(() => {
+  vi.stubEnv('CS_FAKE_TODAY', '2026-09-30'); vi.stubEnv('CS_FAKE_TIME', '00:00');
   vi.stubEnv('CS_DATA_MODE','fake'); vi.stubEnv('CS_CONTENT_STORE','db'); vi.stubEnv('CS_TEST_MODE','e2e'); vi.stubEnv('VERCEL_ENV','preview');
   resetEnvCache(); resetServices();
 });
 afterEach(() => { vi.unstubAllEnvs(); resetEnvCache(); resetServices(); });
 
 describe('DB e2e control boundary', () => {
+  it('validates the fake clock and reset restores the fixture clock', async () => {
+    expect((await post({ kind: 'clock', today: '2026-10-01', time: '21:30' })).status).toBe(200);
+    expect(process.env.CS_FAKE_TIME).toBe('21:30');
+    expect((await post({ kind: 'clock', today: '2026-10-01', time: '25:00' })).status).toBe(400);
+    expect((await post({ kind: 'reset' })).status).toBe(200);
+    expect(process.env.CS_FAKE_TODAY).toBe('2026-09-30');
+    expect(process.env.CS_FAKE_TIME).toBe('00:00');
+  });
   it.each(['libraryId','contentId','posted','constructor'])('refuses protected or inherited patch key %s', async field => {
     expect((await post({kind:'db_external_edit',collection:'schedule',id:'2026-10-02-MAIN-X',patch:{[field]:'Synthetic'}})).status).toBe(400);
   });
@@ -18,6 +27,8 @@ describe('DB e2e control boundary', () => {
     for (const [key,value] of Object.entries(env)) vi.stubEnv(key,value);
     resetEnvCache();
     expect((await post({kind:'db_fail_next',op:'write',code:'PROVIDER_UNAVAILABLE'})).status).toBe(404);
+    expect((await post({kind:'clock',today:'2026-10-01',time:'21:30'})).status).toBe(404);
+    expect(process.env.CS_FAKE_TIME).toBe('00:00');
   });
   it('injects a write failure once and an external edit changes the revision', async () => {
     const {repo} = getServices(); const before = await repo.getLibrary('SYN-L001');

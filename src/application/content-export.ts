@@ -9,14 +9,14 @@ import { sheetCellValue } from '@/integrations/google/sheet-cell';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
 import { cellText, rowRevision, type RawRow } from '@/domain/mapping';
 import { fingerprintValues } from '@/domain/hash';
-import { AppError } from '@/domain/errors';
+import { AppError, isAppError } from '@/domain/errors';
 import { operationIdSchema, type Actor } from '@/domain/mutation';
 
 export type ExportKind = 'library' | 'queue' | 'schedule' | 'workflow_settings';
 export type ExportCell = { value: string; formula?: string; link?: string; type?: 'boolean' };
 export type ExportRow = { kind: ExportKind; id: string; version: string; importedRevision: string | null; dbOrigin?: boolean; cells: Record<string, ExportCell> };
 export type ExportCheckpoint = { fingerprint: string; cells: Record<string, ExportCell>; version: string; at: number };
-export type ExportIssue = { kind: ExportKind; id: string; fields: string[]; since: number; reason: 'export_mismatch' | 'export_lag'; lagSince?: number };
+export type ExportIssue = { kind: ExportKind; id: string; fields: string[]; since: number; reason: 'export_mismatch' | 'export_lag'; lagSince?: number; recovery?: 'change_authoritative_value' };
 export type ExportParity = { at: number; exact: boolean; counts: Record<ExportKind, number>; dbHash: string; sheetHash: string; differences: ExportIssue[] };
 
 /** Private durable implementation required before live wiring. Checkpoints must
@@ -144,7 +144,9 @@ export class ContentExporter {
     // One inventory read per collection on ordinary repair. Fresh reads are
     // reserved for changed rows immediately before their write and read-back.
     const inventories = new Map<ExportKind, Awaited<ReturnType<ContentExporter['tab']>>>();
+    const duplicateTabs = new Set<ExportKind>();
     for (const row of rows) {
+      if (duplicateTabs.has(row.kind)) continue;
       const key = exportKey(row.kind, row.id);
       try {
         const checkpoint = this.journal.checkpoints.get(key);
@@ -161,14 +163,14 @@ export class ContentExporter {
         // distinguish it from an actual formula. Refuse explicitly rather than
         // creating a permanently unwritable exported cell.
         const formulaText = Object.entries(row.cells).filter(([, c]) => c.value.startsWith('=') && !c.formula).map(([h]) => h);
-        if (formulaText.length) { this.issue(row, formulaText, 'export_mismatch'); continue; }
+        if (formulaText.length) { this.issue(row, formulaText, 'export_mismatch').recovery = 'change_authoritative_value'; continue; }
         const current = data.find(r => r.id === row.id);
         if (!current) {
           // Only a genuinely new Queue idea can be appended. A missing exported
           // row is a deletion conflict, never a license to recreate it.
           if (row.kind !== 'queue' || row.importedRevision || checkpoint) { this.issue(row, ['@missing'], 'export_mismatch'); continue; }
           if (Object.values(row.cells).some(c => c.formula || c.link && c.link !== c.value)) { this.issue(row, ['@links'], 'export_mismatch'); continue; }
-          await this.sheet.appendRow(spec.name, 'ZZ', headers.map(h => sheetCellValue(h, row.cells[h]?.value ?? '')));
+          await this.sheet.appendRow(spec.name, 'ZZ', headers.map(h => row.cells[h] ? sheetCellValue(h, row.cells[h].value) : ''));
         } else {
           const actual = this.observed(current.raw, headers);
           const fingerprint = revision(current.raw, headers.length);
@@ -202,7 +204,11 @@ export class ContentExporter {
         const failure = this.journal.issues.get(key);
         if (failure) this.repairedFailures.push({ since: failure.since, repairedAt: this.now() });
         this.journal.issues.delete(key);
-      } catch { this.issue(row, ['@provider'], 'export_lag'); }
+      } catch (error) {
+        // Duplicate IDs invalidate the whole tab, not each individual row.
+        if (isAppError(error) && error.details.reason === 'duplicate_export_id') duplicateTabs.add(row.kind);
+        this.issue(row, ['@provider'], 'export_lag');
+      }
     }
     return this.measureParity(true);
   }
@@ -252,6 +258,12 @@ export class ContentExporter {
         if (wanted) dbProjection.push({ kind, id, cells: project(wanted.cells) });
         if (actual) sheetProjection.push({ kind, id, cells: project(actual) });
         const fields = !wanted ? ['@unexpected'] : !actual ? ['@missing'] : this.parityFields(wanted.cells, actual);
+        const checkpoint = this.journal.checkpoints.get(exportKey(kind, id));
+        if (wanted?.dbOrigin && observed && checkpoint) {
+          // Unknown columns are outside the DB projection, but edits since our
+          // checkpoint still block export/rollback and must block exact parity.
+          fields.push(...different(checkpoint.cells, observed).filter(h => !(h in wanted.cells)));
+        }
         if (fields.length) differences.push({ kind, id, fields, reason: 'export_mismatch', since: this.now() });
       }
     }

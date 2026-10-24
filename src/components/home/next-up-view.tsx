@@ -12,9 +12,9 @@ import { StepButton } from '../panel/step-button';
  * the next list. Every row has one button that opens the side panel on the right
  * post or slot; only the very first task gets the filled primary button.
  */
-export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'>;
+export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'> & { integrationStatus?: React.ReactNode };
 
-export function NextUpView({ today, counts, tasks, posts }: NextUpViewProps) {
+export function NextUpView({ today, counts, tasks, posts, integrationStatus }: NextUpViewProps) {
   const { now, next, more } = splitTasks(tasks, 12);
   const thumbs = new Map(posts.map((p) => [p.libraryId, p.thumb]));
   const tiles = [
@@ -37,6 +37,8 @@ export function NextUpView({ today, counts, tasks, posts }: NextUpViewProps) {
           </>
         }
       />
+
+      {integrationStatus}
 
       <section aria-labelledby="summary-h">
         <h2 id="summary-h" className="sr-only">

@@ -159,7 +159,7 @@ test('Backlog search, status, sort and column controls keep private search out o
   await expect(page.getByText('1 post · page 1 of 1')).toBeVisible();
   await expect(table.locator('[data-backlog-id]:visible')).toHaveCount(1);
   expect(page.url()).not.toContain('Most%20people');
-  await page.getByRole('combobox', { name: 'Platform' }).selectOption('LinkedIn');
+  await page.getByRole('group', { name: 'Platform', exact: true }).getByRole('button', { name: 'LinkedIn', exact: true }).click();
   await expect(page.getByLabel('Find a post')).toHaveValue('Most people negotiate the salary');
   await expect(page.getByText('1 post · page 1 of 1')).toBeVisible();
   await page.getByLabel('Find a post').fill('');

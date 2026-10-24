@@ -73,21 +73,33 @@ formatted checkbox text alone cannot pass. A DB-origin Replies idea has no
 ownership of unknown Queue columns it never carried; these are excluded from
 that row's comparison projection. Imported rows still compare every retained
 passthrough column, including blanks and lost values. Checkpoints still cover
-the whole exported Sheet row so later unknown-column hand edits block writes.
+the whole exported Sheet row so later unknown-column hand edits block writes
+and exact parity, even when the owned-field projection hashes still match.
 
+Recovery action **Change authoritative value** (`change_authoritative_value`):
 Text starting with `=` is currently refused by export as a named blocking
 `export_mismatch` before any cells in that row are written. RAW prevents formula
 evaluation, but the current formula projection cannot distinguish entered text
 from formula syntax reliably. Resolve/change that authoritative value through
 the normal audited patch flow; do not prepend an apostrophe to the DB copy or
-claim byte-equal export. Supporting this text requires a separately tested
+claim byte-equal export. Preview the affected fields privately, use the ordinary
+authenticated, revision-checked, idempotent DB patch with a new operation ID to
+choose replacement text without a leading `=`, and retry export. Confirm the
+blocking item clears and fresh parity is exact. If the exact leading `=` text
+must be retained, leave the row blocked; this action does not authorize changing
+the meaning of the content. Supporting this text requires a separately tested
 entered-value representation at the transport boundary.
 
 Before writing a changed row, compare its fresh Sheet fingerprint against the
 checkpoint. A mismatch skips the **whole row**, preserving all Sheet cells,
 and raises blocking `export_mismatch` with the stable ID and differing header
 names. Repeated repair never clears it by overwriting. The design's one-round-
-trip Sheet race remains; read-back and fresh parity are required. A lost export
+trip Sheet race remains; read-back and fresh parity are required. A hand edit
+to the **same cell** between the fresh read and write can be silently overwritten;
+read-back cannot detect that lost edit. Before Phase D, record the owner's
+decision whether the 14-day comparison window must measure and explicitly accept
+this race, or require a stronger transport/freeze control. This remains an open
+live/product gate, not local acceptance. A lost export
 response still fails closed if the checkpoint cannot confirm the new bytes.
 
 Resolution is an explicit owner decision, never part of repair:
@@ -154,6 +166,19 @@ Backup verification currently accepts only the compiled Content schema version.
 A future schema bump must add a versioned archive reader/restore migration and
 prove old archives remain restorable before deployment. This round does not
 change the archive format or authorize a schema bump.
+
+**Schema-bump re-backup procedure (required until versioned restore exists):**
+Before a bump, pause writes and take/verify a final six-table backup with the old
+build. Preserve that exact build SHA, its schema/migrations, the private archive
+and separately trusted manifest hash; rehearse its restore into an empty branch
+at the old schema using that build. Old archives must be verified/restored with
+their matching build, never relabelled with the new schema version. After the
+separately authorized migration, while writes remain paused, take a new backup
+with the new build, re-read all six hashes and rehearse restore/parity into an
+empty branch at the new schema. Resume writes only after the new-schema backup
+and restore succeed. Keep both archives/builds through retention; if either
+drill fails, stop the bump and use its reviewed rollback. No historical archive
+reader or automatic cross-version restore is introduced by this follow-up.
 
 Restore steps:
 

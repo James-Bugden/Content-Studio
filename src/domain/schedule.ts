@@ -46,6 +46,11 @@ export function taipeiToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
+/** Taipei wall-clock comparison shared by the board and promotion picker. */
+export function isPastSlot(isoDate: string, time: string, day: string, now: string): boolean {
+  return isoDate < day || (isoDate === day && Boolean(time) && time < now);
+}
+
 export function slotOrder(slot: string): number {
   const i = (SLOTS as readonly string[]).indexOf(slot);
   return i < 0 ? 99 : i;

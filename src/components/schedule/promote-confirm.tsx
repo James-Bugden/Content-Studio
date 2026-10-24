@@ -15,7 +15,7 @@ import { InlineResult } from '../inline-result';
  */
 type Result = { ok: true; replayed: boolean; contentId: string } | { ok: false; code: string; message?: string; problems?: string[]; blockers?: Gate[] };
 
-export function PromoteConfirm(props: { libraryId: string; contentId: string; libraryRevision: string; scheduleRevision: string }) {
+export function PromoteConfirm(props: { libraryId: string; contentId: string; slotLabel: string; libraryRevision: string; scheduleRevision: string }) {
   const router = useRouter();
   const [opId] = useState(() => newOperationId('promote'));
   const [busy, setBusy] = useState(false);
@@ -64,7 +64,7 @@ export function PromoteConfirm(props: { libraryId: string; contentId: string; li
       ) : null}
       <div>
         <button type="button" className={buttonClass('primary')} disabled={busy} onClick={() => void confirm()}>
-          {busy ? 'Scheduling…' : `Confirm and write to ${props.contentId}`}
+          {busy ? 'Scheduling…' : `Confirm and write to ${props.slotLabel}`}
         </button>
       </div>
     </div>

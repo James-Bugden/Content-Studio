@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { startTransition, useId, useOptimistic } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLeaveConfirmation } from './leave-confirm';
 import { buttonClass } from './button-styles';
@@ -15,7 +15,7 @@ import { buttonClass } from './button-styles';
  * this control. Changing a filter while an editor is dirty asks first.
  */
 export type FilterOption = { value: string; label: string };
-export type FilterDef = { key: string; label: string; options: FilterOption[]; allLabel?: string };
+export type FilterDef = { key: string; label: string; options: FilterOption[]; allLabel?: string; control?: 'chips' };
 
 /** Only values present in the option list survive. */
 export function sanitiseFilterValue(filter: FilterDef, value: string | null): string {
@@ -42,64 +42,96 @@ export function nextFilterQuery(filters: FilterDef[], current: URLSearchParams, 
  * of "Label value" chips instead of a boxed grid of full-width selects. Labels
  * stay real <label> elements, and controls keep a 44px touch height on phones.
  */
-export function FilterBar({ filters, variant = 'panel', trailing }: { filters: FilterDef[]; variant?: 'panel' | 'toolbar'; /** Extra controls placed after the selects, e.g. a sort-direction toggle. */ trailing?: React.ReactNode }) {
+export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys = [] }: { filters: FilterDef[]; variant?: 'panel' | 'toolbar'; /** Secondary controls share state, clear action and announcement with the chips. */ disclosureKeys?: string[]; /** Extra controls placed after the selects, e.g. a sort-direction toggle. */ trailing?: React.ReactNode }) {
   const toolbar = variant === 'toolbar';
   const router = useRouter();
   const pathname = usePathname() ?? '';
   const searchParams = useSearchParams();
-  const current = new URLSearchParams(searchParams?.toString() ?? '');
+  const [query, setQuery] = useOptimistic(searchParams?.toString() ?? '');
+  const current = new URLSearchParams(query);
   const { guard, dialog } = useLeaveConfirmation();
   const baseId = useId();
 
   const active = filters.filter((f) => sanitiseFilterValue(f, current.get(f.key)) !== '');
 
   const go = (change: { key: string; value: string } | 'clear') => {
-    const url = `${pathname}${nextFilterQuery(filters, current, change)}`;
-    guard(() => router.push(url, { scroll: false }));
+    if (change !== 'clear') {
+      const filter = filters.find((f) => f.key === change.key);
+      if (!filter || sanitiseFilterValue(filter, current.get(change.key)) === change.value) return;
+    }
+    const next = nextFilterQuery(filters, current, change);
+    // Compose rapid chip clicks while the server is still rendering the first
+    // navigation. The committed URL takes over when the transition finishes.
+    guard(() => startTransition(() => {
+      setQuery(next.replace(/^\?/, ''));
+      router.push(`${pathname}${next}`, { scroll: false });
+    }));
+  };
+
+  const control = (filter: FilterDef) => {
+    const id = `${baseId}-${filter.key}`;
+    if (filter.control === 'chips') {
+      const selected = sanitiseFilterValue(filter, current.get(filter.key));
+      return (
+        <div key={filter.key} role="group" aria-label={filter.label} className="flex max-w-full flex-wrap items-center gap-1.5 text-sm">
+          <span className="text-ink-soft">{filter.label}</span>
+          {[{ value: '', label: filter.allLabel ?? 'All' }, ...filter.options].map((option) => (
+            <button key={option.value} type="button" aria-pressed={selected === option.value}
+              className={`${buttonClass('secondary', 'sm')} min-h-11 ${selected === option.value ? 'border-ink bg-primary-soft font-semibold' : ''}`}
+              onClick={() => go({ key: filter.key, value: selected === option.value ? '' : option.value })}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div
+        key={filter.key}
+        className={
+          toolbar
+            ? `inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md border bg-card pl-2.5 text-sm md:min-h-9 ${
+                sanitiseFilterValue(filter, current.get(filter.key)) ? 'border-ink/40' : 'border-line'
+              }`
+            : 'flex min-w-0 flex-[1_1_10rem] flex-col gap-1'
+        }
+      >
+        <label htmlFor={id} className={toolbar ? 'whitespace-nowrap text-ink-soft' : 'text-sm font-medium'}>
+          {filter.label}
+        </label>
+        <select
+          id={id}
+          value={sanitiseFilterValue(filter, current.get(filter.key))}
+          onChange={(event) => go({ key: filter.key, value: event.target.value })}
+          className={
+            toolbar
+              ? 'field-sizing-content min-h-11 max-w-40 min-w-0 cursor-pointer truncate rounded-md bg-transparent pr-1 font-medium text-ink md:min-h-9'
+              : 'min-h-11 w-full min-w-0 rounded-md border border-line bg-card px-2 text-sm'
+          }
+        >
+          <option value="">{filter.allLabel ?? 'All'}</option>
+          {filter.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
   };
 
   return (
-    <div
-      role="group"
-      aria-label="Filters"
-      className={toolbar ? 'mb-3 flex flex-wrap items-center gap-2' : 'mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-card p-3'}
-    >
-      {filters.map((filter) => {
-        const id = `${baseId}-${filter.key}`;
-        return (
-          <div
-            key={filter.key}
-            className={
-              toolbar
-                ? `inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md border bg-card pl-2.5 text-sm md:min-h-9 ${
-                    sanitiseFilterValue(filter, current.get(filter.key)) ? 'border-ink/40' : 'border-line'
-                  }`
-                : 'flex min-w-0 flex-[1_1_10rem] flex-col gap-1'
-            }
-          >
-            <label htmlFor={id} className={toolbar ? 'whitespace-nowrap text-ink-soft' : 'text-sm font-medium'}>
-              {filter.label}
-            </label>
-            <select
-              id={id}
-              value={sanitiseFilterValue(filter, current.get(filter.key))}
-              onChange={(event) => go({ key: filter.key, value: event.target.value })}
-              className={
-                toolbar
-                  ? 'field-sizing-content min-h-11 max-w-40 min-w-0 cursor-pointer truncate rounded-md bg-transparent pr-1 font-medium text-ink md:min-h-9'
-                  : 'min-h-11 w-full min-w-0 rounded-md border border-line bg-card px-2 text-sm'
-              }
-            >
-              <option value="">{filter.allLabel ?? 'All'}</option>
-              {filter.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        );
-      })}
+    <div role="group" aria-label="Filters" className={toolbar ? 'mb-3 flex flex-wrap items-center gap-2' : 'mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-card p-3'}>
+      {filters.filter((f) => !disclosureKeys.includes(f.key)).map(control)}
+      {disclosureKeys.length ? (
+        <details open={active.some((f) => disclosureKeys.includes(f.key))} className="group w-full rounded-lg border border-line bg-card px-4">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold marker:hidden [&::-webkit-details-marker]:hidden">
+            <span aria-hidden="true" className="mr-2 inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">▸</span>
+            Filters{active.length > 0 ? <span className="ml-1 font-normal text-ink-soft">({active.length} on)</span> : null}
+          </summary>
+          <div className="flex flex-wrap items-end gap-3 pb-3">{filters.filter((f) => disclosureKeys.includes(f.key)).map(control)}</div>
+        </details>
+      ) : null}
       {trailing}
       {toolbar && active.length === 0 ? null : (
         <button type="button" className={toolbar ? `${buttonClass('secondary', 'sm')} max-md:min-h-11` : buttonClass('secondary')} onClick={() => go('clear')} disabled={active.length === 0}>

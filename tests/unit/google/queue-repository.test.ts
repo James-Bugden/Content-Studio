@@ -108,6 +108,7 @@ describe('Content Queue: createQueueIdea', () => {
     });
     expect(created.value.sourcePlatform).toMatchObject({ ok: true, value: 'LinkedIn' });
     expect(transport.writes.at(-1)?.tab).toBe('Content Queue');
+    expect(transport.writes.at(-1)!.writes[transport.rawTab('Content Queue')[0]!.findIndex(c => c.value === 'Queue for Schedule')]!.value).toBe(false);
   });
 
   it('replays the same Reply ID without appending a duplicate', async () => {
