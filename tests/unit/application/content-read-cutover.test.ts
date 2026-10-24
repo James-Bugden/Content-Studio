@@ -161,6 +161,14 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
       .toMatchObject({ ok: true, steps: [{ provider: 'sheet', status: 'done' }, { step: 'refresh_pending', status: 'pending', errorCode: 'VALIDATION_FAILED' }] });
     expect((await sheet.getLibrary(ids.library)).cells.hookScore).toBe('8/10');
   });
+  it('a valid Sheet patch over the combined DB byte cap is saved with refresh pending', async () => {
+    const before = await repo.getLibrary(ids.library), text = '漢'.repeat(45_000);
+    const result = await repo.updateLibrary({ operationId: 'synthetic_large_copy', actor: owner, target: { libraryId: ids.library }, expectedRevision: before.revision,
+      patch: { draftContent: text, imageBrief: text } });
+    expect(result).toMatchObject({ ok: true, steps: [{ provider: 'sheet', status: 'done' }, { step: 'refresh_pending', status: 'pending', errorCode: 'VALIDATION_FAILED' }] });
+    expect((await sheet.getLibrary(ids.library)).cells.draftContent).toBe(text);
+    expect((await repo.getLibrary(ids.library)).cells.imageBrief).toBe(text);
+  });
   it('keeps content-identical copies at the same row version', async () => {
     const before = await read('library');
     const row = await db.getPost('library', ids.library);

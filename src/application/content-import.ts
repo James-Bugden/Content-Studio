@@ -154,5 +154,8 @@ export function typedContentRow(collection: Exclude<ImportCollection, 'workflow_
     : { sourceMarkdown: 'source_markdown_url', sourceMasterFile: 'source_master_file_url', imageFile: 'image_file_url' })) {
     row[column] = (record.links as Record<string, string>)[field] ?? '';
   }
+  // Apply the existing DB-3 transport cap to full derived rows too. A Sheet
+  // save may be valid while its combined UTF-8 copy exceeds the SQL limit.
+  if (Buffer.byteLength(JSON.stringify(row)) > 262_144) throw new AppError('VALIDATION_FAILED', { reason: 'value_size' });
   return row;
 }
