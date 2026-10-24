@@ -35,7 +35,7 @@ export type Services = {
   contentParity?: ContentParityJournal;
   reconcileRepo?: ContentRepository;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
-  fakes?: { sheet: FakeSheetTransport; drive: FakeDriveGateway; ai?: FakeAiGateway; typefully?: FakeTypefullyGateway };
+  fakes?: { sheet: FakeSheetTransport; db: FakeContentDb; drive: FakeDriveGateway; ai?: FakeAiGateway; typefully?: FakeTypefullyGateway };
 };
 
 /**
@@ -90,16 +90,18 @@ function build(): Services {
     const drive = new FakeDriveGateway();
     const ai = createAiGateway(env);
     const typefully = createTypefullyGateway(env);
+    const db = new FakeContentDb();
     services = {
       mode: 'fake',
       repo: env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read'
-        ? new SupabaseContentRepository(new FakeContentDb(), env.CS_CONTENT_STORE)
+        ? new SupabaseContentRepository(db, env.CS_CONTENT_STORE)
         : new SheetsContentRepository(sheet),
       drive,
       ai,
       typefully,
       fakes: {
         sheet,
+        db,
         drive,
         ...(ai instanceof FakeAiGateway ? { ai } : {}),
         ...(typefully instanceof FakeTypefullyGateway ? { typefully } : {}),

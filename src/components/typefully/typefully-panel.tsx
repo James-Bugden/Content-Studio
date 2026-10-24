@@ -316,7 +316,7 @@ export function TypefullyPanel({ initial, canEdit }: { initial: TypefullyDetailV
       {panel.kind === 'provider_error' ? (
         <StateView
           kind={ERROR_STATE_KIND[panel.code]}
-          title={panel.code === 'CONFIG_MISSING' ? 'Typefully is not configured' : panel.provider === 'sheet' ? 'The Sheet could not be read' : 'Typefully could not be checked'}
+          title={panel.code === 'CONFIG_MISSING' ? 'Typefully is not configured' : panel.provider === 'db' ? 'The database could not be read' : panel.provider === 'sheet' ? 'The Sheet could not be read' : 'Typefully could not be checked'}
           detail="Nothing was linked, created or changed. Review and scheduling keep working without Typefully."
           nextStep={panel.code === 'CONFIG_MISSING' ? 'Add the Typefully key and social set, then reload.' : 'Check again in a moment.'}
         />

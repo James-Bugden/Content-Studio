@@ -6,6 +6,8 @@ import { ERROR_CODES } from '@/domain/errors';
 import { testAuthEnabled } from '@/lib/auth/policy';
 import { json } from '@/lib/http';
 import { largeLibraryRows, SYNTH_MASTER_FILE_ID } from '@/fixtures/synthetic';
+import { contentPatch } from '@/integrations/supabase/content-repository';
+import { isAppError } from '@/domain/errors';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +38,8 @@ const typefullyAction = z.discriminatedUnion('type', [
 ]);
 
 const bodySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('db_fail_next'), op: z.enum(['read', 'write']), code: z.enum(ERROR_CODES), times: z.number().int().min(1).max(10).optional() }),
+  z.object({ kind: z.literal('db_external_edit'), collection: z.enum(['library', 'queue', 'schedule']), id: z.string().max(64), patch: z.record(z.string(), z.string().max(50_000)) }),
   z.object({ kind: z.literal('reset') }),
   z.object({ kind: z.literal('seed_library_pages'), total: z.number().int().min(100).max(2000).optional() }),
   z.object({
@@ -70,6 +74,17 @@ export async function POST(request: Request) {
   }
   const fakes = getServices().fakes;
   if (!fakes) return new Response('Not found', { status: 404 });
+  if (body.kind === 'db_fail_next') {
+    fakes.db.failNext({ op: body.op, code: body.code, times: body.times });
+    return json({ ok: true });
+  }
+  if (body.kind === 'db_external_edit') {
+    const headers = body.collection === 'schedule' ? SCHEDULE_HEADERS : LIBRARY_HEADERS;
+    if (Object.keys(body.patch).some(field => !Object.hasOwn(headers, field) || ['libraryId', 'contentId', 'posted'].includes(field))) return json({ ok: false }, { status: 400 });
+    try { fakes.db.externalEdit(body.collection, body.id, contentPatch(body.patch)); }
+    catch (error) { return json({ ok: false }, { status: isAppError(error) && error.code === 'NOT_FOUND' ? 404 : 400 }); }
+    return json({ ok: true });
+  }
   if (body.kind === 'seed_library_pages') {
     const grid = fakes.sheet.rawTab(SHEET_TABS.library.name);
     const rows = largeLibraryRows(body.total === undefined ? 45 : Math.max(0, body.total - (grid.length - 1))).slice(1);

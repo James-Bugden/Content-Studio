@@ -103,17 +103,17 @@ describe('MIG-06 typed schema/version contract', () => {
     }
   });
 
-  it('matches the compiled version; refuses missing, malformed and mismatched versions as SCHEMA_DRIFT', async () => {
+  it('keeps the historical DB-1 version; the current adapter refuses its missing DB-3 contract', async () => {
     const version = (await rows('schema_version'))[0]!.version;
-    expect(version).toBe(CONTENT_STUDIO_SCHEMA_VERSION);
-    expect(() => assertContentSchemaVersion(version)).not.toThrow();
-    for (const actual of [null, undefined, '1', 0, 2, {}, Number.NaN]) {
+    expect(version).toBe(1);
+    expect(() => assertContentSchemaVersion(version)).toThrowError(expect.objectContaining({ code: 'SCHEMA_DRIFT' }));
+    for (const actual of [null, undefined, String(CONTENT_STUDIO_SCHEMA_VERSION), 0, CONTENT_STUDIO_SCHEMA_VERSION + 1, {}, Number.NaN]) {
       expect(() => assertContentSchemaVersion(actual)).toThrowError(expect.objectContaining({ code: 'SCHEMA_DRIFT', details: expect.objectContaining({ kind: 'version' }) }));
     }
     const err = await expectRejection(db.raw.exec('insert into public.content_studio_schema_version (singleton,version) values (false,2)'));
     expect(sqlState(err)).toBe('23514');
     expect(sqlState(await expectRejection(db.raw.exec('insert into public.content_studio_schema_version (version) values (2)')))).toBe('23505');
-    await db.raw.exec('update public.content_studio_schema_version set version=2');
+    await db.raw.exec('update public.content_studio_schema_version set version=3');
     try {
       expect(() => assertContentSchemaVersion(undefined)).toThrowError(expect.objectContaining({ code: 'SCHEMA_DRIFT' }));
       const drift = (await rows('schema_version'))[0]!.version;

@@ -142,7 +142,7 @@ export type Reconciliation =
   | { kind: 'ambiguous'; row: RowDiscriminators; candidates: ReconcileCandidate[]; discriminators: CandidateDiscriminators[] }
   | { kind: 'no_match'; row: RowDiscriminators; searched: boolean }
   | { kind: 'invalid_row'; reason: 'platform_unrecognised' }
-  | { kind: 'provider_error'; provider: 'sheet' | 'typefully'; code: ErrorCode };
+  | { kind: 'provider_error'; provider: 'sheet' | 'db' | 'typefully'; code: ErrorCode };
 
 async function candidateSearch(
   tf: TypefullyGateway,
@@ -234,7 +234,7 @@ export async function reconcile(repo: ContentRepository, tf: TypefullyGateway, c
   try {
     result = await reconcileLoaded(repo, tf, await loadRow(repo, contentId));
   } catch (error) {
-    result = { kind: 'provider_error', provider: 'sheet', code: toAppError(error).code };
+    result = { kind: 'provider_error', provider: contentProvider(repo), code: toAppError(error).code };
   }
   outcome('reconcile', contentId, result.kind === 'provider_error' ? 'error' : result.kind === 'ambiguous' ? 'blocked' : 'ok', {
     kind: result.kind,
@@ -276,6 +276,8 @@ class Run<T> {
   }
 }
 
+const contentProvider = (repo: ContentRepository): 'sheet' | 'db' => repo.capability().provider === 'db' ? 'db' : 'sheet';
+
 function assertSyncFields(patch: SchedulePatch): void {
   for (const field of Object.keys(patch) as ScheduleField[]) {
     if (!SCHEDULE_SYNC_FIELDS.includes(field) && field !== 'typefullyDraftId') throw new AppError('VALIDATION_FAILED', { reason: 'field_not_syncable', field });
@@ -292,12 +294,13 @@ async function writeRow<T>(
 ): Promise<{ ok: true; record: ScheduleRecord; replayed: boolean } | { ok: false; code: ErrorCode; details?: Record<string, unknown> }> {
   assertSyncFields(patch);
   const res = await repo.updateSchedule({ operationId: input.operationId, actor, target: { contentId: input.contentId }, expectedRevision: input.expectedRevision, patch });
-  const sheetStep = res.steps.find((s) => s.provider === 'sheet');
+  const provider = contentProvider(repo);
+  const sheetStep = res.steps.find((s) => s.provider === provider);
   if (!res.ok) {
-    run.step(stepName, 'sheet', 'failed', { errorCode: res.code });
+    run.step(stepName, provider, 'failed', { errorCode: res.code });
     return { ok: false, code: res.code, ...(res.details ? { details: res.details } : {}) };
   }
-  run.step(stepName, 'sheet', sheetStep?.status ?? 'done', { revision: res.value.revision });
+  run.step(stepName, provider, sheetStep?.status ?? 'done', { revision: res.value.revision });
   return { ok: true, record: res.value, replayed: res.replayed };
 }
 
@@ -431,7 +434,7 @@ async function createDraftOnce(
   if (row.typefullyDraftId) {
     if (mine && mine.id === row.typefullyDraftId) {
       run.step('create Typefully draft', 'typefully', 'skipped_already_applied');
-      run.step('link Schedule row', 'sheet', 'skipped_already_applied', { revision: loaded.record.revision });
+      run.step('link Schedule row', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
       return run.ok({ record: loaded.record, draft: mine }, true, { path: 'already_linked' });
     }
     return run.fail('CONFLICT', { reason: 'already_linked' });
@@ -562,7 +565,7 @@ export async function syncFromTypefully(
     patch.finalSyncedAt = formatSyncStamp(now(), text);
   }
   if (Object.keys(patch).length === 0) {
-    run.step('write Schedule row', 'sheet', 'skipped_already_applied', { revision: loaded.record.revision });
+    run.step('write Schedule row', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
     return run.ok({ record: loaded.record, comparison }, true, { path: 'in_sync' });
   }
   const w = await writeRow(run, repo, actor, input, patch, 'write Schedule row');
@@ -616,7 +619,7 @@ export async function pushToTypefully(
   if (stamp?.textHash !== finalTextHash(text)) patch.finalSyncedAt = formatSyncStamp(now(), text);
   if (loaded.record.cells.typefullyStatus !== current.status) patch.typefullyStatus = current.status;
   if (Object.keys(patch).length === 0) {
-    run.step('write Schedule row', 'sheet', 'skipped_already_applied', { revision: loaded.record.revision });
+    run.step('write Schedule row', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
     return run.ok({ record: loaded.record, comparison: compareCopy(row, current) }, true, { path: 'in_sync' });
   }
   const w = await writeRow(run, repo, actor, input, patch, 'write Schedule row');
@@ -682,7 +685,7 @@ export async function syncAnalytics(
   }
   // Unavailable metrics are not in the patch: blank stays blank, a recorded value is never erased.
   if (Object.keys(patch).length === 0) {
-    run.step('write analytics', 'sheet', 'skipped_already_applied', { revision: loaded.record.revision });
+    run.step('write analytics', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
     return run.ok({ record: loaded.record, supplied, unavailable }, true, { path: 'unchanged', supplied: supplied.length });
   }
   patch.analyticsSyncedAt = toTaipeiIso(now());

@@ -40,7 +40,7 @@ export type DraftSaveInput = {
 };
 
 export type DraftConflict = {
-  provider: 'sheet' | 'drive';
+  provider: 'sheet' | 'db' | 'drive';
   /** Current authoritative text, returned so the editor can show base/current/proposed. */
   current: string;
   currentRevision: string;
@@ -53,6 +53,8 @@ export type DraftSaveResult = MutationResult<DraftSaveValue> & { conflict?: Draf
 const MAX_DRAFT_CHARS = 40_000;
 
 export async function saveDraft(repo: ContentRepository, drive: DriveGateway, input: DraftSaveInput): Promise<DraftSaveResult> {
+  const store = repo.capability().provider === 'db' ? 'db' : 'sheet';
+  const mirrorStep = store === 'db' ? 'mirror Draft Content to database' : 'mirror Draft Content to Sheet';
   const steps: StepResult[] = [];
   const op = input.operationId;
   const finish = (r: DraftSaveResult): DraftSaveResult => {
@@ -81,14 +83,14 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
   }
   const sheetAlreadyHasIt = record.value.draftContent === input.proposed;
   if (record.revision !== input.expectedSheetRevision && !sheetAlreadyHasIt) {
-    return fail('STALE_READ', { conflict: { provider: 'sheet', current: record.value.draftContent, currentRevision: record.revision } });
+    return fail('STALE_READ', { conflict: { provider: store, current: record.value.draftContent, currentRevision: record.revision } });
   }
 
   // Step 1: Drive section.
   const read = await readSection(drive, record);
   if (!read.ok) {
     steps.push({ step: 'update Markdown section', provider: 'drive', status: 'failed', errorCode: read.code });
-    steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: 'pending' });
+    steps.push({ step: mirrorStep, provider: store, status: 'pending' });
     return fail(sheetAlreadyHasIt ? 'PARTIAL_FAILURE' : read.code, { details: { reason: read.reason } });
   }
   let driveRevision = read.meta.revision;
@@ -112,7 +114,7 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
     } catch (error) {
       const code = isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE';
       steps.push({ step: 'update Markdown section', provider: 'drive', status: 'failed', errorCode: code });
-      steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: 'pending' });
+      steps.push({ step: mirrorStep, provider: store, status: 'pending' });
       // If the Sheet already has the text, the two sides now disagree: that is partial.
       return fail(sheetAlreadyHasIt ? 'PARTIAL_FAILURE' : code);
     }
@@ -123,7 +125,7 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
       if (!check.ok || check.section.body !== input.proposed) {
         // The upload happened, so the step is done; what followed is unconfirmed.
         steps.push({ step: 'verify Markdown section', provider: 'drive', status: 'failed', errorCode: 'CONFLICT' });
-        steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: 'pending' });
+        steps.push({ step: mirrorStep, provider: store, status: 'pending' });
         return fail('PARTIAL_FAILURE', { details: { reason: 'section_changed_during_write' } });
       }
     } catch {
@@ -138,7 +140,7 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
     patch.reviewStatus = SHEET_WRITE_VALUE.review.Pending;
   }
   if (Object.keys(patch).length === 0) {
-    steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: 'skipped_already_applied', revision: record.revision });
+    steps.push({ step: mirrorStep, provider: store, status: 'skipped_already_applied', revision: record.revision });
     const allSkipped = steps.every((s) => s.status === 'skipped_already_applied');
     return finish({ ok: true, operationId: op, replayed: allSkipped, value: { record, sectionHash, driveRevision }, steps });
   }
@@ -150,10 +152,10 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
     patch,
   });
   if (!res.ok) {
-    steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: 'failed', errorCode: res.code });
+    steps.push({ step: mirrorStep, provider: store, status: 'failed', errorCode: res.code });
     const driveDone = steps.some((s) => s.provider === 'drive' && s.status === 'done');
     return fail(driveDone ? 'PARTIAL_FAILURE' : res.code);
   }
-  steps.push({ step: 'mirror Draft Content to Sheet', provider: 'sheet', status: res.replayed ? 'skipped_already_applied' : 'done', revision: res.value.revision });
+  steps.push({ step: mirrorStep, provider: store, status: res.replayed ? 'skipped_already_applied' : 'done', revision: res.value.revision });
   return finish({ ok: true, operationId: op, replayed: false, value: { record: res.value, sectionHash, driveRevision }, steps });
 }
