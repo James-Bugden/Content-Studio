@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID, randomBytes } from 'node:crypto';
 import { AppError } from '@/domain/errors';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import type { ContentRepository } from './ports';
@@ -53,6 +53,13 @@ export function canonicalJson(value: unknown): string {
 
 export function mirrorHash(value: unknown): string {
   return createHash('sha256').update(canonicalJson(value), 'utf8').digest('hex');
+}
+
+// AUTH_SECRET already exists in the server env surface. Synthetic/unit sessions
+// without auth use an ephemeral process key; none of these keys reach the UI.
+const evidenceKey = process.env.AUTH_SECRET ?? randomBytes(32).toString('hex');
+export function evidenceHash(value: unknown): string {
+  return createHmac('sha256', process.env.AUTH_SECRET ?? evidenceKey).update(canonicalJson(value), 'utf8').digest('hex');
 }
 
 function canonicalValue(value: unknown): unknown {

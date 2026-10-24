@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import type { ContentImportStore, ImportEnvelope } from '@/application/content-import';
+import { assertImportMode, type ContentImportStore, type ImportEnvelope } from '@/application/content-import';
 import type { ContentDb } from '@/application/content-db';
 import { mirrorHash } from '@/application/sheet-mirror';
 import { AppError, isAppError } from '@/domain/errors';
@@ -11,6 +11,7 @@ export class SupabaseContentImportStore implements ContentImportStore {
   readonly db: ContentDb;
   constructor(private readonly options: SupabaseContentDbOptions) { this.db = new SupabaseContentDb(options); }
   async applyImport(e: ImportEnvelope): Promise<void> {
+    assertImportMode();
     if (e.snapshotHash !== mirrorHash({ counts: e.counts, hashes: e.hashes, exceptions: e.exceptions, rows: e.rows })) throw new AppError('VALIDATION_FAILED');
     try {
       const response = await (this.options.fetch ?? fetch)(`${this.options.url.replace(/\/$/, '')}/rest/v1/rpc/content_studio_import_run`, {

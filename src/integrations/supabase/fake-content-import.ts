@@ -1,5 +1,5 @@
 import 'server-only';
-import type { ContentImportStore, ImportEnvelope } from '@/application/content-import';
+import { assertImportMode, type ContentImportStore, type ImportEnvelope } from '@/application/content-import';
 import type { ContentPostRow, ContentScheduleRow, ContentSettingRow } from '@/application/content-db';
 import { mirrorHash } from '@/application/sheet-mirror';
 import { AppError } from '@/domain/errors';
@@ -14,6 +14,7 @@ export class FakeContentImportStore implements ContentImportStore {
   constructor(seed = syntheticContentDbSeed()) { this.seed = structuredClone(seed); this.reader = new FakeContentDb(seed); }
   get db() { return this.reader; }
   async applyImport(e: ImportEnvelope) {
+    assertImportMode();
     const hash = mirrorHash({ counts: e.counts, hashes: e.hashes, exceptions: e.exceptions, rows: e.rows });
     if (hash !== e.snapshotHash) throw new AppError('VALIDATION_FAILED');
     const identity = mirrorHash([hash, e.actorHash]);

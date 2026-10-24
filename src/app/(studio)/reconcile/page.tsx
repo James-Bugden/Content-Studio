@@ -44,8 +44,8 @@ export default async function ReconcilePage() {
           <p>Store mode: {serverEnv().CS_CONTENT_STORE}. Sheet remains authoritative.</p>
           {parity ? <>
             <p>{parity.sampleCount} compared requests · {parity.daysGreen} complete days green · import lag p95: {parity.lagP95 === null ? 'not measured' : `${Math.round(parity.lagP95 / 60000)} min`}.</p>
-            <p>{parity.ready ? 'Shadow thresholds met in this instance.' : 'Shadow thresholds not yet met.'} Evidence covers {parity.scope}; a restart loses this measurement window.</p>
-            <ul>{parity.collections.map(c => <li key={c.collection}>{c.collection}: ID sets {c.idsEqual === null ? 'not measured' : c.idsEqual ? 'equal' : 'differ'}; fields {c.fieldEquality === null ? 'not measured' : `${c.fieldEquality.toFixed(2)}% equal`}; {c.samples} samples.</li>)}</ul>
+            <p>{parity.ready ? 'Shadow thresholds met in this instance.' : 'Shadow thresholds not yet met.'} Evidence covers {parity.scope}; a restart loses this measurement window. This is not permission to switch reads; durable deployment evidence and the phase gates are still required.</p>
+            <ul>{parity.collections.map(c => <li key={c.collection}>{c.collection}: ID sets {c.idsEqual === null ? 'not measured' : c.idsEqual ? 'equal' : 'differ'}; fields {c.fieldsNA ? 'n/a (empty collection)' : c.fieldEquality === null ? 'not measured' : `${c.fieldEquality.toFixed(2)}% equal`}; {c.samples} samples{c.blankBooleans ? `; ${c.blankBooleans} named blank-checkbox equivalents` : ''}.</li>)}</ul>
             {parity.lastRun ? <details className="mt-3"><summary className="cursor-pointer py-2">Last import counts, hashes and exceptions</summary>
               <p className="break-all text-sm">Snapshot: {parity.lastRun.snapshotHash}</p>
               <ul className="text-sm">{Object.entries(parity.lastRun.counts).map(([collection, count]) => <li key={collection} className="break-all">{collection}: {count} rows · {parity.lastRun!.hashes[collection as keyof typeof parity.lastRun.hashes]}</li>)}</ul>

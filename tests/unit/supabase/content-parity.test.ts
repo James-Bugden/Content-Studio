@@ -9,6 +9,65 @@ import { buildReconcileReport } from '@/application/reconcile';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 
 describe('MIG-10 shadow comparisons', () => {
+  it('names blank checkbox equivalence without masking any other field or true checkbox', () => {
+    const record = (posted: string, content: string) => [{ value: { contentId: 'SYN-1', posted: false }, cells: { posted, content } }];
+    const equal = compareContent('schedule', record('', 'Synthetic copy'), record('FALSE', 'Synthetic copy'), 1, 0);
+    expect(equal.equal).toBe(equal.fields); expect(equal.blocking).toBe(0);
+    expect(equal.facts).toContainEqual(expect.objectContaining({ field: 'cells.posted', kind: 'blank_boolean' }));
+    const changed = compareContent('schedule', record('', 'Synthetic copy '), record('FALSE', 'Synthetic copy'), 1, 0);
+    expect(changed.blocking).toBe(1); expect(changed.equal).toBeLessThan(changed.fields);
+    expect(compareContent('schedule', record('', ''), record('TRUE', ''), 1, 0).blocking).toBeGreaterThan(0);
+  });
+  it('detects unknown-column loss through the real DB reader', async () => {
+    const db = new FakeContentDb();
+    const row = (await db.listPosts('library'))[0]!;
+    row.passthrough = { '34': { header: 'Synthetic extra', value: 'Synthetic text', formula: '', link: '' } };
+    vi.spyOn(db, 'listPosts').mockResolvedValue([row]);
+    const repo = new SupabaseContentRepository(db);
+    const expected = await repo.listLibrary();
+    expect(expected[0]?.passthrough).toEqual(row.passthrough);
+    const lost = structuredClone(expected); lost[0]!.passthrough = {};
+    const sample = compareContent('library', expected, lost, 1, 0);
+    expect(sample.blocking).toBeGreaterThan(0);
+    expect(sample.facts.some(f => f.field.startsWith('passthrough.'))).toBe(true);
+  });
+  it('keeps copy whitespace exact, narrowly classifies a terminal suffix, and still counts classified differences', async () => {
+    const rows = await new SheetsContentRepository(new FakeSheetTransport()).listLibrary();
+    const left = [structuredClone(rows[0]!)], right = structuredClone(left);
+    left[0]!.cells.draftContent += '  \n';
+    expect(compareContent('library', left, right, 1, 0).facts).toContainEqual(expect.objectContaining({ field: 'cells.draftContent', kind: 'changed' }));
+    left[0]!.cells.draftContent = right[0]!.cells.draftContent;
+    left[0]!.cells.nextAction = 'Synthetic action  \n'; right[0]!.cells.nextAction = 'Synthetic action';
+    const sample = compareContent('library', left, right, 1, 0);
+    expect(sample.facts).toContainEqual(expect.objectContaining({ field: 'cells.nextAction', kind: 'trailing_whitespace' }));
+    expect(sample.equal).toBeLessThan(sample.fields);
+    left[0]!.cells.nextAction = 'Synthetic action\n\n';
+    expect(compareContent('library', left, right, 1, 0).blocking).toBeGreaterThan(0);
+    left[0]!.cells.nextAction = 'Synthetic action\t';
+    expect(compareContent('library', left, right, 1, 0).blocking).toBeGreaterThan(0);
+  });
+  it('treats measured empty-vs-empty as n/a while missing records and providers still fail', () => {
+    const journal = new ContentParityJournal();
+    journal.record(compareContent('ready', [], [], 1, 0));
+    expect(journal.summary(1).collections.find(c => c.collection === 'ready')).toMatchObject({ fieldsNA: true, fieldEquality: 100, idsEqual: true });
+    journal.record(compareContent('ready', [{ value: { libraryId: 'SYN-1' }, cells: {} }], [], 2, 0));
+    expect(journal.summary(2).collections.find(c => c.collection === 'ready')).toMatchObject({ fieldsNA: false, fieldEquality: null, idsEqual: false });
+    expect(journal.summary(2).ready).toBe(false);
+    const green = new ContentParityJournal(), day = 86400_000, now = Date.UTC(2026, 9, 25);
+    for (let d = 1; d <= 7; d++) for (const c of PARITY_COLLECTIONS) for (let n = 0; n < 5; n++) {
+      green.record({ at: now - d * day + n, collection: c, idsEqual: true, fields: c === 'ready' ? 0 : 10, equal: c === 'ready' ? 0 : 10, blocking: 0, lagMs: 0, facts: [] });
+    }
+    green.imported(now);
+    expect(green.summary(now)).toMatchObject({ ready: true, daysGreen: 7, sampleCount: 210 });
+  });
+  it('emits only one aggregate event per collection observation even for many differing fields', () => {
+    const journal = new ContentParityJournal(), before = recentEvents().length;
+    const sample = compareContent('library', [{ value: { libraryId: 'SYN-1' }, cells: { one: 'a', two: 'b' } }], [{ value: { libraryId: 'SYN-1' }, cells: { one: 'c', two: 'd' } }], 1, 0);
+    expect(sample.facts.length).toBe(2);
+    journal.record(sample);
+    expect(recentEvents().length).toBe(before + 1);
+    expect(recentEvents().at(-1)?.facts).toMatchObject({ collection: 'library', differences: 2, blocking: 2 });
+  });
   it('uses the default ten-percent boundary and bounds a stalled comparison', async () => {
     const sheet = new SheetsContentRepository(new FakeSheetTransport()), db = new SupabaseContentRepository(new FakeContentDb()), journal = new ContentParityJournal();
     const random = vi.spyOn(Math, 'random').mockReturnValueOnce(.099).mockReturnValueOnce(.1);
@@ -63,8 +122,7 @@ describe('MIG-10 shadow comparisons', () => {
     expect(journal.summary(now).ready).toBe(false);
     expect(journal.summary(now).collections[0]).toMatchObject({ idsEqual: false, blocking: 1 });
     const event = recentEvents().at(-1)!;
-    expect(Object.keys(event.facts!).sort()).toEqual(['collection', 'field', 'fingerprint', 'kind']);
-    expect(event.facts?.fingerprint).toBe('1234567890123456');
+    expect(event.facts).toEqual({ collection: 'library', fields: 2, equal: 1, differences: 1, blocking: 1, idsEqual: false });
     expect(journal.summary(now + 2 * day).daysGreen).toBe(0);
   });
   it('DB failure never replaces the Sheet response and becomes a blocking measurement', async () => {

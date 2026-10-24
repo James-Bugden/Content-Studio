@@ -1,18 +1,17 @@
 import 'server-only';
 import type { ContentRepository } from './ports';
-import { canonicalJson, mirrorHash } from './sheet-mirror';
+import { canonicalJson, evidenceHash } from './sheet-mirror';
 import { classifyDifference } from './content-import';
 import type { ImportEnvelope } from './content-import';
 import { emit } from '@/observability/events';
 
 export const PARITY_COLLECTIONS = ['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] as const;
 export type ParityCollection = typeof PARITY_COLLECTIONS[number];
-export type ParityFact = { collection: ParityCollection; field: string; kind: 'equal' | 'missing' | 'unexpected' | 'changed' | 'formula_display' | 'number_formatting' | 'trailing_whitespace' | 'zero_row_source'; fingerprint: string };
+export type ParityFact = { collection: ParityCollection; field: string; kind: 'equal' | 'missing' | 'unexpected' | 'changed' | 'number_formatting' | 'trailing_whitespace' | 'blank_boolean' | 'boolean_formatting' | 'timestamp_formatting' | 'zero_row_source'; fingerprint: string };
 export type ParitySample = { at: number; collection: ParityCollection; idsEqual: boolean; fields: number; equal: number; blocking: number; lagMs: number | null; facts: ParityFact[] };
-type RecordLike = { value: unknown; cells: Record<string, string>; links: Record<string, string>; formulaFields: string[] };
 const object = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 function flatten(value: unknown, prefix = ''): Record<string, unknown> {
-  if (value && typeof value === 'object' && !Array.isArray(value)) return Object.fromEntries(Object.entries(object(value)).flatMap(([k, v]) => Object.entries(flatten(v, prefix ? `${prefix}.${k}` : k))));
+  if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length) return Object.fromEntries(Object.entries(object(value)).flatMap(([k, v]) => Object.entries(flatten(v, prefix ? `${prefix}.${k}` : k))));
   return { [prefix]: value };
 }
 function indexed(collection: ParityCollection, input: unknown): Map<string, unknown> {
@@ -33,7 +32,7 @@ export function compareContent(collection: ParityCollection, expected: unknown, 
   const facts: ParityFact[] = [];
   let idsEqual = true, fields = 0, equal = 0, blocking = 0;
   const fact = (id: string, field: string, kind: ParityFact['kind']) => {
-    facts.push({ collection, field, kind, fingerprint: mirrorHash([collection, id, field]).slice(0, 16) });
+    facts.push({ collection, field, kind, fingerprint: evidenceHash([collection, id, field]).slice(0, 16) });
   };
   if (collection !== 'workflow_settings' && ((expected as unknown[]).length !== left.size || (actual as unknown[]).length !== right.size)) {
     idsEqual = false; blocking++; fact('duplicate', 'stable_id', 'changed');
@@ -49,14 +48,17 @@ export function compareContent(collection: ParityCollection, expected: unknown, 
       blocking++;
       continue;
     }
-    const record = object(a).cells ? a as RecordLike : null;
-    const project = (v: unknown) => object(v).cells ? { cells: object(v).cells, links: object(v).links, value: object(v).value } : v;
+    const project = (v: unknown) => object(v).cells ? { cells: object(v).cells, links: object(v).links, value: object(v).value, passthrough: object(v).passthrough ?? {} } : v;
     const af = flatten(project(a)), bf = flatten(project(b));
     for (const field of new Set([...Object.keys(af), ...Object.keys(bf)])) {
       fields++;
       if (canonicalJson([af[field]]) === canonicalJson([bf[field]])) { equal++; continue; }
-      const kind = field.startsWith('cells.') ? classifyDifference(af[field], bf[field], record?.formulaFields.includes(field.slice(6))) : null;
+      const kind = field.startsWith('cells.') ? classifyDifference(af[field], bf[field], field.slice(6)) : null;
       fact(id, collection === 'queue_summary' && field.startsWith('counts.') ? 'counts' : field, kind ?? 'changed');
+      // Sheet's blank checkbox is false. Name this single semantic equivalence
+      // explicitly so real unposted rows can pass Phase B; all other classified
+      // text changes (especially whitespace) remain unequal fields.
+      if (kind === 'blank_boolean') equal++;
       if (!kind) blocking++;
     }
   }
@@ -80,7 +82,8 @@ export class ContentParityJournal {
   record(sample: ParitySample) {
     this.samples.push(sample);
     if (this.samples.length > 10_000) this.samples.shift();
-    for (const { collection, field, kind, fingerprint } of sample.facts) emit({ name: 'content.parity', adapter: 'app', outcome: ['changed', 'missing', 'unexpected', 'zero_row_source'].includes(kind) ? 'blocked' : 'ok', facts: { collection, field, kind, fingerprint } });
+    emit({ name: 'content.parity', adapter: 'app', outcome: sample.blocking || !sample.idsEqual ? 'blocked' : 'ok',
+      facts: { collection: sample.collection, fields: sample.fields, equal: sample.equal, differences: sample.facts.length, blocking: sample.blocking, idsEqual: sample.idsEqual } });
   }
   summary(now = Date.now()) {
     const day = 86400_000, today = Math.floor(now / day) * day;
@@ -95,7 +98,9 @@ export class ContentParityJournal {
       const rows = samples.filter(s => s.collection === collection);
       const fields = rows.reduce((n, s) => n + s.fields, 0);
       return { collection, samples: rows.length, idsEqual: rows.length ? rows.every(s => s.idsEqual) : null,
-        fieldEquality: fields ? 100 * rows.reduce((n, s) => n + s.equal, 0) / fields : null,
+        fieldEquality: fields ? 100 * rows.reduce((n, s) => n + s.equal, 0) / fields : rows.length && rows.every(s => s.idsEqual && s.blocking === 0) ? 100 : null,
+        fieldsNA: rows.length > 0 && fields === 0 && rows.every(s => s.idsEqual && s.blocking === 0),
+        blankBooleans: rows.reduce((n, s) => n + s.facts.filter(f => f.kind === 'blank_boolean').length, 0),
         blocking: rows.reduce((n, s) => n + s.blocking, 0) };
     });
     const lags = samples.flatMap(s => s.lagMs === null ? [] : [s.lagMs]).sort((a, b) => a - b);
@@ -134,7 +139,7 @@ export function shadowContentRepository(sheet: ContentRepository, db: ContentRep
         const compared = await dbRead;
         if (compared) journal.record(compareContent(collection, result, compared.value, Date.now(), journal.lastImport));
         else journal.record({ at: Date.now(), collection, idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
-          facts: [{ collection, field: 'provider', kind: 'changed', fingerprint: mirrorHash(collection).slice(0, 16) }] });
+          facts: [{ collection, field: 'provider', kind: 'changed', fingerprint: evidenceHash(collection).slice(0, 16) }] });
       }
       return result;
     };
