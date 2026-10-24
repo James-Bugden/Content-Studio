@@ -245,12 +245,15 @@ export class ContentWriteCutover {
   constructor(repo: ContentRepository, readonly exporter: ContentExporter) {
     this.repo = new Proxy(repo, { get: (target, property) => {
       const original = Reflect.get(target, property);
+      if (property === 'capability') return () => ({ ...target.capability(), ...(this.readOnly ? { state: 'read_only' as const } : {}) });
       if (!['updateLibrary', 'updateQueue', 'updateSchedule', 'createQueueIdea'].includes(String(property))) return typeof original === 'function' ? original.bind(target) : original;
       return (mutation: { operationId: string }) => {
         const run = this.tail.then(async () => {
           if (this.readOnly) return { ok: false, operationId: mutation.operationId, code: 'FORBIDDEN', steps: [], details: { reason: 'rollback_read_only' } };
           const result = await original.call(target, mutation);
-          if (result.ok) {
+          // A confirmation read may fail after SQL committed. That DB step
+          // still requires export/repair; never retry the authoritative patch.
+          if (result.ok || result.steps.some((step: { provider: string; status: string }) => step.provider === 'db' && step.status === 'done')) {
             if (!result.replayed && result.steps.some((step: { status: string }) => step.status === 'done')) this.completed.add(mutation.operationId);
             await exporter.run().catch(() => {});
           }

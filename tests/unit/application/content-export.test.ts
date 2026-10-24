@@ -109,6 +109,12 @@ describe('MIG-12 one-way stable-ID export', () => {
     }
     now += 3600_001; expect((await exporter.run()).exact).toBe(true); expect(exporter.journal.issues.size).toBe(0);
   });
+  it('exports a committed SQL step even when the mutation confirmation read failed', async () => {
+    const { db, repo, exporter } = setup(); await exporter.run();
+    vi.spyOn(db, 'mutationRow').mockRejectedValueOnce(new Error('synthetic confirmation failure'));
+    expect(await save(repo)).toMatchObject({ ok: false, code: 'PARTIAL_FAILURE', steps: [expect.objectContaining({ provider: 'db', status: 'done' }), expect.anything()] });
+    expect((await exporter.parity()).exact).toBe(true);
+  });
   it('never recreates deleted rows or ignores extra Sheet IDs; duplicate IDs fail closed', async () => {
     const { sheet, exporter } = setup(); await exporter.run();
     const grid = sheet.rawTab(SHEET_TABS.library.name), before = grid.length; grid.splice(1, 1);
@@ -175,6 +181,7 @@ describe('MIG-05/MIG-12 rollback and authority', () => {
     expect(await scheduledContentBackup()).toMatchObject({ status: 'verified' });
     expect(await scheduledContentBackup()).toMatchObject({ status: 'already_verified' });
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'false'); resetEnvCache(); resetServices(); services = getServices();
+    expect(services.repo.capability().state).toBe('read_only');
     expect(await save(services.repo)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
   });
   it('daily comparison never counts missing days/samples green, needs 14 days AND 50 mutations, rejects lag and old failures', async () => {
