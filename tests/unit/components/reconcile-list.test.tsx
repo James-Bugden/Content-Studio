@@ -41,3 +41,11 @@ describe('Fix issues grouping (CS-048)', () => {
     expect(missing.textContent).toContain('4 · needs attention');
   });
 });
+
+
+it('keeps the operation ID in a closed support disclosure and the full-page action', () => {
+  render(<ReconcileList items={[{ ...item('A', 'partial_mutation', 'blocking'), operationId: 'op_synthetic_support' }]} />);
+  const operation = screen.getByText('op_synthetic_support');
+  expect(operation.closest('details')?.open).toBe(false);
+  expect(screen.getByRole('link', { name: 'Review' }).getAttribute('href')).toBe('/review/A');
+});

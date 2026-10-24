@@ -42,6 +42,18 @@ export function observe(page: Page) {
   const observedFaults: ExpectedResponse[] = [];
   const pending = new Set<Request>();
   pendingRequests.set(page, pending);
+  let replacingDocument: Request | null = null;
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame() && replacingDocument) {
+      // Old-document fetches can start after navigate() clears the set, while
+      // the next document is still loading. Chromium may drop their terminal
+      // events at document replacement. They cannot keep the new view busy.
+      // Only a document request arms this reset: SPA/history changes must not
+      // discard outstanding reads belonging to the current document.
+      pending.clear();
+      replacingDocument = null;
+    }
+  });
   const rsc = (r: Request) => r.method() === 'GET' && r.headers().rsc === '1' && new URL(r.url()).searchParams.has('_rsc');
   const studioPage = (url: string) => {
     const path = new URL(url).pathname;
@@ -50,6 +62,7 @@ export function observe(page: Page) {
   };
   page.on('request', (r) => {
     if (!sameOrigin(r.url())) return;
+    if (r.isNavigationRequest() && r.resourceType() === 'document' && r.frame() === page.mainFrame()) replacingDocument = r;
     if (!rsc(r) && ['fetch', 'xhr'].includes(r.resourceType())) pending.add(r);
   });
   page.on('requestfinished', (r) => pending.delete(r));
@@ -69,6 +82,7 @@ export function observe(page: Page) {
   const sameOrigin = (url: string) => new URL(url).origin === new URL(test.info().project.use.baseURL!).origin;
   page.on('requestfailed', (r) => {
     pending.delete(r);
+    if (r === replacingDocument) replacingDocument = null;
     // Next deliberately cancels obsolete route streams, including after its
     // panel-close transition commits. This exception is ONLY aborted fetches of
     // known studio page RSC; documents, APIs and other failure reasons still fail.

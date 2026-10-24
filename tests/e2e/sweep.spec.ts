@@ -78,6 +78,45 @@ test('dirty guard and conflict keep synthetic edits', async ({ page }, info) => 
   } finally { await coverage.finish(); }
 });
 
+test('document replacement drops only superseded reads, while current-document reads stay required', async ({ page }, info) => {
+  await signIn(page, 'owner');
+  await navigate(page, '/');
+  const monitor = observe(page);
+  await settled(page);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/replies/resources', async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await page.route('**/api/sweep-pending*', () => { /* held until its document is replaced or the test ends */ });
+  const coverage = report(page, info, 'owner');
+  try {
+    await coverage.check('/replies/resources', 'document read ownership', async () => {
+      // Start a read in the old document AFTER navigate() clears its inventory,
+      // but before the new document commits. This reproduces the CI race.
+      await page.evaluate(() => window.addEventListener('beforeunload', () => {
+        void fetch('/api/sweep-pending?old', { keepalive: true }).catch(() => undefined);
+      }, { once: true }));
+      const oldRead = page.waitForRequest('**/api/sweep-pending?old');
+      const navigation = navigate(page, '/replies/resources');
+      try {
+        await oldRead;
+      } finally { release(); }
+      await navigation;
+      await settled(page);
+      await monitor.assertClean();
+
+      const currentRead = page.waitForRequest('**/api/sweep-pending?current');
+      await page.evaluate(() => { void fetch('/api/sweep-pending?current').catch(() => undefined); });
+      await currentRead;
+      // A history transition must not clear a current-document read either.
+      await page.evaluate(() => history.replaceState(null, '', '/replies/resources?view=synthetic'));
+      await expect(settled(page, 250)).rejects.toThrow();
+    });
+  } finally { release(); await coverage.finish(); }
+});
+
 // The same detectors used above must reject controlled defects. To demonstrate
 // a real nonzero Playwright exit, set CS_SWEEP_MUTATION=<name> and --grep the
 // corresponding proof: that run deliberately does not catch the detector error.

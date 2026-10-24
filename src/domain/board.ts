@@ -62,6 +62,8 @@ export type Board = {
 export type PostPanelData = {
   /** Available slots for a Ready post (owner only). */
   slotOptions: { contentId: string; isoDate: string; slot: string; time: string }[];
+  /** Preview computed with the same authoritative snapshot as the options. */
+  initialPreview?: { ok: true; contentId: string; libraryRevision: string; scheduleRevision: string; preview: { field: string; header: string; before: string; after: string }[] } | null;
   model: EditorModel;
   card: ReviewCard;
   summary: PostSummary;

@@ -89,3 +89,48 @@ describe('FilterBar', () => {
     expect(nav.push.mock.calls[0]?.[0]).toBe('/review?platform=X');
   });
 });
+
+
+describe('direct filter chips (CS-059c)', () => {
+  it('All on an unselected chip filter preserves pagination without navigating or invoking the dirty guard', () => {
+    nav.params = new URLSearchParams('page=3');
+    setDirty('editor', true);
+    render(<FilterBar filters={[{ ...filters[0]!, control: 'chips' }]} />);
+    fireEvent.click(screen.getByRole('button', { name: /^All$/ }));
+    expect(nav.push).not.toHaveBeenCalled();
+    expect(nav.params.get('page')).toBe('3');
+    expect(screen.queryByText('Leave without saving?')).toBeNull();
+  });
+
+  it('shares one count, announcement and clear action across chips and disclosed controls', () => {
+    nav.params = new URLSearchParams('platform=X&status=ready&page=3&layout=cards');
+    render(<FilterBar filters={[{ ...filters[0]!, control: 'chips' }, filters[1]!]} variant="toolbar" disclosureKeys={['status']} />);
+    expect(screen.getByText('(2 on)')).toBeTruthy();
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+    expect(screen.getByText('2 filters applied')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Clear filters' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(nav.push.mock.calls[0]?.[0]).toBe('/review?layout=cards');
+  });
+  it('selects in one click, preserves other filters and removes an active selection', () => {
+    nav.params = new URLSearchParams('status=ready&page=3');
+    const chips = filters.map((f) => f.key === 'platform' ? { ...f, control: 'chips' as const } : f);
+    const { rerender } = render(<FilterBar filters={chips} />);
+    fireEvent.click(screen.getByRole('button', { name: /^X$/ }));
+    expect(nav.push.mock.calls[0]?.[0]).toBe('/review?platform=X&status=ready');
+    nav.params = new URLSearchParams('platform=X&status=ready');
+    rerender(<FilterBar filters={chips} />);
+    expect(screen.getByRole('button', { name: /^X$/ }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: /^X$/ }));
+    expect(nav.push.mock.calls[1]?.[0]).toBe('/review?status=ready');
+  });
+
+  it('keeps the dirty editor guard for a chip click', () => {
+    setDirty('editor', true);
+    render(<FilterBar filters={[{ ...filters[0]!, control: 'chips' }]} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Threads$/ }));
+    expect(nav.push).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Leave and discard changes' }));
+    expect(nav.push.mock.calls[0]?.[0]).toBe('/review?platform=Threads');
+  });
+});

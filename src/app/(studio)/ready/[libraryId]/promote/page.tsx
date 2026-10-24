@@ -3,6 +3,7 @@ import { getServices } from '@/application/container';
 import { previewPromotion, promotionContext, type PromotionContext, type PromotionPreview } from '@/application/schedule';
 import { ErrorState, GateChip, GuardedLink, PageHeader, StateView } from '@/components';
 import { PromoteConfirm } from '@/components/schedule/promote-confirm';
+import { slotLabel } from '@/domain/slot-label';
 import { isAppError } from '@/domain/errors';
 import { contentIdSchema, libraryIdSchema } from '@/domain/mutation';
 import { requireActor } from '@/lib/auth';
@@ -40,8 +41,11 @@ export default async function PromotePage({
   } catch (error) {
     return <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} action={back} />;
   }
+  const requestedOption = ctx.options.find((o) => o.contentId === slot && o.ok);
+  const selectedSlot = requestedOption?.contentId ?? ctx.options.find((o) => o.ok)?.contentId ?? null;
+  const selectedOption = ctx.options.find((o) => o.contentId === selectedSlot);
   let preview: PromotionPreview | null = null;
-  if (slot) preview = await previewPromotion(repo, libraryId, slot);
+  if (selectedSlot && ctx.group === 'ready') preview = await previewPromotion(repo, libraryId, selectedSlot);
   const item = ctx.library.value;
 
   return (
@@ -70,6 +74,7 @@ export default async function PromotePage({
               <h2 id="slots-h" className="text-lg font-semibold">
                 Choose a slot
               </h2>
+              {slot && !requestedOption ? <p className="mt-2 text-sm text-ink-soft">This slot cannot be used. Choose another slot.</p> : null}
               {ctx.options.length === 0 ? (
                 <p className="mt-2 text-sm text-ink-soft">No available slot rows in the next three weeks. Add slot rows in the Sheet first.</p>
               ) : (
@@ -79,8 +84,8 @@ export default async function PromotePage({
                       {o.ok ? (
                         <GuardedLink
                           href={`/ready/${encodeURIComponent(libraryId)}/promote?slot=${encodeURIComponent(o.contentId)}`}
-                          aria-current={o.contentId === slot ? 'true' : undefined}
-                          className={`flex min-h-11 flex-col rounded-md border px-3 py-2 text-sm ${o.contentId === slot ? 'border-primary bg-primary-soft' : 'border-line bg-card hover:border-ink'}`}
+                          aria-current={o.contentId === selectedSlot ? 'true' : undefined}
+                          className={`flex min-h-11 flex-col rounded-md border px-3 py-2 text-sm ${o.contentId === selectedSlot ? 'border-primary bg-primary-soft' : 'border-line bg-card hover:border-ink'}`}
                         >
                           <span className="font-semibold">
                             {o.isoDate} · {o.slot} · {o.time}
@@ -137,8 +142,8 @@ export default async function PromotePage({
                       </tbody>
                     </table>
                   </div>
-                  {actor.role === 'owner' ? (
-                    <PromoteConfirm libraryId={libraryId} contentId={preview.contentId} libraryRevision={preview.libraryRevision} scheduleRevision={preview.scheduleRevision} />
+                  {actor.role === 'owner' && selectedOption ? (
+                    <PromoteConfirm key={`${preview.contentId}-${preview.libraryRevision}-${preview.scheduleRevision}`} slotLabel={slotLabel(selectedOption.isoDate, selectedOption.time)} libraryId={libraryId} contentId={preview.contentId} libraryRevision={preview.libraryRevision} scheduleRevision={preview.scheduleRevision} />
                   ) : null}
                 </section>
               ) : (
