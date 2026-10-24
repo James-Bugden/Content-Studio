@@ -4,7 +4,11 @@ import { AppError, isAppError } from '@/domain/errors';
 
 export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number };
 
-/** Server-only GET client. Explicit range continuation also handles hosted row caps. */
+/**
+ * Server-only GET client. Explicit range continuation also handles hosted row caps.
+ * PostgREST order has no COLLATE modifier: DB-2 pins every text sort column to
+ * COLLATE "C" in SQL, including the derived views, so all orders below inherit it.
+ */
 export class SupabaseContentDb implements ContentDb {
   readonly mode = 'live' as const;
   private readonly base: string;

@@ -70,6 +70,10 @@ Table drops also remove their owned `content_studio_row_history_history_id_seq` 
 
 ## NOTES for DB-2/DB-3/DB-4
 
+- DB-2 review round 1 — summary parity: `syntheticQueueSummaryRows` and the DB view use the same synthetic Queue rows/rules. Their contract proves self-consistency, not equality with the real Sheet summary tab. DB-4's parity report against the real Sheet is the actual check.
+- DB-2 review round 1 — zero-row sources: the fixture correction removed the `Synthetic Interview Guide` summary source with zero Queue rows. A grouped DB view cannot represent a source with no rows. This is a known Sheet-vs-DB difference for DB-4 to classify explicitly in parity reports.
+- DB-2 review round 1 — Ready Queue revisions: in `db-read`, the derived Ready Queue returns the imported Library row revision. The Sheet Ready tab computes its revision from that tab's own cells. The shared list contract checks only the 16-hex revision format and stability, not equality between those tokens; DB-4 must account for this difference.
+- DB-2 review round 1 — deterministic ordering: the unapplied DB-2 migration pins every text column used by PostgREST ordering to `COLLATE "C"` (PostgREST has no per-order collation modifier), and both master-link minima explicitly use `COLLATE "C"`. It rebuilds the two dependent views transactionally with their original invoker security and server-only grants. No live database was changed.
 - Finding 3 — DB-3: store the entry-point mode in the operation ledger and compare it on replay. Currently the trusted caller must bind operation type into the hash; SQL does not independently enforce mode identity.
 - Finding 4 — DB-4: the canonical import snapshot_hash must cover counts, rows and exceptions (and collection hashes). Replay currently trusts that caller-supplied hash.
 - Finding 7 — DB-3: consider moving `content_studio_mutate` into a non-exposed schema. Service-role callers can currently invoke import mode directly without an enclosing import ledger entry; service role already has direct DML privileges.

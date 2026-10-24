@@ -10,5 +10,5 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   const env = serverEnv();
-  return json({ ok: true, commit: commitSha(), mode: env.CS_DATA_MODE, capabilities: capabilities({ includeInactiveDb: true }) });
+  return json({ ok: true, commit: commitSha(), mode: env.CS_DATA_MODE, capabilities: capabilities() });
 }

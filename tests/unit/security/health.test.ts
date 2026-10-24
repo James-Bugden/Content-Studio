@@ -37,7 +37,7 @@ describe('OBS-01 health output', () => {
   it('OBS-01 / SEC-08: reports read-only capabilities without leaking any configured value', async () => {
     const env = process.env as Record<string, string | undefined>;
     delete env.AI_API_KEY;
-    Object.assign(process.env, SENTINELS, { CS_DATA_MODE: 'live', GOOGLE_WRITE_ENABLED: 'false' });
+    Object.assign(process.env, SENTINELS, { CS_DATA_MODE: 'live', CS_CONTENT_STORE: 'sheet', GOOGLE_WRITE_ENABLED: 'false' });
     resetEnvCache();
     const { res, text } = await health();
     expect(res.headers.get('cache-control')).toContain('no-store');
@@ -45,7 +45,16 @@ describe('OBS-01 health output', () => {
     const body = JSON.parse(text) as { capabilities: { provider: string; state: string }[] };
     expect(body.capabilities.find((c) => c.provider === 'sheet')?.state).toBe('read_only');
     expect(body.capabilities.find((c) => c.provider === 'typefully')?.state).toBe('ready');
-    expect(body.capabilities.find((c) => c.provider === 'db')?.state).toBe('not_configured');
+    expect(body.capabilities.map(c => c.provider).sort()).toEqual(['ai', 'auth', 'drive', 'sheet', 'typefully']);
+  });
+
+  it.each(['db', 'db-read'])('reports the selected %s capability without leaking configured values', async store => {
+    Object.assign(process.env, SENTINELS, { CS_DATA_MODE: 'fake', CS_CONTENT_STORE: store });
+    resetEnvCache();
+    const { text } = await health();
+    for (const value of Object.values(SENTINELS)) expect(text).not.toContain(value);
+    const body = JSON.parse(text);
+    expect(body.capabilities.find((c: { provider: string }) => c.provider === 'db')).toMatchObject({ state: 'read_only', mode: 'fake' });
   });
 
   it('refuses fake mode in production', async () => {

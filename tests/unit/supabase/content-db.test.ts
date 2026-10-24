@@ -62,7 +62,12 @@ describe('QueueSummaryRow SQL parity (DB-1 review item 8)', () => {
   beforeAll(async () => {
     db = await PGlite.create();
     await db.exec('create role anon; create role authenticated; create role service_role bypassrls; grant usage on schema public to service_role;');
-    for (const migration of ['20261024000100_content_authority.sql', '20261024000200_content_summary_reads.sql']) await db.exec(readFileSync(`supabase/migrations/${migration}`, 'utf8'));
+    // Use ICU en-US input collations: PGlite libc en_US behaves like C here.
+    // Only DB-1 table declarations are varied; DB-2 runs byte-for-byte from disk.
+    await db.exec("create collation fixture_en (provider = icu, locale = 'en-US')");
+    const base = readFileSync('supabase/migrations/20261024000100_content_authority.sql', 'utf8');
+    await db.exec(base.replace(/\b(library_id|content_source|date|platform|slot|content_id|setting|source_master_file_url|source_markdown_url) text\b/g, '$1 text collate "fixture_en"'));
+    await db.exec(readFileSync('supabase/migrations/20261024000200_content_summary_reads.sql', 'utf8'));
   });
   afterAll(async () => { await db?.close(); });
   it('groups one source across multiple masters, exposes all named counts and matches fake', async () => {
@@ -80,11 +85,57 @@ describe('QueueSummaryRow SQL parity (DB-1 review item 8)', () => {
     expect(result.rows[0]).toMatchObject({ master_link: 'https://example.com/a', count: 3, counts: { Total: 3, 'Not Reviewed': 2, Approved: 1, Queued: 1, 'Needs Fix': 1 } });
   });
   it('retains security_invoker and server-only view grants', async () => {
-    const { rows } = await db.query<{ reloptions: string[] }>("select reloptions from pg_class where relname='content_studio_queue_summary'");
-    expect(rows[0]!.reloptions).toContain('security_invoker=true');
-    for (const role of ['anon', 'authenticated']) {
-      await expect(db.transaction(async tx => { await tx.exec(`set local role ${role}`); await tx.query('select * from content_studio_queue_summary'); })).rejects.toThrow(/permission denied/);
+    for (const view of ['content_studio_queue_summary', 'content_studio_ready_queue']) {
+      const { rows } = await db.query<{ reloptions: string[] }>('select reloptions from pg_class where relname=$1', [view]);
+      expect(rows[0]!.reloptions).toContain('security_invoker=true');
+      for (const role of ['anon', 'authenticated']) {
+        await expect(db.transaction(async tx => { await tx.exec(`set local role ${role}`); await tx.query(`select * from ${view}`); })).rejects.toThrow(/permission denied/);
+      }
+      await db.transaction(async tx => { await tx.exec('set local role service_role'); await tx.query(`select * from ${view}`); });
     }
-    await db.transaction(async tx => { await tx.exec('set local role service_role'); expect((await tx.query('select * from content_studio_queue_summary')).rows).toHaveLength(1); });
+  });
+  it('uses C collation for mixed-case master URLs and markdown fallback despite ICU locale inputs', async () => {
+    await db.transaction(async tx => {
+      const masters = ['https://drive.google.com/file/d/a-SYNTH/view', 'https://drive.google.com/file/d/Z-SYNTH/view'];
+      const markdown = ['https://drive.google.com/file/d/b-SYNTH/view', 'https://drive.google.com/file/d/Y-SYNTH/view'];
+      for (const [i, source] of ['SYNTH-masters', 'SYNTH-fallback'].entries()) {
+        for (let j = 0; j < 2; j++) await tx.query(
+          'insert into content_studio_posts (collection, library_id, content_source, source_master_file_url, source_markdown_url) values ($1,$2,$3,$4,$5)',
+          ['queue', `SYNTH-collation-${i}-${j}`, source, i === 0 ? masters[j] : '', markdown[j]],
+        );
+      }
+      // Prove the fixture distinguishes C from ICU; a C-default-only test
+      // would stay green if either explicit minimum collation were removed.
+      const baseline = await tx.query<{ locale_min: string; c_min: string }>(
+        `select min(source_master_file_url collate "fixture_en") as locale_min,
+          min(source_master_file_url collate "C") as c_min
+         from content_studio_posts where content_source='SYNTH-masters'`,
+      );
+      expect(baseline.rows[0]).toEqual({ locale_min: masters[0], c_min: masters[1] });
+      const result = await tx.query(`select content_source, master_link from content_studio_queue_summary
+        where content_source in ('SYNTH-masters', 'SYNTH-fallback') order by content_source collate "C"`);
+      expect(result.rows).toEqual([
+        { content_source: 'SYNTH-fallback', master_link: markdown[1] },
+        { content_source: 'SYNTH-masters', master_link: masters[1] },
+      ]);
+      await tx.query("delete from content_studio_posts where library_id like 'SYNTH-collation-%'");
+    });
+  });
+  it('pins every PostgREST text order key to C, including Ready Queue and summary projections', async () => {
+    // Query the actual schema, not SQL text: plain PostgREST ORDER BY inherits
+    // these collations. Covers all keys in content-db.ts, including tie breaks.
+    const keys: Record<string, string[]> = {
+      content_studio_posts: ['library_id'],
+      content_studio_ready_queue: ['library_id'],
+      content_studio_schedule: ['date', 'platform', 'slot', 'content_id'],
+      content_studio_queue_summary: ['content_source'],
+      content_studio_workflow_settings: ['setting'],
+    };
+    for (const [table, columns] of Object.entries(keys)) {
+      const result = await db.query<{ attname: string; collname: string }>(`select a.attname, c.collname
+        from pg_attribute a join pg_collation c on c.oid=a.attcollation
+        where a.attrelid=$1::regclass and a.attname=any($2::text[]) order by a.attname collate "C"`, [table, columns]);
+      expect(result.rows).toEqual([...columns].sort().map(attname => ({ attname, collname: 'C' })));
+    }
   });
 });

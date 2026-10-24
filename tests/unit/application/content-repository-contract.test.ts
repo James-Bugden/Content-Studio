@@ -47,6 +47,9 @@ describe.each(factories)('MIG-14 reads: %s', (_name, create) => {
     for (const get of [() => repo.getLibrary('MISSING'), () => repo.getQueue('MISSING'), () => repo.getSchedule('MISSING')]) await expect(get()).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
   it('serves the same settings and named summary counts', async () => {
+    // syntheticQueueSummaryRows and the DB summary derive from the same Queue
+    // rows/rules. This proves self-consistency, not parity with the real Sheet
+    // summary tab; DB-4's real-Sheet parity report is the acceptance check.
     const repo = create();
     expect(await repo.schema()).toMatchObject({ ok: true });
     expect(await repo.workflowSettings()).toEqual(await sheet().workflowSettings());

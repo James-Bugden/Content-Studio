@@ -3,9 +3,9 @@ import type { Capability } from '@/domain/capability';
 import { serverEnv } from '@/lib/env';
 
 /** Capability from configuration presence only. Content-free by construction (OBS-01). */
-export function capabilities(options: { includeInactiveDb?: boolean } = {}): Capability[] {
+export function capabilities(): Capability[] {
   const env = serverEnv();
-  const includeDb = options.includeInactiveDb || env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read';
+  const includeDb = env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read';
   const active = (caps: Capability[]) => caps.filter(c => c.provider !== 'db' || includeDb);
   if (env.CS_DATA_MODE === 'fake') {
     return active((['auth', 'sheet', 'db', 'drive', 'typefully', 'ai'] as const).map((provider) => ({ provider, state: provider === 'db' ? 'read_only' : 'ready', mode: 'fake' })));
