@@ -9,7 +9,7 @@ test('MIG-12: DB save exports, Sheet hand edit is preserved and shown as a block
   await page.goto('/review/SYN-L001');
   await page.getByLabel(/Post copy/).fill('Synthetic first DB export with exact spaces  ');
   await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
+  await expect(page.getByText('Saved to the master Markdown and mirrored to the database.')).toBeVisible();
   await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic first DB export with exact spaces  ');
   await page.goto('/reconcile');
   await expect(page.getByText('Store mode: db.', { exact: false })).toContainText('Database is authoritative');
@@ -20,7 +20,7 @@ test('MIG-12: DB save exports, Sheet hand edit is preserved and shown as a block
   await page.goto('/review/SYN-L001');
   await page.getByLabel(/Post copy/).fill('Synthetic second DB save');
   await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
+  await expect(page.getByText('Saved to the master Markdown and mirrored to the database.')).toBeVisible();
   await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic second DB save');
   await page.goto('/reconcile');
   const conflict = page.locator('[data-reconcile-kind="export_mismatch"]');
