@@ -1,3 +1,6 @@
+import type { ContentRepository } from '@/application/ports';
+import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
+import { SupabaseContentRepository, contentPatch, contentColumn } from '@/integrations/supabase/content-repository';
 import { setTelemetrySink, type TelemetryEvent } from '@/observability/events';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
@@ -13,21 +16,27 @@ export const SCHEDULE = SHEET_TABS.schedule.name;
 /** Before every synthetic slot, so planned times are in the future. */
 export const NOW = () => new Date('2026-09-30T00:00:00Z');
 
-export function setup(extra: SyntheticTypefullyDraft[] = []) {
+export function setup(extra: SyntheticTypefullyDraft[] = [], mode: 'sheet' | 'db' = 'sheet') {
   const sheet = new FakeSheetTransport();
-  const repo = new SheetsContentRepository(sheet);
+  const db = new FakeContentDb();
+  const repo: ContentRepository = mode === 'db' ? new SupabaseContentRepository(db) : new SheetsContentRepository(sheet);
+  const store = {
+    get writes() { return mode === 'sheet' ? sheet.writes : db.history.filter(h => h.target_kind === 'schedule').map(h => ({ tab: SCHEDULE, writes: h.changed_fields.map(f => ({ column: SCHEDULE_ORDER.findIndex(field => contentColumn(field) === (f === 'final_synced_hash' ? 'final_synced_at' : f)) })) })); },
+    failNext(fault: Parameters<FakeSheetTransport['failNext']>[0]) { if (mode === 'db') db.failNext({ op: fault.op, code: fault.code, times: fault.times }); else sheet.failNext(fault); },
+  };
   const tf = new FakeTypefullyGateway([...SYNTH_TYPEFULLY_DRAFTS, ...extra], NOW);
   const row = (id: string): Promise<ScheduleRecord> => repo.getSchedule(id);
   const edit = async (contentId: string, field: ScheduleField, value: string) => {
     const r = await row(contentId);
-    sheet.externalEdit(SCHEDULE, r.row, SCHEDULE_ORDER.indexOf(field), value);
+    if (mode === 'db') db.externalEdit('schedule', contentId, contentPatch({ [field]: value }));
+    else sheet.externalEdit(SCHEDULE, r.row, SCHEDULE_ORDER.indexOf(field), value);
   };
   const input = async (contentId: string, operationId: string) => ({ operationId, contentId, expectedRevision: (await row(contentId)).revision });
-  return { sheet, repo, tf, row, edit, input };
+  return { sheet: store, db, repo, tf, row, edit, input };
 }
 
 /** Columns a list of Schedule writes touched, as field names. */
-export function writtenFields(sheet: FakeSheetTransport, since = 0): ScheduleField[] {
+export function writtenFields(sheet: { writes: { tab: string; writes: { column: number }[] }[] }, since = 0): ScheduleField[] {
   return sheet.writes
     .slice(since)
     .filter((w) => w.tab === SCHEDULE)

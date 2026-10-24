@@ -17,7 +17,7 @@ All new tables enable and force RLS with zero policies. Tables, sequences, views
 
 `20261024000100_content_authority.sql` defines the seven tables and two derived views in design section 1.1. It also defines `content_studio_import_runs` as the durable home of the Phase A counts, hashes and named exception ledger. The existing jsonb Sheet staging objects remain unchanged. This additional prefixed table contains run evidence, never another copy of Content payloads.
 
-The version singleton starts at 1. The server-only adapter contract constant and `assertContentSchemaVersion` agree with it; missing/malformed/different versions raise SCHEMA_DRIFT with kind `version`. Runtime schema reads and adapter wiring belong to the later adapter issues.
+The DB-1 version singleton starts at 1; DB-3 advances it and the compiled adapter expectation to 2. The server-only adapter contract constant and `assertContentSchemaVersion` agree with it; missing/malformed/different versions raise SCHEMA_DRIFT with kind `version`. Runtime schema reads and adapter wiring belong to the later adapter issues.
 
 The four entry points are:
 
@@ -55,6 +55,8 @@ drop function if exists public.content_studio_insert_queue_idea(text, text, text
 drop function if exists public.content_studio_write_through(text, text, text, text, text, bigint, jsonb);
 drop function if exists public.content_studio_import_run(text, text, text, jsonb, jsonb, jsonb, jsonb);
 drop function if exists public.content_studio_mutate(text, text, text, text, text, text, bigint, jsonb);
+drop function if exists content_studio_private.content_studio_mutate(text, text, text, text, text, text, bigint, jsonb);
+drop schema if exists content_studio_private;
 drop table if exists public.content_studio_import_runs;
 drop table if exists public.content_studio_schema_version;
 drop table if exists public.content_studio_audit_events;
@@ -79,3 +81,27 @@ Table drops also remove their owned `content_studio_row_history_history_id_seq` 
 - Finding 7 — DB-3: consider moving `content_studio_mutate` into a non-exposed schema. Service-role callers can currently invoke import mode directly without an enclosing import ledger entry; service role already has direct DML privileges.
 - Finding 8 — resolved in DB-2: `20261024000200_content_summary_reads.sql` retains the existing view columns and adds `counts` with Total, Not Reviewed, Approved, Queued and Needs Fix. It retains DB-1's Content Queue collection scope, groups once per content source, and chooses the lexically first nonblank master URL when a source has several (falling back to the Source Markdown URL when the Source Master File has no link). Not Reviewed includes blank/Not Reviewed/Pending; Needs Fix includes Changes Requested, copyright REWORK or duplicate CHECK/DUPLICATE. SQL and fake parity, multiple masters, security_invoker and role denial are tested with synthetic PGlite data. The adapter also accepts nullable named counts as `QueueSummaryRow` requires. No migration has been applied live.
 - Finding 11 — DB-3: PostgREST defaults to READ COMMITTED. Under REPEATABLE READ/SERIALIZABLE the snapshot can precede the advisory lock, so concurrent first deliveries may fail closed with 23505/40001; define retry handling and verify with real independent backends. PGlite's single connection cannot establish that behavior.
+
+## DB-3 adapter and replay contract
+
+DB-3 enables writes only when the repository uses DB revisions. `db-read`
+remains read-only here; DB-5 owns Sheet-first writes in that mode. The runtime
+still defaults to `sheet` and rejects every live DB store mode. No migration
+has been applied live, no production phase is flipped, and no new dependency
+is required.
+
+The ledger stores content-free SQL results, never the application record.
+Replay responses add `replayed: true` without changing the stored result.
+The adapter reconstructs the exact successful record from the current row at
+that version or the earliest matching history before-image after a later edit.
+A confirmation read failure is PARTIAL_FAILURE with a completed DB step; a
+retry uses the same durable ledger entry. DB-4 must preserve this revision
+snapshot rule when adding metadata-only copies that do not increment versions.
+No-op patches preserve the row version and add no history; attempts have audit
+events, while ledger replay adds neither history nor a duplicate audit event.
+
+`exportContentAudit` is an explicit public-evidence projection: identifiers and
+hashes become at most 12-character hashes, field names use a compiled allowlist,
+and raw identifiers, URLs, timestamps and copy are omitted. Private database
+history and audit tables retain their operational identifiers. The scheduled
+private history/backup exporter remains DB-6 work.

@@ -33,7 +33,17 @@ export type ContentSummaryRow = {
 };
 export type ContentSettingRow = { setting: string; value: string; notes: string; source_sheet_row: number | null };
 
-/** Read-only DB-2 boundary. Mutation/RPC methods are introduced by DB-3. */
+export type ContentTarget = ContentCollection | 'schedule';
+export type ContentWrite = {
+  operationId: string; patchHash: string; actorHash: string; kind: ContentTarget; id: string;
+  expectedVersion: string | null; data: Record<string, unknown>;
+};
+export type ContentWriteResult = {
+  ok: boolean; code: 'CONFLICT' | 'STALE_READ' | 'NOT_FOUND' | null;
+  steps: { state: 'applied' | 'already_applied' | 'stale' | 'not_found' | 'conflict'; reason?: string }[];
+  revision: number | string | null; replayed?: boolean;
+};
+
 export interface ContentDb {
   readonly mode: 'fake' | 'live';
   schemaVersion(): Promise<unknown>;
@@ -43,4 +53,8 @@ export interface ContentDb {
   getSchedule(id: string): Promise<ContentScheduleRow | null>;
   queueSummary(): Promise<ContentSummaryRow[]>;
   workflowSettings(): Promise<ContentSettingRow[]>;
+  applyPatch(write: ContentWrite): Promise<ContentWriteResult>;
+  insertQueueIdea(write: ContentWrite): Promise<ContentWriteResult>;
+  /** Exact successful revision, recovered from before-images on durable replay. */
+  mutationRow(kind: ContentTarget, id: string, version: string): Promise<ContentPostRow | ContentScheduleRow>;
 }

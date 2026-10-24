@@ -112,12 +112,12 @@ describe('DB revision and failure contracts', () => {
     const seed = syntheticContentDbSeed(); Object.assign(seed.posts[0]!, { hook_score: 'invalid' });
     await expect(new SupabaseContentRepository(new FakeContentDb(seed)).listLibrary()).rejects.toMatchObject({ code: 'SCHEMA_DRIFT' });
   });
-  it('refuses all writes without changing the seeded data', async () => {
-    const repo = new SupabaseContentRepository(new FakeContentDb());
+  it('refuses db-read writes without changing the seeded data', async () => {
+    const repo = new SupabaseContentRepository(new FakeContentDb(), 'db-read');
     const before = await repo.listLibrary();
     const actor = { sub: 'synthetic-owner', role: 'owner' as const };
     const m = { actor, operationId: 'SYNTH-op-0001', expectedRevision: before[0]!.revision, target: { libraryId: before[0]!.value.libraryId }, patch: { draftContent: 'Synthetic change' } };
-    for (const result of [await repo.updateLibrary(m), await repo.updateQueue(m), await repo.updateSchedule({ ...m, target: { contentId: 'SYNTH' }, patch: { content: 'Synthetic change' } }), await repo.createQueueIdea({ actor, operationId: m.operationId, libraryId: 'SYNTH', sourcePlatform: 'X', currentHook: 'Synthetic', draftContent: 'Synthetic' })]) expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN', steps: [] });
+    for (const result of [await repo.updateLibrary(m), await repo.updateQueue(m), await repo.updateSchedule({ ...m, target: { contentId: 'SYNTH' }, patch: { content: 'Synthetic change' } }), await repo.createQueueIdea({ actor, operationId: m.operationId, libraryId: 'SYNTH', sourcePlatform: 'X', currentHook: 'Synthetic', draftContent: 'Synthetic' })]) expect(result).toMatchObject({ ok: false, code: 'FORBIDDEN' });
     expect(await repo.listLibrary()).toEqual(before);
     expect(repo.capability()).toEqual({ provider: 'db', state: 'read_only', mode: 'fake' });
   });
@@ -133,6 +133,7 @@ describe('composition', () => {
     vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', mode); resetEnvCache(); resetServices();
     const repo = getServices().repo;
     expect(repo.capability().provider).toBe(mode === 'db' || mode === 'db-read' ? 'db' : 'sheet');
+    expect(repo.capability().state).toBe(mode === 'db' || mode === 'sheet' || mode === 'db-shadow' ? 'ready' : 'read_only');
     expect(capabilities().some(c => c.provider === 'db')).toBe(mode === 'db' || mode === 'db-read');
     expect((await repo.listLibrary()).length).toBeGreaterThan(0);
     expect((await repo.listReadyQueue()).length).toBeGreaterThan(0);

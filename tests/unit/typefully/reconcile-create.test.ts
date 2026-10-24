@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setTelemetrySink } from '@/observability/events';
 import { createDraft, createIdempotencyKey, linkDraft, reconcile } from '@/application/typefully';
-import { NOW, captureTelemetry, owner, setup, viewer } from './harness';
+import { NOW, captureTelemetry, owner, setup as setupStore, viewer } from './harness';
+
+describe.each(['sheet', 'db'] as const)('%s repository', mode => {
+const setup = (extra: Parameters<typeof setupStore>[0] = []) => setupStore(extra, mode);
 
 beforeEach(() => {
   captureTelemetry();
@@ -233,4 +236,6 @@ describe('create gates', () => {
     await edit('2026-10-01-MAIN-X', 'contentStage', 'Ready');
     expect(await createDraft(r2, t2, owner, await in2('2026-10-01-MAIN-X', 'op_linked_row'), { now: NOW })).toMatchObject({ ok: false, code: 'CONFLICT', details: { reason: 'already_linked' } });
   });
+});
+
 });

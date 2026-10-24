@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { setTelemetrySink } from '@/observability/events';
 import { compareCopy, pushToTypefully, reconcile, syncAnalytics, syncFromTypefully } from '@/application/typefully';
 import { SCHEDULE_SYNC_FIELDS } from '@/domain/sheet-schema';
-import { NOW, captureTelemetry, owner, setup, writtenFields } from './harness';
+import { NOW, captureTelemetry, owner, setup as setupStore, writtenFields } from './harness';
+
+describe.each(['sheet', 'db'] as const)('%s repository', mode => {
+const setup = (extra: Parameters<typeof setupStore>[0] = []) => setupStore(extra, mode);
 
 afterEach(() => setTelemetrySink(null));
 
@@ -253,4 +256,6 @@ describe('OBS-04: provider status, duration, rate limit and outcome are recorded
     const kinds = events.filter((e) => e.name === 'typefully.reconcile').map((e) => e.facts?.kind);
     expect(kinds).toEqual(['linked', 'ambiguous']);
   });
+});
+
 });
