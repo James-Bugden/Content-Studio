@@ -29,7 +29,7 @@ export type MutationEnvelope<TTarget, TPatch> = {
 export type StepResult = {
   step: string;
   status: 'done' | 'skipped_already_applied' | 'failed' | 'pending';
-  provider: 'sheet' | 'drive' | 'typefully' | 'ai';
+  provider: 'sheet' | 'db' | 'drive' | 'typefully' | 'ai';
   /** Provider revision/fingerprint after the step, when known. */
   revision?: string;
   errorCode?: ErrorCode;

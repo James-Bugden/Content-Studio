@@ -72,7 +72,7 @@ export type TypefullyPanelView =
   | { kind: 'ambiguous'; row: RowDiscriminators; candidates: CandidateView[] }
   | { kind: 'no_match'; row: RowDiscriminators; searched: boolean }
   | { kind: 'invalid_row'; reason: 'platform_unrecognised' }
-  | { kind: 'provider_error'; provider: 'sheet' | 'typefully'; code: ErrorCode };
+  | { kind: 'provider_error'; provider: 'sheet' | 'db' | 'typefully'; code: ErrorCode };
 
 export type ScheduleRowFacts = {
   contentId: string;

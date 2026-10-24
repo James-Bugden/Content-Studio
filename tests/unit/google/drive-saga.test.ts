@@ -1,3 +1,6 @@
+import type { ContentRepository } from '@/application/ports';
+import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
+import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
@@ -10,14 +13,17 @@ import { SYNTH_MARKDOWN, SYNTH_MASTER_FILE_ID } from '@/fixtures/synthetic';
 import type { Actor } from '@/domain/mutation';
 import type { DriveGateway } from '@/application/ports';
 
+describe.each(['sheet', 'db'] as const)('%s repository', store => {
 const owner: Actor = { sub: '100000000000000000001', role: 'owner' };
 let sheet: FakeSheetTransport;
-let repo: SheetsContentRepository;
+let repo: ContentRepository;
+let db: FakeContentDb;
 let drive: FakeDriveGateway;
 
 beforeEach(() => {
   sheet = new FakeSheetTransport();
-  repo = new SheetsContentRepository(sheet);
+  db = new FakeContentDb();
+  repo = store === 'db' ? new SupabaseContentRepository(db) : new SheetsContentRepository(sheet);
   drive = new FakeDriveGateway();
 });
 
@@ -66,7 +72,7 @@ describe('DRV-01 / REV-07: exact round trip through the saga', () => {
     const proposed = '談薪水不是吵架 🙂\n\n  indented line\t\nlast line with trailing spaces   ';
     const r = await saveDraft(repo, drive, input('SYN-L008', record, read.section.bodyHash, proposed));
     expect(r.ok).toBe(true);
-    expect(r.steps.map((s) => [s.provider, s.status])).toEqual([['drive', 'done'], ['sheet', 'done']]);
+    expect(r.steps.map((s) => [s.provider, s.status])).toEqual([['drive', 'done'], [store, 'done']]);
     const after = drive.textOf(SYNTH_MASTER_FILE_ID);
     const section = findSection(after, 'SYN-L008');
     if (!section.ok) throw new Error('lost');
@@ -96,7 +102,7 @@ describe('DRV-02 / REV-08: unsafe writes are refused', () => {
     expect(r).toMatchObject({ ok: false, code: 'STALE_READ', conflict: { provider: 'drive' } });
     expect(r.conflict?.current).toContain('Edited in Drive.');
     expect(drive.writes).toHaveLength(0);
-    expect(sheet.writes).toHaveLength(0);
+    expect(store === 'db' ? db.history.filter(h => h.operation_id !== 'synthetic-external') : sheet.writes).toHaveLength(0);
   });
 
   it('external edit to a different section is merged safely by replacing only ours', async () => {
@@ -110,9 +116,10 @@ describe('DRV-02 / REV-08: unsafe writes are refused', () => {
   it('external Sheet edit is STALE_READ with the current Sheet text', async () => {
     const { record, read } = await load('SYN-L001');
     const col = sheet.rawTab('Content Library')[0]!.findIndex((c) => c.value === 'Draft Content');
-    sheet.externalEdit('Content Library', record.row, col, 'Edited in the Sheet');
+    if (store === 'db') db.externalEdit('library', 'SYN-L001', { draft_content: 'Edited in the Sheet' });
+    else sheet.externalEdit('Content Library', record.row, col, 'Edited in the Sheet');
     const r = await saveDraft(repo, drive, input('SYN-L001', record, read.section.bodyHash, 'Mine'));
-    expect(r).toMatchObject({ ok: false, code: 'STALE_READ', conflict: { provider: 'sheet', current: 'Edited in the Sheet' } });
+    expect(r).toMatchObject({ ok: false, code: 'STALE_READ', conflict: { provider: store, current: 'Edited in the Sheet' } });
     expect(drive.writes).toHaveLength(0);
   });
 
@@ -127,7 +134,7 @@ describe('DRV-02 / REV-08: unsafe writes are refused', () => {
     const r = await saveDraft(repo, drive, input('SYN-L001', record, '0000000000000000', 'Mine'));
     expect(r).toMatchObject({ ok: false, code });
     expect(drive.writes).toHaveLength(0);
-    expect(sheet.writes).toHaveLength(0);
+    expect(store === 'db' ? db.history.filter(h => h.operation_id !== 'synthetic-external') : sheet.writes).toHaveLength(0);
   });
 
   it('duplicate Library-ID sections are refused', async () => {
@@ -141,7 +148,7 @@ describe('DRV-02 / REV-08: unsafe writes are refused', () => {
 describe('DRV-03 / DRV-04: partial failures are explicit and retryable', () => {
   it('Drive success then Sheet failure is PARTIAL_FAILURE; retry completes without a second Drive write', async () => {
     const { record, read } = await load('SYN-L001');
-    sheet.failNext({ op: 'write', code: 'PROVIDER_UNAVAILABLE' });
+    (store === 'db' ? db : sheet).failNext({ op: 'write', code: 'PROVIDER_UNAVAILABLE' });
     const first = await saveDraft(repo, drive, input('SYN-L001', record, read.section.bodyHash, 'Mine'));
     expect(first).toMatchObject({ ok: false, code: 'PARTIAL_FAILURE' });
     expect(first.steps.map((s) => s.status)).toEqual(['done', 'failed']);
@@ -154,11 +161,12 @@ describe('DRV-03 / DRV-04: partial failures are explicit and retryable', () => {
   it('Sheet already mirrored but Drive write fails is PARTIAL_FAILURE, not success', async () => {
     const { record, read } = await load('SYN-L001');
     const col = sheet.rawTab('Content Library')[0]!.findIndex((c) => c.value === 'Draft Content');
-    sheet.externalEdit('Content Library', record.row, col, 'Mine');
+    if (store === 'db') db.externalEdit('library', 'SYN-L001', { draft_content: 'Mine' });
+    else sheet.externalEdit('Content Library', record.row, col, 'Mine');
     drive.failNext({ op: 'write', code: 'PROVIDER_UNAVAILABLE' });
     const r = await saveDraft(repo, drive, input('SYN-L001', record, read.section.bodyHash, 'Mine'));
     expect(r).toMatchObject({ ok: false, code: 'PARTIAL_FAILURE' });
-    expect(r.steps.map((s) => [s.provider, s.status])).toEqual([['drive', 'failed'], ['sheet', 'pending']]);
+    expect(r.steps.map((s) => [s.provider, s.status])).toEqual([['drive', 'failed'], [store, 'pending']]);
   });
 
   it('Drive failure alone writes nothing and is not partial', async () => {
@@ -166,7 +174,7 @@ describe('DRV-03 / DRV-04: partial failures are explicit and retryable', () => {
     drive.failNext({ op: 'write', code: 'RATE_LIMITED' });
     const r = await saveDraft(repo, drive, input('SYN-L001', record, read.section.bodyHash, 'Mine'));
     expect(r).toMatchObject({ ok: false, code: 'RATE_LIMITED' });
-    expect(sheet.writes).toHaveLength(0);
+    expect(store === 'db' ? db.history.filter(h => h.operation_id !== 'synthetic-external') : sheet.writes).toHaveLength(0);
   });
 
   it('a fully applied save replays as already applied', async () => {
@@ -210,4 +218,6 @@ describe('SEC-04 / VIS-01: inert content and safe previews', () => {
   ])('refuses %s', async (_name, ref, code) => {
     await expect(previewAsset(drive, ref)).rejects.toMatchObject({ code });
   });
+});
+
 });

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestDatabase, type TestDatabase } from '../../replies/support/db';
 import { buildTypedImport, type ImportEnvelope } from '@/application/content-import';
@@ -22,11 +22,20 @@ const rpc = (e: ImportEnvelope) => db.asService(q => q.query<{ result: { ok: boo
   [e.operationId, e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows]));
 beforeAll(async () => {
   db = await createTestDatabase();
-  for (const migration of ['20261024000100_content_authority.sql', '20261024000200_content_summary_reads.sql']) await db.raw.exec(readFileSync(`supabase/migrations/${migration}`, 'utf8'));
+  // Include future Content migrations: a later RPC redefinition must preserve
+  // every representation accepted by the complete import chain.
+  for (const migration of readdirSync('supabase/migrations').filter(f => /^\d+_content_.*\.sql$/.test(f)).sort()) await db.raw.exec(readFileSync(`supabase/migrations/${migration}`, 'utf8'));
 }, 120_000);
 afterAll(async () => { await db?.close(); });
 
 describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
+  it.each(['formula_display', 'number_formatting', 'trailing_whitespace', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting'])('the complete migration chain still accepts %s', async kind => {
+    const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey: 'synthetic_workbook' });
+    const e = buildTypedImport(snapshot, new Map(), actor);
+    e.exceptions = [{ class: kind as ImportEnvelope['exceptions'][number]['class'], collection: 'schedule', field: 'posted', hash: mirrorHash(kind) }];
+    e.snapshotHash = mirrorHash({ counts: e.counts, hashes: e.hashes, exceptions: e.exceptions, rows: e.rows });
+    expect((await rpc(e)).rows[0]!.result.ok).toBe(true);
+  });
   it('SQL accepts the named real-workbook representations and persists their ledger', async () => {
     const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey: 'synthetic_workbook' });
     const row = snapshot.rows.find(r => r.collection === 'schedule')!;

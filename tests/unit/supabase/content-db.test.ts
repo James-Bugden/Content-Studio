@@ -49,7 +49,7 @@ describe('read-only PostgREST transport', () => {
   it('rehydrates typed UTC timestamps and hash stamps without losing zero/null metrics', async () => {
     const seed = syntheticContentDbSeed(); const row = seed.schedule.find(r => r.typefully_status === 'Published')!;
     row.final_synced_at = '2026-10-01T01:00:00+00:00'; row.final_synced_hash = 'abcdef12'; row.published_at = '2026-10-01T00:00:04+00:00'; row.analytics_synced_at = '2026-10-02T01:00:00+00:00';
-    const request = vi.fn<typeof fetch>(async input => String(input).includes('schema_version') ? Response.json([{ version: 1 }], { headers: { 'content-range': '0-0/1' } }) : Response.json([row], { headers: { 'content-range': '0-0/1' } }));
+    const request = vi.fn<typeof fetch>(async input => String(input).includes('schema_version') ? Response.json([{ version: 2 }], { headers: { 'content-range': '0-0/1' } }) : Response.json([row], { headers: { 'content-range': '0-0/1' } }));
     const record = await new SupabaseContentRepository(new SupabaseContentDb({ ...options, fetch: request })).getSchedule(String(row.content_id));
     expect(record.cells.finalSyncedAt).toBe('2026-10-01T09:00:00+08:00 #abcdef12');
     expect(record.cells.publishedAt).toBe('2026-10-01T08:00:04+08:00');
