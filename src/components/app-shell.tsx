@@ -1,6 +1,7 @@
 import { NavLink } from './nav-link';
 import { NavMore } from './nav-more';
 import { ToastProvider } from './toaster';
+import { NavigationCountsProvider } from './navigation-counts';
 
 /**
  * Application frame for every signed-in surface (CS-006, UX-01, UX-03; CS-042).
@@ -35,6 +36,7 @@ export type AppShellProps = {
 export function AppShell({ children, accountSlot }: AppShellProps) {
   return (
     <ToastProvider>
+      <NavigationCountsProvider>
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-primary px-4 py-2 font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -73,6 +75,7 @@ export function AppShell({ children, accountSlot }: AppShellProps) {
           {children}
         </main>
       </div>
+      </NavigationCountsProvider>
     </ToastProvider>
   );
 }

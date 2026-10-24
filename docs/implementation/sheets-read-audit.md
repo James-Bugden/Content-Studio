@@ -95,6 +95,29 @@ Counts are per process, within the existing bounded 500-event buffer;
 transport-internal HTTP retries are not separate repository calls. This lets
 #88/#93 compare logical read costs without introducing a new diagnostics surface.
 
+## CS-044: cache-only navigation counts (#93)
+
+Next up and Fix issues publish only their derived task/blocking totals after
+their existing reads complete. Navigation uses an authenticated, private/no-store
+endpoint that only inspects those totals and existing Library/Schedule cache
+witnesses. It never calls a loader, Sheet transport, Drive or Typefully. Cold,
+incomplete, invalidated, replaced or older-than-15-second snapshots produce no
+badge; a successfully derived zero remains a real zero. Existing last-good
+snapshots also permit synthetic zero-retention mode without changing its reads.
+
+Counts are best effort per server process. Next up becomes available after a
+board load; Fix issues after a complete reconciliation load. Visiting an unrelated
+page does not run either workflow just to populate a badge. The phone keeps its
+existing four tabs and displays Fix issues' badge in More. Browser expiry removes
+numbers even when the page remains open. Mutation code is unchanged; the existing
+cache invalidation makes its witnesses unavailable to subsequent navigation reads.
+
+`tests/unit/navigation-counts.test.ts` asserts zero extra adapter calls for cold,
+warm and expired navigation: a board plus reconciliation requires seven Sheet
+calls (three board tabs and four existing schema checks), and ten navigation
+reads add zero Sheet, Drive or Typefully calls. Route and component tests also
+cover authentication, private caching, unknown/zero display and expiry.
+
 ## Unchanged limits
 
 Caches do not span server instances; external Sheet edits can remain invisible

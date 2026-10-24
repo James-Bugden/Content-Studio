@@ -34,6 +34,8 @@ export interface ContentRepository {
   listLibrary(): Promise<LibraryRecord[]>;
   /** Recent cached rows for an explicitly labelled read-only list after a transient failure. */
   lastGoodLibrary?(error: unknown): LibraryRecord[] | null;
+  /** Cache-only witnesses for disposable navigation counts; never starts a read. */
+  navigationSnapshots?(): { sources: readonly number[]; expiresAt: number } | null;
   getLibrary(libraryId: string): Promise<LibraryRecord>;
   /** Content Queue: same headers/shape as Content Library, a second writable tab of idea-stage rows. */
   listQueue(): Promise<LibraryRecord[]>;

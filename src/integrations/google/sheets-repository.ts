@@ -53,7 +53,7 @@ const OP_CACHE_MAX = 500;
 type OpRecord = { patchHash: string; result: MutationResult<unknown> };
 
 type TabRead<F extends string> = { index: HeaderIndex<F>; rows: { raw: RawRow; row: number }[] };
-type ReadEntry = { expiresAt: number | null; rows: Promise<RawRow[]>; lastGood?: { rows: RawRow[]; at: number } };
+type ReadEntry = { generation: number; expiresAt: number | null; rows: Promise<RawRow[]>; lastGood?: { rows: RawRow[]; at: number } };
 const LAST_GOOD_MAX_AGE_MS = 5 * 60_000;
 
 export class SheetsContentRepository implements ContentRepository {
@@ -72,6 +72,7 @@ export class SheetsContentRepository implements ContentRepository {
    * compares against a cached revision.
    */
   private readonly readCache = new Map<string, ReadEntry>();
+  private readGeneration = 0;
 
   private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<RawRow[]> {
     // Filter/search/editor navigation shares a short-lived Library snapshot.
@@ -89,7 +90,7 @@ export class SheetsContentRepository implements ContentRepository {
     const hit = this.readCache.get(key);
     if (hit && (hit.expiresAt === null || Date.now() < hit.expiresAt)) return hit.rows;
     const rows = this.readAll(tabKey, withExtras);
-    const entry: ReadEntry = { expiresAt: null, rows, lastGood: hit?.lastGood };
+    const entry: ReadEntry = { generation: ++this.readGeneration, expiresAt: null, rows, lastGood: hit?.lastGood };
     this.readCache.set(key, entry);
     // In-flight de-duplication is independent of retention. A slow provider
     // request stays shared until it settles, even if it outlasts the TTL.
@@ -189,6 +190,16 @@ export class SheetsContentRepository implements ContentRepository {
   async listLibrary(): Promise<LibraryRecord[]> {
     const { index, rows } = await this.readTab('library', LIBRARY_HEADERS);
     return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
+  }
+
+  /** Use completed existing reads only. Invalidation/failure hides derived badges. */
+  navigationSnapshots(): { sources: readonly number[]; expiresAt: number } | null {
+    const entries = ['library:true', 'schedule:true'].map((key) => this.readCache.get(key));
+    if (entries.some((entry) => !entry?.lastGood || entry.expiresAt === null || entry.expiresAt === 0 || Date.now() - entry.lastGood.at >= 15_000)) return null;
+    return {
+      sources: entries.map((entry) => entry!.generation),
+      expiresAt: Math.min(...entries.map((entry) => entry!.lastGood!.at + 15_000)),
+    };
   }
 
   /** Explicit read-only recovery; ordinary reads and mutation reads never fall back. */
