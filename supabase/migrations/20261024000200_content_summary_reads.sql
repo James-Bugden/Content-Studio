@@ -3,7 +3,7 @@
 -- lexical order; never split a source or multiply its totals by master count.
 begin;
 create or replace view public.content_studio_queue_summary with (security_invoker = true) as
-  select content_source, coalesce(min(coalesce(nullif(source_master_file_url, ''), nullif(source_markdown_url, ''))), '') as master_link,
+  select content_source, coalesce(min(nullif(source_master_file_url, '')), min(nullif(source_markdown_url, '')), '') as master_link,
     count(*) as count,
     jsonb_build_object(
       'Total', count(*),

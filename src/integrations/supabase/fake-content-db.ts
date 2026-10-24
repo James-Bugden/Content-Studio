@@ -64,7 +64,8 @@ export class FakeContentDb implements ContentDb {
       const source = String(row.content_source); groups.set(source, [...groups.get(source) ?? [], row]);
     }
     return [...groups].sort(([a], [b]) => textCompare(a, b)).map(([content_source, rows]) => ({
-      content_source, master_link: rows.map(r => r.source_master_file_url || r.source_markdown_url).filter(Boolean).sort()[0] ?? '', count: rows.length,
+      content_source, master_link: rows.map(r => r.source_master_file_url).filter(Boolean).sort()[0]
+        ?? rows.map(r => r.source_markdown_url).filter(Boolean).sort()[0] ?? '', count: rows.length,
       counts: { Total: rows.length, 'Not Reviewed': rows.filter(r => ['', 'Not Reviewed', 'Pending'].includes(String(r.review_status))).length,
         Approved: rows.filter(r => r.review_status === 'Approved').length, Queued: rows.filter(r => r.queue_for_schedule).length,
         'Needs Fix': rows.filter(r => r.review_status === 'Changes Requested' || r.copyright_qa === 'REWORK' || ['CHECK', 'DUPLICATE'].includes(String(r.duplicate_qa))).length },
