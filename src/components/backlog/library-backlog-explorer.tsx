@@ -172,11 +172,13 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     {search.trim() && (pending || loading || error) ? null : active.total === 0 ? <p role="status" className="rounded-lg border border-line bg-card p-4 text-sm">No posts match. Try a different source, status or search.</p>
       : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} canEdit={canEdit} pestoOptions={pestoOptions}
         sort={sort ?? 'sheet'} dir={dir ?? 'asc'} group={group} groupTotals={active.groupTotals} onSort={sortBy} />}
-    {active.totalPages > 1 && !(search.trim() && (pending || loading || error)) ? <nav aria-label="Backlog pages" className="flex items-center justify-between text-sm">
-      {search.trim() ? <button type="button" disabled={pending || active.page <= 1} onClick={() => { setPending(true); setSearchPage(active.page - 1); }} className="min-h-11 text-primary underline disabled:opacity-40">Previous page</button>
+    {/* Keep search controls mounted and focusable during loading and at page edges.
+        aria-disabled plus guarded handlers prevents navigation without losing keyboard focus. */}
+    {active.totalPages > 1 && !error ? <nav aria-label="Backlog pages" className="flex items-center justify-between text-sm">
+      {search.trim() ? <button type="button" aria-disabled={pending || loading || active.page <= 1} onClick={() => { if (pending || loading || active.page <= 1) return; setPending(true); setSearchPage(active.page - 1); }} className="min-h-11 text-primary underline aria-disabled:opacity-40">Previous page</button>
         : active.page > 1 ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(active.page - 1)}>Previous page</a> : <span />}
       <span>Page {active.page} / {active.totalPages}</span>
-      {search.trim() ? <button type="button" disabled={pending || active.page >= active.totalPages} onClick={() => { setPending(true); setSearchPage(active.page + 1); }} className="min-h-11 text-primary underline disabled:opacity-40">Next page</button>
+      {search.trim() ? <button type="button" aria-disabled={pending || loading || active.page >= active.totalPages} onClick={() => { if (pending || loading || active.page >= active.totalPages) return; setPending(true); setSearchPage(active.page + 1); }} className="min-h-11 text-primary underline aria-disabled:opacity-40">Next page</button>
         : active.page < active.totalPages ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(active.page + 1)}>Next page</a> : <span />}
     </nav> : null}
     {dialog}

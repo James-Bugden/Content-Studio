@@ -74,7 +74,8 @@ function GroupCount({ label, shown, total }: { label: string; shown: number; tot
 }
 
 /** Bounded rows, keeping the page light even when the Sheet holds thousands of posts. */
-export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showHooks = true, sort = 'sheet', dir = 'asc', group, groupTotals = {}, onSort, canEdit = false, pestoOptions = [] }: {
+export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showHooks = true, sort = 'sheet', dir = 'asc', group, groupTotals = {}, onSort, canEdit = false, pestoOptions = [], readOnly = false }: {
+  readOnly?: boolean;
   rows: Row[]; statuses?: Record<string, BacklogReadiness>; compact?: boolean; showHooks?: boolean;
   /** Owner edits PESTO in place (CS-054); needs each row's revision. */
   canEdit?: boolean; pestoOptions?: readonly string[];
@@ -110,7 +111,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                 {sortKey && onSort ? <button type="button" onClick={() => onSort(sortKey)} title={`Sort by ${column.label === '#' ? 'Sheet order' : column.label}`}
                   className={`inline-flex min-h-8 items-center gap-1 rounded text-left font-medium hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${active ? 'text-ink' : ''}`}>
                   {column.label}<span aria-hidden="true" className={active ? '' : 'opacity-30'}>{active && dir === 'desc' ? '↓' : '↑'}</span>
-                </button> : column.label}
+                </button> : column.label || <span className="sr-only">Actions</span>}
               </th>;
             })}
           </tr>
@@ -129,7 +130,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                   <td className={`${cell} tabular-nums text-ink-soft`}>{record.row}</td>
                   <td className={`${cell} font-medium`}><span title={item.contentSource || 'Uncategorised'} className="line-clamp-2 break-words">{item.contentSource || 'Uncategorised'}</span></td>
                   <td className={cell}>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</td>
-                  <td className={cell}>{canEdit && record.revision
+                  <td className={cell}>{canEdit && !readOnly && record.revision
                     ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} />
                     : <PillarTag value={item.pesto} />}</td>
                   {showHooks ? <><td className={cell}><span title={item.hookTemplate || undefined} className="line-clamp-3 break-words">{item.hookTemplate || '—'}</span></td>
@@ -139,7 +140,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                     <PostContent text={item.draftContent} />
                   </td>
                   <td className={`sticky right-20 z-10 border-l border-line bg-card ${cell}`}><ReadinessExplanation status={status} /></td>
-                  <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}><OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink></td>
+                  <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}>{readOnly ? <button disabled className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}</td>
                 </tr>
               );
             })}
@@ -158,10 +159,10 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
               <p className="text-base font-semibold">{title}</p>
               <div className="text-sm"><PostContent text={item.draftContent} /></div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span>
-                {canEdit && record.revision ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} /> : <PillarTag value={item.pesto} />}
+                {canEdit && !readOnly && record.revision ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} /> : <PillarTag value={item.pesto} />}
                 <span>Hook template: {item.hookTemplate || '—'}</span></div>
               {showHooks && item.hookAlternatives ? <details className="text-xs"><summary className="inline-flex min-h-11 cursor-pointer items-center font-medium text-ink-soft">Hook alternatives ({parseHookAlternatives(item.hookAlternatives).length})</summary><div className="pt-1 text-sm"><HookAlternativesList raw={item.hookAlternatives} /></div></details> : null}
-              <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>
+              {readOnly ? <button disabled className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}
             </li>;
           })}
         </Fragment>)}
