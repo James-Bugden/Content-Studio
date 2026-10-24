@@ -27,6 +27,23 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
+  it('SQL accepts the named real-workbook representations and persists their ledger', async () => {
+    const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey: 'synthetic_workbook' });
+    const row = snapshot.rows.find(r => r.collection === 'schedule')!;
+    Object.assign((row.payload as { cells: Record<string, string> }).cells, { views: '007', posted: '', publishedAt: '2026-10-01T00:00:00Z' });
+    row.rowHash = mirrorHash(row.payload);
+    const library = snapshot.rows.find(r => r.collection === 'library')!;
+    (library.payload as { cells: Record<string, string> }).cells.queueForSchedule = 'yes';
+    library.rowHash = mirrorHash(library.payload);
+    const e = buildTypedImport(snapshot, new Map(), actor);
+    expect(e.exceptions).toEqual(expect.arrayContaining(['number_formatting', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting'].map(kind => expect.objectContaining({ class: kind }))));
+    expect((await rpc(e)).rows[0]!.result.ok).toBe(true);
+    const stored = await db.asService(q => q.query<{ posted: boolean; views: number; published_at: Date }>('select posted,views,published_at from content_studio_schedule where content_id=$1', [row.stableId]));
+    expect(stored.rows[0]).toMatchObject({ posted: false, views: 7 });
+    expect(Date.parse(String(stored.rows[0]!.published_at))).toBe(Date.parse('2026-10-01T00:00:00Z'));
+    const ledger = await db.asService(q => q.query<{ exceptions: unknown }>('select exceptions from content_studio_import_runs where operation_id=$1', [e.operationId]));
+    expect(ledger.rows[0]!.exceptions).toEqual(e.exceptions);
+  });
   it('scheduled reruns capture fresh SQL versions, preserve no-op/metadata versions, and reject a raced version atomically', async () => {
     vi.stubEnv('CS_DATA_MODE', 'fake'); resetServices(); resetEnvCache();
     const services = getServices(), reader = new FakeContentDb({ posts: [], schedule: [], settings: [] });

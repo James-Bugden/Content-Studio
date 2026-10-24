@@ -15,6 +15,7 @@ import type { ContentRepository, DriveGateway, TypefullyGateway } from './ports'
 import { today } from './schedule';
 import { reconcileRecord } from './typefully';
 import type { ContentParityJournal } from './content-parity';
+import { fixIssuesCount, rememberNavigationCount } from './navigation-counts';
 
 /**
  * Reconciliation centre (CS-017).
@@ -85,6 +86,7 @@ export async function buildReconcileReport(
   now = Date.now(),
   options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal } = {},
 ): Promise<ReconcileReport> {
+  rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
   const unreadable: string[] = [];
 
@@ -126,6 +128,8 @@ export async function buildReconcileReport(
   } catch {
     unreadable.push('Content Schedule');
   }
+
+  const navigationSnapshots = repo.navigationSnapshots?.();
 
   // Sheet vs Markdown, reading each master file once.
   const byFile = new Map<string, LibraryRecord[]>();
@@ -261,7 +265,7 @@ export async function buildReconcileReport(
   }
   const order: Record<ReconcileItem['severity'], number> = { blocking: 0, attention: 1 };
   items.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind));
-  return {
+  const report: ReconcileReport = {
     items,
     alerts: evaluateAlerts(events, stale.length, now),
     events: summariseEvents(events),
@@ -269,4 +273,6 @@ export async function buildReconcileReport(
     checkedAt: new Date(now).toISOString(),
     unreadable,
   };
+  rememberNavigationCount(repo, 'fixIssues', fixIssuesCount(report), navigationSnapshots);
+  return report;
 }

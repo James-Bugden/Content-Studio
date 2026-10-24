@@ -13,6 +13,7 @@ import { lineageLibraryId, scheduledFacts } from './lineage';
 import { stalePublishedRows } from './reconcile';
 import { screenshotUses } from './review';
 import { today } from './schedule';
+import { nextUpCount, rememberNavigationCount } from './navigation-counts';
 
 /**
  * Board read model (UX redesign). One load gives Next up, the calendar and the
@@ -29,6 +30,7 @@ function taipeiNow(): string {
 }
 
 export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number; requireSchedule?: boolean } = {}): Promise<Board> {
+  rememberNavigationCount(repo, 'nextUp', null);
   const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch((error: unknown) => {
     // Calendar cannot present an unreadable Schedule as an empty date range.
     // Other board consumers can still review Library posts without it.
@@ -80,7 +82,7 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
   );
 
   const weekSlots = slots.filter((s) => s.isoDate >= weekStart(day) && s.isoDate <= addDays(weekStart(day), 6));
-  return {
+  const board: Board = {
     today: day,
     now,
     posts,
@@ -95,6 +97,8 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
       problems: [...posts.map((p) => p.step), ...upcoming.map((s) => s.step)].filter((s) => s.urgency === 'now').length,
     },
   };
+  rememberNavigationCount(repo, 'nextUp', schedule === null ? null : nextUpCount(board));
+  return board;
 }
 
 function summarisePost(r: LibraryRecord, library: LibraryRecord[], schedule: ScheduleRecord[] | null): PostSummary {
