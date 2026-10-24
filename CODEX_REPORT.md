@@ -1,111 +1,127 @@
-# CS-061b / issue #164 — build round 1
+# CS-061b / issue #164 — fix round 1
 
-Status: implemented locally, **partial acceptance; not merge-ready**. Copy image,
-PNG Download and capability-gated file Share are implemented. Native cross-frame
-drag does **not** deliver the generated File in the tested Chromium. This report
-does not claim external composer drag support or physical-phone verification.
+Status: **requested fix round complete locally; overall native-transfer
+acceptance remains partial, not merge-ready**. No production build, CI run,
+external composer or physical-phone pass is claimed.
 
 - Issue: https://github.com/James-Bugden/Content-Studio/issues/164
-- Branch: `cs-164-img`; base `544d9c9cd74e69967bca1a8ced7f01e1f24ad6f1` (`origin/main`).
-- Tested code: `9e0c0150bea068ba4accd943065e0c4062f9f54a`.
-- Classification: Standard, scoped existing-surface feature; no new PRD needed.
-- Read: AGENTS.md; MASTER-SPEC assets, Visual Studio, Ready/Schedule, Published,
-  privacy and verification contracts; issues #164 and #162; existing asset/render
-  routes, Visuals editor, thumbnails, post/slot panels and Published views.
-- No PR exists for this branch at the read-only check. No push, GitHub write,
-  merge, deployment, dependency installation or shared-node_modules edit occurred.
+- Branch: `cs-164-img` (existing isolated worktree).
+- Actual starting HEAD: `13d1537`, after implementation `9e0c015`; clean at start.
+  The request mentioned `c2d0227`, which was not this checkout's HEAD.
+- Verified code/docs commit: `41329594ecf7a63db8d8ae37a97297825686393b`.
+  This report is committed separately afterwards; no application/test changes
+  followed verification.
+- Classification: Standard; scoped review fixes, no new surface or PRD.
+- Read: AGENTS.md, previous CODEX_REPORT.md, MASTER-SPEC.md, implementation and
+  QA skills, issues #164/#162, repository Playwright/server/CI contracts.
+- Read-only GitHub state: issue open; no PR for `cs-164-img`. No push, PR/issue
+  write, merge, deployment, dependency installation or other-worktree operation.
 
-## Implementation
+## Fixes
 
-`TransferImage` prepares a PNG from the already-loaded image, with no additional
-fetch. SVG previews retain their 1080px design width; raster images retain their
-dimensions. Filenames are sanitised and end in `-1.png`. Actions remain disabled
-until preparation finishes; cached images are prepared after hydration too.
-Changing the source discards the previous prepared file.
+1. Deleted `playwright.image-transfer.config.ts`. The committed spec has no
+   special server, port or config dependency. Repository config discovery lists
+   five ordinary tests in each of `w375` and `w1280`; CI runs that config against
+   a production build. The test-only HTML receiver remains because the
+   controlled drop test uses it.
+2. Removed the two expected-failing native cross-frame cases (one per width).
+   No `test.fail()` or skipped acceptance remains in the image-transfer spec.
+   Real mouse dragstart inspects the native store and then cancels. Controlled
+   dragstart/drop additionally asserts strict File object identity, plus PNG
+   name/type/signature/size. This does not establish native cross-site receipt.
+3. Moved the owner T4 checklist/results table to the PR-facing
+   [docs/testing/image-transfer.md](docs/testing/image-transfer.md). It states
+   plainly that Chromium strips the JS-created File in native cross-frame drops
+   and that drag-out may fail in targets. Copy image and Download are the
+   reliable offered paths; paste depends on destination support. All external
+   composer/browser/phone results remain owner-pending.
+4. Investigated native raster `<img draggable>` once in disposable scratch
+   tooling. It exposed the session asset URL in dragged data and did not produce
+   a completed cross-site receiver drop in this run. No workaround was shipped.
 
-The image's wrapper starts the file drag; the inner image suppresses native image
-dragging, which otherwise inserted URL/HTML data in Chromium. The handler clears
-the native store and adds only the PNG File. It never adds DownloadURL, URI lists,
-HTML, Drive URLs, blob URLs or tokens. Unsupported drag preparation cancels safely.
-The on-screen hint offers Copy image and Download when a target rejects the drop.
+Application implementation is unchanged this round: prepared PNG File-only
+drag; clipboard `image/png`; PNG Download; capability-gated file-only Share;
+SVG rasterisation at design dimensions; Schedule-backed Published images.
+No dependency or package/lockfile change.
 
-Copy writes a real clipboard `image/png`; Download creates a short-lived local
-blob URL outside DataTransfer; Share passes only `{files}` and appears only when
-both Share and `canShare({files})` support the prepared PNG. Denial/failure gives
-fallback feedback. No server mutation or approval state changes.
+## Verification
 
-The shared component covers Visuals draft/full-size/phone previews, screenshot
-assets, post/slot platform previews and existing small thumbnails. Thumbnails
-remain compact, with actions in the full preview. Published now displays its
-recorded Schedule image through an authenticated Schedule asset route, using the
-existing byte validation, size limit, sandbox and private-cache pattern. No
-Library-to-Schedule image substitution is introduced for Published.
+Windows; Node `v24.15.0`, installed Next `16.3.6`, Playwright `1.63.0`,
+Vitest `5.0.1`; synthetic fake providers only. Shared installed versions do not
+all match the manifest. Every heavy command used `bash ~/bin/heavy`.
+Only targeted test files ran; no full test suite.
 
-The model has one `Image File` per post. No carousel model or all-images action
-was invented. No npm dependency or package/lockfile change was made.
-
-## Verification results
-
-Environment: Windows, Node `v24.15.0`, installed Next `16.3.6`, Playwright `1.63.0`,
-synthetic fake providers only. The manifest declares Next `16.4.1`; the shared
-installation does not match it. Every Vitest, typecheck, build and Playwright
-command ran through `bash ~/bin/heavy`.
-
-| Check | Command / evidence | Result |
+| Check | Exact command | Result |
 | --- | --- | --- |
-| T0 focused tests | `bash ~/bin/heavy npx vitest run tests/unit/components/image-transfer.test.tsx tests/unit/visuals/render-route.test.ts` | **12 passed** across 2 files. Includes cache/hydration, stale source, failure/unsupported states, file-only payloads, and actual Schedule route session/validation/private headers/SVG refusal. |
-| T0 lint | `npx.cmd eslint` on all changed TS/TSX files, including the fallback config and specs | Passed. |
-| T0 privacy/secrets | `node scripts/check-private-paths.mjs`; `node scripts/scan-secrets.mjs`; `git diff --cached --check` | Passed, including staged new files. |
-| Full typecheck | `bash ~/bin/heavy npx tsc --noEmit` | **Blocked/red**: missing shared `@supabase/supabase-js` and `@electric-sql/pglite`, plus consequent existing Replies/Supabase typing errors. No diagnostics remain in the changed files. This is not a full typecheck pass. |
-| Stock production-config T1 | `bash ~/bin/heavy npx playwright test tests/e2e/image-transfer.spec.ts --project=w375 --project=w1280` | **Blocked before tests**: Turbopack rejects the shared node_modules junction pointing outside its filesystem root. |
-| Alternative production build | `bash ~/bin/heavy npx next build --webpack` | **Blocked/red**: missing `@supabase/supabase-js` imported by existing Replies routes. No production artifact was validated. |
-| Development fallback T1 | `bash ~/bin/heavy npx playwright test tests/e2e/image-transfer.spec.ts --config=playwright.image-transfer.config.ts --project=w375 --project=w1280` | Final run: **8 ordinary passes + 2 expected native-drop failures**, 50.1s, exit 0. Playwright prints “10 passed” because it counts expected failures as successful test outcomes. The two failed native acceptances are **not passes**. |
-| T2 responsive/accessibility | Real Chromium at repository project widths 375 and 1280; screenshots `test-results/image-transfer-VIS-real-cl-afa3d-wnload-and-keyboard-actions-w{375,1280}/image-actions.png` | Visuals screenshots reviewed: compact focusable actions below the existing full-size scrolling viewport; no document overflow; Enter activates Copy. WCAG 2 A/AA and 2.1 AA axe scan has **zero violations** at both widths. Screenshots are synthetic and stay in ignored test output. |
-| Physical/browser integration | External composers, Safari, Firefox, phone OS Share | Not run; owner checklist below. Share capability is mocked in browser tests, not a physical Share-sheet pass. |
+| T0 lint | `bash ~/bin/heavy npx eslint .` | **Passed**, exit 0. |
+| T0 targeted units | `bash ~/bin/heavy npx vitest run tests/unit/components/image-transfer.test.tsx tests/unit/visuals/render-route.test.ts` | **12 passed**, 2 files, exit 0; 2.55s test duration. Includes stale/cached sources, unsupported actions, file-only payload and authenticated Schedule asset validation. |
+| Normal config discovery | `bash ~/bin/heavy npx playwright test tests/e2e/image-transfer.spec.ts --project=w375 --project=w1280 --list` | **10 tests discovered**, exit 0; no special config/port. |
+| Production-config T1 | `bash ~/bin/heavy npx playwright test tests/e2e/image-transfer.spec.ts --project=w375 --project=w1280` | **Blocked before tests**, exit 1: Turbopack rejects node_modules junction pointing outside its filesystem root. |
+| Typecheck | `bash ~/bin/heavy npx tsc --noEmit` | **Blocked**, exit 1: missing shared `@supabase/supabase-js`, `@electric-sql/pglite` and its `contrib/pg_trgm` declarations, with consequent existing Replies/database implicit-any errors. No diagnostics in changed files. |
+| Production build without Turbopack | `bash ~/bin/heavy npx next build --webpack` | **Blocked**, exit 1: existing Replies route cannot resolve `@supabase/supabase-js`. No production artifact validated. |
+| Development browser evidence + scratch investigation | `bash ~/bin/heavy npx playwright test --config=C:/Users/jbbug/AppData/Local/Temp/cs164-fix-r1/local.config.ts --project=w375 --project=w1280 --project=investigation` | **All 10 committed-spec checks passed**, zero expected failures/skips. **1 scratch-only investigation failed** waiting for native cross-site drop; combined exit 1, 1.6m. Local development evidence, not production/CI acceptance. |
+| Privacy / secrets / whitespace | `node scripts/check-private-paths.mjs`; `node scripts/scan-secrets.mjs`; `git diff --cached --check` | Passed for staged fix files; repeated for final report. |
 
-The committed fallback config imports the repository config and retains its
-Chromium projects, widths, motion setting, timeouts and fixture conventions. It
-uses a local fake-provider Webpack **dev** server on port 3264 and warms the render
-route before tests. It does not replace the repository production-build gate.
-Earlier dev iterations exposed native URL leakage and cached-image preparation;
-both were corrected and retested. One cold dev iteration also hit a transient
-empty manifest; the final warmed run completed without that error.
+Typecheck and the Webpack build are locally blocked by missing shared packages,
+not a new dependency requirement. Both packages already exist in manifest and
+lockfile; CI installs them through its own `npm ci`. Stock Turbopack additionally
+hits this worktree's junction restriction. No environment workaround was
+committed. CI was not run by this local-only round; its results remain unknown.
 
-## Acceptance evidence and remaining limitation
+The disposable config imported repository projects/settings and restricted
+execution to this spec plus one investigation. It started a fake-provider
+Webpack dev server at normal local port 3200 and warmed the existing render
+route in its readiness check. Both scratch files and their directory were
+deleted afterwards. Next dev's generated AGENTS.md append was restored to the
+clean starting contents after the server stopped. Playwright owned its server
+processes; no unrelated Node process was killed.
 
-| Acceptance | Evidence / result |
-| --- | --- |
-| AC1: dragstart PNG type/name/items at both widths | Passed in actual mouse drags: only `Files`; one `file`, MIME `image/png`, `researched-range-1.png`. SVG is never the exported file. |
-| AC1: Copy/Download and SVG conversion | Passed: granted real clipboard read/write permissions, read back `image/png` and PNG magic bytes, verified download name/magic bytes and 1080 x 1080 PNG dimensions. Finished raster download also passed. |
-| AC2: dropzone File receipt | Controlled browser dragstart/drop dispatch uses the actual prepared File and the test-only page in `tests/e2e/fixtures/image-dropzone.html`; File identity, name/type, bytes and size pass at both widths. **This is not native cross-site proof.** |
-| Native cross-frame drop / goal of dragging into another app | **Failed at both widths**: dragstart has the File, but Chromium's native receiver sees `files: []`. The real native assertion remains in the spec, marked expected-failing only after the type/name/privacy assertions succeed. If Chromium starts forwarding the File, it becomes an unexpected pass requiring review. |
-| AC3: owner T4 results table | Supplied below; owner actions remain unverified. |
-| AC4: no dragged URLs/tokens | Passed in real native dragstart: exactly `Files`, no string data; asserted absence of HTTP/blob/data/API/Drive/token/bearer data. No DownloadURL workaround is used. |
+The committed-spec passes cover native dragstart PNG name/type/items and no
+URL/token strings; controlled receiver File identity; real clipboard read-back
+PNG signature; Download signature/name and SVG-derived 1080 × 1080 dimensions;
+keyboard activation, no document overflow and zero axe violations at both
+widths; finished raster Download and mocked file-only Share; Published Schedule
+asset content type and anonymous refusal. Share mocks are not phone OS/app
+acceptance. No product UI changed this round.
 
-The observed native failure is why this work is not merge-ready against the
-complete drag goal. A synthetic drop is not offered as evidence that LinkedIn,
-Threads or Instagram accept a real cross-tab drag. Adding a URL-based drag
-workaround would violate this round's explicit no-URLs-in-DataTransfer rule.
-For an unsupported target, Download followed by selecting the saved file in its
-upload picker is the available fallback. Clipboard paste also depends on what
-the destination accepts. Phone mouse-style drag is not implemented.
+## One-off native raster finding for the coordinator
 
-## T4 owner checklist — results table
+Chromium `153.0.8010.12` (Playwright, Windows), desktop 1280 px. A scratch-only
+same-origin source page used a plain `<img draggable="true">` pointing directly
+at existing session-protected `/api/library/SYN-L009/asset`, after owner test
+login and synthetic finished-raster row setup. The receiver was a distinct site,
+`http://receiver.test`, fulfilled entirely by local Playwright routing.
+No external service or private content was involved.
 
-Use a synthetic image on the exact deployed candidate; record browser/OS/version,
-filename, visible image result and fallback result. Open an empty composer and
-cancel afterwards; publishing is outside this issue. These rows are pending,
-not passes. No external uploads were made during this build round.
+Native dragstart, recovered from the retained trace's DOM snapshot:
 
-| Target | Owner steps | Result this round / what cannot be claimed |
-| --- | --- | --- |
-| LinkedIn web, desktop Chrome | Drag the Content Studio image into the composer's upload area. Then Copy image and Ctrl/Cmd+V. Check Download and upload the saved PNG if either fails. | **Owner pending.** Native Chromium test-frame drop loses the generated File; LinkedIn cross-tab drag is not established. Record whether paste is accepted. |
-| Threads web, desktop Chrome | Repeat drag, Copy/paste, and downloaded-PNG upload in a new post composer. Verify the intended image appears. | **Owner pending.** No successful native cross-tab delivery claim; Download is the fallback if drag/paste is rejected. |
-| Instagram web, desktop Chrome | Try drag into Create/upload. Try Copy/paste only if the composer accepts it; otherwise upload the downloaded PNG. | **Owner pending.** Neither drag nor image-paste acceptance is established. No SVG is supplied. |
-| Desktop Safari | Repeat the composer checks with a synthetic PNG and note macOS/Safari version; verify Download even if Clipboard/drag is unavailable. | **Not tested.** No Chromium-parity claim; no URL-based native drag fallback. Copy is disabled when required clipboard APIs are absent. |
-| Desktop Firefox | Repeat drag, clipboard and Download checks; note Firefox/OS version and any disabled Copy control. | **Not tested.** File-drag and clipboard-image support must be checked on that browser; Download remains the offered fallback. |
-| iPhone / Safari | Open a post image; if Share appears, tap it and choose an available image-capable destination. Verify the image arrives, then cancel posting. Also verify Download. | **Physical device pending.** Share appears only for `canShare({files})`; a particular app's presence/acceptance in the OS sheet is not guaranteed. Desktop mouse drag is not a phone workflow. |
-| Android / Chrome | Repeat file Share and Download; record whether the target app accepts the PNG and whether Share is offered. | **Physical device pending.** Browser test verifies only the file-only Share call with a mock capability, not a real OS/app transfer. |
+- Types: `["text/uri-list", "text/html", "Files"]`.
+- URI string: `http://127.0.0.1:3200/api/library/SYN-L009/asset`.
+- HTML string: `<img id="source" draggable="true" src="http://127.0.0.1:3200/api/library/SYN-L009/asset" width="180" height="180">`.
+- File: `{name: "asset", type: "image/png", size: 67}` (synthetic fixture).
 
-No deployed build, CI, T4 or external-app acceptance is claimed. The issue remains
-open, and this branch/report are local only under the requested build-role scope.
+Chromium supplied a native PNG File at dragstart, but also disclosed the image
+URL in URI and HTML data. The cross-site receiver's output stayed empty until
+the 10-second assertion timeout: **no completed native drop observed**, not
+successful File receipt. This differs from the earlier generated-File native
+cross-frame result (`files: []` in an actual drop event). Investigation stopped
+here, with no repeated workaround search, URL-clearing variant or product code.
+
+Even if native delivery works in other targets, this observed payload violates
+AC4, “no image URL or token appears in the dragged data (asserted).” Session
+protection alone does not satisfy that stricter criterion. No native-img
+alternative was shipped.
+
+Ignored synthetic evidence:
+`test-results/image-transfer-native-inve-160f5-rop-and-URL-disclosure-once-investigation/trace.zip`.
+That failed investigation is not part of the committed CI spec.
+
+## Handoff and residual acceptance
+
+AC1 and AC4 have local development browser evidence at both widths. AC2 has a
+controlled receiver File-identity pass, not native cross-site proof. AC3's
+PR-facing checklist is committed; all owner results are pending. The original
+native cross-frame finding remains a limitation, not an expected-failure CI
+success. Production-config CI, deployed-build verification, external composers
+and physical Share remain unverified. No PR, deployment or issue closure was
+attempted under this round's explicit local-only scope.
