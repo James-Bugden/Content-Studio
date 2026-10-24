@@ -30,6 +30,7 @@ export type QueueIdeaCreate = {
 
 export interface ContentRepository {
   capability(): Capability;
+  draftBodyAuthority?(): 'db';
   /** Write authority can differ from the read provider during Phase C. */
   mutationProvider?(): 'sheet' | 'db';
   authorityLibrary?(id: string): Promise<LibraryRecord>;

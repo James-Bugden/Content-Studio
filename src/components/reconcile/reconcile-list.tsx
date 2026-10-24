@@ -130,6 +130,7 @@ const KIND_LABEL: Record<string, string> = {
   refresh_pending: 'Database refresh pending',
   schema_drift: 'Content schema changed',
   provider_config: 'Connection not set up',
+  markdown_export_lag: 'Drive draft export is behind',
   markdown_mismatch: 'Sheet draft differs from the Markdown',
   markdown_missing: 'Markdown section missing or duplicated',
   stale_approval: 'Approval out of date',

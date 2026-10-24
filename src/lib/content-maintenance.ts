@@ -9,6 +9,7 @@ import { AppError } from '@/domain/errors';
 export async function repairContentExport() {
   const services = getServices();
   if (serverEnv().CS_CONTENT_STORE !== 'db' || !services.contentCutover) throw new AppError('FORBIDDEN', { reason: 'export_store_mode' });
+  await services.markdownExport?.run();
   const parity = await services.contentCutover.exporter.run();
   return { ...parity, comparison: services.contentCutover.exporter.comparison(Date.now(), services.contentCutover.mutationCount) };
 }

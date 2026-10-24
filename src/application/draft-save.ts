@@ -4,7 +4,7 @@ import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
 import { findSection, safeReplaceSectionBody, sectionBodyProblems } from '@/domain/markdown';
 import type { LibraryPatch } from '@/domain/mapping';
-import type { Actor, MutationResult, StepResult } from '@/domain/mutation';
+import { libraryIdSchema, operationIdSchema, revisionSchema, type Actor, type MutationResult, type StepResult } from '@/domain/mutation';
 import type { LibraryRecord } from '@/domain/records';
 import { emit, targetHash } from '@/observability/events';
 import { readSection } from './markdown-source';
@@ -72,6 +72,7 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
     finish({ ok: false, operationId: op, code, steps, ...extra } as DraftSaveResult);
 
   if (input.actor.role !== 'owner') return fail('FORBIDDEN');
+  if (!operationIdSchema.safeParse(op).success || !libraryIdSchema.safeParse(input.libraryId).success || !revisionSchema.safeParse(input.expectedSheetRevision).success || !revisionSchema.safeParse(input.expectedSectionHash).success) return fail('VALIDATION_FAILED');
   if (typeof input.proposed !== 'string' || input.proposed.length > MAX_DRAFT_CHARS) return fail('VALIDATION_FAILED');
 
   // Load the authoritative row.
@@ -82,8 +83,16 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
     return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
   }
   const sheetAlreadyHasIt = record.value.draftContent === input.proposed;
-  if (record.revision !== input.expectedSheetRevision && !sheetAlreadyHasIt) {
+  if (repo.draftBodyAuthority?.() !== 'db' && record.revision !== input.expectedSheetRevision && !sheetAlreadyHasIt) {
     return fail('STALE_READ', { conflict: { provider: store, current: record.value.draftContent, currentRevision: record.revision } });
+  }
+
+  if (repo.draftBodyAuthority?.() === 'db') {
+    const result = await repo.updateLibrary({ operationId: op, actor: input.actor,
+      target: { libraryId: input.libraryId }, expectedRevision: input.expectedSheetRevision,
+      patch: { draftContent: input.proposed } });
+    if (!result.ok) return finish({ ...result, ...(result.code === 'STALE_READ' ? { conflict: { provider: 'db', current: record.value.draftContent, currentRevision: record.revision } } : {}) });
+    return finish({ ...result, value: { record: result.value, sectionHash: fingerprint(result.value.value.draftContent), driveRevision: '' } });
   }
 
   // Step 1: Drive section.

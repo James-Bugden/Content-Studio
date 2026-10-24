@@ -183,7 +183,7 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
   } catch (error) {
     return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
   }
-  const read = await readSection(drive, record);
+  const read = await readSection(drive, record, repo.draftBodyAuthority?.());
   if (!read.ok) return fail(read.code, { reason: read.reason });
   const body = read.section.body;
   const alternativesCell = formatHookAlternatives(alts.data.alternatives);
@@ -214,6 +214,21 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
     steps.push({ step: 'write hook fields to Sheet', provider: 'sheet', status: res.replayed ? 'skipped_already_applied' : 'done', revision: res.value.revision });
     return finish({ ok: true, operationId: op, replayed: false, value: { record: res.value }, steps: [...steps] });
   };
+
+  if (repo.draftBodyAuthority?.() === 'db') {
+    // Keep hook metadata and the opening-line change in the same apply_patch.
+    const patch: LibraryPatch = chosen ? hookPatch(chosen) : { hookAlternatives: alternativesCell };
+    if (chosen) {
+      const current = record.value.currentHook;
+      const rest = body.slice(current.length);
+      const already = body.startsWith(chosen.text) && record.cells.currentHook === chosen.text;
+      if (!already && (fingerprint(body) !== input.generationDraftHash || read.section.bodyHash !== input.expectedSectionHash)) return fail('STALE_READ');
+      if (!already && (!current.trim() || !body.startsWith(current) || !(rest === '' || rest.startsWith('\n') || rest.startsWith('\r\n')))) return fail('CONFLICT', { reason: 'opening_mismatch' });
+      patch.draftContent = already ? body : chosen.text + rest;
+    } else if (fingerprint(body) !== input.generationDraftHash || read.section.bodyHash !== input.expectedSectionHash) return fail('STALE_READ');
+    const result = await repo.updateLibrary({ operationId: op, actor, target: { libraryId: input.libraryId }, expectedRevision: input.expectedSheetRevision, patch });
+    return finish(result.ok ? { ...result, value: { record: result.value } } : result);
+  }
 
   // Resume or replay after an earlier partial run of this selection: the draft
   // already opens with the chosen hook, so only the hook fields may be missing.

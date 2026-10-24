@@ -1,4 +1,5 @@
 import 'server-only';
+import { databaseBodyRepository, MarkdownExporter } from './markdown-export';
 import { ContentReadCutoverRepository } from './content-read-cutover';
 import { ContentExporter, ContentWriteCutover } from './content-export';
 import { FakePrivateBackupFolder } from '@/integrations/supabase/fake-content-backup';
@@ -40,6 +41,7 @@ export type Services = {
   importRepo?: ContentRepository;
   contentParity?: ContentParityJournal;
   contentCutover?: ContentWriteCutover;
+  markdownExport?: MarkdownExporter;
   contentBackup?: { source: ContentBackupSource; folder: PrivateBackupFolder; journal: BackupJournal };
   reconcileRepo?: ContentRepository;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
@@ -117,9 +119,10 @@ function build(): Services {
     };
     if (env.CS_CONTENT_STORE === 'db') {
       const exporter = new ContentExporter(db, sheet, { checkpoints: new Map(), issues: new Map(), reports: [] });
-      services.contentCutover = new ContentWriteCutover(services.repo, exporter);
+      services.contentCutover = new ContentWriteCutover(services.repo, exporter, () => services.markdownExport!.verifyRollback());
       if (env.CS_CONTENT_WRITE_ENABLED === 'false') void services.contentCutover.disableWrites();
-      services.repo = services.contentCutover.repo;
+      services.repo = databaseBodyRepository(services.contentCutover.repo);
+      services.markdownExport = new MarkdownExporter(services.repo, drive, db);
       services.contentBackup = { source: { snapshot: () => db.backupSnapshot() }, folder: new FakePrivateBackupFolder(), journal: { lastVerified: null, failureSince: null } };
     }
     if (env.CS_CONTENT_STORE === 'db-read') {

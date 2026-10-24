@@ -1,3 +1,4 @@
+import { MarkdownImport } from '@/components/reconcile/markdown-import';
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { buildReconcileReport, type ReconcileReport } from '@/application/reconcile';
@@ -21,8 +22,8 @@ export default async function ReconcilePage() {
   const actor = await requireActor('viewer');
   let report: ReconcileReport;
   try {
-    const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup } = getServices();
-    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal });
+    const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport } = getServices();
+    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport });
   } catch (error) {
     return (
       <>
@@ -57,6 +58,8 @@ export default async function ReconcilePage() {
             {actor.role === 'owner' ? <ContentImportButton /> : null}
           </> : <p>Typed import and shadow comparison are inactive. No parity measurements recorded.</p>}
         </section>
+
+        {serverEnv().CS_CONTENT_STORE === 'db' && actor.role === 'owner' ? <MarkdownImport /> : null}
 
         {report.alerts.length > 0 ? (
           <section aria-labelledby="alerts-h">

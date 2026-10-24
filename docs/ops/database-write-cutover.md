@@ -52,8 +52,8 @@ DB-5 follow-ups remain separate [#179](https://github.com/James-Bugden/Content-S
     run. This change installs no schedule.
 
 For every gate record SHA, environment, timestamp, expected/actual result and
-private evidence location. Failed/skipped/unknown is not green. The separate
-Drive-body authority decision remains DB-7 work.
+private evidence location. Failed/skipped/unknown is not green. The DB-7 delegated choice is option (b); see
+[its gated preparation and extra rollback checks](database-draft-authority.md).
 
 ## Export and conflicts
 

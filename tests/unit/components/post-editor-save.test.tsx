@@ -49,7 +49,7 @@ describe('PostEditor save notification (CS-050)', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Database synthetic copy' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await complete(success);
-    expect(screen.getByText('Saved to the master Markdown and mirrored to the database.')).toBeTruthy();
+    expect(screen.getByText('Saved in the database. Drive export is queued.')).toBeTruthy();
   });
   it('confirms a Sheet save with a pending derived copy without leaving the draft dirty', async () => {
     const complete = pendingSave();

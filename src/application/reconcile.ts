@@ -19,6 +19,7 @@ import { fixIssuesCount, rememberNavigationCount } from './navigation-counts';
 import type { ContentWriteCutover, ExportIssue } from './content-export';
 import { exportKey } from './content-export';
 import type { BackupJournal } from './content-backup';
+import type { MarkdownExporter } from './markdown-export';
 import { isAppError } from '@/domain/errors';
 
 /**
@@ -39,6 +40,7 @@ export type ReconcileKind =
   | 'export_parity'
   | 'backup_fresh'
   | 'provider_config'
+  | 'markdown_export_lag'
   | 'markdown_mismatch'
   | 'markdown_missing'
   | 'stale_approval'
@@ -93,7 +95,7 @@ export async function buildReconcileReport(
   repo: ContentRepository,
   drive: DriveGateway,
   now = Date.now(),
-  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal } = {},
+  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter } = {},
 ): Promise<ReconcileReport> {
   rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
@@ -172,10 +174,22 @@ export async function buildReconcileReport(
 
   const navigationSnapshots = repo.navigationSnapshots?.();
 
+  const dbBody = repo.draftBodyAuthority?.() === 'db';
+  const queuedMarkdown = new Set<string>();
+  if (dbBody && options.markdownExport) {
+    try {
+      for (const job of await options.markdownExport.status()) {
+        queuedMarkdown.add(job.libraryId);
+        items.push(item('markdown_export_lag', job.code === 'CONFLICT' || now - job.since >= 3600_000 ? 'blocking' : 'attention', `${job.libraryId}: Drive export is behind`,
+          [job.code ? `Export is unconfirmed (${job.code}). The database draft is saved. Conflicting Drive text is preserved.` : 'Awaiting verified Drive export. The database draft is saved.'], [job.libraryId], { label: 'Review' }));
+      }
+    } catch { unreadable.push('Markdown export queue'); }
+  }
   // Sheet vs Markdown, reading each master file once.
   const byFile = new Map<string, LibraryRecord[]>();
   for (const r of library) {
     const id = markdownFileId(r);
+    if (!id && dbBody && !queuedMarkdown.has(r.value.libraryId) && r.value.draftContent) items.push(item('markdown_export_lag', 'attention', `${r.value.libraryId}: Drive export needs attention`, ['No usable master link. The database draft is saved.'], [r.value.libraryId], { label: 'Review' }));
     if (id) byFile.set(id, [...(byFile.get(id) ?? []), r]);
   }
   for (const [fileId, rows] of byFile) {
@@ -183,11 +197,16 @@ export async function buildReconcileReport(
     try {
       text = (await drive.readText(fileId)).text;
     } catch {
-      unreadable.push(`Markdown file ${shortHash(fileId)}`);
+      if (dbBody) for (const r of rows.filter(r => !queuedMarkdown.has(r.value.libraryId))) items.push(item('markdown_export_lag', 'attention', `${r.value.libraryId}: Drive export is behind`, ['Drive could not be read. The database draft is saved.'], [r.value.libraryId], { label: 'Retry' }));
+      else unreadable.push(`Markdown file ${shortHash(fileId)}`);
       continue;
     }
     for (const r of rows) {
       const found = findSection(text, r.value.libraryId);
+      if (dbBody) {
+        if (!queuedMarkdown.has(r.value.libraryId) && (!found.ok || found.section.body !== r.value.draftContent)) items.push(item('markdown_export_lag', !found.ok && found.reason === 'duplicate' ? 'blocking' : 'attention', `${r.value.libraryId}: Drive export is behind`, [!found.ok ? 'The section is missing or duplicated. The database draft is saved.' : 'The database is authoritative. A conflicting Drive body is preserved; preview Import Markdown master to choose a direction.'], [r.value.libraryId], { label: 'Review' }));
+        continue;
+      }
       if (!found.ok) {
         // Rows without a section are only a problem once they are in review or approved.
         if (r.value.draftContent.trim() === '') continue;

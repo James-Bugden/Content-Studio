@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { z } from 'zod';
 import { getServices } from '@/application/container';
 import { selectHook } from '@/application/hooks';
@@ -33,10 +34,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ libraryId:
     if (!libraryIdSchema.safeParse(libraryId).success) throw new AppError('VALIDATION_FAILED');
     const parsed = bodySchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new AppError('VALIDATION_FAILED');
-    const { repo, drive } = getServices();
+    const { repo, drive, markdownExport } = getServices();
     // The service re-parses both with the strict hook schemas.
     const input = parsed.data as unknown as Parameters<typeof selectHook>[3];
     const result = await selectHook(repo, drive, actor, { ...input, libraryId });
+    if (result.ok && markdownExport) after(() => markdownExport.run());
     return resultResponse(result);
   } catch (error) {
     return errorResponse(error);

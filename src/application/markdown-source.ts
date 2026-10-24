@@ -1,4 +1,5 @@
 import 'server-only';
+import { fingerprint } from '@/domain/hash';
 import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
 import { parseDriveFileId } from '@/domain/links';
 import { findSection, type MarkdownSection } from '@/domain/markdown';
@@ -34,7 +35,13 @@ function safeReadErrorCode(error: unknown): ErrorCode {
   return typeof code === 'string' && (ERROR_CODES as readonly string[]).includes(code) ? code as ErrorCode : 'PROVIDER_UNAVAILABLE';
 }
 
-export async function readSection(drive: DriveGateway, record: LibraryRecord): Promise<SectionRead> {
+export async function readSection(drive: DriveGateway, record: LibraryRecord, authority?: 'db'): Promise<SectionRead> {
+  if (authority === 'db') {
+    const body = record.value.draftContent;
+    return { ok: true, fileId: '', text: body,
+      meta: { id: '', mimeType: 'text/plain', revision: record.revision, modifiedTime: '', size: Buffer.byteLength(body), trashed: false },
+      section: { libraryId: record.value.libraryId, headingLine: '', level: 2, body, bodyHash: fingerprint(body), bodyStart: 0, bodyEnd: body.length } };
+  }
   const fileId = markdownFileId(record);
   if (!fileId) return { ok: false, code: 'NOT_FOUND', reason: 'no_link' };
   let text: string;

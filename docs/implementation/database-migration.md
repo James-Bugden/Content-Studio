@@ -234,7 +234,13 @@ apart.
 - Never writing the derived Ready Queue (it is a view, so this is structural).
 - Redaction: no copy bodies, ids or URLs in telemetry; `targetHash` stays.
 
-## 3. Drive Markdown bodies: the one open decision
+## 3. Drive Markdown bodies: database body authority selected
+
+DB-7 decision (2026-10-25): the owner delegated the choice to the coordinator,
+who selected option (b), the recommendation below. Implementation is gated to
+`db` with fake/PGlite evidence only; this is not a production flip. See
+[the DB-7 runbook](../ops/database-draft-authority.md). The other three modes
+retain Drive authority and the existing saga. All phase/owner/live gates stand.
 
 Today the draft body has two homes: the Library-ID section of a master Markdown
 file in Drive (canonical) and `Draft Content` in the Sheet (mirror). Every save

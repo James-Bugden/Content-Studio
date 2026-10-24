@@ -290,3 +290,11 @@ history export is an additional safeguard, not proof of plan backups.
 7. Unified application: [CS-025](https://github.com/James-Bugden/Content-Studio/issues/61) -> [CS-026](https://github.com/James-Bugden/Content-Studio/issues/62) -> [CS-027](https://github.com/James-Bugden/Content-Studio/issues/63) -> [CS-028](https://github.com/James-Bugden/Content-Studio/issues/64).
 
 Parallel work is safe only behind the shared contracts and fake adapters. The first vertical demo should be: login -> read one synthetic Library row and Markdown section -> review/edit with conflict protection -> approve -> see the derived Ready Queue state. Typefully and live AI are not required for that slice.
+
+DB-7 preparation (#151): option (b) was selected through the owner's delegation
+to the coordinator. In gated `db` mode only, the DB holds draft bodies and Drive
+receives a verified asynchronous section export. All other modes retain the
+Drive-first saga. Default/live gates and the operative production authority
+table above are unchanged; no production flip is recorded. See
+[DB-7 operations](ops/database-draft-authority.md) for explicit import direction,
+rollback parity and remaining owner/live evidence.
