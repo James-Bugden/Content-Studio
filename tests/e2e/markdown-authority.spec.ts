@@ -18,6 +18,8 @@ test('DB-7 body authority, failed Drive save and explicit Markdown import; Sheet
     return;
   }
   await expect(page.getByText('The database holds your saved draft.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Database; Drive is an export', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Invalid Date/)).toHaveCount(0);
   await page.getByLabel(/Post copy/).fill('Synthetic DB body survives Drive failure 🙂');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Saved in the database. Drive export is queued.')).toBeVisible();
