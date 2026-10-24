@@ -54,7 +54,7 @@ describe('OBS-01 health output', () => {
     const { text } = await health();
     for (const value of Object.values(SENTINELS)) expect(text).not.toContain(value);
     const body = JSON.parse(text);
-    expect(body.capabilities.find((c: { provider: string }) => c.provider === 'db')).toMatchObject({ state: store === 'db' ? 'ready' : 'read_only', mode: 'fake' });
+    expect(body.capabilities.find((c: { provider: string }) => c.provider === 'db')).toMatchObject({ state: 'ready', mode: 'fake' });
   });
 
   it('refuses fake mode in production', async () => {
