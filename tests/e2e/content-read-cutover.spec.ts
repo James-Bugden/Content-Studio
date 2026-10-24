@@ -14,6 +14,11 @@ test('MIG-11 B1: importing a later Sheet edit clears a failed-save overlay befor
   const imported = await page.request.post('/api/ops/sheet-mirror', { headers: { 'Idempotency-Key': '11111111-1111-4111-8111-111111111111', origin: new URL(page.url()).origin } });
   expect(imported.status()).toBe(200);
   await page.reload();
+  // Drive remains canonical; a hand edit must appear in the comparison until
+  // the owner explicitly chooses that version for the editor.
+  await page.getByText('Show the Sheet version', { exact: true }).click();
+  await expect(page.getByText('Synthetic external R2', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Start from the Sheet version instead' }).click();
   await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic external R2');
   await expect(page.getByText('Saved in the Sheet. Database refresh pending;', { exact: false })).toHaveCount(0);
 });
@@ -39,6 +44,9 @@ test('MIG-11 N1/N2: ordinary lag and refused rows have truthful row-specific rec
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/cutover-refused-${test.info().project.name}.png`, fullPage: true });
   await page.goto('/review/SYN-L002');
+  await page.getByText('Show the Sheet version', { exact: true }).click();
+  await expect(page.getByText('Synthetic hand-edited import lag', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Start from the Sheet version instead' }).click();
   await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic hand-edited import lag');
 });
 
