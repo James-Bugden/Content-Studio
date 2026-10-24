@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { scanAxe } from './support/axe';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 const visibleCard = (page: Page, contentId: string) => page.locator(`[data-content-id="${contentId}"]`).filter({ visible: true });
 
 async function expectNoSeriousAxe(page: Page) {
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  const results = await scanAxe(page, ['wcag2a', 'wcag2aa', 'wcag21aa']);
   const bad = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
   expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(', ')}`)).toEqual([]);
 }

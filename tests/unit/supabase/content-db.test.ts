@@ -171,3 +171,11 @@ describe('QueueSummaryRow SQL parity (DB-1 review item 8)', () => {
     }
   });
 });
+
+it('CS-059j: production body-edit history selects only audited Library draft changes and deduplicates IDs', async () => {
+  const request = vi.fn<typeof fetch>(async () => Response.json([{ target_id: 'SYN-L008' }, { target_id: 'SYN-L008' }], { headers: { 'content-range': '0-1/2' } }));
+  expect(await new SupabaseContentDb({ ...options, fetch: request }).markdownBodyEdits()).toEqual(['SYN-L008']);
+  const target = new URL(String(request.mock.calls[0]![0]));
+  expect(target.pathname).toBe('/rest/v1/content_studio_row_history');
+  expect(Object.fromEntries(target.searchParams)).toEqual({ select: 'target_id', target_kind: 'eq.library', before_image: 'not.is.null', changed_fields: 'cs.{draft_content}', order: 'history_id.asc', offset: '0', limit: '1000' });
+});

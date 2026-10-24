@@ -32,10 +32,16 @@ The existing authenticated 15-minute Content export repair also drains Markdown
 jobs, including hook updates and retries. No cron is installed by this change.
 A Drive failure never vetoes the DB save. Save rejects section-level headings
 and open code fences with the existing Sheet validation/copy, using the standard
-level-2 boundary without a Drive read (conservative for deeper layouts).
-Missing links, missing/duplicate
-sections, provider failures, unsafe Markdown structure and conflicting Drive
-bodies appear as `markdown_export_lag`. A known unconfirmed job remains visible
+level-2 boundary without a Drive read. This does not detect level-3 headings
+in a level-4 Draft section; fresh export validates the actual section level and
+refuses unsafe structure without changing the master or acknowledging the job.
+Reading Drive during save to discover its level would break the Drive-independent
+save contract; that extension is deferred until section metadata can be trusted
+without a provider read.
+Missing links and missing/duplicate sections appear as `markdown_missing`
+when no job is pending; audited body edits make these blocking. Pending jobs,
+provider failures, unsafe Markdown structure and conflicting Drive bodies appear
+as `markdown_export_lag`. A known unconfirmed job remains visible
 even if Drive currently shows equal text. Conflict/one-hour lag is blocking.
 
 Repair reads the fresh file and matches its section by Library ID. It refuses
@@ -118,5 +124,20 @@ Drive baseline. The current fake outbox is process-local; the SQL outbox and
 PostgREST methods exist but the live container remains deliberately unwired.
 No destructive production operation or invented cutover date is authorized here.
 
-Local fix-round commands, code identity, mutation testing and responsive checks
-are recorded in the repository's [CODEX_REPORT.md](../../CODEX_REPORT.md).
+Local verification uses synthetic fake providers and PGlite only. Coverage
+includes atomic save/outbox rollback, stale revision and replay guards, exact UTF-8
+and adjacent-byte preservation, provider revision/readback checks, coalesced jobs,
+import direction, approval invalidation, and rollback parity. A level-4 Draft
+containing `intro\n### Deeper heading\nmore` is saved under the level-2 DB
+validation but export refuses it, retains its pending job, and leaves the entire
+master unchanged. These checks are local evidence, not DRV-01 against real Drive
+or live SQL/concurrency/cron/backup/editor T2/Phase D evidence.
+
+An unedited legacy row with a resolvable section whose Drive body differs from
+the DB also refuses rollback. Resolve that pre-existing drift before retrying:
+back up both versions, preview Import Markdown master, and explicitly select
+**Use Markdown body** if Drive is the intended text. If the DB text is intended,
+preserve the Drive version and deliberately restore the matching DB text in its
+unique section, then verify exact parity. **Keep database body** alone does not
+repair drift or authorize an overwrite. Never remove history or queue records to
+bypass parity.

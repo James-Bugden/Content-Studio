@@ -486,3 +486,12 @@ describe('MIG-05/MIG-12 rollback and authority', () => {
     expect(exporter.comparison(now, 50).ready).toBe(false);
   });
 });
+
+it('CS-059j: equals-only refusal gives value recovery without unrelated direction advice', async () => {
+  const { exporter, repo, cutover } = setup(); await exporter.run();
+  await save(repo, 'synthetic_equals_only', '=Synthetic literal');
+  const report = await buildReconcileReport(repo, new FakeDriveGateway(), Date.now(), { contentCutover: cutover });
+  const facts = report.items.find(i => i.kind === 'export_mismatch' && i.stableIds.includes('SYN-L001'))!.facts.join(' ');
+  expect(facts).toContain('Change authoritative value');
+  expect(facts).not.toContain('Review the direction');
+});

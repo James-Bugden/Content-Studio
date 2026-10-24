@@ -3,6 +3,7 @@ import { getServices } from '@/application/container';
 import { previewPromotion, promotionContext, type PromotionContext, type PromotionPreview } from '@/application/schedule';
 import { ErrorState, GateChip, GuardedLink, PageHeader, StateView } from '@/components';
 import { PromoteConfirm } from '@/components/schedule/promote-confirm';
+import { parseContentId } from '@/domain/schedule';
 import { slotLabel } from '@/domain/slot-label';
 import { isAppError } from '@/domain/errors';
 import { contentIdSchema, libraryIdSchema } from '@/domain/mutation';
@@ -41,6 +42,7 @@ export default async function PromotePage({
   } catch (error) {
     return <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} action={back} />;
   }
+  const requestedSlot = slot ? parseContentId(slot) : null;
   const requestedOption = ctx.options.find((o) => o.contentId === slot && o.ok);
   const selectedSlot = requestedOption?.contentId ?? ctx.options.find((o) => o.ok)?.contentId ?? null;
   const selectedOption = ctx.options.find((o) => o.contentId === selectedSlot);
@@ -74,7 +76,7 @@ export default async function PromotePage({
               <h2 id="slots-h" className="text-lg font-semibold">
                 Choose a slot
               </h2>
-              {slot && !requestedOption ? <p className="mt-2 text-sm text-ink-soft">This slot cannot be used. Choose another slot.</p> : null}
+              {slot && !requestedOption ? <p className="mt-2 text-sm text-ink-soft">{requestedSlot ? `${slotLabel(requestedSlot.isoDate, '')} \u00b7 ${requestedSlot.platform} \u00b7 ${requestedSlot.slot}: ` : ''}This slot cannot be used. Choose another slot.</p> : null}
               {ctx.options.length === 0 ? (
                 <p className="mt-2 text-sm text-ink-soft">No available slot rows in the next three weeks. Add slot rows in the Sheet first.</p>
               ) : (

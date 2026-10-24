@@ -27,3 +27,20 @@ it.each([0, 2])('CS-059g: one clear action resets filters and lane at %s results
     expect(mocks.push.mock.calls[0]?.[0]).toBe('/review?layout=cards');
   } else expect(clear[0]!.getAttribute('href')).toBe('/review?layout=cards');
 });
+
+it('CS-059j: an empty Library retains a clear action', async () => {
+  mocks.load.mockResolvedValue({ total: 0, totalUnfiltered: 0, page: 1, pages: 1, cards: [], sources: [], laneCounts: {} });
+  render(await ReviewPage({ searchParams: Promise.resolve({ lane: 'review', target: 'Threads' }) }));
+  expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy();
+});
+it('CS-059j: no-match clear removes every defined filter including queue', async () => {
+  mocks.load.mockResolvedValue({ total: 0, totalUnfiltered: 5, page: 1, pages: 1, cards: [], sources: [], laneCounts: {} });
+  render(await ReviewPage({ searchParams: Promise.resolve({ lane: 'review', target: 'Threads', review: 'Pending', src: 'synthetic', from: 'X', copyright: 'PASS', duplicate: 'PASS', queue: 'queued', page: '2', layout: 'cards' }) }));
+  expect(screen.getByRole('link', { name: 'Clear all filters' }).getAttribute('href')).toBe('/review?layout=cards');
+});
+
+it.each([0, 5])('CS-059j: zero-result view has one explicit or implicit polite result region (Library total %s)', async totalUnfiltered => {
+  mocks.load.mockResolvedValue({ total: 0, totalUnfiltered, page: 1, pages: 1, cards: [], sources: [], laneCounts: {} });
+  render(await ReviewPage({ searchParams: Promise.resolve({ target: 'Threads' }) }));
+  expect(document.querySelectorAll('[aria-live="polite"], [role="status"]:not([aria-live="off"])')).toHaveLength(1);
+});

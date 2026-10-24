@@ -156,3 +156,33 @@ it('CS-059g: composes rapid chip clicks while navigation is pending', async () =
   expect(nav.push.mock.calls[1]?.[0]).toBe('/review?platform=X&status=ready');
   await act(async () => release());
 });
+
+
+it('CS-059j: lane alone offers Clear, ordinary changes retain lane', () => {
+  nav.params = new URLSearchParams('lane=review');
+  render(<FilterBar filters={filters} variant="toolbar" clearKeys={['lane']} />);
+  expect((screen.getByRole('button', { name: 'Clear filters' }) as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.change(screen.getByLabelText('Target platform'), { target: { value: 'X' } });
+  expect(nav.push.mock.calls[0]?.[0]).toBe('/review?lane=review&platform=X');
+});
+it('CS-059j: equal result text is reinserted on each committed filter change, in one polite region', () => {
+  nav.params = new URLSearchParams('platform=X');
+  const props = { filters, announcement: 'None match.' };
+  const { rerender } = render(<FilterBar {...props} />);
+  const region = document.querySelector('[aria-live="polite"]')!;
+  const before = region.firstChild;
+  nav.params = new URLSearchParams('platform=Threads');
+  rerender(<FilterBar {...props} />);
+  expect(document.querySelectorAll('[aria-live="polite"]')).toHaveLength(1);
+  expect(document.querySelector('[aria-live="polite"]')).toBe(region);
+  expect(region.firstChild).not.toBe(before);
+  expect(region.textContent).toBe('None match.');
+});
+it('CS-059j: every chip group has exactly one black selected chip', () => {
+  render(<FilterBar filters={filters.map(f => ({ ...f, control: 'chips' }))} />);
+  for (const label of ['Target platform', 'Gate status']) {
+    const group = screen.getByRole('group', { name: label });
+    expect(group.querySelectorAll('button.bg-primary')).toHaveLength(1);
+    expect(group.querySelector('button.bg-primary')?.getAttribute('aria-pressed')).toBe('true');
+  }
+});

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ERROR_CATALOGUE } from '@/domain/errors';
 import type { Gate } from '@/domain/gates';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
@@ -49,7 +50,9 @@ export function PromoteConfirm(props: { libraryId: string; contentId: string; sl
     <div className="flex flex-col gap-3">
       {result && !result.ok ? (
         <InlineResult tone={result.code === 'STALE_READ' ? 'warning' : 'error'}>
-          {result.problems?.join(' ') || result.message || 'Not scheduled. Nothing was written.'}
+          {result.problems?.join(' ')}{' '}
+          {result.message || (result.code === 'VALIDATION_FAILED' ? ERROR_CATALOGUE.VALIDATION_FAILED.message : 'Not scheduled. Nothing was written.')}
+          {result.code === 'VALIDATION_FAILED' ? ' Choose another slot.' : ''}
           {result.code === 'STALE_READ' ? ' Reload this page to see the new preview.' : ''}
         </InlineResult>
       ) : null}
