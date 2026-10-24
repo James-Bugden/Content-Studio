@@ -62,3 +62,11 @@ it('hides previous-page counts while the new cache request remains pending', asy
   rerender(tree());
   expect(container.querySelectorAll('[data-nav-count]').length).toBe(0);
 });
+
+it('caps very large counts so the phone tab bar cannot overflow', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ nextUp: 1100, fixIssues: 999, expiresAt: Date.now() + 15_000 }) }));
+  const { container } = render(tree());
+  await screen.findByText('999+');
+  expect(container.querySelector('[data-nav-count="/"]')?.textContent).toBe('999+');
+  expect(container.querySelector('[data-nav-count="/reconcile"]')?.textContent).toBe('999');
+});

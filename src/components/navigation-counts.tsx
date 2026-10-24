@@ -42,7 +42,7 @@ export function NavigationBadge({ href }: { href: string }) {
   const count = href === '/' ? counts.nextUp : href === '/reconcile' ? counts.fixIssues : null;
   return count === null ? null : (
     <span data-nav-count={href} className="ml-1.5 inline-flex min-w-4 justify-center rounded bg-ink/10 px-1 text-[10px] font-semibold tabular-nums md:ml-auto md:text-xs">
-      {count}
+      {count > 999 ? '999+' : count}
     </span>
   );
 }
