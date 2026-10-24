@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { PillarTag } from '../pillar-tag';
 import { pestoChoices } from './pesto-choices';
@@ -27,7 +27,17 @@ export function LibraryPestoField({ libraryId, value, revision, canEdit, suggest
 }) {
   const [current, setCurrent] = useState({ value, revision });
   const [status, setStatus] = useState<Status | null>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
+  const returnFocus = useRef(false);
   const options = useMemo(() => pestoChoices(suggestions, current.value), [suggestions, current.value]);
+
+  useEffect(() => {
+    if (status?.kind === 'saving' || !returnFocus.current) return;
+    returnFocus.current = false;
+    // Disabling during the write drops focus to the body. Restore it only if
+    // the owner has not moved to another control while waiting.
+    if (document.activeElement === document.body) selectRef.current?.focus();
+  }, [status]);
 
   useEffect(() => {
     if (status?.kind !== 'saved') return;
@@ -39,6 +49,7 @@ export function LibraryPestoField({ libraryId, value, revision, canEdit, suggest
 
   async function change(next: string) {
     const previous = current.value;
+    returnFocus.current = document.activeElement === selectRef.current;
     setCurrent((c) => ({ ...c, value: next }));
     setStatus({ kind: 'saving' });
     const res = await postJson<Outcome>(`/api/library/${encodeURIComponent(libraryId)}/fields`, {
@@ -66,6 +77,7 @@ export function LibraryPestoField({ libraryId, value, revision, canEdit, suggest
   return (
     <span data-pesto-field className="flex min-w-0 flex-col gap-0.5">
       <select
+        ref={selectRef}
         value={current.value.trim()}
         aria-label={`PESTO stage for ${libraryId}`}
         disabled={status?.kind === 'saving'}
