@@ -153,11 +153,20 @@ is never a precondition for accepting a Sheet mutation.
 Copy failures, including conversion failures for nonrepresentable Sheet cells,
 return success plus a `refresh_pending` step. The editor keeps the saved text
 and revision. An instance-local overlay supplies that record on subsequent
-reads until the DB has the same Sheet fingerprint. A successful later copy or
-typed import repairs it. `/reconcile` reconstructs pending items by comparing
+reads until the DB has that Sheet fingerprint or a fingerprint matching the
+current Sheet row. The pre-save DB version is retained; a version advance alone
+does not prove repair. Pending-row checks can read that individual Sheet row.
+A successful later copy or typed import repairs representable values.
+In db-read, `refused_numeric` and `refused_size` rows are excluded from accepted
+import counts and counted in the named exception ledger; other rows continue.
+These appear as blocking pending items: correct the source value/copy limit
+before retrying. An import alone cannot repair a refused value. Unknown
+conversion/integrity failures and CAS conflicts still abort the batch.
+`/reconcile` reconstructs pending items by comparing
 the three authoritative Sheet collections with the DB, including after an
-instance restart. A failed scan is labelled unknown, not clear. Normal page
-reads do not perform this Sheet scan. The Sheet cache in the Phase C composition
+instance restart, without installing a read overlay or claiming an app save
+for ordinary lag. A failed scan is labelled unknown, not clear. Normal page
+reads do not perform this full Sheet scan. The Sheet cache in the Phase C composition
 is three seconds; the DB reader has no retained read cache.
 
 The overlay is disposable and is not a durable authority or cross-instance

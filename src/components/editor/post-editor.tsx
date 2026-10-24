@@ -316,7 +316,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       {status.kind === 'saved' ? (
         <InlineResult tone="success">{status.replayed ? `Already saved: the Markdown and the ${contentStore} both hold this text.` : `Saved to the master Markdown and mirrored to the ${contentStore}.`}</InlineResult>
       ) : null}
-      {(status.kind === 'saved' && status.refreshPending || model.refreshPending) ? <InlineResult tone="warning">Saved in the Sheet. Database refresh pending; your saved text is shown here. The next import will repair the copy.</InlineResult> : null}
+      {(status.kind === 'saved' && status.refreshPending || model.refreshPending) ? <InlineResult tone="warning">Saved in the Sheet. Database refresh pending; your saved text is shown here. Check Fix issues for copy refusals or import lag.</InlineResult> : null}
       {status.kind === 'error' ? <InlineResult tone="error">{status.message}</InlineResult> : null}
       {status.kind === 'partial' ? (
         <RecoveryPanel operationId={status.operationId} steps={status.steps.map((s) => ({ step: s.step, status: s.status, provider: s.provider }))} onRetry={() => void save()} />

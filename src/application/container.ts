@@ -1,5 +1,6 @@
 import 'server-only';
 import { ContentReadCutoverRepository } from './content-read-cutover';
+import { contentSheetCacheOptions } from './content-cache';
 import { AppError } from '@/domain/errors';
 import { serverEnv } from '@/lib/env';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
@@ -93,9 +94,7 @@ function build(): Services {
     const ai = createAiGateway(env);
     const typefully = createTypefullyGateway(env);
     const db = new FakeContentDb();
-    const sheetRepo = env.CS_CONTENT_STORE === 'db-read'
-      ? new SheetsContentRepository(sheet, { writable: true, readCacheMs: 3000, libraryReadCacheMs: 3000, readinessReadCacheMs: 3000 })
-      : new SheetsContentRepository(sheet);
+    const sheetRepo = new SheetsContentRepository(sheet, { writable: true, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'fake') });
     services = {
       mode: 'fake',
       repo: env.CS_CONTENT_STORE === 'db-read' ? new ContentReadCutoverRepository(sheetRepo, db)
@@ -143,7 +142,7 @@ function build(): Services {
     // instance, so bulk editor opens do not re-read the Sheet. Writes clear the
     // cache and every mutation re-reads fresh against the expected revision, so a
     // stale display can be refused but never written over.
-    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, readCacheMs: 3000, libraryReadCacheMs: 60_000, readinessReadCacheMs: 60_000 }),
+    repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'live') }),
     drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
     typefully: createTypefullyGateway(env),

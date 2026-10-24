@@ -1,6 +1,47 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
+test('MIG-11 B1: importing a later Sheet edit clears a failed-save overlay before any reconcile visit', async ({ page }) => {
+  const control = async (data: object) => expect((await page.request.post('/api/test-control', { data })).status()).toBe(200);
+  await control({ kind: 'reset' });
+  expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
+  await page.goto('/review/SYN-L001');
+  await page.getByLabel(/Post copy/).fill('Synthetic app save R1');
+  await control({ kind: 'db_fail_next', op: 'write', code: 'PROVIDER_UNAVAILABLE' });
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Saved in the Sheet. Database refresh pending;', { exact: false })).toBeVisible();
+  await control({ kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Draft Content', value: 'Synthetic external R2' });
+  const imported = await page.request.post('/api/ops/sheet-mirror', { headers: { 'Idempotency-Key': '11111111-1111-4111-8111-111111111111', origin: new URL(page.url()).origin } });
+  expect(imported.status()).toBe(200);
+  await page.reload();
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic external R2');
+  await expect(page.getByText('Saved in the Sheet. Database refresh pending;', { exact: false })).toHaveCount(0);
+});
+
+test('MIG-11 N1/N2: ordinary lag and refused rows have truthful row-specific recovery', async ({ page }) => {
+  const control = async (data: object) => expect((await page.request.post('/api/test-control', { data })).status()).toBe(200);
+  await control({ kind: 'reset' });
+  expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
+  await control({ kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Hook Score', value: '8/10' });
+  await control({ kind: 'sheet_edit', libraryId: 'SYN-L002', header: 'Draft Content', value: 'Synthetic hand-edited import lag' });
+  await page.goto('/reconcile');
+  const pending = page.locator('[data-reconcile-kind="refresh_pending"]');
+  await expect(pending).toHaveCount(2);
+  await expect(pending.filter({ hasText: 'SYN-L001:' })).toContainText('Copy refused (refused_numeric)');
+  await expect(pending.filter({ hasText: 'SYN-L002:' })).toContainText('behind the Sheet');
+  for (const item of await pending.all()) await expect(item).not.toContainText('Saved in the Sheet');
+  await page.getByRole('button', { name: 'Run content import' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Content import completed.' })).toBeVisible();
+  await expect(pending).toHaveCount(1);
+  await expect(pending).toContainText('SYN-L001:');
+  await expect(pending).toContainText('imports continue for other rows');
+  expect((await new AxeBuilder({ page }).include('[data-reconcile-kind="refresh_pending"]').analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `test-results/cutover-refused-${test.info().project.name}.png`, fullPage: true });
+  await page.goto('/review/SYN-L002');
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic hand-edited import lag');
+});
+
 test('MIG-11: Sheet save succeeds during copy failure, next import repairs the visible pending state', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

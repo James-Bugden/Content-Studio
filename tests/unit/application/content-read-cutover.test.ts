@@ -18,12 +18,19 @@ import { LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-sc
 import { saveDraft } from '@/application/draft-save';
 import { loadEditor } from '@/application/editor';
 import { buildReconcileReport } from '@/application/reconcile';
+import { createDraft } from '@/application/typefully';
+import { FakeTypefullyGateway } from '@/integrations/typefully/fake-gateway';
+import { sha256 } from '@/integrations/supabase/content-repository';
+import { contentSheetCacheOptions, DB_READ_CACHE_TTL_MS } from '@/application/content-cache';
 
 const owner = { sub: 'synthetic-owner', role: 'owner' as const };
 let pg: PGlite;
 class SqlDb extends FakeContentDb {
   async rows<T>(sql: string, args: unknown[] = []) {
-    return pg.transaction(async tx => { await tx.exec('set local role service_role'); return (await tx.query<T>(sql, args)).rows; });
+    return pg.transaction(async tx => { await tx.exec('set local role service_role');
+      // Match the production JSON transport (PGlite returns native Date values).
+      return JSON.parse(JSON.stringify((await tx.query<T>(sql, args)).rows)) as T[];
+    });
   }
   override async getPost(kind: ContentCollection, id: string) { return (await this.rows<ContentPostRow>('select * from content_studio_posts where collection=$1 and library_id=$2', [kind, id]))[0] ?? null; }
   override async getSchedule(id: string) { return (await this.rows<ContentScheduleRow>('select * from content_studio_schedule where content_id=$1', [id]))[0] ?? null; }
@@ -70,12 +77,172 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
     repo = new ContentReadCutoverRepository(sheet, db);
   });
   const ids = { library: 'SYN-L001', queue: 'IDEA-BL-0001', schedule: '2026-10-02-MAIN-X' };
+  const importSheet = async () => {
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(sheet, { sourceKey: 'synthetic_workbook' }), await importVersions(db), 'a'.repeat(64));
+    if (mode === 'fake') await new FakeContentImportStore(undefined, db).applyImport(e);
+    else expect((await (db as SqlDb).rows<{ r: { ok: boolean } }>('select content_studio_import_run($1,$2,$3,$4,$5,$6,$7) r',
+      [e.operationId, e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows]))[0]!.r.ok).toBe(true);
+    return e;
+  };
+  it('B1: a failed R1 copy followed by a hand-edited R2 import retires the overlay on get/list, without reconcile', async () => {
+    const before = await repo.getLibrary(ids.library);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    expect((await write('library', before.revision, 'App save R1')).ok).toBe(true);
+    transport.externalEdit(SHEET_TABS.library.name, before.row, transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.draftContent), 'External R2');
+    await importSheet();
+    expect((await db.getPost('library', ids.library))!.draft_content).toBe('External R2');
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('External R2');
+    expect((await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!.value.draftContent).toBe('External R2');
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+    expect((await write('library', (await repo.getLibrary(ids.library)).revision, 'App save R3', 'synthetic_after_repair')).ok).toBe(true);
+  });
+  it('B1: metadata-only repair can retire a superseded overlay without a row_version bump', async () => {
+    const before = await repo.getLibrary(ids.library), original = await db.getPost('library', ids.library);
+    const score = String(original!.hook_score ?? 8);
+    // Establish a known typed baseline before testing representation-only changes.
+    transport.externalEdit(SHEET_TABS.library.name, before.row, transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore), score);
+    await importSheet();
+    const version = String((await db.getPost('library', ids.library))!.row_version);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await repo.updateLibrary({ operationId: 'synthetic_metadata_overlay', actor: owner, target: { libraryId: ids.library }, expectedRevision: (await repo.getLibrary(ids.library)).revision, patch: { hookScore: `0${score}` } });
+    transport.externalEdit(SHEET_TABS.library.name, before.row, transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore), `00${score}`);
+    await importSheet();
+    expect(String((await db.getPost('library', ids.library))!.row_version)).toBe(version);
+    // List is the first read here; it must clear the overlay independently of get.
+    expect((await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!.revision).toBe((await sheet.getLibrary(ids.library)).revision);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+  });
   const read = (kind: keyof typeof ids) => kind === 'schedule' ? repo.getSchedule(ids[kind]) : kind === 'library' ? repo.getLibrary(ids[kind]) : repo.getQueue(ids[kind]);
   const write = (kind: keyof typeof ids, revision: string, text: string, op = 'synthetic_cutover_save') => {
     const m = { operationId: op, actor: owner, expectedRevision: revision };
     return kind === 'schedule' ? repo.updateSchedule({ ...m, target: { contentId: ids[kind] }, patch: { content: text } })
       : (kind === 'library' ? repo.updateLibrary.bind(repo) : repo.updateQueue.bind(repo))({ ...m, target: { libraryId: ids[kind] }, patch: { draftContent: text } });
   };
+  const editSheet = (field: keyof typeof LIBRARY_HEADERS, text: string, row: number) => transport.externalEdit(SHEET_TABS.library.name, row,
+    transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS[field]), text);
+  const advanceDb = async () => {
+    if (mode === 'fake') db.externalEdit('library', ids.library, { current_hook: 'Concurrent snapshot' });
+    else await pg.query('update content_studio_posts set current_hook=$1,row_version=row_version+1 where collection=$2 and library_id=$3', ['Concurrent snapshot', 'library', ids.library]);
+  };
+  it('M04: observes the copy version before the authority write, not after a raced import', async () => {
+    const before = await read('library'), version = String((await db.getPost('library', ids.library))!.row_version);
+    const original = sheet.updateLibrary.bind(sheet);
+    vi.spyOn(sheet, 'updateLibrary').mockImplementationOnce(async m => { await advanceDb(); return original(m); });
+    const copy = vi.spyOn(db, 'writeThrough');
+    const result = await write('library', before.revision, 'New Sheet save');
+    expect(copy.mock.calls[0]![0].expectedVersion).toBe(version);
+    expect(result.steps).toContainEqual(expect.objectContaining({ step: 'refresh_pending' }));
+    // A DB version bump alone MUST NOT retire this newer authoritative overlay.
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('New Sheet save');
+    expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+  });
+  it('M06: a failed in-flight copy re-reads a newer Sheet edit for the overlay', async () => {
+    const before = await read('library');
+    vi.spyOn(db, 'writeThrough').mockImplementationOnce(async () => {
+      editSheet('draftContent', 'Newer Sheet edit while copying', before.row);
+      throw new Error('synthetic outage');
+    });
+    expect((await write('library', before.revision, 'First response')).ok).toBe(true);
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('Newer Sheet edit while copying');
+  });
+  it('M10: Ready Queue adds and removes pending Library rows using the saved eligibility', async () => {
+    const before = await repo.getLibrary(ids.library);
+    vi.spyOn(db, 'writeThrough').mockRejectedValue(new Error('synthetic outage'));
+    const m = { actor: owner, target: { libraryId: ids.library } };
+    const saved = await repo.updateLibrary({ ...m, operationId: 'synthetic_ready_overlay', expectedRevision: before.revision,
+      patch: { reviewStatus: 'Approved', queueForSchedule: 'TRUE', draftContent: 'Eligible pending text' } });
+    expect(saved.ok).toBe(true);
+    expect((await repo.listReadyQueue()).find(r => r.value.libraryId === ids.library)?.value.draftContent).toBe('Eligible pending text');
+    await repo.updateLibrary({ ...m, operationId: 'synthetic_unready_overlay', expectedRevision: (await repo.getLibrary(ids.library)).revision, patch: { queueForSchedule: 'FALSE' } });
+    expect((await repo.listReadyQueue()).find(r => r.value.libraryId === ids.library)).toBeUndefined();
+  });
+  it('M15/M30: successful copies immediately remove the overlay and use a separate hashed operation ID', async () => {
+    const before = await read('library'), copy = vi.spyOn(db, 'writeThrough');
+    expect((await write('library', before.revision, 'Copied successfully', 'synthetic_distinct_operation')).ok).toBe(true);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+    expect(copy.mock.calls[0]![0]).toMatchObject({ operationId: `copy_${sha256('synthetic_distinct_operation')}`, actorHash: sha256(owner.sub) });
+  });
+  it('M30: copy operation identity stays separate even if an overlay is retained', async () => {
+    const before = await read('library'), copy = vi.spyOn(db, 'writeThrough');
+    await write('library', before.revision, 'Separate ledger identity', 'synthetic_copy_namespace');
+    expect(copy.mock.calls[0]![0].operationId).toBe(`copy_${sha256('synthetic_copy_namespace')}`);
+  });
+  it('M16: a reconciliation scan captured before a newer failed save cannot delete its overlay', async () => {
+    const before = await read('library'), snapshot = await sheet.listLibrary();
+    let release!: (rows: typeof snapshot) => void;
+    let entered!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    vi.spyOn(sheet, 'listLibrary').mockImplementationOnce(() => { entered(); return new Promise(resolve => { release = resolve; }); });
+    const scan = repo.refreshPending(); await started;
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Saved during scan');
+    release(snapshot); await scan;
+    expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('Saved during scan');
+  });
+  it('M17/M27: draft saga preserves pending steps and editor reload exposes the pending saved model', async () => {
+    const drive = new FakeDriveGateway(), editor = await loadEditor(repo, drive, ids.library);
+    if (editor.markdown.state !== 'ok') throw new Error('fixture Markdown unavailable');
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    const result = await saveDraft(repo, drive, { operationId: 'synthetic_saga_pending', actor: owner, libraryId: ids.library,
+      expectedSheetRevision: (await read('library')).revision, expectedSectionHash: editor.markdown.sectionHash, proposed: 'Synthetic saga pending copy' });
+    expect(result.ok).toBe(true);
+    expect(result.steps).toContainEqual(expect.objectContaining({ step: 'refresh_pending', provider: 'db', status: 'pending' }));
+    expect(await loadEditor(repo, drive, ids.library)).toMatchObject({ refreshPending: true, sheet: { draft: 'Synthetic saga pending copy' } });
+  });
+  it('M19: Typefully saga preserves refresh_pending after linking a successfully created draft', async () => {
+    const id = '2026-10-02-MAIN-LI', clock = () => new Date('2026-09-30T00:00:00Z'), tf = new FakeTypefullyGateway(undefined, clock);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    const result = await createDraft(repo, tf, owner, { operationId: 'synthetic_typefully_pending', contentId: id, expectedRevision: (await repo.getSchedule(id)).revision }, { now: clock });
+    expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
+    expect(result.steps).toContainEqual(expect.objectContaining({ step: 'refresh_pending', provider: 'db', status: 'pending' }));
+    expect((await sheet.getSchedule(id)).value.typefullyDraftId).toMatch(/^SYNTH-TF-/);
+  });
+  it('M27: editor model exposes a direct-save pending overlay independently of saga steps', async () => {
+    const before = await read('library');
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Pending model copy');
+    expect((await loadEditor(repo, new FakeDriveGateway(), ids.library)).refreshPending).toBe(true);
+  });
+  it('N2: hand-edit lag is reported without a save identity or a read overlay', async () => {
+    const before = await read('library'); editSheet('draftContent', 'External import lag', before.row);
+    expect(await repo.refreshPending()).toContainEqual({ kind: 'library', id: ids.library, source: 'import' });
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+    expect((await read('library')).revision).toBe(before.revision);
+    const report = await buildReconcileReport(repo, new FakeDriveGateway());
+    const item = report.items.find(i => i.kind === 'refresh_pending' && i.stableIds.includes(ids.library));
+    expect(item).toBeDefined(); expect(JSON.stringify(item)).not.toContain('Saved'); expect(JSON.stringify(item)).not.toContain('import_repair');
+    expect(JSON.stringify(item)).toContain('behind the Sheet');
+    editSheet('draftContent', 'Another external edit', before.row); await importSheet();
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('Another external edit');
+  });
+  it.each(['numeric', 'size'] as const)('N1: a refused %s row is ledgered while another row imports, and remains a truthful blocking pending item', async refusal => {
+    const before = await read('library'), huge = '漢'.repeat(45_000);
+    const patch = refusal === 'numeric' ? { hookScore: '8/10' } : { draftContent: huge, imageBrief: huge };
+    const saved = await repo.updateLibrary({ operationId: `synthetic_refused_${refusal}`, actor: owner, target: { libraryId: ids.library }, expectedRevision: before.revision, patch });
+    expect(saved.ok).toBe(true);
+    const other = (await sheet.listLibrary()).find(r => r.value.libraryId !== ids.library)!;
+    editSheet('draftContent', 'Other row continues importing', other.row);
+    const e = await importSheet();
+    const expectedClass = refusal === 'numeric' ? 'refused_numeric' : 'refused_size';
+    expect(e.exceptions.filter(e => e.class === expectedClass)).toHaveLength(1);
+    expect(e.exceptions).toContainEqual(expect.objectContaining({ class: expectedClass, field: refusal === 'numeric' ? 'hook_score' : '@row', collection: 'library' }));
+    expect(e.rows.some(r => r.target_kind === 'library' && r.target_id === ids.library)).toBe(false);
+    expect(e.counts.library).toBe((await sheet.listLibrary()).length - 1);
+    expect((await db.getPost('library', other.value.libraryId))!.draft_content).toBe('Other row continues importing');
+    if (mode === 'pglite') expect((await (db as SqlDb).rows<{ exceptions: unknown }>('select exceptions from content_studio_import_runs where operation_id=$1', [e.operationId]))[0]!.exceptions).toEqual(e.exceptions);
+    const report = await buildReconcileReport(repo, new FakeDriveGateway());
+    const item = report.items.find(i => i.kind === 'refresh_pending' && i.stableIds.includes(ids.library));
+    expect(item).toMatchObject({ severity: 'blocking' }); expect(JSON.stringify(item)).toContain(expectedClass);
+    expect(JSON.stringify(item)).not.toContain('next import'); expect(JSON.stringify(e.exceptions)).not.toContain('8/10');
+    // A restart reconstructs the refusal, but never installs a stale save overlay.
+    const restarted = new ContentReadCutoverRepository(sheet, db);
+    expect(await restarted.refreshPending()).toContainEqual(expect.objectContaining({ id: ids.library, source: 'import', refusal: expectedClass }));
+    expect(restarted.pendingRefresh('library', ids.library)).toBe(false);
+    // Correcting the source makes the same row importable again.
+    editSheet(refusal === 'numeric' ? 'hookScore' : 'imageBrief', refusal === 'numeric' ? '8' : '', before.row);
+    await importSheet(); expect(await repo.refreshPending()).toEqual([]);
+  });
   it.each(['library', 'queue', 'schedule'] as const)('%s uses the imported Sheet token, writes Sheet first and immediately reads back exact copy', async kind => {
     const before = await read(kind);
     const authority = kind === 'schedule' ? await sheet.getSchedule(ids[kind]) : kind === 'library' ? await sheet.getLibrary(ids[kind]) : await sheet.getQueue(ids[kind]);
@@ -253,4 +420,32 @@ it('configured import always captures the fresh Sheet instead of its DB read mod
   await expect(runConfiguredSheetMirror({ kind: 'scheduled' })).resolves.toMatchObject({ status: 'completed' });
   expect(dbReadModel).not.toHaveBeenCalled();
   expect((await services.repo.getLibrary('SYN-L001')).cells.currentHook).toBe('Fresh synthetic Sheet hook');
+});
+
+it('B1: configured cached composition retires R1 immediately after an R2 import, within the display TTL', async () => {
+  vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', 'db-read'); resetEnvCache(); resetServices();
+  const s = getServices(), before = await s.repo.getLibrary('SYN-L001');
+  s.fakes!.db.failNext({ op: 'write', code: 'PROVIDER_UNAVAILABLE' });
+  await s.repo.updateLibrary({ operationId: 'synthetic_cached_r1', actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: before.revision, patch: { draftContent: 'Cached R1' } });
+  s.fakes!.sheet.externalEdit(SHEET_TABS.library.name, before.row, s.fakes!.sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.draftContent), 'Imported R2');
+  await runConfiguredSheetMirror({ kind: 'scheduled' });
+  expect((await s.repo.getLibrary('SYN-L001')).value.draftContent).toBe('Imported R2');
+  expect(s.repo.pendingRefresh!('library', 'SYN-L001')).toBe(false);
+});
+
+it.each(['fake', 'live'] as const)('N4: %s db-read composition uses the single 3-second cache config', mode => {
+  expect(DB_READ_CACHE_TTL_MS).toBe(3_000);
+  expect(contentSheetCacheOptions('db-read', mode)).toEqual({ readCacheMs: 3_000, libraryReadCacheMs: 3_000, readinessReadCacheMs: 3_000 });
+});
+
+it('N4: the fake composition actually expires Library authority reads after 3 seconds', async () => {
+  vi.useFakeTimers();
+  try {
+    vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', 'db-read'); resetEnvCache(); resetServices();
+    const services = getServices(), repo = services.repo as ContentReadCutoverRepository;
+    const before = await repo.authorityLibrary('SYN-L001'), sheet = services.fakes!.sheet;
+    sheet.externalEdit(SHEET_TABS.library.name, before.row, sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.draftContent), 'After short TTL');
+    vi.advanceTimersByTime(2_999); expect((await repo.authorityLibrary('SYN-L001')).revision).toBe(before.revision);
+    vi.advanceTimersByTime(2); expect((await repo.authorityLibrary('SYN-L001')).value.draftContent).toBe('After short TTL');
+  } finally { vi.useRealTimers(); }
 });

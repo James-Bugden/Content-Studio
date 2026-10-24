@@ -267,8 +267,10 @@ export async function buildReconcileReport(
   let pendingRows: Awaited<ReturnType<NonNullable<ContentRepository['refreshPending']>>> = [];
   try { pendingRows = await repo.refreshPending?.() ?? []; } catch { unreadable.push('Database refresh status'); }
   for (const pending of pendingRows) {
-    items.push(item('refresh_pending', 'attention', `${pending.id}: database refresh pending`,
-      ['Saved in the Sheet. The database copy will be repaired by the next import.'], [pending.id], { label: 'Review' }, pending.operationId));
+    items.push(item('refresh_pending', pending.refusal ? 'blocking' : 'attention', `${pending.id}: database refresh pending`,
+      [pending.source === 'save' ? 'Saved in the Sheet.' : 'The database copy is behind the Sheet.',
+        pending.refusal ? `Copy refused (${pending.refusal}). Review the Sheet value or copy limits; imports continue for other rows.`
+          : 'A fresh import can refresh this copy.'], [pending.id], { label: 'Review' }, pending.operationId));
   }
   const order: Record<ReconcileItem['severity'], number> = { blocking: 0, attention: 1 };
   items.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind));
