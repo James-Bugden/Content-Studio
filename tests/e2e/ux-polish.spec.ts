@@ -139,6 +139,9 @@ test('CS-059c: Posts common filters are visible, compose, and remain removable',
   await expect(disclosure.locator('summary')).toContainText('(2 on)');
   await expect(page.getByRole('button', { name: 'Clear filters', exact: true })).toHaveCount(1);
   await expect(disclosure).not.toHaveAttribute('open');
+  // Axe runs against the settled document: wait for the committed navigation's title and results.
+  await expect(page).toHaveTitle('Posts | Content Studio');
+  await expect(page.getByText(/Showing 1 to \d+ of \d+/).first()).toBeVisible();
   await checkAndCapture(page, info, 'posts-filters');
   await review.getByRole('button', { name: 'Not reviewed', exact: true }).click();
   await expect(page).not.toHaveURL(/review=Pending/);
