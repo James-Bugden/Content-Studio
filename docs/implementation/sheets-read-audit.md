@@ -65,7 +65,10 @@ Reproduce with the targeted `sheets-read-cache.test.ts` tests. Provider count is
 tab, start row, maximum rows and latency, without IDs or content. Existing Fix
 issues adapter health reports Sheet Calls from timed transport events, excluding
 the additional mutation-result/schema-drift events. Cache hits emit no provider
-call. Counts are per process, within the existing bounded 500-event buffer;
+call. The existing Errors/Conflicts columns count outcome events (including
+validation or stale-read refusals), not distinct transport calls; they can exceed
+Calls when a provider failure also produces a mutation failure outcome.
+Counts are per process, within the existing bounded 500-event buffer;
 transport-internal HTTP retries are not separate repository calls. This lets
 #88/#93 compare logical read costs without introducing a new diagnostics surface.
 
