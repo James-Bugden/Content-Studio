@@ -210,7 +210,6 @@ export async function escapeDialog(page: Page, timeout?: number) {
 
 export async function designatedState(page: Page, kind: string, timeout?: number) {
   await expect(page.locator(`[data-state="${kind}"]`).first()).toBeVisible({ timeout });
-  expect(await page.locator('[data-state="empty"], [data-state="no_match"]').count(), 'fault disguised as empty data').toBe(0);
 }
 
 export async function noWrites(page: Page) {

@@ -21,6 +21,7 @@ for (const [code, kind] of FAULTS) {
             await navigate(page, route);
             await settled(page);
             await designatedState(page, kind);
+            expect(await page.locator('[data-state="empty"], [data-state="no_match"]').count(), 'primary dataset fault disguised as empty data').toBe(0);
             await noWrites(page);
             await overflow(page);
             await monitor.assertClean();
@@ -76,6 +77,8 @@ for (const [code, kind] of FAULTS) {
           if (status >= 400) monitor.expectResponse(endpoint, status);
           await page.getByRole('button', { name: button, exact: true }).click();
           await designatedState(page, kind);
+          // A secondary section may legitimately be empty (e.g. alternatives
+          // never supplied). The AI operation must still show its typed failure.
           if (route.startsWith('/review')) await expect(page.getByLabel(/Post copy/)).toBeEditable();
           else await expect(page.getByTestId('zh-proposal')).toHaveCount(0);
           await monitor.assertClean();
