@@ -118,8 +118,8 @@ export function PanelHost() {
    * Save and next (CS-047): saves the open draft when it has changes, then moves
    * to the next post in the current sort and filters. With nothing to save it
    * just moves on. A failed save stays put with its error, so nothing is lost.
-   * The move waits two frames so the editor's saved state reaches the dirty
-   * guard first; if something was typed during the save, the guard still asks.
+   * The editor reports success after its saved state reaches the dirty guard;
+   * if something was typed during the save, the guard still asks.
    */
   function saveAndNext() {
     if (!post || moving) return;
@@ -138,7 +138,7 @@ export function PanelHost() {
     refreshTotals();
     if (advanceAfterSave.current !== post) return;
     advanceAfterSave.current = null;
-    if (hasNext) requestAnimationFrame(() => requestAnimationFrame(() => moveTo(1)));
+    if (hasNext) moveTo(1);
   }
 
   function onDraftSaveFailed() {

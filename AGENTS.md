@@ -18,6 +18,10 @@ isolated branch/worktree or managed isolated checkout.
 - Typefully: final editing/publishing surface.
 - Supabase: later migration option, not an MVP dependency.
 
+Pending cutover: the Sheet authority is being replaced in phases by Postgres
+(Supabase) per `docs/implementation/database-migration.md`. Until a phase is
+flipped in production the list above stands; each flip updates this note.
+
 Do not create a parallel source of truth.
 
 ## Default autonomy
