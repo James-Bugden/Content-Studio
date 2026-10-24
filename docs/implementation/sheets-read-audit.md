@@ -101,9 +101,14 @@ Next up and Fix issues publish only their derived task/blocking totals after
 their existing reads complete. Navigation uses an authenticated, private/no-store
 endpoint that only inspects those totals and existing Library/Schedule cache
 witnesses. It never calls a loader, Sheet transport, Drive or Typefully. Cold,
-incomplete, invalidated, replaced or older-than-15-second snapshots produce no
+incomplete, invalidated, changed or older-than-15-second snapshots produce no
 badge; a successfully derived zero remains a real zero. Existing last-good
 snapshots also permit synthetic zero-retention mode without changing its reads.
+Existing thumbnail and prefetch reads that complete with byte-identical rows
+retain the source witness. Pending, failed or changed refreshes hide the total;
+identical refreshes never extend a derived total's original expiry. The counts
+context wraps only the navigation, keeping its asynchronous updates outside
+streamed page and editor hydration boundaries.
 
 Counts are best effort per server process. Next up becomes available after a
 board load; Fix issues after a complete reconciliation load. Visiting an unrelated

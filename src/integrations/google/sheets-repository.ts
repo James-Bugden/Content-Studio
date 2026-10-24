@@ -53,7 +53,7 @@ const OP_CACHE_MAX = 500;
 type OpRecord = { patchHash: string; result: MutationResult<unknown> };
 
 type TabRead<F extends string> = { index: HeaderIndex<F>; rows: { raw: RawRow; row: number }[] };
-type ReadEntry = { generation: number; expiresAt: number | null; rows: Promise<RawRow[]>; lastGood?: { rows: RawRow[]; at: number } };
+type ReadEntry = { generation: number; expiresAt: number | null; rows: Promise<RawRow[]>; lastGood?: { rows: RawRow[]; at: number; generation: number } };
 const LAST_GOOD_MAX_AGE_MS = 5 * 60_000;
 
 export class SheetsContentRepository implements ContentRepository {
@@ -96,7 +96,14 @@ export class SheetsContentRepository implements ContentRepository {
     // request stays shared until it settles, even if it outlasts the TTL.
     void rows.then((snapshot) => {
       if (this.readCache.get(key) !== entry) return;
-      entry.lastGood = { rows: snapshot, at: Date.now() };
+      // Thumbnails and prefetches can repeat the page's reads (especially with
+      // zero retention). An identical completed snapshot still witnesses the
+      // same derived counts. Pending/failed/changed reads remain unknown, and
+      // mutation invalidation drops lastGood along with the entry.
+      if (hit?.lastGood && JSON.stringify(hit.lastGood.rows) === JSON.stringify(snapshot)) {
+        entry.generation = hit.lastGood.generation;
+      }
+      entry.lastGood = { rows: snapshot, at: Date.now(), generation: entry.generation };
       entry.expiresAt = Date.now() + ttl;
     }, () => {
       // An old rejected read must not evict a post-invalidation replacement.

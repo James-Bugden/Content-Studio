@@ -36,7 +36,15 @@ export function cachedNavigationCounts(repo: ContentRepository): Record<Name, nu
     const entry = entries?.[name];
     return entry && snapshots && Date.now() < entry.expiresAt &&
       entry.snapshots.length === snapshots.sources.length && entry.snapshots.every((value, i) => value === snapshots.sources[i])
-      ? entry.count : null;
+      ? entry : undefined;
   };
-  return { nextUp: read('nextUp'), fixIssues: read('fixIssues'), expiresAt: snapshots?.expiresAt ?? Date.now() };
+  const nextUp = read('nextUp');
+  const fixIssues = read('fixIssues');
+  // Identical source refreshes must not renew the lifetime of an older total.
+  const known = [nextUp, fixIssues].filter((entry) => entry && entry.count !== null);
+  return {
+    nextUp: nextUp?.count ?? null,
+    fixIssues: fixIssues?.count ?? null,
+    expiresAt: Math.min(snapshots?.expiresAt ?? Date.now(), ...known.map((entry) => entry!.expiresAt)),
+  };
 }

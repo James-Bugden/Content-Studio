@@ -82,11 +82,49 @@ describe('CS-044 cache-only navigation counts', () => {
   });
 
   it('refuses counts derived from an older snapshot after a concurrent refresh', async () => {
-    const { repo } = setup(0);
+    const { repo, sheet } = setup(0);
     await loadBoard(repo);
     const old = repo.navigationSnapshots();
+    sheet.externalEdit(SHEET_TABS.library.name, 2, 0, 'SYN-CHANGED');
     await repo.listLibrary();
     rememberNavigationCount(repo, 'fixIssues', 99, old);
     expect(cachedNavigationCounts(repo).fixIssues).toBeNull();
+  });
+
+  it('keeps counts through identical existing thumbnail/prefetch reads without extending their expiry', async () => {
+    const { repo, sheet } = setup(0);
+    const board = await loadBoard(repo);
+    const expiry = cachedNavigationCounts(repo).expiresAt;
+    await repo.getLibrary('SYN-L012');
+    await repo.listSchedule();
+    const reads = sheet.reads;
+    expect(cachedNavigationCounts(repo).nextUp).toBe(nextUpCount(board));
+    expect(cachedNavigationCounts(repo).expiresAt).toBe(expiry);
+    expect(sheet.reads).toBe(reads);
+    vi.spyOn(Date, 'now').mockReturnValue(expiry + 1);
+    expect(cachedNavigationCounts(repo).nextUp).toBeNull();
+  });
+
+  it('hides a pending refresh and a changed snapshot without reading any provider itself', async () => {
+    const { repo, sheet } = setup(0);
+    const board = await loadBoard(repo);
+    const read = sheet.readTab.bind(sheet);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    vi.spyOn(sheet, 'readTab').mockImplementationOnce(async (...args) => {
+      const rows = await read(...args);
+      await pending;
+      return rows;
+    });
+    const refresh = repo.listLibrary();
+    const reads = sheet.reads;
+    expect(cachedNavigationCounts(repo).nextUp).toBeNull();
+    expect(sheet.reads).toBe(reads);
+    release();
+    await refresh;
+    expect(cachedNavigationCounts(repo).nextUp).toBe(nextUpCount(board));
+    sheet.externalEdit(SHEET_TABS.library.name, 2, 0, 'SYN-CHANGED');
+    await repo.listLibrary();
+    expect(cachedNavigationCounts(repo).nextUp).toBeNull();
   });
 });

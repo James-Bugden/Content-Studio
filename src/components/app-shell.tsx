@@ -10,8 +10,9 @@ import { NavigationCountsProvider } from './navigation-counts';
  * screens the navigation is a left sidebar; on phones the same list becomes a
  * bottom tab bar, so there is one Primary navigation landmark at every width.
  * The tab bar shows the first four items and a "More" menu for the rest.
- * The only client pieces are the nav items (they need the current path) and the
- * toast region. The account control is a slot so authentication stays with its
+ * Counts context stays inside navigation: its asynchronous updates must not
+ * surround the streamed page or editor hydration boundaries. The account
+ * control is a slot so authentication stays with its
  * own module and never leaks into client code from here.
  */
 export const PRIMARY_NAV = [
@@ -36,7 +37,6 @@ export type AppShellProps = {
 export function AppShell({ children, accountSlot }: AppShellProps) {
   return (
     <ToastProvider>
-      <NavigationCountsProvider>
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-primary px-4 py-2 font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -55,19 +55,21 @@ export function AppShell({ children, accountSlot }: AppShellProps) {
             aria-label="Primary"
             className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card pb-[env(safe-area-inset-bottom)] md:static md:z-auto md:border-0 md:bg-transparent md:pb-0"
           >
-            <ul className="flex md:flex-col md:gap-0.5">
-              {PRIMARY_NAV.map((item, i) => (
-                <li
-                  key={item.href}
-                  className={`min-w-0 flex-1 md:flex-none ${i >= TAB_BAR_COUNT ? 'max-md:hidden' : ''} ${item.href === '/replies' ? 'md:mt-3 md:border-t md:border-line md:pt-3' : ''}`}
-                >
-                  <NavLink href={item.href}>{item.label}</NavLink>
+            <NavigationCountsProvider>
+              <ul className="flex md:flex-col md:gap-0.5">
+                {PRIMARY_NAV.map((item, i) => (
+                  <li
+                    key={item.href}
+                    className={`min-w-0 flex-1 md:flex-none ${i >= TAB_BAR_COUNT ? 'max-md:hidden' : ''} ${item.href === '/replies' ? 'md:mt-3 md:border-t md:border-line md:pt-3' : ''}`}
+                  >
+                    <NavLink href={item.href}>{item.label}</NavLink>
+                  </li>
+                ))}
+                <li className="min-w-0 flex-1 md:hidden">
+                  <NavMore items={PRIMARY_NAV.slice(TAB_BAR_COUNT)} />
                 </li>
-              ))}
-              <li className="min-w-0 flex-1 md:hidden">
-                <NavMore items={PRIMARY_NAV.slice(TAB_BAR_COUNT)} />
-              </li>
-            </ul>
+              </ul>
+            </NavigationCountsProvider>
           </nav>
           {accountSlot ? <div className="flex min-w-0 items-center gap-2 text-sm md:mt-auto md:px-1.5">{accountSlot}</div> : null}
         </header>
@@ -75,7 +77,6 @@ export function AppShell({ children, accountSlot }: AppShellProps) {
           {children}
         </main>
       </div>
-      </NavigationCountsProvider>
     </ToastProvider>
   );
 }
