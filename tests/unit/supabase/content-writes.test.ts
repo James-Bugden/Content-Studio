@@ -134,6 +134,15 @@ describe.each(['sheet', 'fake-db', 'sql-db'] as const)('MIG-07 %s mutation contr
   });
 
   if (mode !== 'sheet') {
+  it('refuses a Schedule identity rename before sending SQL', async () => {
+    const before = await repo.getSchedule('2026-10-02-MAIN-X');
+    const db = mode === 'sql-db' ? sql : fake;
+    const spy = vi.spyOn(db,'applyPatch');
+    try {
+      expect(await repo.updateSchedule({operationId:'synthetic_rename_refused',actor:owner,target:{contentId:before.value.contentId},expectedRevision:before.revision,patch:{contentId:'2026-10-03-MAIN-X'}})).toMatchObject({ok:false,code:'VALIDATION_FAILED',details:{reason:'field_not_writable',field:'contentId'}});
+      expect(spy).not.toHaveBeenCalled();
+    } finally { spy.mockRestore(); }
+  });
   it('DB instances share replay and preserve the original result after another edit', async () => {
     const db = mode === 'sql-db' ? sql : fake;
     const second = new SupabaseContentRepository(db);
@@ -272,11 +281,104 @@ describe('unwired PostgREST write transport', () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
   it.each([
+    {ok:false,code:'STALE_READ',steps:[{state:'stale'}],revision:2,replayed:true},
     {ok:true,code:null,steps:[{state:'stale'}],revision:2},
     {ok:false,code:'STALE_READ',steps:[{state:'stale'}],revision:null},
     {ok:true,code:null,steps:[{state:'applied'}],revision:Number.MAX_SAFE_INTEGER+1},
   ])('fails closed on an inconsistent mutation response: %j', async body => {
     const db = new SupabaseContentDb({url:'https://synthetic-db.supabase.co',serviceKey:'SYNTHETIC_SERVICE_KEY_ONLY',fetch:async()=>Response.json(body)});
     await expect(db.applyPatch(write)).rejects.toMatchObject({code:'SCHEMA_DRIFT'});
+  });
+});
+
+describe('DB-3 SQL guards and live client against the SQL catalog', () => {
+  const sql = new SqlContentDb();
+  const write = (operationId: string, data: Record<string, unknown>, kind: ContentTarget = 'library', id = 'SYN-GUARD'): ContentWrite =>
+    ({operationId, patchHash:sha256([operationId, JSON.stringify(data)].join(':')), actorHash:sha256('synthetic-actor'), kind, id, expectedVersion:'1', data});
+  beforeEach(async () => {
+    await pg.exec("truncate content_studio_posts,content_studio_schedule,content_studio_operations,content_studio_row_history,content_studio_audit_events restart identity cascade; insert into content_studio_posts(collection,library_id) values ('library','SYN-GUARD'),('queue','SYN-QUEUE'); insert into content_studio_schedule(content_id) values ('SYN-SCHEDULE')");
+  });
+  it.each([
+    ['library', {slug:'changed'}], ['schedule', {posted:true}],
+    // Schedule has no second Library writable allowlist to mask a removed
+    // source-metadata protection check.
+    ['schedule', {source_sheet_row:50}], ['schedule', {sheet_revision:'1234567890abcdef'}], ['schedule', {passthrough:{synthetic:'value'}}],
+  ] as const)('SQL refuses %s patch %j without changing rows, ledger or history', async (kind, data) => {
+    const read = () => kind === 'schedule' ? sql.getSchedule('SYN-SCHEDULE') : sql.getPost('library','SYN-GUARD');
+    const before = await read();
+    await expect(sql.applyPatch(write('synthetic_guard', data, kind, kind === 'schedule' ? 'SYN-SCHEDULE' : 'SYN-GUARD'))).rejects.toMatchObject({code:'22023'});
+    expect(await read()).toEqual(before);
+    expect(await sql.service('select * from content_studio_row_history')).toEqual([]);
+    expect(await sql.service('select * from content_studio_operations')).toEqual([]);
+  });
+  it('failed not-found, stale and queue-collision attempts are audited without consuming IDs', async () => {
+    const attempts = [write('synthetic_missing',{draft_content:'Synthetic'},'library','SYN-MISSING'),
+      {...write('synthetic_stale',{draft_content:'Synthetic'}),expectedVersion:'2'},
+      write('synthetic_collision',{draft_content:'Synthetic'},'queue','SYN-QUEUE')];
+    expect((await sql.applyPatch(attempts[0]!)).code).toBe('NOT_FOUND');
+    expect((await sql.applyPatch(attempts[1]!)).code).toBe('STALE_READ');
+    expect((await sql.insertQueueIdea(attempts[2]!)).code).toBe('CONFLICT');
+    expect(await sql.service('select operation_id,outcome from content_studio_audit_events order by event_id')).toEqual([
+      {operation_id:'synthetic_missing',outcome:'not_found'}, {operation_id:'synthetic_stale',outcome:'stale'}, {operation_id:'synthetic_collision',outcome:'conflict'},
+    ]);
+    expect(await sql.service('select * from content_studio_operations')).toEqual([]);
+    expect(await sql.service('select * from content_studio_row_history')).toEqual([]);
+  });
+  it('enforces the byte cap independently in the adapter and SQL, including nested JSON', async () => {
+    const patch = {draftContent:'漢'.repeat(45_000),currentHook:'字'.repeat(45_000)};
+    expect(() => contentPatch(patch)).toThrowError(expect.objectContaining({code:'VALIDATION_FAILED',details:{reason:'value_size'}}));
+    await expect(sql.applyPatch(write('synthetic_byte_cap',{draft_content:patch.draftContent,current_hook:patch.currentHook}))).rejects.toMatchObject({code:'22023'});
+    const args = ['synthetic_nested_cap',sha256('nested'),sha256('actor'),'library','SYN-GUARD',1,{passthrough:{synthetic:'x'.repeat(262_144)}}];
+    await expect(sql.service('select content_studio_write_through($1,$2,$3,$4,$5,$6,$7)',args)).rejects.toMatchObject({code:'22023'});
+    expect((await sql.getPost('library','SYN-GUARD'))!.row_version).toBe(1);
+  });
+  it('runs live RPC names/parameters and mutationRow ordering against real SQL', async () => {
+    // Only the HTTP boundary is replaced. Parameter names come from pg_proc;
+    // filters/order emitted by the production client execute against PGlite.
+    const request: typeof fetch = async (input, init) => {
+      const url = new URL(String(input));
+      const name = url.pathname.split('/').at(-1)!;
+      if (init?.method === 'POST') {
+        expect(['content_studio_apply_patch','content_studio_insert_queue_idea']).toContain(name);
+        const catalog = await pg.query<{proargnames:string[]}>('select proargnames from pg_proc where pronamespace=\'public\'::regnamespace and proname=$1',[name]);
+        const names = catalog.rows[0]!.proargnames;
+        const body = JSON.parse(String(init.body)) as Record<string,unknown>;
+        expect(Object.keys(body).sort()).toEqual([...names].sort());
+        const result = await sql.service<{r:ContentWriteResult}>(`select ${name}(${names.map((n,i)=>`${n} => $${i+1}`).join(',')}) r`,names.map(n=>body[n]));
+        return Response.json(result[0]!.r);
+      }
+      expect(name).toBe('content_studio_row_history');
+      const params = url.searchParams;
+      const order = params.get('order')!;
+      expect(order).toMatch(/^history_id\.(asc|desc)$/);
+      const result = await sql.service(`select * from content_studio_row_history where target_kind=$1 and target_id=$2 and row_version_before=$3 order by ${order.replace('.', ' ')} limit $4 offset $5`,
+        ['target_kind','target_id','row_version_before'].map(k=>params.get(k)!.replace(/^eq\./,'')).concat([params.get('limit')!,params.get('offset')!]));
+      return Response.json(result,{headers:{'content-range':`0-${result.length-1}/${result.length}`}});
+    };
+    const live = new SupabaseContentDb({url:'https://synthetic-db.supabase.co',serviceKey:'SYNTHETIC_SERVICE_KEY_ONLY',fetch:request});
+    const w = write('synthetic_live_patch',{draft_content:'Committed synthetic copy'});
+    expect(await live.applyPatch(w)).toMatchObject({ok:true,revision:2});
+    expect(await live.insertQueueIdea(write('synthetic_live_insert',{draft_content:'Synthetic idea'},'queue','SYN-NEW'))).toMatchObject({ok:true,revision:1});
+    const committed = await sql.getPost('library','SYN-GUARD');
+    for (const [index, revision] of ['aaaaaaaaaaaaaaaa','bbbbbbbbbbbbbbbb'].entries()) {
+      const result = await sql.service<{r:ContentWriteResult}>('select content_studio_write_through($1,$2,$3,$4,$5,$6,$7) r',
+        [`synthetic_metadata_${index}`,sha256(revision),w.actorHash,w.kind,w.id,2,{sheet_revision:revision,source_sheet_row:index+10}]);
+      expect(result[0]!.r).toMatchObject({ok:true,revision:2});
+      expect((await sql.getPost('library','SYN-GUARD'))!.row_version).toBe(2);
+    }
+    expect(await live.applyPatch({...write('synthetic_later_patch',{draft_content:'Newer synthetic copy'}),expectedVersion:'2'})).toMatchObject({ok:true,revision:3});
+    const restored = await live.mutationRow('library','SYN-GUARD','2');
+    // JSON history serializes timestamps; compare through the same boundary.
+    expect(restored).toMatchObject(Object.fromEntries(Object.entries(committed!).filter(([key]) => !['created_at','updated_at'].includes(key))));
+    expect(await live.applyPatch(w)).toMatchObject({ok:true,replayed:true,revision:2});
+  });
+  it('rejects non-ISO/offset-free timestamps and normalizes explicit instants', () => {
+    for (const stamp of ['2026/10/01 09:00','2026-10-01T09:00:00']) expect(() => contentPatch({publishedAt:stamp})).toThrowError(expect.objectContaining({code:'VALIDATION_FAILED'}));
+    expect(contentPatch({publishedAt:'2026-10-01T09:00:00+08:00'})).toEqual({published_at:'2026-10-01T01:00:00.000Z'});
+    expect(contentPatch({publishedAt:'2026-10-01T01:00:00Z'})).toEqual({published_at:'2026-10-01T01:00:00.000Z'});
+  });
+  it('exports only named field names, even when an audit row contains private or prototype strings', () => {
+    const [event] = exportContentAudit([{operation_id:'synthetic-op',actor_hash:'synthetic-actor',target_kind:'library',target_id:'SYN-GUARD',changed_fields:['draft_content','PRIVATE_SYNTHETIC_COPY','https://example.invalid/private','constructor','__proto__'],before_hash:null,after_hash:null,outcome:'applied'}]);
+    expect(event!.changedFields).toEqual(['draft_content']);
   });
 });

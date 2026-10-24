@@ -228,7 +228,7 @@ begin
   end if;
   if exists (select 1 from jsonb_array_elements(p_exceptions) e
     where jsonb_typeof(e) <> 'object' or e ->> 'class' is null
-      or e ->> 'class' not in ('formula_display','number_formatting','trailing_whitespace')
+      or e ->> 'class' not in ('formula_display','number_formatting','trailing_whitespace','blank_boolean','boolean_formatting','timestamp_formatting')
       or not (e ?& array['class','collection','field','hash'])
       or e - array['class','collection','field','hash'] <> '{}'
       or e ->> 'hash' is null or e ->> 'hash' !~ '^[0-9a-f]{64}$'

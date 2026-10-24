@@ -100,6 +100,25 @@ snapshot rule when adding metadata-only copies that do not increment versions.
 No-op patches preserve the row version and add no history; attempts have audit
 events, while ledger replay adds neither history nor a duplicate audit event.
 
+DB-3 review round 1 clarifications: failed row attempts (`NOT_FOUND`,
+`STALE_READ`, queue identity collision) write audit events without consuming
+an operation ID. Envelope/field validation exceptions and reuse of an already
+successful operation with a different hash/target/actor/mode return before
+the row-attempt audit insert; these refusals do not create audit rows.
+
+Typed DB writes intentionally have stricter validation than Sheet string cells:
+`hookScore: '7.5'` and `'8/10'` are rejected (`value_invalid`) because the DB
+column is an integer, whereas Sheet accepts both strings. Each string remains
+capped at 50,000 characters; the entire DB patch also has a 262,144-byte cap
+(SQL measures jsonb text, including nested passthrough). Two 45,000-character
+zh-TW fields can therefore pass Sheet validation but fail DB validation
+(`value_size` at the adapter). Timestamp writes require ISO date-times with
+explicit `Z` or numeric offset; non-ISO `publishedAt: '2026/10/01 09:00'`
+and offset-free ISO date-times are rejected instead of depending on the server
+time zone. Sheet retains string cells and its Taipei display conventions.
+DB-5/cutover parity must account for these differences; they do not authorize
+silently coercing existing Sheet content or flipping authority.
+
 `exportContentAudit` is an explicit public-evidence projection: identifiers and
 hashes become at most 12-character hashes, field names use a compiled allowlist,
 and raw identifiers, URLs, timestamps and copy are omitted. Private database

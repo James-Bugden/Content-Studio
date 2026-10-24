@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   }
   if (body.kind === 'db_external_edit') {
     const headers = body.collection === 'schedule' ? SCHEDULE_HEADERS : LIBRARY_HEADERS;
-    if (Object.keys(body.patch).some(field => !(field in headers) || ['libraryId', 'contentId', 'posted'].includes(field))) return json({ ok: false }, { status: 400 });
+    if (Object.keys(body.patch).some(field => !Object.hasOwn(headers, field) || ['libraryId', 'contentId', 'posted'].includes(field))) return json({ ok: false }, { status: 400 });
     try { fakes.db.externalEdit(body.collection, body.id, contentPatch(body.patch)); }
     catch (error) { return json({ ok: false }, { status: isAppError(error) && error.code === 'NOT_FOUND' ? 404 : 400 }); }
     return json({ ok: true });

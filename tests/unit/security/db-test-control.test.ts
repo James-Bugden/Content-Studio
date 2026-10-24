@@ -11,6 +11,9 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); resetEnvCache(); resetServices(); });
 
 describe('DB e2e control boundary', () => {
+  it.each(['libraryId','contentId','posted','constructor'])('refuses protected or inherited patch key %s', async field => {
+    expect((await post({kind:'db_external_edit',collection:'schedule',id:'2026-10-02-MAIN-X',patch:{[field]:'Synthetic'}})).status).toBe(400);
+  });
   it.each([{CS_DATA_MODE:'live',CS_CONTENT_STORE:'sheet'},{CS_TEST_MODE:'unit'},{VERCEL_ENV:'production',CS_DATA_MODE:'live',CS_CONTENT_STORE:'sheet'}])('is absent outside synthetic e2e mode: %j', async env => {
     for (const [key,value] of Object.entries(env)) vi.stubEnv(key,value);
     resetEnvCache();

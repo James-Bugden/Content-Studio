@@ -164,7 +164,9 @@ export function contentPatch(patch: Record<string, string | undefined>, currentC
     }
     if (['finalSyncedAt', 'publishedAt', 'analyticsSyncedAt'].includes(field)) {
       const [stamp, hash = ''] = field === 'finalSyncedAt' ? value.split(' #') : [value];
-      if (stamp && !Number.isFinite(new Date(stamp).getTime())) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
+      // SQL timestamps represent instants. Never interpret an offset-free value
+      // in the server's local time zone (which differs between dev and hosting).
+      if (stamp && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(stamp) || !Number.isFinite(new Date(stamp).getTime()))) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
       typed = stamp ? new Date(stamp).toISOString() : null;
       if (field === 'finalSyncedAt') result.final_synced_hash = hash;
     }
