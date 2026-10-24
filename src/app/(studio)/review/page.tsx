@@ -65,6 +65,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     return q ? `/review?${q}` : '/review';
   };
 
+  const clearHref = hrefWith({ lane: null, target: null, review: null, src: null, from: null, copyright: null, duplicate: null, queue: null, page: null });
+  const resultCount = queue.total === 0
+    ? `None of the ${queue.totalUnfiltered} Library rows match these filters.`
+    : `Showing ${(queue.page - 1) * 25 + 1} to ${Math.min(queue.page * 25, queue.total)} of ${queue.total}${queue.total !== queue.totalUnfiltered ? ` (filtered from ${queue.totalUnfiltered})` : ''}`;
+
   return (
     <>
       <PageHeader
@@ -142,7 +147,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           ) : null}
         </nav>
 
-        <FilterBar variant="toolbar" disclosureKeys={['src', 'from', 'copyright', 'duplicate', 'queue']} filters={[
+        <FilterBar announcement={resultCount} clearKeys={['lane']} hideClear={queue.total === 0} variant="toolbar" disclosureKeys={['src', 'from', 'copyright', 'duplicate', 'queue']} filters={[
           { key: 'target', label: 'Target platform', control: 'chips', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
           { key: 'review', label: 'Review status', control: 'chips', options: REVIEW_STATUSES.map((s) => ({ value: s, label: s === 'Pending' ? 'Not reviewed' : s })) },
           { key: 'src', label: 'Source', options: queue.sources.map((s) => ({ value: s.key, label: s.label })) },
@@ -173,13 +178,13 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         ) : queue.total === 0 ? (
           <StateView
             kind="no_match"
-            detail={`None of the ${queue.totalUnfiltered} Library rows match these filters.`}
+            detail={resultCount}
+            action={<GuardedLink href={clearHref} className="underline">Clear all filters</GuardedLink>}
           />
         ) : (
           <>
             <p className="text-sm text-ink-soft">
-              Showing {(queue.page - 1) * 25 + 1} to {Math.min(queue.page * 25, queue.total)} of {queue.total}
-              {queue.total !== queue.totalUnfiltered ? ` (filtered from ${queue.totalUnfiltered})` : ''}
+              {resultCount}
             </p>
             {layout === 'cards' ? (
               <ol className="flex flex-col gap-4">

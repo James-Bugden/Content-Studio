@@ -317,3 +317,36 @@ Sheet-mode behavior; it is not evidence against or for DB-read acceptance.
 Watch the next applicable CI runs. If it recurs, retain the exact SHA, browser
 trace and fault seed, reproduce and diagnose before rerunning; a rerun alone
 does not resolve recurrence. No speculative flake fix is included here.
+
+## Explicit owner/live gates carried from #183/#184 (#186)
+
+These gates remain OPEN. Local fake/PGlite evidence cannot close them. Keep
+`CS_CONTENT_STORE=sheet` and live database modes disabled until the applicable
+cutover gates and the following evidence are recorded privately.
+
+- **Phase C: 60 s rate-limit window.** Owner must accept or change the fixed
+  retry/backoff window after measuring real provider retry timing, repeated
+  read-rate-limit events and lag-caused `STALE_READ` across instances for the
+  Phase C observation period. Record exact deployment, interval and counts;
+  no local test establishes a safe live window.
+- **Phase D: same-cell export race.** Owner must choose an operational Sheet
+  edit freeze or a proven stronger write precondition before live export.
+  A hand edit between the final Sheet read and write can still be overwritten;
+  single-flight only serialises this instance. Rehearse on synthetic copies,
+  record the chosen mitigation and rollback evidence before enabling `db`.
+- **Schema bumps: backups and restore.** Owner must confirm plan backups and
+  choose the schema-bump restore policy. Rehearse restoring the prior archive
+  and re-backup against the new schema on an isolated branch, retaining schema
+  versions, exact build and verification results. Current archive verification
+  does not prove restore compatibility across schema versions. Do not treat a
+  fresh backup under the old schema as proof of recoverability after a bump.
+
+### Pending import-runs index (#186.5)
+
+Latest-import reads sort `content_studio_import_runs` by `at DESC,
+operation_id DESC`. Existing migrations do not provide an index for that order.
+The new `20261025000200_content_import_runs_at_index.sql` adds the matching
+index. It has **never been applied live** and is **unapplied** in this work;
+no existing migration was edited. Before live `db-read`, apply it only through
+the authorised migration/rehearsal workflow and verify the latest-import query
+plan with representative synthetic history. This note is not cutover evidence.

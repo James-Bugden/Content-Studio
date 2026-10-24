@@ -173,6 +173,8 @@ export async function previewPromotion(repo: ContentRepository, libraryId: strin
   if (ready.group !== 'ready') return { ok: false, code: 'GATE_BLOCKED', problems: ['This item is not Ready.'], blockers: ready.gates.blockers };
   const plan = planPromotion(record, row[0]!, settings, markdownLinkOf(record));
   if (!plan.ok) return { ok: false, code: 'VALIDATION_FAILED', problems: plan.problems };
+  const instant = new Date();
+  if (isPastSlot(parseContentId(contentId)!.isoDate, plan.slotTime, today(instant), taipeiNow(instant))) return { ok: false, code: 'VALIDATION_FAILED', problems: ['This slot cannot be used.'] };
   return { ok: true, libraryId, contentId, libraryRevision: record.revision, scheduleRevision: row[0]!.revision, preview: plan.preview };
 }
 
@@ -214,6 +216,8 @@ export async function promote(repo: ContentRepository, actor: Actor, input: Prom
   if (ready.group !== 'ready') return done({ ok: false, code: 'GATE_BLOCKED', blockers: ready.gates.blockers });
   const plan = planPromotion(record, row, settings, markdownLinkOf(record));
   if (!plan.ok) return done({ ok: false, code: 'VALIDATION_FAILED', problems: plan.problems });
+  const instant = new Date();
+  if (isPastSlot(parseContentId(input.contentId)!.isoDate, plan.slotTime, today(instant), taipeiNow(instant))) return done({ ok: false, code: 'VALIDATION_FAILED', problems: ['This slot cannot be used.'] });
 
   const res = await repo.updateSchedule({ operationId: input.operationId, actor, target: { contentId: input.contentId }, expectedRevision: row.revision, patch: plan.patch });
   if (!res.ok) return done({ ok: false, code: res.code });

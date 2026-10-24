@@ -33,6 +33,33 @@ async function save(repo: SupabaseContentRepository | ContentWriteCutover['repo'
 }
 
 describe('MIG-12 one-way stable-ID export', () => {
+  it('CS-059g: ordinary AppErrors do not skip the remaining rows of a tab', async () => {
+    const { db, sheet, exporter } = setup(); await exporter.run();
+    db.externalEdit('library', 'SYN-L001', { draft_content: 'Synthetic first change' });
+    db.externalEdit('library', 'SYN-L002', { draft_content: 'Synthetic second change' });
+    const read = sheet.readTab.bind(sheet);
+    let failed = false;
+    vi.spyOn(sheet, 'readTab').mockImplementation(async (...args) => {
+      if (!failed && args[0] === SHEET_TABS.library.name) { failed = true; throw new AppError('PROVIDER_UNAVAILABLE'); }
+      return read(...args);
+    });
+    await exporter.run();
+    expect(failed).toBe(true);
+    const grid = sheet.rawTab(SHEET_TABS.library.name);
+    expect(grid.find(r => r.some(c => c.value === 'SYN-L002'))!.some(c => c.value === 'Synthetic second change')).toBe(true);
+  });
+  it.each([false, true])('CS-059g: hand edits keep direction advice alongside equals advice: %s', async (equals) => {
+    const { sheet, exporter, repo, cutover } = setup(); await exporter.run();
+    const grid = sheet.rawTab(SHEET_TABS.library.name);
+    sheet.externalEdit(SHEET_TABS.library.name, 2, grid[0]!.findIndex(c => c.value === 'Current Hook'), 'Synthetic hand edit');
+    if (equals) await save(repo, 'synthetic-both-conflicts', '=Synthetic literal');
+    else await exporter.run();
+    const report = await buildReconcileReport(repo, new FakeDriveGateway(), Date.now(), { contentCutover: cutover });
+    const facts = report.items.find(i => i.kind === 'export_mismatch' && i.stableIds.includes('SYN-L001'))!.facts.join(' ');
+    expect(facts).toContain('Review the direction in the cutover runbook; no automatic overwrite.');
+    expect(facts.includes('Change authoritative value')).toBe(equals);
+    expect(grid[1]![grid[0]!.findIndex(c => c.value === 'Current Hook')]!.value).toBe('Synthetic hand edit');
+  });
   it('CS-059d: parity blocks an unknown-column hand edit on a DB-created idea', async () => {
     const seed = syntheticContentDbSeed(), sheet = new FakeSheetTransport();
     const grid = sheet.rawTab(SHEET_TABS.queue.name), column = grid[0]!.length;

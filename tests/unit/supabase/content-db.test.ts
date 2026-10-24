@@ -43,6 +43,16 @@ describe('read-only PostgREST transport', () => {
     expect(await new SupabaseContentDb({ ...options, fetch: request }).listPosts('library')).toEqual(source);
     expect(request.mock.calls.length).toBe(Math.ceil(source.length / 2));
   });
+  it('CS-059g: exact count is requested on every page and incomplete reads fail closed', async () => {
+    const source = await new FakeContentDb().listPosts('library');
+    const request = vi.fn<typeof fetch>(async (input, init) => {
+      expect(new Headers(init?.headers).get('Prefer')).toBe('count=exact');
+      const offset = Number(new URL(String(input)).searchParams.get('offset'));
+      return Response.json(offset === 0 ? source.slice(0, 1) : [], { headers: { 'content-range': `${offset}-${offset}/${source.length}` } });
+    });
+    await expect(new SupabaseContentDb({ ...options, fetch: request }).listPosts('library')).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE', details: { reason: 'incomplete_read' } });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
   it('encodes stable IDs as a query value, never a query fragment', async () => {
     const request = vi.fn<typeof fetch>(async input => { const q = new URL(String(input)).searchParams; expect(q.get('library_id')).toBe('eq.SYNTH&collection=eq.queue'); expect(q.get('collection')).toBe('eq.library'); return Response.json([]); });
     expect(await new SupabaseContentDb({ ...options, fetch: request }).getPost('library', 'SYNTH&collection=eq.queue')).toBeNull();
@@ -85,8 +95,13 @@ describe('QueueSummaryRow SQL parity (DB-1 review item 8)', () => {
     const base = readFileSync('supabase/migrations/20261024000100_content_authority.sql', 'utf8');
     await db.exec(base.replace(/\b(library_id|content_source|date|platform|slot|content_id|setting|source_master_file_url|source_markdown_url) text\b/g, '$1 text collate "fixture_en"'));
     await db.exec(readFileSync('supabase/migrations/20261024000200_content_summary_reads.sql', 'utf8'));
+    await db.exec(readFileSync('supabase/migrations/20261025000200_content_import_runs_at_index.sql', 'utf8'));
   });
   afterAll(async () => { await db?.close(); });
+  it('CS-059g: latest-import index matches both descending sort keys', async () => {
+    const result = await db.query<{ indexdef: string }>("select indexdef from pg_indexes where schemaname='public' and tablename='content_studio_import_runs'");
+    expect(result.rows.some(r => r.indexdef.includes('(at DESC, operation_id DESC)'))).toBe(true);
+  });
   it('groups one source across multiple masters, exposes all named counts and matches fake', async () => {
     const seed = syntheticContentDbSeed(); seed.posts = seed.posts.filter(r => r.collection === 'queue').slice(0, 3);
     seed.posts[0]!.source_master_file_url = 'https://example.com/z';

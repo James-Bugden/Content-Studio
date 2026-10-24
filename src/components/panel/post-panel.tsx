@@ -47,15 +47,18 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [previewWarning, setPreviewWarning] = useState<string | null>(null);
   const previewRequest = useRef(0);
   const pickSlot = useCallback(async (contentId: string, fallback: string[] = []) => {
     const request = ++previewRequest.current;
     setPreview(null);
+    setPreviewWarning(null);
     for (const id of [contentId, ...fallback]) {
       const res = await fetch(`/api/schedule/promote/preview?libraryId=${encodeURIComponent(libraryId)}&contentId=${encodeURIComponent(id)}`, { credentials: 'same-origin' }).catch(() => null);
       const body = await res?.json().catch(() => null);
       if (request !== previewRequest.current) return;
       if (res?.ok && body?.ok) { setPreview(body); return; }
+      setPreviewWarning(body?.problems?.join(' ') || body?.message || 'This slot cannot be used.');
       setPreview(body?.ok === false ? body : { ok: false });
     }
   }, [libraryId]);
@@ -66,7 +69,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      if (initialPreview?.contentId === firstSlot) setPreview(initialPreview ?? null);
+      if (initialPreview?.contentId === firstSlot) { setPreview(initialPreview ?? null); setPreviewWarning(null); }
       else if (firstSlot) void pickSlot(firstSlot, slotOptions?.slice(1).map((o) => o.contentId));
       else setPreview(null);
     });
@@ -209,10 +212,11 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
               ))}
             </ul>
           )}
-          {data.slotOptions.length > 0 ? <div className="mt-3 h-80">
+          {data.slotOptions.length > 0 ? <div className={`mt-3 flex flex-col ${preview && !preview.ok ? '' : 'h-80'}`}>
+          {preview?.ok && previewWarning ? <InlineResult tone="warning">{previewWarning}</InlineResult> : null}
           {preview ? (
             preview.ok ? (
-              <div className="flex h-full flex-col gap-2">
+              <div className="flex min-h-0 flex-1 flex-col gap-2">
                 <p className="text-sm text-ink-soft">These cells will be written to the Schedule. Nothing else changes.</p>
                 <ul className="min-h-0 flex-1 overflow-y-auto text-sm" tabIndex={0} aria-label="Cells to write">
                   {preview.preview.map((r) => (

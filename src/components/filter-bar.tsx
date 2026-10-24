@@ -42,7 +42,19 @@ export function nextFilterQuery(filters: FilterDef[], current: URLSearchParams, 
  * of "Label value" chips instead of a boxed grid of full-width selects. Labels
  * stay real <label> elements, and controls keep a 44px touch height on phones.
  */
-export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys = [] }: { filters: FilterDef[]; variant?: 'panel' | 'toolbar'; /** Secondary controls share state, clear action and announcement with the chips. */ disclosureKeys?: string[]; /** Extra controls placed after the selects, e.g. a sort-direction toggle. */ trailing?: React.ReactNode }) {
+export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys = [], clearKeys = [], hideClear = false, announcement }: {
+  filters: FilterDef[];
+  variant?: 'panel' | 'toolbar';
+  /** Secondary controls share state, clear action and announcement with the chips. */
+  disclosureKeys?: string[];
+  /** Page-owned filters (e.g. lane) also reset through the unified clear action. */
+  clearKeys?: string[];
+  hideClear?: boolean;
+  /** Replaces the applied-filter announcement with the page's result count. */
+  announcement?: string;
+  /** Extra controls placed after the selects, e.g. a sort-direction toggle. */
+  trailing?: React.ReactNode;
+}) {
   const toolbar = variant === 'toolbar';
   const router = useRouter();
   const pathname = usePathname() ?? '';
@@ -54,12 +66,16 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
 
   const active = filters.filter((f) => sanitiseFilterValue(f, current.get(f.key)) !== '');
 
+  const hasActive = active.length > 0 || clearKeys.some(key => current.has(key));
+
   const go = (change: { key: string; value: string } | 'clear') => {
     if (change !== 'clear') {
       const filter = filters.find((f) => f.key === change.key);
       if (!filter || sanitiseFilterValue(filter, current.get(change.key)) === change.value) return;
     }
-    const next = nextFilterQuery(filters, current, change);
+    const base = new URLSearchParams(current);
+    if (change === 'clear') for (const key of clearKeys) base.delete(key);
+    const next = nextFilterQuery(filters, base, change);
     // Compose rapid chip clicks while the server is still rendering the first
     // navigation. The committed URL takes over when the transition finishes.
     guard(() => startTransition(() => {
@@ -77,7 +93,7 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
           <span className="text-ink-soft">{filter.label}</span>
           {[{ value: '', label: filter.allLabel ?? 'All' }, ...filter.options].map((option) => (
             <button key={option.value} type="button" aria-pressed={selected === option.value}
-              className={`${buttonClass('secondary', 'sm')} min-h-11 ${selected === option.value ? 'border-ink bg-primary-soft font-semibold' : ''}`}
+              className={`${buttonClass(selected === option.value ? 'primary' : 'secondary', 'sm')} min-h-11`}
               onClick={() => go({ key: filter.key, value: selected === option.value ? '' : option.value })}>
               {option.label}
             </button>
@@ -133,13 +149,13 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
         </details>
       ) : null}
       {trailing}
-      {toolbar && active.length === 0 ? null : (
-        <button type="button" className={toolbar ? `${buttonClass('secondary', 'sm')} max-md:min-h-11` : buttonClass('secondary')} onClick={() => go('clear')} disabled={active.length === 0}>
+      {hideClear || toolbar && !hasActive ? null : (
+        <button type="button" className={toolbar ? `${buttonClass('secondary', 'sm')} max-md:min-h-11` : buttonClass('secondary')} onClick={() => go('clear')} disabled={!hasActive}>
           Clear filters
         </button>
       )}
       <p className="sr-only" aria-live="polite">
-        {active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`}
+        {announcement ?? (active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`)}
       </p>
       {dialog}
     </div>
