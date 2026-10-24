@@ -97,6 +97,10 @@ export class FakeContentDb implements ContentDb {
     if (importId !== undefined) this.importId = importId;
   }
   async pendingMarkdownExports() { this.check('read'); return structuredClone([...this.markdownExports.values()]); }
+  async markdownBodyEdits() {
+    this.check('read');
+    return [...new Set(this.history.filter(h => h.target_kind === 'library' && h.before_image && h.changed_fields.includes('draft_content')).map(h => h.target_id))];
+  }
   async completeMarkdownExport(job: MarkdownExport) {
     this.check('write');
     const current = this.markdownExports.get(job.libraryId);

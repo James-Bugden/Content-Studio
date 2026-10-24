@@ -80,3 +80,20 @@ it('executes production PostgREST queue and completion arguments against the SQL
   await client.completeMarkdownExport(jobs[0]!);
   expect(await client.pendingMarkdownExports()).toEqual([]);
 });
+it('reads audited body-edit identities through the production history filter, excluding initial inserts and metadata edits', async () => {
+  const client = new SupabaseContentDb({ url: 'http://127.0.0.1:54321', serviceKey: 'synthetic-service-key-not-a-real-key',
+    fetch: async url => {
+      const path = new URL(String(url));
+      expect(path.pathname).toBe('/rest/v1/content_studio_row_history');
+      expect(path.searchParams.get('target_kind')).toBe('eq.library');
+      expect(path.searchParams.get('before_image')).toBe('not.is.null');
+      expect(path.searchParams.get('changed_fields')).toBe('cs.{draft_content}');
+      const result = await pg.query("select target_id from content_studio_row_history where target_kind='library' and before_image is not null and changed_fields @> array['draft_content'] order by history_id");
+      return Response.json(result.rows, { headers: { 'content-range': `0-${result.rows.length - 1}/${result.rows.length}` } });
+    } });
+  expect(await client.markdownBodyEdits()).toEqual([]);
+  await patch('First');
+  expect(await client.markdownBodyEdits()).toEqual(['SYN-L008']);
+  await patch('Second', 2, 'synthetic_second_sql_patch');
+  expect(await client.markdownBodyEdits()).toEqual(['SYN-L008']);
+});

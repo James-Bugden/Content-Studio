@@ -31,7 +31,7 @@ export function MarkdownImport() {
     try {
       await send({ action: 'apply', section: { operationId: keys.current.get(key), libraryId: section.libraryId, fileId: preview.fileId, fileRevision: preview.fileRevision,
         expectedRevision: section.expectedRevision, sectionHash: section.sectionHash, markdownBody: section.markdownBody, direction } });
-      setMessage(direction === 'keep_db' ? 'Database body kept. Drive was not changed.' : 'Markdown section imported into the database.');
+      setMessage(direction === 'keep_db' ? 'Database body kept. Drive was not changed.' : !section.differs ? 'The database already holds this Markdown body.' : 'Markdown section imported into the database.');
       router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Import failed.'); }
     finally { setBusy(false); }

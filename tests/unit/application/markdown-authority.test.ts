@@ -25,6 +25,15 @@ async function save(body: string, operationId = 'synthetic_save_draft') {
   return saveDraft(repo, drive, { actor: owner, libraryId: 'SYN-L008', operationId,
     expectedSheetRevision: row.revision, expectedSectionHash: fingerprint(row.value.draftContent), proposed: body });
 }
+async function hookInput() {
+  const row = await repo.getLibrary('SYN-L001');
+  const generated = await generateHooks({ ai: new FakeAiGateway(), libraryId: 'SYN-L001', platform: 'LinkedIn', currentHook: row.value.currentHook,
+    draft: row.value.draftContent, draftHash: fingerprint(row.value.draftContent) });
+  if (!generated.ok) throw new Error('generation');
+  return { operationId: 'synthetic_hook_guard', libraryId: 'SYN-L001', expectedSheetRevision: row.revision,
+    expectedSectionHash: fingerprint(row.value.draftContent), generationDraftHash: fingerprint(row.value.draftContent), alternatives: generated.proposal.alternatives,
+    choice: { kind: 'alternative' as const, index: 0, alternative: generated.proposal.alternatives[0]! } };
+}
 
 describe('DB-7 atomic body and export', () => {
   it('saves and loads with no Drive reads, even when Drive is down; queues lag and repairs later', async () => {
@@ -41,7 +50,7 @@ describe('DB-7 atomic body and export', () => {
     expect(await db.pendingMarkdownExports()).toHaveLength(1);
     const report = await buildReconcileReport(repo, drive);
     expect(report.items.some(item => item.kind === 'markdown_export_lag' && item.stableIds.includes('SYN-L008'))).toBe(true);
-    expect(report.items.some(item => ['markdown_missing', 'markdown_mismatch'].includes(item.kind))).toBe(false);
+    expect(report.items.some(item => item.kind === 'markdown_mismatch')).toBe(false);
     await exporter.run(); expect(await db.pendingMarkdownExports()).toEqual([]);
   });
   it('DRV-01 exports exact UTF-8 body and keeps all adjacent bytes; a repeat writes nothing', async () => {
@@ -143,14 +152,95 @@ describe('DB-7 atomic body and export', () => {
     expect(await selectHook(repo, drive, owner, input)).toMatchObject({ ok: true, replayed: true });
     expect(db.history.length - before).toBe(1);
   });
-  it('unsafe export structure does not veto the DB save and remains queued', async () => {
-    expect((await save('## New section\n\ntext')).ok).toBe(true);
-    await exporter.run(); expect(exporter.failures.get('SYN-L008')?.code).toBe('VALIDATION_FAILED');
-    expect(drive.writes).toHaveLength(0); expect(await db.pendingMarkdownExports()).toHaveLength(1);
+  it.each(['generationDraftHash', 'expectedSectionHash'] as const)('refuses stale DB hook %s even with a fresh row revision', async field => {
+    const input = await hookInput(); input[field] = fingerprint('Stale generation');
+    for (const choice of [input.choice, { kind: 'current' as const }]) {
+      expect(await selectHook(repo, drive, owner, { ...input, choice })).toMatchObject({ ok: false, code: 'STALE_READ' });
+    }
+    expect(db.history).toEqual([]); expect(await db.pendingMarkdownExports()).toEqual([]);
+  });
+  it.each(['Wrong opening', 'suffix', 'blank'])('refuses DB hook opening mismatch: %s', async problem => {
+    const row = await repo.getLibrary('SYN-L001');
+    db.externalEdit('library', 'SYN-L001', problem === 'blank' ? { current_hook: '' }
+      : { draft_content: problem === 'suffix' ? row.value.currentHook + 'suffix\nBody' : 'Different opening\nBody' });
+    const input = await hookInput(), before = await repo.getLibrary('SYN-L001'), history = db.history.length;
+    expect(await selectHook(repo, drive, owner, input)).toMatchObject({ ok: false, code: 'CONFLICT', details: { reason: 'opening_mismatch' } });
+    expect(await repo.getLibrary('SYN-L001')).toEqual(before); expect(db.history).toHaveLength(history);
+    expect(await db.pendingMarkdownExports()).toEqual([]);
+  });
+  it.each(['## New section\n\ntext', 'Body\n```text\nopen fence'])('refuses unsafe structure at save, with the existing Sheet error and no DB or Drive write: %s', async body => {
+    const before = await repo.getLibrary('SYN-L008');
+    const reads = vi.spyOn(drive, 'readText');
+    expect(await save(body)).toMatchObject({ ok: false, code: 'VALIDATION_FAILED', details: { reason: 'unsafe_markdown_structure' } });
+    expect(await repo.getLibrary('SYN-L008')).toEqual(before);
+    expect(db.history).toEqual([]); expect(await db.pendingMarkdownExports()).toEqual([]);
+    expect(reads).not.toHaveBeenCalled(); expect(drive.writes).toEqual([]);
+  });
+  it('refuses an adjacent Drive edit between the export read and write without overwriting it', async () => {
+    await save('Database body');
+    const read = drive.readText.bind(drive);
+    let external = '';
+    vi.spyOn(drive, 'readText').mockImplementationOnce(async id => {
+      const snapshot = await read(id);
+      const other = findSection(snapshot.text, 'SYN-L001'); if (!other.ok) throw new Error('fixture');
+      external = safeReplaceSectionBody(snapshot.text, other.section, 'Hand edit in another section')!;
+      drive.externalEdit(id, external);
+      return snapshot;
+    });
+    await exporter.run();
+    expect(drive.textOf(SYNTH_MASTER_FILE_ID)).toBe(external);
+    expect(drive.writes).toEqual([]);
+    expect(await exporter.status()).toMatchObject([{ libraryId: 'SYN-L008', code: 'STALE_READ' }]);
+    expect(await db.pendingMarkdownExports()).toHaveLength(1);
+  });
+  it('does not acknowledge a matching readback body with a different revision', async () => {
+    await save('Database body');
+    const read = drive.readText.bind(drive); let calls = 0;
+    vi.spyOn(drive, 'readText').mockImplementation(async id => {
+      const result = await read(id);
+      if (++calls === 2) result.meta.revision = 'unexpected-revision';
+      return result;
+    });
+    await exporter.run();
+    expect(await db.pendingMarkdownExports()).toHaveLength(1);
+    expect(exporter.failures.get('SYN-L008')?.code).toBe('CONFLICT');
+  });
+  it('names a stale queued snapshot as blocking and repairs it after an audited save', async () => {
+    await save('Queued body');
+    db.externalEdit('library', 'SYN-L008', { draft_content: 'Out of band body' });
+    await exporter.run();
+    expect(drive.writes).toEqual([]); expect(await db.pendingMarkdownExports()).toHaveLength(1);
+    const report = await buildReconcileReport(repo, drive, undefined, { markdownExport: exporter });
+    expect(report.items.find(i => i.kind === 'markdown_export_lag' && i.stableIds.includes('SYN-L008'))).toMatchObject({ severity: 'blocking',
+      facts: [expect.stringContaining('queued body differs')], action: { href: '/review/SYN-L008' } });
+    await save('Chosen recovery body', 'synthetic_recovery_save');
+    await exporter.run();
+    expect(await db.pendingMarkdownExports()).toEqual([]); expect(exporter.failures.has('SYN-L008')).toBe(false);
+    expect((await buildReconcileReport(repo, drive, undefined, { markdownExport: exporter })).items.filter(i => i.kind === 'markdown_export_lag')).toEqual([]);
+  });
+  it('does not mistake missing legacy sections for export lag; no-link and unreadable masters are distinct', async () => {
+    const report = await buildReconcileReport(repo, drive, undefined, { markdownExport: exporter });
+    expect(report.items.filter(i => i.kind === 'markdown_export_lag')).toEqual([]);
+    expect(report.items.find(i => i.kind === 'markdown_missing' && i.stableIds.includes('SYN-L003'))?.severity).toBe('attention');
+    db.externalEdit('library', 'SYN-L008', { source_markdown_url: '', source_master_file_url: '', source_markdown: '', source_master_file: '' });
+    const missing = await buildReconcileReport(repo, drive, undefined, { markdownExport: exporter });
+    expect(missing.items.find(i => i.stableIds.includes('SYN-L008') && i.kind === 'markdown_missing')).toMatchObject({ title: 'SYN-L008: no Drive master link' });
+    drive.failNext({ op: 'read', code: 'PROVIDER_UNAVAILABLE', times: 10 });
+    const unreadable = await buildReconcileReport(repo, drive, undefined, { markdownExport: exporter });
+    expect(unreadable.items.some(i => i.kind === 'markdown_export_lag' && i.title.includes('could not be checked'))).toBe(true);
   });
 });
 
 describe('previewed Markdown import', () => {
+  it('reports duplicate refusals and exact differs flags, and refuses a trashed master', async () => {
+    await save('Different DB body');
+    const result = await previewMarkdownImport(repo, drive, owner, SYNTH_MASTER_FILE_ID);
+    expect(result.refused).toEqual(['SYN-L003']);
+    expect(result.sections.find(s => s.libraryId === 'SYN-L008')?.differs).toBe(true);
+    expect(result.sections.find(s => s.libraryId === 'SYN-L001')?.differs).toBe(false);
+    drive.trash(SYNTH_MASTER_FILE_ID);
+    await expect(previewMarkdownImport(repo, drive, owner, SYNTH_MASTER_FILE_ID)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
   it('imports a new marker/labelled master by Library ID without changing export destinations', async () => {
     const master = 'SYNTH_new_intake_master';
     const source = '### Synthetic post\r\n<!-- POST_START library_id="SYN-L008" -->\r\nDecision: PENDING\r\n#### Draft\r\n\r\nExact new body 🙂  \r\n\r\n<!-- POST_END -->\r\n\r\n## Another post\r\nLibrary ID: SYN-L001\r\n### Working draft\r\n```text\r\nLabelled body\r\n```\r\n';
@@ -184,6 +274,12 @@ describe('previewed Markdown import', () => {
     expect(db.history).toHaveLength(count);
     expect((await repo.getLibrary('SYN-L008')).value.draftContent).toBe(input.markdownBody);
     expect(drive.writes).toHaveLength(0);
+  });
+  it('refuses a noncanonical file id or a body token that does not describe the preview', async () => {
+    const input = await preview();
+    await expect(importMarkdownSection(repo, drive, owner, { ...input, fileId: `https://drive.google.com/file/d/${input.fileId}/view` })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(importMarkdownSection(repo, drive, owner, { ...input, sectionHash: fingerprint('Other body') })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(db.history).toEqual([]);
   });
   it('keeps DB on the explicit keep direction, refuses stale Drive/DB previews and viewer/non-db use', async () => {
     await save('DB body'); const input = await preview();

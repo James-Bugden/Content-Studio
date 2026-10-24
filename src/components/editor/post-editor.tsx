@@ -170,7 +170,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       clearRecovery(ns, model.libraryId);
       setMismatch(false);
       notifySaved.current = true;
-      setStatus({ kind: 'saved', replayed: body.replayed, refreshPending: body.steps.some(s => s.step === 'refresh_pending') });
+      setStatus({ kind: 'saved', replayed: body.replayed || body.steps.length > 0 && body.steps.every(s => s.status === 'skipped_already_applied'), refreshPending: body.steps.some(s => s.step === 'refresh_pending') });
       return true;
     }
     if (res.status === 401) {

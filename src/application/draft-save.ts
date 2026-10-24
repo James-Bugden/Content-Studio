@@ -88,6 +88,10 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
   }
 
   if (repo.draftBodyAuthority?.() === 'db') {
+    // The DB save must remain independent of Drive availability. Apply the same
+    // structural validation with the standard level-2 export boundary.
+    const problems = sectionBodyProblems(input.proposed, 2);
+    if (problems.length) return fail('VALIDATION_FAILED', { details: { reason: 'unsafe_markdown_structure', problems } });
     const result = await repo.updateLibrary({ operationId: op, actor: input.actor,
       target: { libraryId: input.libraryId }, expectedRevision: input.expectedSheetRevision,
       patch: { draftContent: input.proposed } });

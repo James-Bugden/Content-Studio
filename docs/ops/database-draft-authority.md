@@ -30,7 +30,10 @@ separately reviewed live enablement must explicitly require this migration too.
 The draft route schedules repair with Next `after`, outside the save response.
 The existing authenticated 15-minute Content export repair also drains Markdown
 jobs, including hook updates and retries. No cron is installed by this change.
-A Drive failure never vetoes the DB save. Missing links, missing/duplicate
+A Drive failure never vetoes the DB save. Save rejects section-level headings
+and open code fences with the existing Sheet validation/copy, using the standard
+level-2 boundary without a Drive read (conservative for deeper layouts).
+Missing links, missing/duplicate
 sections, provider failures, unsafe Markdown structure and conflicting Drive
 bodies appear as `markdown_export_lag`. A known unconfirmed job remains visible
 even if Drive currently shows equal text. Conflict/one-hour lag is blocking.
@@ -77,11 +80,33 @@ there is no misleading all-master transaction or bulk overwrite.
 
 ## Rollback and live gates
 
-The DB composition extends DB-6 rollback: disable/drain writes, drain and verify
-Markdown export for every nonempty Library body, then require exact Sheet export
-parity before flipping to `sheet`. Pending jobs, unreadable Drive, missing links,
-duplicate sections or unequal bodies stop rollback and leave DB read-only.
-This prevents returning to a Drive-canonical editor with stale Drive bodies.
+The DB composition extends DB-6 rollback: freeze/drain writes, drain Markdown jobs
+and verify exact body bytes before final Sheet export parity and the `sheet` flip.
+Every pending job must be acknowledged, even if Drive already shows its body.
+Every resolvable section must match the database, including empty bodies.
+Missing links/sections and ambiguous matches on legacy rows with no audited body
+edit are not export lag and do not block rollback: the Sheet/Drive editor already
+handled those rows as missing. Initial import inserts are not DB-authored bodies.
+
+Any audited Library body change with a before-image makes exact export mandatory,
+including after its outbox job is acknowledged or if the section later disappears.
+History is deliberately conservative: historical body-changing copies with a
+before-image also require parity. Do not erase history to bypass this check.
+Pending jobs, unreadable Drive, or unequal bodies refuse rollback. A Markdown
+refusal restores the previous write state after the drain; an already frozen DB
+stays frozen. Later Sheet-parity or flip failures retain DB-6's read-only state.
+
+Fix issues names the affected Library ID and links to its editor. For missing or
+duplicate sections, restore the intended master/link and give that ID exactly one
+section containing the saved DB body; retry repair and rollback. Preserve a copy
+of ambiguous text before changing the synthetic/private master. For a Drive body
+conflict, preview Import Markdown master and explicitly choose the desired body;
+keeping DB text alone does not authorize overwriting Drive. For an unsafe legacy
+body, remove section-level headings/close fences and save again. For a stale
+queued snapshot after an out-of-band DB edit, save the chosen body through the
+editor with a fresh operation, then repair (an equal-body save creates no job;
+make a deliberate content correction if needed). Never delete a pending job to
+force rollback. Sheet repair is attempted even when Markdown repair throws.
 
 All [DB-6 gates](database-write-cutover.md) remain. Hosted ACL/advisor checks,
 independent-backend concurrency, durable leases and export lag measurements,
@@ -93,5 +118,5 @@ Drive baseline. The current fake outbox is process-local; the SQL outbox and
 PostgREST methods exist but the live container remains deliberately unwired.
 No destructive production operation or invented cutover date is authorized here.
 
-Local commands, exact build identity, mutation testing, DRV-01 and copy/T2 review
-are recorded in `CODEX_REPORT.md` for this build round.
+Local fix-round commands, code identity, mutation testing and responsive checks
+are recorded in the repository's [CODEX_REPORT.md](../../CODEX_REPORT.md).
