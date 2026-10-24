@@ -9,6 +9,12 @@ beforeAll(() => {
 });
 
 describe('Next up and Posts tell the same story (UX redesign)', () => {
+  it.each(['RATE_LIMITED', 'PROVIDER_UNAVAILABLE', 'SCHEMA_DRIFT', 'STALE_READ'] as const)('never presents an unreadable Schedule as an empty board: %s (#172)', async (code) => {
+    const sheet = new FakeSheetTransport();
+    sheet.failNext({ op: 'read', tab: 'Content Schedule', code });
+    await expect(loadBoard(new SheetsContentRepository(sheet))).rejects.toMatchObject({ code });
+  });
+
   it('tab counts on Posts match the Next up tiles', async () => {
     const repo = new SheetsContentRepository(new FakeSheetTransport());
     const board = await loadBoard(repo);

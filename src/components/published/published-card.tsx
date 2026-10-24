@@ -18,10 +18,12 @@ function syncWords(label: string, s: SyncFreshness): string {
 
 export function PublishedCard({ row, canEdit, detailLink = true }: { row: PublishedRowView; canEdit: boolean; detailLink?: boolean }) {
   const stale = row.finalSync.state !== 'fresh' || row.analyticsSync.state !== 'fresh';
+  const Heading = detailLink ? 'h3' : 'h2';
+  const CopyHeading = detailLink ? 'h4' : 'h3';
   return (
     <article aria-label={`${row.platformRaw || 'Unknown platform'} ${row.contentId}`} className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4" data-platform={row.platformRaw}>
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-mono text-sm font-semibold">{row.contentId}</h3>
+        <Heading className="font-mono text-sm font-semibold">{row.contentId}</Heading>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-0.5 text-sm font-semibold">
           <span aria-hidden="true">{row.typefullyStatus === 'Published' ? '●' : '◐'}</span>
           {row.typefullyStatus}
@@ -50,8 +52,8 @@ export function PublishedCard({ row, canEdit, detailLink = true }: { row: Publis
         </li>
       </ul>
       {stale ? <p className="text-xs text-ink-soft">Values shown may be out of date until the next sync.</p> : null}
-      <section aria-label="Final Content" className="rounded-md border border-line">
-        <h4 className="border-b border-line bg-paper px-3 py-2 text-sm font-semibold">Final Content</h4>
+      <section aria-label={`Final Content for ${row.contentId}`} className="rounded-md border border-line">
+        <CopyHeading className="border-b border-line bg-paper px-3 py-2 text-sm font-semibold">Final Content</CopyHeading>
         <div className="copy px-3 py-2 text-sm">{row.finalContent === '' ? <span className="text-ink-soft">Empty</span> : row.finalContent}</div>
       </section>
       <div className="overflow-x-auto">

@@ -29,7 +29,7 @@ function taipeiNow(): string {
 }
 
 export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number } = {}): Promise<Board> {
-  const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null), repo.workflowSettings()]);
+  const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule(), repo.workflowSettings()]);
   const day = today();
   const now = taipeiNow();
   const from = opts.from ?? weekStart(day);

@@ -108,7 +108,13 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
   }
 
   // Ideas remain in Content Queue; read that tab once for rows and filters.
-  const queue = await repo.listQueue();
+  let queue: Awaited<ReturnType<typeof repo.listQueue>>;
+  try {
+    queue = await repo.listQueue();
+  } catch (error) {
+    return <><PageHeader title="Backlog ideas" description="Ideas from the Content Queue Sheet, before they become posts." />
+      <ErrorState code={safeBacklogErrorCode(error)} action={<a href="/backlog?view=ideas" className="font-semibold underline">Try again</a>} /></>;
+  }
   const approvedRaw = one(params, 'approved');
   const filters: BacklogFilters = { source: one(params, 'source'), platform: platform(params), approved: approvedRaw === 'yes' ? true : approvedRaw === 'no' ? false : undefined };
   const [groups, options] = await Promise.all([loadBacklogGroups(repo, filters, queue), loadBacklogOptions(repo, queue)]);

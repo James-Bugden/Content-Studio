@@ -160,13 +160,13 @@ export function SlotPanel({ contentId }: { contentId: string }) {
               <p className="copy mt-2">{copy.finalContent}</p>
             </details>
           ) : null}
-          <section aria-label="Typefully">
+          <div>
             {typefully ? (
               <TypefullyPanel initial={typefully} canEdit={canEdit} />
             ) : (
               <StateView kind="provider_error" title="Typefully state unavailable" detail={`Review and scheduling still work. (${typefullyError ?? 'unknown'})`} nextStep="Try again in a moment." />
             )}
-          </section>
+          </div>
         </>
       ) : null}
 
