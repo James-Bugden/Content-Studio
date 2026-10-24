@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { startTransition } from 'react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), params: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
@@ -133,4 +134,25 @@ describe('direct filter chips (CS-059c)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Leave and discard changes' }));
     expect(nav.push.mock.calls[0]?.[0]).toBe('/review?platform=Threads');
   });
+});
+
+it('CS-059g: selected chips use a dark contrasting fill', () => {
+  nav.params = new URLSearchParams('platform=X');
+  render(<FilterBar filters={[{ ...filters[0]!, control: 'chips' }]} />);
+  expect(screen.getByRole('button', { name: /^X$/ }).className).toContain('bg-primary');
+  expect(screen.getByRole('button', { name: /^X$/ }).className).toContain('text-white');
+});
+it('CS-059g: composes rapid chip clicks while navigation is pending', async () => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  nav.push.mockImplementation(() => startTransition(async () => { await pending; }));
+  render(<FilterBar filters={filters.map(f => ({ ...f, control: 'chips' }))} />);
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /^X$/ }));
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Ready' }));
+  });
+  expect(nav.push.mock.calls[1]?.[0]).toBe('/review?platform=X&status=ready');
+  await act(async () => release());
 });

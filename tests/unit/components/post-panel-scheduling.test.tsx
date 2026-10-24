@@ -99,9 +99,18 @@ it('tries the next default after a failed preview and keeps every selector avail
   });
   render(<PostPanel libraryId="SYN-L005" />);
   await screen.findByRole('button', { name: 'Confirm and write to Fri 2 Oct \u00b7 21:00' });
+  expect(screen.getByText('This slot cannot be used.')).toBeTruthy();
   vi.mocked(fetch).mockResolvedValue(response({ ok: false }));
   fireEvent.click(screen.getByRole('button', { name: 'Thu 1 Oct \u00b7 21:00' }));
-  await screen.findByText('This slot cannot be used.');
+  await waitFor(() => expect(screen.queryByRole('button', { name: /Confirm and write/ })).toBeNull());
+  expect(screen.getByText('This slot cannot be used.').closest('.h-80')).toBeNull();
   expect(screen.queryByRole('button', { name: /Confirm and write/ })).toBeNull();
   expect((screen.getByRole('button', { name: 'Fri 2 Oct \u00b7 21:00' }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it('CS-059g: a warning preview uses natural height', async () => {
+  vi.mocked(fetch).mockImplementation(async url => String(url).includes('/api/panel/') ? response({ ok: true, data }) : response({ ok: false }));
+  render(<PostPanel libraryId="SYN-L005" />);
+  const warning = await screen.findByText('This slot cannot be used.');
+  expect(warning.closest('.h-80')).toBeNull();
 });

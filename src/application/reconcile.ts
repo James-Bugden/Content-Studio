@@ -118,7 +118,7 @@ export async function buildReconcileReport(
     }
     for (const [key, issue] of exporter.journal.issues) if (issue.reason === 'export_mismatch' && !mismatches.has(key)) mismatches.set(key, issue);
     for (const issue of mismatches.values()) items.push(item('export_mismatch', 'blocking', 'Sheet export differs; row preserved',
-      [`${issue.kind}: ${issue.fields.join(', ')}. ${issue.recovery === 'change_authoritative_value' ? 'Change authoritative value: use the normal audited DB patch to choose text without a leading equals sign, then retry export. See the cutover runbook.' : 'Review the direction in the cutover runbook; no automatic overwrite.'}`], [issue.id], { label: 'Review' }));
+      [`${issue.kind}: ${issue.fields.join(', ')}. ${issue.recovery === 'change_authoritative_value' ? 'Change authoritative value: use the normal audited DB patch to choose text without a leading equals sign, then retry export. See the cutover runbook. ' : ''}Review the direction in the cutover runbook; no automatic overwrite.`], [issue.id], { label: 'Review' }));
     for (const issue of exporter.journal.issues.values()) {
       const since = issue.reason === 'export_lag' ? issue.since : issue.lagSince;
       if (since === undefined) continue;

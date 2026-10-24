@@ -164,3 +164,19 @@ test('CS-059c: Fix issues keeps health folded and the existing full-page fix act
   const stale = page.getByRole('article').filter({ hasText: 'SYN-L006: approval no longer matches' });
   await expect(stale.getByRole('link', { name: /Review/ })).toHaveAttribute('href', '/review/SYN-L006');
 });
+
+
+test('CS-059g: Posts announces results once and clears lane with every filter', async ({ page }) => {
+  await page.goto('/review?lane=review&target=Threads');
+  await expect(page).toHaveTitle('Posts | Content Studio');
+  const announcement = page.locator('[aria-live="polite"]').filter({ hasText: /None of the .* Library rows match these filters/ });
+  await expect(announcement).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Clear filters', exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Clear all filters', exact: true }).click();
+  await expect(page).toHaveURL(/\/review$/);
+  await expect(page.getByRole('navigation', { name: 'Post tabs' }).getByRole('link', { name: /^All/ })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('[aria-live="polite"]').filter({ hasText: /Showing 1 to/ })).toHaveCount(1);
+  await page.goto('/review?lane=review&target=LinkedIn');
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await expect(page).toHaveURL(/\/review$/);
+});
