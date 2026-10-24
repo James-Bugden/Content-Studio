@@ -182,3 +182,66 @@ The Ideas tab read-error handler tracked by
 [#169](https://github.com/James-Bugden/Content-Studio/issues/169) came from main's
 [#166](https://github.com/James-Bugden/Content-Studio/pull/166) (`8e44fb7`), not this
 PR. It is exercised by the sweep without claiming its implementation here.
+
+
+## Review round 1: final code evidence
+
+Validated code head: `34833cf4496acc40ef8d673ca83a1279b0b2f3be`. Integrated `origin/main`
+`bdff565be7eca597f71e8870073e5aabdecdc8c5` by merge, preserving both isolated
+sweep servers and main's Sheet/shadow parity projects. Synthetic production
+BUILD_ID: `P-2Q1lx2NiKYqByNissHu`. The follow-up evidence commit changes only this
+document and `CODEX_REPORT.md`; application, tests, scripts and config match
+this validated code head.
+
+`bash ~/bin/heavy node scripts/verify-sweep.mjs` passed with the repository
+Playwright config, two workers, four isolated servers and zero retries:
+
+| Run | Playwright execution (ms) | Command wall time (ms) | Tests / rows |
+|---|---:|---:|---:|
+| run-1 | 246,494.165 | 247,509 | 76 / 2,618 |
+| run-2 | 239,585.778 | 240,363 | 76 / 2,618 |
+| run-3 | 245,398.268 | 246,126 | 76 / 2,618 |
+
+All three complete coverage/action arrays have SHA-256
+`6717505979037d0981f29fe82870f62339c642c33554d90d71a8ee8b473c11be`.
+The 2,618 rows include 161 independent unsafe-write checks per width. Runs 1 and
+3 exceeded the reported target and remained green; run 2 stayed within it.
+These are local timings, not replacement Ubuntu CI measurements.
+
+All **19 separate red Playwright executions** exited 1 with one failed test
+and the intended `mutation/<name>` failed row. The helper independently checks
+those conditions, not just the exit code. The changed held-read proof took
+5,257 ms wall time; the expanded unsafe-write proof took 14,297 ms and rejected
+all 161 label/surface combinations. Exact individual times and commands are in
+`CODEX_REPORT.md` and ignored `sweep-report/validation/validation.json`.
+
+The targeted reporter/board unit command passed 24 tests (15 reporter + 9 board).
+Five uncommitted scratch reporter copies each had exactly one gate removed or
+replaced. Their targeted unit run exited 1: five failed files, six failed
+cases and 69 passing cases. The committed reporter stayed unmutated.
+
+| Removed gate in scratch copy | Regression that goes red | Failed cases |
+|---|---|---:|
+| Attachment count | Two passed tests, one valid attachment | 1 |
+| Report errors | Readable rows plus an unreadable attachment | 1 |
+| Failed row | Passed test carrying a failed row | 1 |
+| Per-test status | Skipped/interrupted tests carrying valid passing rows | 2 |
+| Zero tests | Zero discovered tests with a retained synthetic row | 1 |
+
+An earlier validation at `4146c13d7b1945870b9f484c81d2ca791747268f` passed
+in 244,023.734 and 267,570.761 ms, then failed its third run (278,572.141 ms):
+`/replies/resources` exceeded the old 10-second readiness deadline with one
+pending read. Its other 2,615 rows passed. That failure is preserved under
+`sweep-report/validation-before-readiness-fix/`; it is not counted as green.
+The old diagnostic did not identify the request. The final code gives readiness
+30 seconds, lists pending methods/paths, and adds the held-read mutation without
+removing any readiness condition. The affected 1280 px owner route and the new
+proof also passed a targeted traced retest (84,546.319 ms for both tests).
+
+Production build, typecheck, targeted ESLint, actionlint, private-path and secret
+checks passed. The merged Sheet/shadow parity and navigation-count journeys
+passed 10 tests at both widths. No new dependency or account access was used.
+No production UI change was added in this fix round; no new T2/live-provider or
+physical-device claim is made. Fresh Ubuntu CI, main-branch acceptance and
+post-merge verification remain pending; this read-only GitHub fix round did not
+trigger CI or publish anything.
