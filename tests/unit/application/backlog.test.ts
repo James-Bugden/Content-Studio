@@ -47,7 +47,7 @@ describe('loadBacklogGroups', () => {
     expect(first.slug).toBe(record.value.slug);
     expect(first.revision).toBe(record.revision);
     expect(first.row).toBe(record.row);
-    expect(first.thumb).toEqual({ src: null, label: 'No image decided', tone: 'todo' });
+    expect(first.thumb).toEqual({ src: null, label: 'No image decided', tone: 'todo', filename: record.value.slug, contentId: first.libraryId });
   });
 
   it('drops an empty-source row into a group literally named "Uncategorised" at the end', async () => {

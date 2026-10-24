@@ -1,3 +1,4 @@
+import { TransferImage } from '../image-transfer';
 import type { Thumb } from '@/domain/next-steps';
 
 /**
@@ -31,8 +32,7 @@ export function PostThumb({ thumb, size = 'md', showLabel = true, imageOnly = fa
     <figure className="flex min-w-0 flex-col gap-1">
       <div className={`${box} shrink-0 overflow-hidden rounded-md border ${t.src ? 'border-line bg-card' : `${TONE[t.tone]} shadow-[inset_0_0_0_1px_#fff]`} flex items-center justify-center`}>
         {t.src ? (
-          // eslint-disable-next-line @next/next/no-img-element -- same-origin, auth-gated, sandboxed image route
-          <img src={t.src} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+          <TransferImage actions={false} preparation="interaction" filename={t.filename} contentId={t.contentId ?? t.src.split('/')[3]} src={t.src} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
         ) : (
           <span aria-hidden="true" className="text-center text-[10px] font-semibold leading-tight">
             {t.label === 'Text only' ? 'Aa' : GLYPH[t.tone]}
