@@ -208,6 +208,9 @@ describe.each(['sheet', 'fake-db', 'sql-db'] as const)('MIG-07 %s mutation contr
 });
 
 describe('DB-1 carried review items and atomicity', () => {
+  beforeEach(async () => {
+    await pg.exec("insert into content_studio_posts(collection,library_id) values ('library','SYN-L001') on conflict do nothing");
+  });
   it('binds the entry-point mode independently of a trusted caller hash', async () => {
     const db = new SqlContentDb();
     const args: unknown[] = ['synthetic_mode_identity', sha256('same'), sha256('actor'), 'library', 'SYN-L001', null, { draft_content: 'Mode proof' }];
