@@ -111,6 +111,7 @@ export async function buildSheetMirrorSnapshot(
   repo: ContentRepository,
   options: { sourceKey: string; runId?: string; startedAt?: Date } = { sourceKey: '' },
 ): Promise<SheetMirrorSnapshot> {
+  const startedAt = options.startedAt ?? new Date();
   if (!SOURCE_KEY.test(options.sourceKey)) throw new AppError('VALIDATION_FAILED', { reason: 'mirror_source_key' });
   const runId = options.runId ?? randomUUID();
   if (!UUID.test(runId)) throw new AppError('VALIDATION_FAILED', { reason: 'mirror_run_id' });
@@ -147,7 +148,7 @@ export async function buildSheetMirrorSnapshot(
     schemaVersion: MIRROR_SCHEMA_VERSION,
     sourceKey: options.sourceKey,
     runId,
-    startedAt: (options.startedAt ?? new Date()).toISOString(),
+    startedAt: startedAt.toISOString(),
     counts,
     snapshotHash,
     rows,
