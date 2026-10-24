@@ -12,7 +12,7 @@ it.each(['RATE_LIMITED', 'PROVIDER_UNAVAILABLE'] as const)('selects last good da
   const good = await repo.listLibrary();
   transport.failNext({ op: 'read', code });
   await expect(repo.listLibrary()).rejects.toMatchObject({ code });
-  expect(repo.lastGoodLibrary(new AppError(code))).toEqual(good);
+  expect(repo.lastGoodLibrary(new AppError(code))).toEqual({ rows: good, readAt: expect.any(Number) });
   expect(transport.reads).toBe(2);
   expect(await repo.listLibrary()).toEqual(good);
   expect(transport.reads).toBe(3);
@@ -58,7 +58,7 @@ it('recovers after the live display TTL expires without extending last-good age 
   now.mockReturnValue(15_100);
   transport.failNext({ op: 'read', code: 'RATE_LIMITED', times: 2 });
   await expect(repo.listLibrary()).rejects.toMatchObject({ code: 'RATE_LIMITED' });
-  expect(repo.lastGoodLibrary(new AppError('RATE_LIMITED'))).toEqual(good);
+  expect(repo.lastGoodLibrary(new AppError('RATE_LIMITED'))).toEqual({ rows: good, readAt: 100 });
   now.mockReturnValue(300_100);
   await expect(repo.listLibrary()).rejects.toMatchObject({ code: 'RATE_LIMITED' });
   expect(repo.lastGoodLibrary(new AppError('RATE_LIMITED'))).toBeNull();
@@ -70,5 +70,5 @@ it('distinguishes a genuinely empty cached Library from no prior good read', asy
   transport.rawTab(SHEET_TABS.library.name).splice(1);
   const repo = new SheetsContentRepository(transport);
   expect(await repo.listLibrary()).toEqual([]);
-  expect(repo.lastGoodLibrary(new AppError('RATE_LIMITED'))).toEqual([]);
+  expect(repo.lastGoodLibrary(new AppError('RATE_LIMITED'))).toEqual({ rows: [], readAt: expect.any(Number) });
 });

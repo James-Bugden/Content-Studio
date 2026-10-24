@@ -9,6 +9,7 @@ import type { Capability, CapabilityState, Provider } from '@/domain/capability'
  */
 const NAMES: Record<Provider, string> = {
   sheet: 'Google Sheet',
+  db: 'Content database',
   drive: 'Google Drive',
   typefully: 'Typefully',
   ai: 'AI assistant',
@@ -25,6 +26,7 @@ const STATE_WORDS: Record<Exclude<CapabilityState, 'ready'>, string> = {
 /** What a limited provider means in practice, and what is still safe. */
 const IMPACT: Record<Provider, string> = {
   sheet: 'saving is disabled and nothing will be written; what is shown may be out of date',
+  db: 'content saving is disabled; review still works',
   drive: 'Markdown saves are disabled; the Sheet copy still shows',
   typefully: 'publishing actions are disabled; review still works',
   ai: 'QA and hook suggestions are off; manual review still works',

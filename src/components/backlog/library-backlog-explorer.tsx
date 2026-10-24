@@ -8,6 +8,7 @@ import { isTypingTarget } from '../keyboard';
 import { adjacentPosition } from '@/domain/backlog-navigation';
 import { useBacklogNavigation, type BacklogResult } from './backlog-navigation';
 import { LibraryBacklogTable } from './library-backlog-table';
+import { StateView } from '../state-view';
 
 type Props = {
   initial: BacklogResult;
@@ -15,12 +16,13 @@ type Props = {
   /** Owner may edit PESTO in place (CS-054). */
   canEdit?: boolean;
   pestoOptions?: readonly string[];
+  emptyLibrary?: boolean;
 };
 
 
 
 /** Search is deliberately ephemeral: private post copy never goes in a URL. */
-export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pestoOptions = [] }: Props) {
+export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pestoOptions = [], emptyLibrary = false }: Props) {
   const { source, platform, pesto, status, sort, dir, group } = filters;
   const router = useRouter();
   const pathname = usePathname() ?? '/backlog';
@@ -168,8 +170,9 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     <p className="text-sm text-ink-soft" aria-live="polite">
       {pending || loading ? 'Searching…' : error ? 'Results unavailable.' : `${active.total} ${active.total === 1 ? 'post' : 'posts'} · page ${active.page} of ${active.totalPages}`}.
     </p>
-    {error ? <p role="alert" className="text-sm text-block">Search could not load. Your search text is kept here. <button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button></p> : null}
-    {search.trim() && (pending || loading || error) ? null : active.total === 0 ? <p role="status" className="rounded-lg border border-line bg-card p-4 text-sm">No posts match. Try a different source, status or search.</p>
+    {pending || loading ? <StateView kind="loading" title="Searching…" /> : null}
+    {error ? <StateView kind="provider_error" title="Search could not load" detail="Your search text is kept here." action={<button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button>} /> : null}
+    {search.trim() && (pending || loading || error) ? null : active.total === 0 ? <StateView kind={emptyLibrary ? 'empty' : 'no_match'} nextStep={emptyLibrary ? null : undefined} />
       : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} canEdit={canEdit} pestoOptions={pestoOptions}
         sort={sort ?? 'sheet'} dir={dir ?? 'asc'} group={group} groupTotals={active.groupTotals} onSort={sortBy} />}
     {/* Keep search controls mounted and focusable during loading and at page edges.

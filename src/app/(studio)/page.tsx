@@ -17,7 +17,7 @@ export default async function NextUpPage() {
   await requireActor('viewer');
   let board: Board;
   try {
-    board = await loadBoard(getServices().repo);
+    board = await loadBoard(getServices().repo, { requireSchedule: true });
   } catch (error) {
     return (
       <>

@@ -292,14 +292,27 @@ export function syntheticReadyQueueRows(): RawRow[] {
   const [header, ...rows] = syntheticLibraryRows();
   const review = LIBRARY_ORDER.indexOf('reviewStatus');
   const queue = LIBRARY_ORDER.indexOf('queueForSchedule');
-  return [header!, ...rows.filter((r) => r.values[review] === 'Approved' && r.values[queue] === 'TRUE').map((r) => ({ values: r.values }))];
+  return [header!, ...rows.filter((r) => r.values[review] === 'Approved' && r.values[queue] === 'TRUE').map((r) => ({
+    values: r.values,
+    links: r.values.map((_, i) => r.links?.[i] ?? (typeof r.formulas?.[i] === 'string' ? /^=HYPERLINK\(\s*"([^"]+)"/i.exec(String(r.formulas[i]))?.[1] : undefined)),
+  }))];
 }
 
+/** Summary fixtures describe the same idea corpus as Content Queue. */
 export function syntheticQueueSummaryRows(): RawRow[] {
+  const groups = new Map<string, WithUrl[]>();
+  for (const row of SYNTH_QUEUE) {
+    const source = row.contentSource ?? LIBRARY_DEFAULTS.contentSource!;
+    groups.set(source, [...groups.get(source) ?? [], { ...LIBRARY_DEFAULTS, ...row }]);
+  }
   return [
     { values: ['Content Source', 'Total', 'Not Reviewed', 'Approved', 'Queued', 'Needs Fix', 'Master Markdown'] },
-    { values: ['Synthetic Negotiation Handbook', '12', '5', '6', '4', '2', 'Open master'], links: [null, null, null, null, null, null, SYNTH_MASTER_URL] },
-    { values: ['Synthetic Interview Guide', '0', '0', '0', '0', '0', ''] },
+    ...[...groups].sort(([a], [b]) => a.localeCompare(b)).map(([source, rows]) => ({
+      values: [source, String(rows.length), String(rows.filter(r => ['', 'Not Reviewed', 'Pending'].includes(r.reviewStatus ?? '')).length),
+        String(rows.filter(r => r.reviewStatus === 'Approved').length), String(rows.filter(r => r.queueForSchedule === 'TRUE').length),
+        String(rows.filter(r => r.reviewStatus === 'Changes Requested' || r.copyrightQa === 'REWORK' || ['CHECK', 'DUPLICATE'].includes(r.duplicateQa ?? '')).length), 'Open master'],
+      links: [null, null, null, null, null, null, rows.map(r => r.sourceMarkdownUrl ?? SYNTH_MASTER_URL).sort()[0]],
+    })),
   ];
 }
 
