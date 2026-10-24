@@ -3,7 +3,7 @@ import { AppError, type ErrorCode } from '@/domain/errors';
 import type { Gate } from '@/domain/gates';
 import type { Actor } from '@/domain/mutation';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { addDays, hasScheduleActivity, isActiveScheduleSlot, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
+import { addDays, hasScheduleActivity, isActiveScheduleSlot, isPastSlot, parseContentId, planPromotion, slotAvailability, slotOrder, taipeiToday, weekStart, type PreviewRow } from '@/domain/schedule';
 import { scheduledPillar } from '@/domain/settings';
 import { adaptationState } from '@/domain/zh-state';
 import { emit, targetHash } from '@/observability/events';
@@ -24,11 +24,20 @@ import { evaluateReady, lineageLibraryId, scheduledRowsFor } from './ready';
  * Taipei today. In fake mode only, CS_FAKE_TODAY pins the date so synthetic
  * fixtures with fixed dates stay schedulable in tests; live mode ignores it.
  */
-export function today(): string {
+export function today(now: Date = new Date()): string {
   const env = serverEnv();
   const pinned = process.env.CS_FAKE_TODAY;
   if (env.CS_DATA_MODE === 'fake' && pinned && /^\d{4}-\d{2}-\d{2}$/.test(pinned)) return pinned;
-  return taipeiToday();
+  return taipeiToday(now);
+}
+
+/** Fake time is configurable so browser journeys can exercise elapsed slots. */
+export function taipeiNow(now: Date = new Date()): string {
+  if (serverEnv().CS_DATA_MODE === 'fake' && process.env.CS_FAKE_TODAY) {
+    const time = process.env.CS_FAKE_TIME;
+    return time && /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : '00:00';
+  }
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
 }
 
 export type CalendarCell = {
@@ -102,6 +111,7 @@ export type PromotionContext = {
   group: string;
   alreadyScheduled: { contentId: string; date: string; slot: string }[];
   options: SlotOption[];
+  initialPreview: PromotionPreview | null;
 };
 
 async function readAll(repo: ContentRepository) {
@@ -114,20 +124,26 @@ function markdownLinkOf(record: LibraryRecord): string {
   return record.links.sourceMarkdown ?? (id ? `https://drive.google.com/file/d/${id}/view` : '');
 }
 
-export async function promotionContext(repo: ContentRepository, libraryId: string, horizonDays = 21): Promise<PromotionContext> {
+export async function promotionContext(repo: ContentRepository, libraryId: string, horizonDays = 21, clock: () => Date = () => new Date()): Promise<PromotionContext> {
   const { library, schedule, settings } = await readAll(repo);
   const record = library.find((r) => r.value.libraryId === libraryId);
   if (!record) throw new AppError('NOT_FOUND');
   const ready = evaluateReady(record, library, schedule);
   const target = record.value.targetPlatform.ok ? record.value.targetPlatform.value : null;
-  const from = today();
+  const instant = clock();
+  const from = today(instant);
+  const now = taipeiNow(instant);
   const last = addDays(from, horizonDays);
   const options: SlotOption[] = [];
+  const previews = new Map<string, PromotionPreview>();
   for (const r of schedule) {
     const parsed = parseContentId(r.value.contentId);
     if (!parsed || parsed.platform !== target || parsed.isoDate < from || parsed.isoDate > last) continue;
     if (!slotAvailability(r).available) continue;
     const plan = planPromotion(record, r, settings, markdownLinkOf(record));
+    const time = plan.ok ? plan.slotTime : r.value.publishTime.trim();
+    if (isPastSlot(parsed.isoDate, time, from, now)) continue;
+    if (plan.ok && ready.group === 'ready') previews.set(r.value.contentId, { ok: true, libraryId, contentId: r.value.contentId, libraryRevision: record.revision, scheduleRevision: r.revision, preview: plan.preview });
     options.push({
       contentId: r.value.contentId,
       isoDate: parsed.isoDate,
@@ -139,7 +155,8 @@ export async function promotionContext(repo: ContentRepository, libraryId: strin
     });
   }
   options.sort((a, b) => a.isoDate.localeCompare(b.isoDate) || a.time.localeCompare(b.time) || slotOrder(a.slot) - slotOrder(b.slot));
-  return { library: record, gates: ready.gates.blockers, group: ready.group, alreadyScheduled: ready.scheduledAs, options };
+  const first = options.find((o) => o.ok);
+  return { library: record, gates: ready.gates.blockers, group: ready.group, alreadyScheduled: ready.scheduledAs, options, initialPreview: first ? previews.get(first.contentId) ?? null : null };
 }
 
 export type PromotionPreview =

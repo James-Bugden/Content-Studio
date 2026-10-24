@@ -4,15 +4,14 @@ import { evaluateLibraryGates } from '@/domain/gates';
 import { libraryNextStep, slotNextStep, thumbFor, URGENCY_ORDER } from '@/domain/next-steps';
 import type { Board, PostSummary, SlotSummary, Task } from '@/domain/board';
 import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from '@/domain/records';
-import { addDays, hasScheduleActivity, isActiveScheduleSlot, parseContentId, slotAvailability, slotOrder, weekStart } from '@/domain/schedule';
+import { addDays, hasScheduleActivity, isActiveScheduleSlot, isPastSlot, parseContentId, slotAvailability, slotOrder, weekStart } from '@/domain/schedule';
 import { scheduledPillar } from '@/domain/settings';
 import { adaptationState } from '@/domain/zh-state';
-import { serverEnv } from '@/lib/env';
 import type { ContentRepository } from './ports';
 import { lineageLibraryId, scheduledFacts } from './lineage';
 import { stalePublishedRows } from './reconcile';
 import { screenshotUses } from './review';
-import { today } from './schedule';
+import { taipeiNow, today } from './schedule';
 import { nextUpCount, rememberNavigationCount } from './navigation-counts';
 
 /**
@@ -23,12 +22,6 @@ import { nextUpCount, rememberNavigationCount } from './navigation-counts';
  */
 export type { Board, PostSummary, SlotSummary, Task } from '@/domain/board';
 
-/** Taipei wall-clock HH:MM now; fake mode pins the day via CS_FAKE_TODAY and uses 00:00. */
-function taipeiNow(): string {
-  if (serverEnv().CS_DATA_MODE === 'fake' && process.env.CS_FAKE_TODAY) return '00:00';
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
-}
-
 export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number; requireSchedule?: boolean } = {}): Promise<Board> {
   rememberNavigationCount(repo, 'nextUp', null);
   const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch((error: unknown) => {
@@ -37,8 +30,9 @@ export async function loadBoard(repo: ContentRepository, opts: { from?: string; 
     if (opts.requireSchedule) throw error;
     return null;
   }), repo.workflowSettings()]);
-  const day = today();
-  const now = taipeiNow();
+  const instant = new Date();
+  const day = today(instant);
+  const now = taipeiNow(instant);
   const from = opts.from ?? weekStart(day);
   const to = addDays(from, (opts.days ?? 7) - 1);
 
@@ -148,7 +142,7 @@ function summariseSlot(
 ): SlotSummary {
   const v = r.value;
   const time = v.publishTime.trim();
-  const past = parsed.isoDate < day || (parsed.isoDate === day && Boolean(time) && time < now);
+  const past = isPastSlot(parsed.isoDate, time, day, now);
   const hasCopy = Boolean(v.hook.trim() || v.content.trim() || v.chineseContent.trim());
   const zh = parsed.platform === 'X' && hasCopy ? adaptationState(v, all) : undefined;
   const parent = parsed.platform === 'Threads' && v.parentContentId ? all.find((p) => p.contentId === v.parentContentId) : undefined;

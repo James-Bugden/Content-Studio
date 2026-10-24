@@ -65,3 +65,43 @@ it('does not offer confirm when no usable slot exists', async () => {
   expect(screen.queryByRole('button', { name: /Confirm and write/ })).toBeNull();
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it('uses the snapshot preview without another GET and retains an operation only for the same revisions', async () => {
+  let revision = 'slot-rev';
+  const fetcher = vi.mocked(fetch).mockImplementation(async (_url, init) => {
+    if (init?.method === 'POST') return response({ ok: false, code: 'STALE_READ' });
+    return response({ ok: true, data: { ...data, initialPreview: { ...preview(slots[0]!.contentId), scheduleRevision: revision } } });
+  });
+  const { rerender } = render(<PostPanel libraryId="SYN-L005" />);
+  const label = 'Confirm and write to Thu 1 Oct \u00b7 21:00';
+  fireEvent.click(await screen.findByRole('button', { name: label }));
+  await screen.findByText(/Reload this page to see the new preview/);
+  fireEvent.click(screen.getByRole('button', { name: label }));
+  await waitFor(() => expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2));
+  const writes = () => fetcher.mock.calls.filter(([, init]) => init?.method === 'POST').map(([, init]) => JSON.parse(String(init?.body)));
+  expect(writes()[1].operationId).toBe(writes()[0].operationId);
+  expect(fetcher.mock.calls.filter(([, init]) => !init?.method)).toHaveLength(1);
+  // Reload the same slot from the panel read with a newer Schedule revision.
+  revision = 'slot-rev-new';
+  rerender(<PostPanel libraryId="SYN-L005-refreshed" />);
+  await waitFor(() => expect(screen.queryByText(/Reload this page to see the new preview/)).toBeNull());
+  fireEvent.click(await screen.findByRole('button', { name: label }));
+  await waitFor(() => expect(writes()).toHaveLength(3));
+  expect(writes()[2].operationId).not.toBe(writes()[0].operationId);
+  expect(writes()[2].expectedScheduleRevision).toBe('slot-rev-new');
+});
+
+it('tries the next default after a failed preview and keeps every selector available after all fail', async () => {
+  vi.mocked(fetch).mockImplementation(async (url) => {
+    if (String(url).includes('/api/panel/')) return response({ ok: true, data });
+    if (String(url).includes(slots[0]!.contentId)) throw new Error('Synthetic read failure');
+    return response(preview(slots[1]!.contentId));
+  });
+  render(<PostPanel libraryId="SYN-L005" />);
+  await screen.findByRole('button', { name: 'Confirm and write to Fri 2 Oct \u00b7 21:00' });
+  vi.mocked(fetch).mockResolvedValue(response({ ok: false }));
+  fireEvent.click(screen.getByRole('button', { name: 'Thu 1 Oct \u00b7 21:00' }));
+  await screen.findByText('This slot cannot be used.');
+  expect(screen.queryByRole('button', { name: /Confirm and write/ })).toBeNull();
+  expect((screen.getByRole('button', { name: 'Fri 2 Oct \u00b7 21:00' }) as HTMLButtonElement).disabled).toBe(false);
+});

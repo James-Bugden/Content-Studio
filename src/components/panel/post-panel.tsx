@@ -48,20 +48,31 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
   const [result, setResult] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
   const previewRequest = useRef(0);
-  const pickSlot = useCallback(async (contentId: string) => {
+  const pickSlot = useCallback(async (contentId: string, fallback: string[] = []) => {
     const request = ++previewRequest.current;
     setPreview(null);
-    const res = await fetch(`/api/schedule/promote/preview?libraryId=${encodeURIComponent(libraryId)}&contentId=${encodeURIComponent(contentId)}`, { credentials: 'same-origin' }).catch(() => null);
-    const body = await res?.json().catch(() => null);
-    if (request === previewRequest.current) setPreview(body ?? { ok: false });
+    for (const id of [contentId, ...fallback]) {
+      const res = await fetch(`/api/schedule/promote/preview?libraryId=${encodeURIComponent(libraryId)}&contentId=${encodeURIComponent(id)}`, { credentials: 'same-origin' }).catch(() => null);
+      const body = await res?.json().catch(() => null);
+      if (request !== previewRequest.current) return;
+      if (res?.ok && body?.ok) { setPreview(body); return; }
+      setPreview(body?.ok === false ? body : { ok: false });
+    }
   }, [libraryId]);
   const firstSlot = load.state === 'ok' ? load.data.slotOptions[0]?.contentId : undefined;
+  const initialPreview = load.state === 'ok' ? load.data.initialPreview : null;
+  const slotOptions = load.state === 'ok' ? load.data.slotOptions : null;
   useEffect(() => {
     let active = true;
-    if (firstSlot) queueMicrotask(() => { if (active) void pickSlot(firstSlot); });
+    queueMicrotask(() => {
+      if (!active) return;
+      if (initialPreview?.contentId === firstSlot) setPreview(initialPreview ?? null);
+      else if (firstSlot) void pickSlot(firstSlot, slotOptions?.slice(1).map((o) => o.contentId));
+      else setPreview(null);
+    });
     const requests = previewRequest;
     return () => { active = false; requests.current++; };
-  }, [firstSlot, pickSlot]);
+  }, [firstSlot, initialPreview, slotOptions, pickSlot]);
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/panel/post/${encodeURIComponent(libraryId)}`, { credentials: 'same-origin' }).catch(() => null);
@@ -198,11 +209,12 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
               ))}
             </ul>
           )}
+          {data.slotOptions.length > 0 ? <div className="mt-3 h-80">
           {preview ? (
             preview.ok ? (
-              <div className="mt-3 flex flex-col gap-2">
+              <div className="flex h-full flex-col gap-2">
                 <p className="text-sm text-ink-soft">These cells will be written to the Schedule. Nothing else changes.</p>
-                <ul className="text-sm">
+                <ul className="min-h-0 flex-1 overflow-y-auto text-sm" tabIndex={0} aria-label="Cells to write">
                   {preview.preview.map((r) => (
                     <li key={r.field} className="flex gap-2 border-t border-line py-1">
                       <span className="w-40 shrink-0 font-medium">{r.header}</span>
@@ -215,7 +227,8 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
             ) : (
               <InlineResult tone="warning">{preview.problems?.join(' ') || preview.message || 'This slot cannot be used.'}</InlineResult>
             )
-          ) : null}
+          ) : <StateView kind="loading" title="Loading the preview" />}
+          </div> : null}
         </section>
       ) : null}
 

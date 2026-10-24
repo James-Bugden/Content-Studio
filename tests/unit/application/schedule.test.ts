@@ -21,6 +21,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete process.env.CS_FAKE_TODAY;
+  delete process.env.CS_FAKE_TIME;
+  vi.restoreAllMocks();
 });
 
 async function doPromote(libraryId: string, contentId: string, op = 'op_promote_0001') {
@@ -51,6 +53,41 @@ describe('dates are Taipei and timezone independent', () => {
 });
 
 describe('SCHED-01: slot policy from Workflow Settings', () => {
+  it('excludes today\'s elapsed slot at 21:30 Taipei with an injected clock, including a blank row time', async () => {
+    delete process.env.CS_FAKE_TODAY;
+    const clock = () => new Date('2026-10-01T13:30:00Z');
+    const row = await repo.getSchedule('2026-10-01-MAIN-LI');
+    const header = sheet.rawTab('Content Schedule')[1]!.map((c) => c.value);
+    sheet.externalEdit('Content Schedule', row.row, header.indexOf('Publish Time (Taipei)'), '');
+    const ctx = await promotionContext(repo, 'SYN-L005', 21, clock);
+    expect(ctx.options.map((o) => o.contentId)).toEqual(['2026-10-03-MAIN-LI']);
+    expect(ctx.initialPreview).toMatchObject({ ok: true, contentId: '2026-10-03-MAIN-LI' });
+    expect((await promotionContext(repo, 'SYN-L005', 0, clock)).options).toEqual([]);
+    expect((await promotionContext(repo, 'SYN-L005', 0, clock)).initialPreview).toBeNull();
+    expect(sheet.writes).toHaveLength(0);
+  });
+
+  it('supports elapsed slots in the fake browser clock and keeps the exact boundary usable', async () => {
+    process.env.CS_FAKE_TODAY = '2026-10-01';
+    process.env.CS_FAKE_TIME = '21:00';
+    expect((await promotionContext(repo, 'SYN-L005')).options[0]?.contentId).toBe('2026-10-01-MAIN-LI');
+    process.env.CS_FAKE_TIME = '21:30';
+    expect((await promotionContext(repo, 'SYN-L005')).options[0]?.contentId).toBe('2026-10-03-MAIN-LI');
+  });
+
+  it('orders by time before slot order when policy puts the second slot earlier', async () => {
+    const settings = await repo.workflowSettings();
+    const time = (slot: string) => slot === 'Main' ? '21:00' : '08:00';
+    vi.spyOn(repo, 'workflowSettings').mockResolvedValue({ ...settings, slots: settings.slots.map((s) => s.platform === 'X' ? { ...s, time: time(s.slot) } : s) });
+    const rows = await repo.listSchedule();
+    const open = rows.find((r) => slotAvailability(r).available && r.value.contentId.endsWith('-X'))!;
+    const pair = ['Main', '2nd'].map((slot) => ({ ...open, cells: { ...open.cells, publishTime: time(slot) }, value: { ...open.value, contentId: `2026-10-05-${slot === 'Main' ? 'MAIN' : '2ND'}-X`, publishTime: time(slot) } }));
+    vi.spyOn(repo, 'listSchedule').mockResolvedValue(pair);
+    const ctx = await promotionContext(repo, 'SYN-X004');
+    expect(ctx.options.map((o) => [o.contentId, o.time, o.ok])).toEqual([
+      ['2026-10-05-2ND-X', '08:00', true], ['2026-10-05-MAIN-X', '21:00', true],
+    ]);
+  });
   it('reads five active times and keeps deprecated third-slot settings for legacy compatibility', () => {
     const s = parseWorkflowSettings(syntheticSettingsRows().map((r) => r.values));
     expect(s.slots.find((x) => x.platform === 'X' && x.slot === 'Main')?.time).toBe('08:00');

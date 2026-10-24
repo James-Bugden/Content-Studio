@@ -29,12 +29,14 @@ export async function loadPostPanel(services: Services, actor: Actor, libraryId:
   const record = library.find((r) => r.value.libraryId === libraryId);
   const summary = board.posts.find((p) => p.libraryId === libraryId);
   if (!record || !summary) throw new AppError('NOT_FOUND');
-  const slotOptions =
+  const promotion =
     summary.step.kind === 'schedule' && actor.role === 'owner'
-      ? (await promotionContext(repo, libraryId)).options.filter((o) => o.ok).map((o) => ({ contentId: o.contentId, isoDate: o.isoDate, slot: o.slot, time: o.time }))
-      : [];
+      ? await promotionContext(repo, libraryId)
+      : null;
+  const slotOptions = promotion?.options.filter((o) => o.ok).map((o) => ({ contentId: o.contentId, isoDate: o.isoDate, slot: o.slot, time: o.time })) ?? [];
   return {
     slotOptions,
+    initialPreview: promotion?.initialPreview?.ok ? promotion.initialPreview : null,
     model,
     card: toCard(record, library, schedule),
     summary,
