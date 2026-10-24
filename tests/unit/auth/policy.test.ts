@@ -91,6 +91,33 @@ describe('roleForSubject', () => {
 });
 
 describe('test-mode switches', () => {
+  it('production disables test auth even with fake data and e2e mode', () => {
+    // Exercise the policy directly: serverEnv separately refuses fake production.
+    expect(testAuthEnabled({
+      CS_DATA_MODE: 'fake', CS_TEST_MODE: 'e2e', VERCEL_ENV: 'production',
+      APP_TIMEZONE: 'Asia/Taipei', GOOGLE_WRITE_ENABLED: 'false',
+      SUPABASE_READ_MODEL_MODE: 'off', AI_PROVIDER: 'fake',
+    })).toBe(false);
+  });
+
+  it.each([
+    ['/api/test-auth', { as: 'owner' }, () => import('@/app/api/test-auth/route')],
+    ['/api/test-control', { kind: 'reset' }, () => import('@/app/api/test-control/route')],
+  ] as const)('%s returns NOT_FOUND in production', async (path, body, loadRoute) => {
+    setEnv({ CS_DATA_MODE: 'live', CS_TEST_MODE: 'e2e', VERCEL_ENV: 'production' });
+    const { POST } = await loadRoute();
+    const response = await POST(new Request(`http://localhost:3000${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }));
+    expect(response.status).toBe(404);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    // test-auth uses the JSON error contract; test-control uses a plain 404.
+    if (path === '/api/test-auth') expect(await response.json()).toMatchObject({ code: 'NOT_FOUND' });
+    else expect(await response.text()).toBe('Not found');
+  });
+
   it('test auth needs fake data, e2e mode and a non-production deployment', () => {
     setEnv({ CS_DATA_MODE: 'fake', CS_TEST_MODE: 'e2e' });
     expect(testAuthEnabled()).toBe(true);

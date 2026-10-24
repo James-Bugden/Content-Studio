@@ -1,5 +1,10 @@
 # Content Studio — handover to a new Claude Code account
 
+Maintenance note (2026-10-24, issue #129): this is a historical handover. Sections
+5–6 describe the state at `5a7a023`, not today's task list; inspect current issues
+and PRs before acting. Use `AGENTS.md`, `docs/MASTER-SPEC.md` and
+`docs/ops/deploy.md` for current policy, product and deployment guidance.
+
 Written: 2026-09-24 18:52 Asia/Taipei, at commit `5a7a023` on `main`.
 Written by the Claude Code session that had been building this project all
 week, handing off because its weekly usage is about to run out. James is
@@ -29,9 +34,11 @@ lives entirely in:
 - **Google Drive** — canonical Markdown/source assets.
 - **Typefully** — final editing/publishing surface (X, Threads, LinkedIn).
 
-The app reads/writes the Sheet directly via a Google service account (no
-Supabase, no separate database — Supabase is a documented *later* migration
-option, not a current dependency: see `docs/MASTER-SPEC.md` §11). **The full
+Content reads/writes the Sheet directly via a Google service account. Replies
+now lives at `/replies` and uses an isolated Supabase library; the optional
+Content read model does not replace Sheets as Content authority (see
+`docs/MASTER-SPEC.md` §§2–3, 11). Backlog defaults to Content Library posts;
+the Content Queue ideas view is available at `/backlog?view=ideas`. **The full
 domain vocabulary, exact Sheet column mapping, and architecture are in
 `docs/MASTER-SPEC.md` — read it, don't re-derive it.**
 
@@ -130,14 +137,15 @@ don't assume:
    in the Sheet/UI, never a plausible-sounding guess.
 4. **Test before every PR:**
    ```bash
-   npx tsc --noEmit -p .
-   npx eslint <touched files>
-   npx vitest run
-   rm -rf .next && npx playwright test tests/e2e/<relevant spec>.spec.ts --reporter=line
+   bash ~/bin/heavy npx tsc --noEmit -p .
+   bash ~/bin/heavy npx eslint <touched files>
+   bash ~/bin/heavy npx vitest run <relevant test files>
+   bash ~/bin/heavy npx playwright test tests/e2e/<relevant spec>.spec.ts --reporter=line
    ```
-   `rm -rf .next` before Playwright matters — `reuseExistingServer` in
-   `playwright.config.ts` will happily serve a stale build otherwise and
-   you'll "pass" against old code.
+   Confirm no existing server is serving an older build before Playwright:
+   `reuseExistingServer` in `playwright.config.ts` can reuse one. When it starts
+   a new server, the configured command builds first. Run targeted tests locally;
+   CI runs the full suite. Use the shared heavy queue on this 16 GB PC.
 5. **Open the PR**, `Closes #NNN` in the body, then `gh pr checks <N>
    --watch`. **Merge green PRs without asking** — squash + delete branch —
    unless the PR touches auth, RLS/access-control, payments, or the Sheet
@@ -216,10 +224,15 @@ from values already used elsewhere in the Sheet, never invented).
 
 ## 7. Things that will burn time if you don't know them going in
 
-- **Playwright + stale build**: `reuseExistingServer: true` in
-  `playwright.config.ts` means a `.next` left over from a previous run gets
-  served as-is. Always `rm -rf .next` before trusting a Playwright result
-  that's supposed to prove a code change works.
+- **Playwright + stale server**: `reuseExistingServer: !process.env.CI` in
+  `playwright.config.ts` can reuse an older running server. A newly started test
+  server runs `npm run build` first; a leftover `.next` alone is not reused.
+- **Test routes in production**: `POST /api/test-auth` and `POST /api/test-control` return
+  HTTP 404, guarded by `testAuthEnabled`. Both production exclusions are covered
+  by `tests/unit/auth/policy.test.ts`. Fake mode is separately refused in production.
+- **Weekly health check**: `.github/workflows/ci.yml` runs the existing synthetic
+  verify and browser jobs on `main` every Monday at 03:17 UTC, with read-only
+  permissions, pinned action SHAs and no secrets.
 - **The synthetic test fixture has non-obvious defaults.** Every row in
   `src/fixtures/synthetic.ts`'s `LIBRARY_DEFAULTS` defaults to
   `targetPlatform: 'LinkedIn'` and `hookTemplate: 'Contrarian #12 -
@@ -284,10 +297,10 @@ gh issue create --title "CS-NNN - <title>" --body "..."
 git checkout -b jb/cs-NNN-<slug>
 
 # verify before a PR
-npx tsc --noEmit -p .
-npx eslint <files>
-npx vitest run
-rm -rf .next && npx playwright test tests/e2e/<spec>.spec.ts --reporter=line
+bash ~/bin/heavy npx tsc --noEmit -p .
+bash ~/bin/heavy npx eslint <files>
+bash ~/bin/heavy npx vitest run <relevant test files>
+bash ~/bin/heavy npx playwright test tests/e2e/<spec>.spec.ts --reporter=line
 
 # ship
 git add <files> && git commit -m "CS-NNN: <summary>
@@ -307,4 +320,4 @@ npx vercel ls --yes
 
 That's the whole picture. Read `AGENTS.md` next for the full policy this
 was condensed from, then `docs/MASTER-SPEC.md` for the domain/architecture
-detail, then get moving on §6 item 1.
+detail, then inspect current issues and PRs; §6 is historical.

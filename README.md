@@ -24,12 +24,23 @@ Node 24 (see `.nvmrc`) and npm.
 
 ```bash
 npm ci
-npm run dev          # fake mode: synthetic Content and Reply providers, no credentials
+npm run dev          # fake mode: synthetic Content providers, no credentials
 npm run verify       # typecheck, lint, private-path policy, secret scan, unit tests
 npm run test:e2e     # deterministic browser journeys against a production build
 ```
 
-`CS_DATA_MODE=fake` (the default) seeds every adapter from `src/fixtures/synthetic.ts` and is refused in production. `.env.example` lists variable names only; values live in Vercel or an untracked `.env.local`.
+`CS_DATA_MODE=fake` (the default) uses synthetic Content fixtures in `src/fixtures/synthetic.ts`. The synthetic Replies store additionally requires `CS_TEST_MODE=e2e` outside production; its seeds live in `src/replies/lib/server/memory-store.ts`. Fake mode is refused in production. `.env.example` lists variable names only; values live in Vercel or an untracked `.env.local`.
+
+CI runs on pushes to `main`, pull requests, manual dispatch and weekly on `main`
+(Monday 03:17 UTC). The scheduled run uses the existing verify and browser jobs,
+synthetic providers, no repository secrets, read-only permissions and actions pinned
+to commit SHAs. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+
+`POST /api/test-auth` and `POST /api/test-control` return HTTP 404 in production. Both
+handlers use `testAuthEnabled`, which requires fake data and e2e mode outside
+production; `tests/unit/auth/policy.test.ts` covers both production exclusions.
+Operational recovery and rollback are in [the runbook](docs/ops/runbook.md) and
+[deployment guide](docs/ops/deploy.md).
 
 | Path | Responsibility |
 | --- | --- |
