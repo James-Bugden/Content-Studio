@@ -10,7 +10,8 @@ import { buttonClass } from '@/components/button-styles';
 import { CapabilityBanner } from '@/components/capability-banner';
 import { FilterBar, type FilterDef } from '@/components/filter-bar';
 import { StaleBacklogBanner } from '@/components/backlog/stale-backlog-banner';
-import { BacklogNavigationProvider } from '@/components/backlog/backlog-navigation';
+import { AiErrorView } from '@/components/editor/ai-error';
+import StudioLoading from '@/app/(studio)/loading';
 import { InlineResult } from '@/components/inline-result';
 import { PageHeader } from '@/components/page-header';
 import { PillarTag } from '@/components/pillar-tag';
@@ -123,7 +124,7 @@ export default async function StatesGalleryPage() {
 
       <Section id="g-capability" title="Capability banner">
         <CapabilityBanner capabilities={capabilities} />
-        <BacklogNavigationProvider><StaleBacklogBanner /></BacklogNavigationProvider>
+        <StaleBacklogBanner readAt={Date.UTC(2026, 9, 24, 4, 30)} retryHref="/backlog?platform=X&amp;sort=source" />
         <p className="text-sm text-ink-soft">When every provider is ready the banner renders nothing.</p>
       </Section>
 
@@ -167,6 +168,14 @@ export default async function StatesGalleryPage() {
           <StateView key={kind} kind={kind} />
         ))}
         <StateView kind="no_match" title={CJK} detail={LONG_EN} action={<button type="button" className={buttonClass('secondary')}>Clear filters</button>} />
+      </Section>
+
+      <Section id="g-route-loading" title="Route loading">
+        <StudioLoading />
+      </Section>
+
+      <Section id="g-ai-errors" title="AI errors">
+        {ERROR_CODES.map((code) => <AiErrorView key={code} code={code} what="English check" />)}
       </Section>
 
       <Section id="g-errors" title="Typed errors">

@@ -33,9 +33,9 @@ export function SlotPanel({ contentId }: { contentId: string }) {
   const [preview, setPreview] = useState<Preview | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await fetch(`/api/panel/slot/${encodeURIComponent(contentId)}`, { credentials: 'same-origin' });
-    const body = (await res.json().catch(() => null)) as { ok: boolean; data?: SlotPanelData; message?: string } | null;
-    if (!res.ok || !body?.ok || !body.data) {
+    const res = await fetch(`/api/panel/slot/${encodeURIComponent(contentId)}`, { credentials: 'same-origin' }).catch(() => null);
+    const body = (await res?.json().catch(() => null)) as { ok: boolean; data?: SlotPanelData; message?: string } | null;
+    if (!res?.ok || !body?.ok || !body.data) {
       setLoad({ state: 'error', message: body?.message ?? 'This slot could not be loaded. Nothing was changed.' });
       return;
     }
