@@ -6,17 +6,23 @@ until then nothing in production changes.
 
 ## 0. Why now, and what changes
 
-ADR-0001 required "measured need" before replacing Sheet writes. The need is now
-recorded:
+ADR-0001 required "measured need" before replacing Sheet writes. The trigger
+for this design is an owner decision, not quota evidence:
 
-- Production hits the Google Sheets read quota (issue #88, CS-041): a Backlog of
-  roughly 2,000 Library rows is re-read page by page on cache miss, and one
-  owner session has already met a rate-limit screen twice.
-- James has decided that Content Studio is the only editing surface. Nobody
-  edits the workbook by hand. Every Sheet-specific safeguard that exists to
-  tolerate hand edits (header drift, formula cells, external row edits) now
-  protects against something that no longer happens, while costing quota and
-  a documented lost-update window (`docs/implementation/atomicity.md`).
+- On 2026-10-24 James decided that Content Studio is the only editing surface,
+  that nobody edits the workbook by hand, and that the operational source of
+  truth should move to a database regardless of further measurement. Every
+  Sheet-specific safeguard that exists to tolerate hand edits (header drift,
+  formula cells, external row edits) now protects against something that no
+  longer happens, while carrying a documented lost-update window
+  (`docs/implementation/atomicity.md`).
+- Sheet read pressure is a supporting concern, not the justification. Issue
+  #88 (CS-041, still open) records three timed Backlog reloads of roughly
+  2,000 Library rows and one rate-limit screen, says not to infer a root cause
+  from that sample, and notes that runtime logs were unavailable. It also says
+  a read mirror must never dual-write Content; the bounded exception to that
+  rule in Phase C exists only through the owner approval of this design and
+  the carve-out recorded in MASTER-SPEC section 11 (section 4).
 - The master Markdown in Drive currently returns `NOT_FOUND` in production
   (issue #81, CS-038), so the Drive half of the draft-save saga is broken.
 
@@ -72,20 +78,41 @@ Derived Sheet tabs become SQL views, never tables:
   unknown Sheet column from the final import, so MAP-02 (unknown columns
   survive round trips) still holds and the one-way export can write them back.
 - Every row carries `row_version bigint not null default 1`, `created_at`,
-  `updated_at`, `created_by_op`, `updated_by_op` (operation ids), and
+  `updated_at`, `created_by_op`, `updated_by_op` (operation ids),
   `source_sheet_row integer` (the last known Sheet row, used only by the import
-  parity report and the export).
+  parity report and the export), `sheet_revision text` (the full-row Sheet
+  fingerprint, exactly `record.revision` as the Sheet repository computed it
+  when the row was last imported or written through) and
+  `exported_sheet_revision text` (the Sheet fingerprint observed by the last
+  successful export, phase D).
 
 ### 1.3 Revision and optimistic concurrency
 
-The domain's `revisionSchema` is a 16-hex string. The database adapter derives
-it deterministically: `revision = fingerprintValues(['db', table, id, row_version])`.
-A mutation's `expectedRevision` is therefore a claim about `row_version`, and
-the write is a true compare-and-set: `update ... where id = $1 and row_version = $2`.
-Zero rows updated means the adapter re-reads the row and either reports
-`skipped_already_applied` (the patch is already present, a lost response) or
-`STALE_READ` with the current revision. This closes the one-round-trip lost
-update window that the Sheet could not.
+The domain's `revisionSchema` is a 16-hex string. Which fingerprint the
+repository exposes as `record.revision` depends on who holds write authority
+in the active store mode (section 4), so that `expectedRevision` is always
+compared by the authority that will perform the write:
+
+| Mode | `record.revision` served | Compared by | Mechanism |
+| --- | --- | --- | --- |
+| `sheet`, `db-shadow` | Sheet full-row fingerprint (`rowRevision`, today's behaviour) | Sheet repository, fresh re-read | unchanged |
+| `db-read` | `sheet_revision` stored in the DB (the Sheet fingerprint imported or written through) | Sheet repository, fresh re-read | the token is a Sheet revision, so `current.revision !== m.expectedRevision` behaves exactly as today |
+| `db` | `fingerprintValues(['db', table, id, row_version])` | `apply_patch` compare-and-set | `update ... where id = $1 and row_version = $2` |
+
+In `db` mode zero rows updated means the adapter re-reads the row and either
+reports `skipped_already_applied` (the patch is already present, a lost
+response) or `STALE_READ` with the current revision. This closes the
+one-round-trip lost update window that the Sheet could not. `row_version` is
+bumped only by `apply_patch`, never by an import or write-through whose
+content is identical (`is distinct from` guard), so an import cannot
+invalidate an open editor.
+
+In `db-read` mode the DB's `sheet_revision` can lag the Sheet only between a
+Sheet write and the next write-through or import. A save made from such a
+stale row is refused by the Sheet repository as `STALE_READ`, exactly as a
+concurrent edit is today, and the editor shows the comparison; the Phase C
+exit metric counts those refusals, attributed by `sheet_revision` age at the
+time of the request.
 
 ### 1.4 Idempotency and the operation ledger
 
@@ -121,8 +148,9 @@ place where partial failure can originate.
 Chosen: every `content_studio_*` table has RLS enabled and forced with **zero**
 policies, all privileges revoked from `anon` and `authenticated`, and grants to
 `service_role` only; every writer is a `security invoker` SQL function executable
-by `service_role` alone. This is the pattern MIG-04 already verified live for the
-read model.
+by `service_role` alone. This is the pattern MIG-04 verified live for the three
+read-model tables and RPCs on 2026-09-25; every new table, view and function
+needs its own denial proof (DB-1 acceptance), not inheritance of that result.
 
 Why not owner RLS like the Replies tables: Content Studio authenticates the
 owner with Auth.js Google OIDC, not Supabase Auth, so `auth.uid()` is null on
@@ -241,13 +269,20 @@ Store modes are a single server variable, `CS_CONTENT_STORE`, set per Vercel
 environment; preview stays `fake` data with either store. `SUPABASE_READ_MODEL_MODE`
 is folded into it and removed in phase E.
 
-| Mode | Reads | Writes | Sheet role |
-| --- | --- | --- | --- |
-| `sheet` (today) | Sheet | Sheet | authority |
-| `db-shadow` | Sheet served; DB read in parallel on a sample | Sheet | authority |
-| `db-read` | DB | Sheet, then write-through to DB | authority |
-| `db` | DB | DB; one-way export to Sheet | export / comparison copy |
-| `db` with export off | DB | DB | retired; weekly backup export only |
+| Mode | Reads | Writes | Authority | Sheet role |
+| --- | --- | --- | --- | --- |
+| `sheet` (today) | Sheet | Sheet | Sheet | authority |
+| `db-shadow` | Sheet served; DB read in parallel on a sample (adds no Sheet reads) | Sheet | Sheet | authority |
+| `db-read` | DB | Sheet first; the read-back record is then copied into the DB | Sheet | authority |
+| `db` | DB | DB; one-way, precondition-checked export to Sheet | DB | export / comparison copy |
+| `db` with export off | DB | DB | DB | retired; weekly backup export only |
+
+Exactly one authority exists in every mode. The Phase C copy-into-DB is the one
+place where two stores are written in a single request; it is not a second
+authority because the DB copy is derived from the Sheet read-back, is never
+compared against for a Sheet write, and is repaired by the import if it fails.
+MASTER-SPEC section 11 carves out this bounded exception to the dual-write rule
+for Phase C only, by owner approval of this document.
 
 Numeric parity thresholds below are measured by the parity job (DB-4) and shown
 on `/reconcile`; a phase cannot advance while any threshold is red, and a
@@ -260,7 +295,10 @@ skipped or inconclusive measurement is not green.
 - Work: migration, typed import from the Sheet (reusing `buildSheetMirrorSnapshot`
   as the exact source of truth for a run, then a typed `import_run` RPC that
   upserts and records counts, hashes and the exception ledger), scheduled every
-  15 minutes via the existing cron route with `CRON_SECRET`.
+  15 minutes via the existing cron route with `CRON_SECRET`. The schedule is
+  owner configuration (a `crons` entry in the Vercel project, see
+  `docs/ops/deploy.md`); without it the import runs only when triggered from
+  `/reconcile`.
 - Exit: three consecutive full imports with identical stable-ID sets to the
   Sheet, per-collection count equality, and every field equal except entries
   recorded in the exception ledger (allowed classes: formula display values,
@@ -276,7 +314,8 @@ skipped or inconclusive measurement is not green.
   every `/reconcile` load, compares records field by field after the adapter
   (so links, revision-independent cells and view models are compared, not raw
   rows), and emits only `collection`, `field`, `kind` and a short fingerprint.
-  The sample is small so the Sheet quota problem is not made worse.
+  The Sheet is read exactly as today; the sample bounds the extra DB reads and
+  comparison cost, not Sheet quota.
 - Exit: over 7 consecutive days or at least 200 compared requests, whichever is
   longer: stable-ID set equality 100 percent; field equality at least 99.9
   percent per collection with zero unclassified mismatches; import lag p95 at
@@ -289,17 +328,21 @@ skipped or inconclusive measurement is not green.
 
 - Entry: Phase B exit, T4 smoke of the `db-read` build on preview with fake
   data, runbook updated.
-- Work: reads come from the DB. A Sheet write still goes first; on success the
-  repository takes the read-back record (which it already fetches) and upserts
-  it into the DB in the same request (`write_through` RPC, idempotent by
-  operation id). If that upsert fails the mutation still succeeds, the row is
-  marked `refresh_pending`, the UI shows the returned record, and the next
-  scheduled import repairs it. The 60-second Library cache is reduced to 3
-  seconds.
-- Exit: 7 days; zero Sheets `RATE_LIMITED` events on reads; `STALE_READ`
-  caused by import lag (patch against a revision the DB had not yet seen)
-  equals zero after the write-through landed; Backlog p95 server time under 1 s
-  warm and under 2.5 s cold.
+- Work: reads come from the DB and carry the stored `sheet_revision` as
+  `record.revision` (section 1.3), so the Sheet repository's fresh re-read and
+  compare is unchanged. The Sheet write goes first and is the only authoritative
+  write; on success the repository takes the read-back record (which it
+  already fetches, including its new Sheet fingerprint) and copies it into the
+  DB in the same request (`write_through` RPC, idempotent by operation id,
+  content-identical guard). If that copy fails the mutation still succeeds,
+  the row is marked `refresh_pending`, the UI shows the returned record, and
+  the next scheduled import repairs it. The 60-second Library cache is reduced
+  to 3 seconds.
+- Exit: 7 days; zero Sheets `RATE_LIMITED` events on reads; zero `STALE_READ`
+  refusals whose `sheet_revision` was older than the last completed import at
+  request time (that is, none caused by lag rather than by a genuine
+  concurrent edit); Backlog p95 server time under 1 s warm and under 2.5 s
+  cold.
 - Rollback: `CS_CONTENT_STORE=sheet`. The Sheet is still the authority, so no
   data is lost; the DB is simply ignored until re-enabled.
 
@@ -315,6 +358,19 @@ skipped or inconclusive measurement is not green.
   mutation and repaired every 15 minutes. New Queue ideas are appended. The
   Sheet is never read for authority again; `GOOGLE_WRITE_ENABLED` now gates the
   export only.
+- Export precondition (never silently overwrite a newer Sheet row): before
+  writing, the exporter re-reads the target row and compares its current Sheet
+  fingerprint with the row's `exported_sheet_revision`. Equal means the Sheet
+  holds exactly what we last exported, so the write proceeds and the new
+  fingerprint is stored. Different means someone or something changed the
+  Sheet since the last export: the exporter writes nothing for that row, keeps
+  the Sheet value, and raises a blocking `export_mismatch` reconcile item that
+  shows the row id and the field names that differ. Resolution is explicit:
+  "Export DB value" (the DB is the authority, so this is the normal choice)
+  or "Copy Sheet value into DB" as a new audited patch; both record the
+  decision. The precondition carries the same one-round-trip residual window
+  the Sheet always had, which is acceptable because the Sheet is no longer an
+  authority.
 - Comparison period: 14 days **and** at least 50 mutations, whichever ends
   later. Daily `export_parity` report: every DB row present in the Sheet, every
   exported field equal after export lag, lag p95 at or under 15 minutes, zero
@@ -360,7 +416,8 @@ skipped or inconclusive measurement is not green.
 | `schema_drift` | Fires on schema version mismatch; action `Configure` (deploy the matching build) instead of `Fix in the Sheet`. |
 | `partial_mutation` | Read from `content_studio_operations` (durable, cross-instance) instead of `recentEvents`; still offers `Retry` with the same operation id. |
 | `markdown_mismatch`, `markdown_missing` | Unchanged while Drive is canonical; become `markdown_export_lag` if the section 3 recommendation is accepted. |
-| new `import_lag` (phases A–C), `export_lag` and `export_mismatch` (phase D) | Attention at 15 minutes, blocking at 60 minutes or any mismatch. |
+| new `import_lag` (phases A–C), `export_lag` (phase D) | Attention at 15 minutes, blocking at 60 minutes. |
+| new `export_mismatch` (phase D) | Blocking on the first occurrence: the exporter found a Sheet row that differs from the last export and skipped it (Phase D precondition). Actions `Export DB value` or `Copy Sheet value into DB`. |
 | new `backup_fresh` | Attention when the last verified backup is older than 36 hours. |
 | new `store_mode` fact | The report header states the active `CS_CONTENT_STORE`, so screenshots and T4 evidence always show which authority was in force. |
 
@@ -436,7 +493,7 @@ retirement with docs updated.
 Dependency order: DB-1 -> DB-2 -> DB-3 -> DB-4 -> DB-5 -> DB-6 -> DB-7 and
 DB-8. DB-7 waits for James's section 3 decision and can run alongside DB-6.
 
-### DB-1 — Content schema, RPCs and PGlite tests (standard)
+### DB-1 — Content schema, RPCs and PGlite tests (heavy: schema, access control and RPCs)
 
 **Outcome.** The `content_studio_*` typed schema from section 1 exists as one
 reviewed migration, applied explicitly to the shared project, with every
@@ -539,25 +596,33 @@ retired (reuse of the complete-snapshot rule).
 
 **Non-goals.** Serving any read from the DB; writes.
 
-**Regression areas.** Sheet quota: shadow sampling must not raise Sheet reads
-by more than the sampled fraction; existing mirror cron.
+**Regression areas.** Sheet quota: shadow mode must add zero Sheet reads (the
+Sheet result is served as today; only DB reads are added); request latency on
+sampled requests; existing mirror cron.
 
 ### DB-5 — Read cutover with write-through and rollback (heavy)
 
 **Outcome.** Production serves Content reads from the database while the
 Sheet remains the write authority; one flag returns to Sheet reads.
 
-**In scope.** `CS_CONTENT_STORE=db-read` path in the container: Sheet write,
-then `write_through` upsert of the read-back record in the same request,
-`refresh_pending` marker and UI state when the upsert fails, cache TTL
-reduction, runbook rollback steps, T3 rehearsal on the copied workbook and a
-Supabase branch, T4 smoke on the exact commit, Phase C exit measurements.
+**In scope.** `CS_CONTENT_STORE=db-read` path in the container: DB reads
+serving `sheet_revision` as `record.revision`; Sheet write first (sole
+authority), then `write_through` copy of the read-back record and its Sheet
+fingerprint in the same request, `refresh_pending` marker and UI state when
+the copy fails, cache TTL reduction, runbook rollback steps, T3 rehearsal on
+the copied workbook and a Supabase branch, T4 smoke on the exact commit,
+Phase C exit measurements. This phase relies on the MASTER-SPEC section 11
+carve-out: the Sheet remains the only authority and the DB copy is derived,
+never compared against for a Sheet write.
 
 **Acceptance.** MIG-11: with the flag flipped back, every e2e journey passes
 unchanged and no data is lost (contract: the DB is ignored, not consulted).
-Write-through failure yields a successful mutation plus a `refresh_pending`
-reconcile item that disappears after the next import. Phase C exit numbers
-recorded with environment and SHA; a skipped measurement is not a pass.
+A save from a DB-served record succeeds against the Sheet when nothing else
+changed, and is `STALE_READ` when the Sheet row changed since the import, both
+proven in the contract suite. Write-through failure yields a successful
+mutation plus a `refresh_pending` reconcile item that disappears after the
+next import. Phase C exit numbers recorded with environment and SHA; a
+skipped measurement is not a pass.
 
 **Non-goals.** DB writes; export; Drive.
 
@@ -579,7 +644,10 @@ T3 rehearsal; MASTER-SPEC and AGENTS.md "pending cutover" notes become
 
 **Acceptance.** MIG-12: on the copied workbook the export reproduces every
 exported field byte-equal, and the rehearsed rollback (read-only, final
-export, exact parity, flag to `sheet`) is recorded with hashes. MIG-13: a
+export, exact parity, flag to `sheet`) is recorded with hashes. A hand edit
+injected into the copied workbook between two exports is not overwritten: the
+exporter skips the row, the Sheet value is preserved, and a blocking
+`export_mismatch` item appears with the differing field names. MIG-13: a
 backup export is produced, its manifest verified, and a restore into a
 Supabase branch passes the parity report. MIG-05 is finally evidenced: no
 period has two uncoordinated authorities (export is one-way, imports are off).
@@ -644,7 +712,7 @@ secret scan, e2e matrix (store mode `sheet` run is removed).
 | Risk | Mitigation |
 | --- | --- |
 | Shared Supabase project with Replies: a bad migration or paused project affects both | Additive, prefixed, explicitly applied migration; PGlite tests; Supabase branch for T3; project tier that does not auto-pause (owner). |
-| Hidden hand edits to the Sheet after the freeze | Phase D export parity would show the Sheet drifting from the DB; the report names the collection and field class, and the runbook says the DB wins and the Sheet cell is overwritten by the next export. |
+| Hidden hand edits to the Sheet after the freeze | The exporter's fingerprint precondition skips the row and raises a blocking `export_mismatch`; nothing is overwritten until the owner chooses a direction on `/reconcile`. The freeze is an assurance, not a control. |
 | Import exception ledger hides a real difference | Only three named classes are allowed; anything else blocks. Classes are listed in the report. |
 | Write-through gap in phase C shows a stale row for seconds | `refresh_pending` state; the mutation response already carries the new record. |
 | Lost Drive revision history if section 3 (b) is accepted | DB row history per operation; weekly and daily exports; the decision is James's. |
@@ -662,7 +730,11 @@ Owner-only items:
    the billing; the agent cannot create or pay for it.
 4. Put the production `SUPABASE_*` service credential and `CRON_SECRET` into
    the Vercel Production target (values are never typed by an agent).
-5. Share the private backup Drive folder with the service account.
+5. Enable the 15-minute cron in the Vercel project (the `crons` entry in
+   `docs/ops/deploy.md`; the repository has no `vercel.json`, so this is
+   project configuration and may need a plan that supports that frequency) and
+   confirm one scheduled run.
+6. Share the private backup Drive folder with the service account.
 
 Everything else, including filing DB-1 to DB-8, implementation, tests,
 reviews, T0–T3 and the per-phase T4 smoke, is routine engineering work under
