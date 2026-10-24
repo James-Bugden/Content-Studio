@@ -9,7 +9,11 @@ import { AppError } from '@/domain/errors';
 export async function repairContentExport() {
   const services = getServices();
   if (serverEnv().CS_CONTENT_STORE !== 'db' || !services.contentCutover) throw new AppError('FORBIDDEN', { reason: 'export_store_mode' });
-  const parity = await services.contentCutover.exporter.run();
+  // Both repairs get an attempt; a queue read failure must not skip Sheet repair.
+  const [markdown, sheet] = await Promise.allSettled([services.markdownExport?.run(), services.contentCutover.exporter.run()]);
+  if (sheet.status === 'rejected') throw sheet.reason;
+  if (markdown.status === 'rejected') throw markdown.reason;
+  const parity = sheet.value;
   return { ...parity, comparison: services.contentCutover.exporter.comparison(Date.now(), services.contentCutover.mutationCount) };
 }
 type BackupRun = { status: string; manifestHash: string; verifiedAt?: number };

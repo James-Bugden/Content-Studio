@@ -1,4 +1,5 @@
 import 'server-only';
+import type { MarkdownExport } from '@/application/markdown-export';
 import type { ContentCollection, ContentDb, ContentPostRow, ContentScheduleRow, ContentSettingRow, ContentSummaryRow, ContentTarget, ContentWrite, ContentWriteResult } from '@/application/content-db';
 import { AppError, type ErrorCode } from '@/domain/errors';
 import { syntheticLibraryRows, syntheticQueueRows, syntheticScheduleRows, syntheticSettingsRows } from '@/fixtures/synthetic';
@@ -50,6 +51,7 @@ const position = (a: { source_sheet_row: number | null }, b: { source_sheet_row:
 export class FakeContentDb implements ContentDb {
   readonly mode = 'fake' as const;
   private readonly seed: ContentDbSeed;
+  private readonly markdownExports = new Map<string, MarkdownExport>();
   private importId: string | null = null;
   constructor(seed: ContentDbSeed = syntheticContentDbSeed(), private readonly version: unknown = CONTENT_STUDIO_SCHEMA_VERSION) { this.seed = structuredClone(seed); }
   private faults: { op: 'read' | 'write'; code: ErrorCode; times: number }[] = [];
@@ -94,6 +96,18 @@ export class FakeContentDb implements ContentDb {
     Object.assign(this.seed, structuredClone(seed));
     if (importId !== undefined) this.importId = importId;
   }
+  async pendingMarkdownExports() { this.check('read'); return structuredClone([...this.markdownExports.values()]); }
+  async markdownBodyEdits() {
+    this.check('read');
+    return [...new Set(this.history.filter(h => h.target_kind === 'library' && h.before_image && h.changed_fields.includes('draft_content')).map(h => h.target_id))];
+  }
+  async completeMarkdownExport(job: MarkdownExport) {
+    this.check('write');
+    const current = this.markdownExports.get(job.libraryId);
+    if (!current || current.expectedBody !== job.expectedBody) return;
+    if (current.version === job.version && current.body === job.body) this.markdownExports.delete(job.libraryId);
+    else current.expectedBody = job.body;
+  }
   async latestImportId() { this.check('read'); return this.importId; }
   async writeThrough(write: ContentWrite) { return this.mutate('copy', write); }
   async applyPatch(write: ContentWrite) { return this.mutate('patch', write); }
@@ -109,6 +123,9 @@ export class FakeContentDb implements ContentDb {
     }
     let row = this.row(kind, id);
     const before = structuredClone(row ?? null);
+    if (mode === 'patch' && kind === 'library' && row && 'draft_content' in data && (row as ContentPostRow).draft_content !== data.draft_content && (row as ContentPostRow).review_status === 'Approved') {
+      data.review_status = 'Not Reviewed';
+    }
     const fields = Object.keys(data).filter(f => !row || JSON.stringify((row as unknown as Record<string, unknown>)[f]) !== JSON.stringify(data[f])).sort();
     let state: ContentWriteResult['steps'][number]['state'];
     let code: ContentWriteResult['code'] = null;
@@ -127,6 +144,12 @@ export class FakeContentDb implements ContentDb {
           this.seed.schedule.push(row);
         } else { row.collection = kind; this.seed.posts.push(row); }
       } else Object.assign(row, structuredClone(data), { row_version: String(BigInt(row.row_version) + BigInt(mode !== 'copy' || fields.some(f => !['source_sheet_row', 'sheet_revision'].includes(f)))) });
+      if (mode === 'patch' && kind === 'library' && before && fields.some(f => ['draft_content', 'source_markdown_url', 'source_master_file_url'].includes(f))) {
+        const post = row as ContentPostRow;
+        const prior = this.markdownExports.get(id);
+        this.markdownExports.set(id, { libraryId: id, version: String(row.row_version), expectedBody: prior?.expectedBody ?? (before as ContentPostRow).draft_content,
+          body: post.draft_content, since: prior?.since ?? Date.now() });
+      }
       state = 'applied';
       this.history.push({ operation_id: operationId, target_kind: kind, target_id: id, before_image: before, row_version_before: before ? String(before.row_version) : null, changed_fields: fields });
     }

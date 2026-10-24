@@ -213,7 +213,7 @@ jobs:
         env:
           CS_E2E_PREBUILT: '1'
           CS_E2E_CONTENT_STORE: db
-        run: npm run test:e2e -- tests/e2e/content-write-cutover.spec.ts --project=w375 --project=w1280
+        run: npm run test:e2e -- tests/e2e/markdown-authority.spec.ts tests/e2e/content-write-cutover.spec.ts --project=w375 --project=w1280
       - name: Upload synthetic cutover evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

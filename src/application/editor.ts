@@ -25,7 +25,7 @@ export async function loadEditor(repo: ContentRepository, drive: DriveGateway, l
   // for every post doubled the Sheets requests per editor open (each tab page is
   // three API calls) and ran production into Google's per-minute read quota.
   const [read, schedule] = await Promise.all([
-    readSection(drive, record),
+    readSection(drive, record, repo.draftBodyAuthority?.()),
     item.visual.source.kind === 'screenshot' ? repo.listSchedule().catch(() => null) : Promise.resolve([]),
   ]);
   const mismatch = read.ok && read.section.body !== item.draftContent;

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { MarkdownExport } from '@/application/markdown-export';
 import type { ContentCollection, ContentDb, ContentPostRow, ContentScheduleRow, ContentSettingRow, ContentSummaryRow, ContentTarget, ContentWrite, ContentWriteResult } from '@/application/content-db';
 import { z } from 'zod';
 import { AppError, isAppError } from '@/domain/errors';
@@ -74,6 +75,19 @@ export class SupabaseContentDb implements ContentDb {
         throw new AppError('PROVIDER_UNAVAILABLE', { provider: 'db', reason: 'network' });
       }
     }
+  }
+  async pendingMarkdownExports(): Promise<MarkdownExport[]> {
+    const rows = await this.select<{ library_id: string; row_version: string | number; expected_body: string; body: string; queued_at: string }>('markdown_export', { order: 'library_id.asc' });
+    return rows.map(row => ({ libraryId: row.library_id, version: String(row.row_version), expectedBody: row.expected_body, body: row.body, since: Date.parse(row.queued_at) }));
+  }
+  async markdownBodyEdits(): Promise<string[]> {
+    const rows = await this.select<{ target_id: string }>('row_history', {
+      select: 'target_id', target_kind: 'eq.library', before_image: 'not.is.null', changed_fields: 'cs.{draft_content}', order: 'history_id.asc',
+    });
+    return [...new Set(rows.map(row => row.target_id))];
+  }
+  async completeMarkdownExport(job: MarkdownExport) {
+    await this.rpc('complete_markdown_export', { p_library_id: job.libraryId, p_version: job.version, p_expected_body: job.expectedBody, p_body: job.body });
   }
   writeThrough(w: ContentWrite) { return this.rpc('write_through', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
     p_target_kind: w.kind, p_target_id: w.id, p_expected_version: w.expectedVersion, p_row: w.data }); }

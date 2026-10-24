@@ -208,3 +208,30 @@ See [the Phase C runbook](../ops/runbook.md#phase-c-content-read-cutover-db-5--m
 for rollback, copied-workbook/Supabase-branch rehearsal, exact-SHA T4 smoke and
 seven-day measurements. No live database, production flag, deployment, hosted
 security proof, T3/T4 rehearsal or Phase C exit is claimed by this local change.
+
+## DB-7: delegated body authority decision and local preparation
+
+On 2026-10-25 the coordinator selected design section 3 option (b) under the
+owner's explicit delegation in #151. Only the `db` composition reads/saves
+draft bodies in the DB and exports Drive asynchronously. The `sheet`,
+`db-shadow` and `db-read` paths retain Drive authority and the original saga.
+No production phase has flipped and live database modes remain refused.
+
+`20261025000400_content_markdown_export.sql` adds the private outbox and a
+completion RPC with forced RLS, zero policies, browser-role revokes and
+service-role grants. The existing single `apply_patch` transaction now also
+enqueues a changed Library body and resets approval on material body changes.
+The request hash remains bound to the caller's exact patch; the approval reset
+is deterministic server policy, so replay after approval reset retains the
+same operation identity. Sheet-import/copy RPCs do not enqueue. Version-2 row/backup
+representations are unchanged; matching deployment must explicitly require the
+new additive migration. No SQL has been applied live.
+
+One-off, per-section Markdown intake is previewed and owner-confirmed. It
+retains existing export destinations. A changed file/section/DB revision refuses;
+missing direction refuses. Keep-database is a no-write decision and does not
+force overwrite Drive. DB-to-Drive conflicts remain visible until resolved.
+Rollback now requires exact verified Markdown bodies as well as Sheet parity.
+See [DB-7 operations and remaining gates](../ops/database-draft-authority.md),
+including the six-table archive/outbox reconstruction and cross-instance lease
+limits; PGlite/fakes cannot establish hosted security or concurrency.

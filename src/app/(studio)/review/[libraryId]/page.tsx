@@ -75,9 +75,9 @@ export default async function EditorPage({ params }: { params: Promise<{ library
             <dd>{model.visual}</dd>
             <dt className="mt-2 text-ink-soft">Content revision</dt>
             <dd className="font-mono text-xs">{model.sheet.revision}</dd>
-            <dt className="mt-2 text-ink-soft">Markdown</dt>
+            <dt className="mt-2 text-ink-soft">{model.contentProvider === 'db' ? 'Draft source' : 'Markdown'}</dt>
             <dd className="text-xs">
-              {model.markdown.state === 'ok' ? (
+              {model.contentProvider === 'db' ? 'Database; Drive is an export' : model.markdown.state === 'ok' ? (
                 <>
                   <span className="font-mono">rev {model.markdown.fileRevision}</span> · modified {new Date(model.markdown.modifiedTime).toLocaleString('en-GB', { timeZone: 'Asia/Taipei' })} Taipei
                 </>

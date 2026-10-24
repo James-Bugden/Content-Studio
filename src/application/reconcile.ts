@@ -19,6 +19,7 @@ import { fixIssuesCount, rememberNavigationCount } from './navigation-counts';
 import type { ContentWriteCutover, ExportIssue } from './content-export';
 import { exportKey } from './content-export';
 import type { BackupJournal } from './content-backup';
+import type { MarkdownExporter } from './markdown-export';
 import { isAppError } from '@/domain/errors';
 
 /**
@@ -39,6 +40,7 @@ export type ReconcileKind =
   | 'export_parity'
   | 'backup_fresh'
   | 'provider_config'
+  | 'markdown_export_lag'
   | 'markdown_mismatch'
   | 'markdown_missing'
   | 'stale_approval'
@@ -93,7 +95,7 @@ export async function buildReconcileReport(
   repo: ContentRepository,
   drive: DriveGateway,
   now = Date.now(),
-  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal } = {},
+  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter } = {},
 ): Promise<ReconcileReport> {
   rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
@@ -172,10 +174,29 @@ export async function buildReconcileReport(
 
   const navigationSnapshots = repo.navigationSnapshots?.();
 
+  const dbBody = repo.draftBodyAuthority?.() === 'db';
+  const queuedMarkdown = new Set<string>();
+  const editedMarkdown = new Set<string>();
+  if (dbBody && options.markdownExport) {
+    try {
+      for (const id of await options.markdownExport.editedLibraryIds()) editedMarkdown.add(id);
+      for (const job of await options.markdownExport.status()) {
+        queuedMarkdown.add(job.libraryId);
+        items.push(item('markdown_export_lag', ['CONFLICT', 'STALE_READ', 'VALIDATION_FAILED'].includes(job.code ?? '') || now - job.since >= 3600_000 ? 'blocking' : 'attention', `${job.libraryId}: Drive export is behind`,
+          [job.reason === 'queued_body_stale' ? 'The queued body differs from the saved draft. Save the intended draft with a new operation, then retry export. Rollback is blocked.'
+            : job.code === 'CONFLICT' || job.code === 'STALE_READ' ? 'Drive changed or export could not be verified. Compare the master with the saved database draft before retrying.'
+            : job.code === 'VALIDATION_FAILED' ? 'The draft cannot be exported safely. Remove section headings or close code fences, save again, then retry export.'
+            : job.code === 'NOT_FOUND' ? 'The master or its unique section could not be found. Restore the link and give this Library ID one section, then retry export.'
+            : job.code ? 'Drive export is unavailable. The database draft is saved. Retry export when Drive is available.'
+            : 'Awaiting verified Drive export. The database draft is saved.'], [job.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(job.libraryId)}` }));
+      }
+    } catch { unreadable.push('Markdown export queue'); }
+  }
   // Sheet vs Markdown, reading each master file once.
   const byFile = new Map<string, LibraryRecord[]>();
   for (const r of library) {
     const id = markdownFileId(r);
+    if (!id && dbBody && !queuedMarkdown.has(r.value.libraryId) && (r.value.draftContent || editedMarkdown.has(r.value.libraryId))) items.push(item('markdown_missing', editedMarkdown.has(r.value.libraryId) ? 'blocking' : 'attention', `${r.value.libraryId}: no Drive master link`, ['No usable master link. Restore the link before exporting a database edit.'], [r.value.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
     if (id) byFile.set(id, [...(byFile.get(id) ?? []), r]);
   }
   for (const [fileId, rows] of byFile) {
@@ -183,11 +204,21 @@ export async function buildReconcileReport(
     try {
       text = (await drive.readText(fileId)).text;
     } catch {
-      unreadable.push(`Markdown file ${shortHash(fileId)}`);
+      if (dbBody) for (const r of rows.filter(r => !queuedMarkdown.has(r.value.libraryId))) items.push(item('markdown_export_lag', 'attention', `${r.value.libraryId}: Drive could not be checked`, ['Drive could not be read. The database draft is saved. Retry when Drive is available.'], [r.value.libraryId], { label: 'Retry', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
+      else unreadable.push(`Markdown file ${shortHash(fileId)}`);
       continue;
     }
     for (const r of rows) {
       const found = findSection(text, r.value.libraryId);
+      if (dbBody) {
+        if (!queuedMarkdown.has(r.value.libraryId)) {
+          if (!found.ok && (r.value.draftContent || editedMarkdown.has(r.value.libraryId))) items.push(item('markdown_missing', editedMarkdown.has(r.value.libraryId) ? 'blocking' : 'attention', `${r.value.libraryId}: ${found.reason === 'duplicate' ? 'duplicate Drive sections' : 'no Drive section'}`,
+            [editedMarkdown.has(r.value.libraryId) ? 'Give this Library ID one section and export the exact saved body before rollback.' : 'Give this Library ID one section before exporting a database edit. This legacy section warning does not block rollback.'], [r.value.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
+          else if (found.ok && found.section.body !== r.value.draftContent) items.push(item('markdown_export_lag', 'blocking', `${r.value.libraryId}: Drive export is behind`,
+            ['The database is authoritative. A conflicting Drive body is preserved; preview Import Markdown master to choose a direction.'], [r.value.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
+        }
+        continue;
+      }
       if (!found.ok) {
         // Rows without a section are only a problem once they are in review or approved.
         if (r.value.draftContent.trim() === '') continue;

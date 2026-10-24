@@ -281,7 +281,7 @@ export class ContentWriteCutover {
   private readOnly = false;
   private readonly completed = new Set<string>();
   readonly repo: ContentRepository;
-  constructor(repo: ContentRepository, readonly exporter: ContentExporter) {
+  constructor(repo: ContentRepository, readonly exporter: ContentExporter, private readonly beforeSheetRollback?: () => Promise<void>) {
     this.repo = new Proxy(repo, { get: (target, property) => {
       const original = Reflect.get(target, property);
       if (property === 'capability') return () => ({ ...target.capability(), ...(this.readOnly ? { state: 'read_only' as const } : {}) });
@@ -305,9 +305,16 @@ export class ContentWriteCutover {
   }
   get mutationCount() { return this.completed.size; }
   async disableWrites() { this.readOnly = true; await this.tail; }
-  /** Failure deliberately leaves DB read-only. No automatic re-enable. */
+  /** Markdown refusal restores the prior write state; Sheet/flip failures stay frozen. */
   async rollbackToSheet(flip: (mode: 'sheet') => Promise<void>) {
+    const wasReadOnly = this.readOnly;
     await this.disableWrites();
+    try {
+      await this.beforeSheetRollback?.();
+    } catch (error) {
+      this.readOnly = wasReadOnly;
+      throw error;
+    }
     await this.exporter.run();
     const parity = await this.exporter.parity();
     if (!parity.exact || parity.dbHash !== parity.sheetHash || this.exporter.journal.issues.size) throw new AppError('CONFLICT', { reason: 'rollback_export_not_exact' });

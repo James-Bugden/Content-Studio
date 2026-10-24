@@ -49,7 +49,15 @@ describe('PostEditor save notification (CS-050)', () => {
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Database synthetic copy' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await complete(success);
-    expect(screen.getByText('Saved to the master Markdown and mirrored to the database.')).toBeTruthy();
+    expect(screen.getByText('Saved in the database. Drive export is queued.')).toBeTruthy();
+  });
+  it('does not claim an export was queued for an unchanged database body', async () => {
+    const complete = pendingSave();
+    render(<PostEditor model={{ ...model, contentProvider: 'db' }} canEdit ns="synthetic" />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Synthetic copy already present' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await complete({ ...success, steps: [{ provider: 'db', step: 'update Library', status: 'skipped_already_applied' }] });
+    expect(screen.getByText('Already saved in the database.')).toBeTruthy();
   });
   it('confirms a Sheet save with a pending derived copy without leaving the draft dirty', async () => {
     const complete = pendingSave();

@@ -288,8 +288,8 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
             <dd className="font-mono">{summary.scheduledAs.join(', ') || 'Not yet'}</dd>
             <dt className="text-ink-soft">Content revision</dt>
             <dd className="font-mono text-xs">{model.sheet.revision}</dd>
-            <dt className="text-ink-soft">Markdown</dt>
-            <dd className="text-xs">{model.markdown.state === 'ok' ? `rev ${model.markdown.fileRevision}` : `Unavailable (${model.markdown.reason.replace(/_/g, ' ')})`}</dd>
+            <dt className="text-ink-soft">{model.contentProvider === 'db' ? 'Draft source' : 'Markdown'}</dt>
+            <dd className="text-xs">{model.contentProvider === 'db' ? 'Database; Drive is an export' : model.markdown.state === 'ok' ? `rev ${model.markdown.fileRevision}` : `Unavailable (${model.markdown.reason.replace(/_/g, ' ')})`}</dd>
           </dl>
           <GuardedLink href={`/review/${encodeURIComponent(libraryId)}`} className="underline">
             Open the full editor page
