@@ -89,16 +89,16 @@ export function observe(page: Page) {
     expectResponse(path: string, status: number) { intended.push({ path, status }); },
     async assertClean() {
       try {
-      // Drain browser events before evaluating the accumulated diagnostics.
-      await page.evaluate(() => undefined);
-      const remaining = [...observedFaults];
-      for (const diagnostic of httpDiagnostics) {
-        const index = remaining.findIndex((fault) => fault.path === diagnostic.path && fault.status === diagnostic.status);
-        expect(index, `unexpected browser HTTP diagnostic: ${JSON.stringify(diagnostic)}`).toBeGreaterThanOrEqual(0);
-        remaining.splice(index, 1);
-      }
-      expect(intended, 'expected fault responses were never observed').toEqual([]);
-      expect(errors).toEqual([]);
+        // Drain browser events before evaluating the accumulated diagnostics.
+        await page.evaluate(() => undefined);
+        const remaining = [...observedFaults];
+        for (const diagnostic of httpDiagnostics) {
+          const index = remaining.findIndex((fault) => fault.path === diagnostic.path && fault.status === diagnostic.status);
+          expect(index, `unexpected browser HTTP diagnostic: ${JSON.stringify(diagnostic)}`).toBeGreaterThanOrEqual(0);
+          remaining.splice(index, 1);
+        }
+        expect(intended, 'expected fault responses were never observed').toEqual([]);
+        expect(errors).toEqual([]);
       } finally {
         // Attribute a diagnostic once, to its own route/scenario.
         errors.length = httpDiagnostics.length = observedFaults.length = intended.length = 0;
@@ -334,4 +334,3 @@ export const SHEET_READERS = [
   ['/schedule/2026-10-03-MAIN-X/adapt', 'Content Schedule'],
   ['/ready/SYN-L005/promote?slot=2026-10-01-MAIN-LI', 'Content Library'],
 ] as const;
-

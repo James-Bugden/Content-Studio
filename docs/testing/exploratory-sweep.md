@@ -106,6 +106,29 @@ identical runs. CI runtime and main-branch green status likewise require actual
 CI evidence. Any real app defects found by the strict checks must have separate
 issues; do not suppress their assertions to obtain a green sweep.
 
+## Build-round evidence
+
+At `70a702657b0efaafe5d8a770dbb53b86f451ec5f`, three consecutive local full runs
+passed: 74 tests and 2,296 check rows each, in 266,979 / 271,299 / 263,808 ms
+with two workers. Their canonical coverage/action SHA-256 was identical:
+`76ef823870d44992eb532e94a81545f394bd04344673e82e8cfea586e1be9c7a`.
+All 18 separate mutation executions returned exit 1 with their intended failed
+check; `scripts/verify-sweep.mjs` recorded overall status `passed`.
+
+[CI run 40113890423](https://github.com/James-Bugden/Content-Studio/actions/runs/40113890423)
+passed all 74 sweep tests on one `ubuntu-latest` runner. The test command ran
+from 16:59:19 to 17:03:11 UTC on 2026-10-24 (232 seconds); the whole job,
+including installation and artifact upload, took 279 seconds. The four-minute
+budget applies to sweep execution, enforced by Playwright's global timeout.
+Main-branch acceptance remains pending merge and post-merge verification.
+
+Targeted board/reporter regressions passed (14 tests), as did the production
+build, typecheck, targeted lint and workflow lint. Synthetic screenshot journeys
+passed at both widths (32 images); rendered Replies, Published and Review were
+inspected for layout and readable headings. This is Chromium emulation evidence,
+with no physical-device or live-provider claim. Subsequent integration changes
+must be reverified rather than inheriting these results.
+
 ## Findings included under the trivial-fix exception
 
 - [#167](https://github.com/James-Bugden/Content-Studio/issues/167): repair heading

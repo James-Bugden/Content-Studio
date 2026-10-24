@@ -195,7 +195,7 @@ jobs:
 
   dependency-review:
     name: dependency review
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

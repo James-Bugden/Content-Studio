@@ -3,30 +3,30 @@ import { ERROR_CATALOGUE } from '../../src/domain/errors';
 import { control, signIn, observe, report, settled, designatedState, noWrites, overflow, navigate, FAULTS, SHEET_READERS } from './sweep-checks';
 
 for (const [code, kind] of FAULTS) {
-test(`fault sweep: ${code}`, async ({ page }, info) => {
-  test.setTimeout(150_000);
-  await signIn(page, 'owner');
-  const monitor = observe(page);
-  const coverage = report(page, info, 'owner');
-  try {
-    for (const role of ['owner', 'viewer'] as const) {
-      await signIn(page, role);
-      for (const [route, tab] of SHEET_READERS) {
-        // Promotion is owner-only and refuses the viewer before any provider
-        // read; its forbidden state is covered by the normal route sweep.
-        if (role === 'viewer' && route.startsWith('/ready/')) continue;
-        await coverage.check(route, `sheet/read/${code}`, async () => {
-          await control(page, { kind: 'reset' });
-          await control(page, { kind: 'fail', provider: 'sheet', op: 'read', tab, code, times: 10 });
-          await navigate(page, route);
-          await settled(page);
-          await designatedState(page, kind);
-          await noWrites(page);
-          await overflow(page);
-          await monitor.assertClean();
-        }, role);
+  test(`fault sweep: ${code}`, async ({ page }, info) => {
+    test.setTimeout(150_000);
+    await signIn(page, 'owner');
+    const monitor = observe(page);
+    const coverage = report(page, info, 'owner');
+    try {
+      for (const role of ['owner', 'viewer'] as const) {
+        await signIn(page, role);
+        for (const [route, tab] of SHEET_READERS) {
+          // Promotion is owner-only and refuses the viewer before any provider
+          // read; its forbidden state is covered by the normal route sweep.
+          if (role === 'viewer' && route.startsWith('/ready/')) continue;
+          await coverage.check(route, `sheet/read/${code}`, async () => {
+            await control(page, { kind: 'reset' });
+            await control(page, { kind: 'fail', provider: 'sheet', op: 'read', tab, code, times: 10 });
+            await navigate(page, route);
+            await settled(page);
+            await designatedState(page, kind);
+            await noWrites(page);
+            await overflow(page);
+            await monitor.assertClean();
+          }, role);
+        }
       }
-    }
       await signIn(page, 'owner');
       for (const provider of ['sheet', 'drive', 'typefully'] as const) {
         await coverage.check('/reconcile', `${provider}/read/${code}`, async () => {
@@ -81,7 +81,6 @@ test(`fault sweep: ${code}`, async ({ page }, info) => {
           await monitor.assertClean();
         });
       }
-  } finally { await coverage.finish(); }
-});
+    } finally { await coverage.finish(); }
+  });
 }
-
