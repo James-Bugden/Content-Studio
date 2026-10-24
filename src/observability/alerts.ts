@@ -60,7 +60,10 @@ export function summariseEvents(events: readonly Ev[]): EventSummary[] {
       const q = (p: number) => (lat.length ? lat[Math.min(lat.length - 1, Math.floor(p * lat.length))]! : null);
       return {
         adapter,
-        total: list.length,
+        // Sheet mutation result events accompany timed transport events; they
+        // are outcomes, not additional provider calls. Header checks are timed
+        // too, so this count matches SheetTransport reads/writes (not retries).
+        total: adapter === 'sheet' ? list.filter((e) => typeof e.latencyMs === 'number').length : list.length,
         errors: list.filter((e) => e.outcome === 'error').length,
         conflicts: list.filter((e) => e.outcome === 'conflict').length,
         p50: q(0.5),
