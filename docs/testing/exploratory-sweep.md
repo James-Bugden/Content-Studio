@@ -47,6 +47,8 @@ aggregation, linked/unlinked Typefully reads and all three AI entry points have
 explicit state expectations. An unavailable primary dataset cannot pass as
 `empty`/`no_match`. Unsafe writes must be absent or disabled; AI failures must
 leave manual editing available and must not manufacture translation proposals.
+An unrelated secondary section (such as absent hook alternatives) may still use
+its designated empty state while the AI operation displays its typed error.
 Owner-only promotion refuses viewers before reading a provider. Drive failures use the editor's designated inline warning and disabled Save,
 while Typefully uses its own provider-error panel. Reply-store faults are covered
 by the separate Replies contracts; test-control cannot inject them. Sheet `meta`
@@ -137,9 +139,11 @@ must be reverified rather than inheriting these results.
   copy regions unique labels and remove the redundant Typefully wrapper landmark.
 - [#169](https://github.com/James-Bugden/Content-Studio/issues/169): catch the Ideas
   tab read error using the existing typed ErrorState and retry link.
-- [#172](https://github.com/James-Bugden/Content-Studio/issues/172): stop swallowing
-  the Schedule failure in the shared board; the existing page handlers show the
-  typed recovery state. A targeted board regression proves the former false empty.
+- [#172](https://github.com/James-Bugden/Content-Studio/issues/172): Next up requires
+  Schedule data through the shared board's `requireSchedule` option, as Calendar
+  already does on current main. Their existing handlers show the typed recovery
+  state; Library-only consumers retain their fallback. A targeted board regression
+  proves the former false empty.
 
 The shared error-identity correction is a separate change,
 [PR #171](https://github.com/James-Bugden/Content-Studio/pull/171) for

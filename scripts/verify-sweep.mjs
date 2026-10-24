@@ -14,6 +14,8 @@ const env = { ...process.env, CS_E2E_PREBUILT: '1', CS_SWEEP_ISOLATED: '1', CS_E
 delete env.CS_SWEEP_MUTATION;
 const evidence = { runs: [], mutations: [], status: 'running' };
 const save = () => writeFile(path.join(dir, 'validation.json'), JSON.stringify(evidence, null, 2));
+// A crash during the first run must not leave a previous validation marked green.
+await save();
 
 async function run(name, args, overrides = {}) {
   await rm('sweep-report/coverage.json', { force: true });
