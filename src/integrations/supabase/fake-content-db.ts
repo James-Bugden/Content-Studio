@@ -31,7 +31,7 @@ export function syntheticContentDbSeed(): ContentDbSeed {
   const found = discoverHeaders(SCHEDULE_HEADERS, rows[1]!.values);
   if (!found.ok) throw new Error('Invalid synthetic schedule headers');
   const schedule = rows.slice(2).map((raw, i) => {
-    const record = toScheduleRecord(found.index, raw, i + 3);
+    const record = toScheduleRecord(found.index, { ...raw, formulas: raw.formulas ?? raw.values }, i + 3);
     const [stamp, hash = ''] = record.cells.finalSyncedAt.split(' #');
     return { ...typedCells(record.cells), final_synced_at: stamp || null, final_synced_hash: hash,
       published_at: record.cells.publishedAt || null, analytics_synced_at: record.cells.analyticsSyncedAt || null,
@@ -77,9 +77,12 @@ export class FakeContentDb implements ContentDb {
     if (!row) throw new AppError('PROVIDER_UNAVAILABLE', { reason: 'revision_unavailable' });
     return structuredClone(row);
   }
+  snapshot(): ContentDbSeed { return structuredClone(this.seed); }
+  replaceSnapshot(seed: ContentDbSeed) { Object.assign(this.seed, structuredClone(seed)); }
+  async writeThrough(write: ContentWrite) { return this.mutate('copy', write); }
   async applyPatch(write: ContentWrite) { return this.mutate('patch', write); }
   async insertQueueIdea(write: ContentWrite) { return this.mutate('queue', write); }
-  private mutate(mode: 'patch' | 'queue', write: ContentWrite): ContentWriteResult {
+  private mutate(mode: 'patch' | 'queue' | 'copy', write: ContentWrite): ContentWriteResult {
     this.check('write');
     const { operationId, kind, id, data } = write;
     const prior = this.operations.get(operationId);
@@ -99,11 +102,15 @@ export class FakeContentDb implements ContentDb {
     else if (row && String(row.row_version) !== write.expectedVersion) { state = 'stale'; code = 'STALE_READ'; }
     else {
       if (!row) {
-        const defaults = Object.fromEntries(Object.keys(LIBRARY_HEADERS).map(f => [contentColumn(f), f === 'queueForSchedule' ? false : numeric.has(f) ? null : '']));
-        row = { ...defaults, ...structuredClone(data), library_id: id, collection: 'queue', row_version: 1, source_sheet_row: null,
-          sheet_revision: null, passthrough: {}, source_markdown_url: '', source_master_file_url: '', image_file_url: '' } as ContentPostRow;
-        this.seed.posts.push(row);
-      } else Object.assign(row, structuredClone(data), { row_version: String(BigInt(row.row_version) + 1n) });
+        const headers = kind === 'schedule' ? SCHEDULE_HEADERS : LIBRARY_HEADERS;
+        const defaults = Object.fromEntries(Object.keys(headers).map(f => [contentColumn(f), ['queueForSchedule', 'posted'].includes(f) ? false : numeric.has(f) ? null : '']));
+        row = { ...defaults, library_id: id, collection: 'queue', row_version: 1, source_sheet_row: null,
+          sheet_revision: null, passthrough: {}, source_markdown_url: '', source_master_file_url: '', image_file_url: '', ...structuredClone(data) } as ContentPostRow;
+        if (kind === 'schedule') {
+          row = { ...row, content_id: id, parent_content_id: null, final_synced_at: null, published_at: null, analytics_synced_at: null, final_synced_hash: '', source_link_url: '', ...structuredClone(data) } as unknown as ContentScheduleRow;
+          this.seed.schedule.push(row);
+        } else { row.collection = kind; this.seed.posts.push(row); }
+      } else Object.assign(row, structuredClone(data), { row_version: String(BigInt(row.row_version) + BigInt(mode !== 'copy' || fields.some(f => !['source_sheet_row', 'sheet_revision'].includes(f)))) });
       state = 'applied';
       this.history.push({ operation_id: operationId, target_kind: kind, target_id: id, before_image: before, row_version_before: before ? String(before.row_version) : null, changed_fields: fields });
     }

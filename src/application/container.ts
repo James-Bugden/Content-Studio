@@ -1,4 +1,5 @@
 import 'server-only';
+import { ContentReadCutoverRepository } from './content-read-cutover';
 import { AppError } from '@/domain/errors';
 import { serverEnv } from '@/lib/env';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
@@ -32,6 +33,7 @@ export type Services = {
   /** Optional: when Typefully is down or unconfigured, manual scheduling keeps working. */
   typefully: TypefullyGateway;
   contentImport?: ContentImportStore;
+  importRepo?: ContentRepository;
   contentParity?: ContentParityJournal;
   reconcileRepo?: ContentRepository;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
@@ -91,11 +93,13 @@ function build(): Services {
     const ai = createAiGateway(env);
     const typefully = createTypefullyGateway(env);
     const db = new FakeContentDb();
+    const sheetRepo = env.CS_CONTENT_STORE === 'db-read'
+      ? new SheetsContentRepository(sheet, { writable: true, readCacheMs: 3000, libraryReadCacheMs: 3000, readinessReadCacheMs: 3000 })
+      : new SheetsContentRepository(sheet);
     services = {
       mode: 'fake',
-      repo: env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read'
-        ? new SupabaseContentRepository(db, env.CS_CONTENT_STORE)
-        : new SheetsContentRepository(sheet),
+      repo: env.CS_CONTENT_STORE === 'db-read' ? new ContentReadCutoverRepository(sheetRepo, db)
+        : env.CS_CONTENT_STORE === 'db' ? new SupabaseContentRepository(db) : sheetRepo,
       drive,
       ai,
       typefully,
@@ -107,6 +111,11 @@ function build(): Services {
         ...(typefully instanceof FakeTypefullyGateway ? { typefully } : {}),
       },
     };
+    if (env.CS_CONTENT_STORE === 'db-read') {
+      services.contentImport = new FakeContentImportStore(undefined, db);
+      services.importRepo = new SheetsContentRepository(sheet);
+      services.contentParity = new ContentParityJournal();
+    }
     if (env.CS_CONTENT_STORE === 'db-shadow') {
       const contentImport = new FakeContentImportStore();
       const contentParity = new ContentParityJournal();

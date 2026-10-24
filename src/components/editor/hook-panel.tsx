@@ -46,6 +46,7 @@ type Sel =
   | { kind: 'error'; message: string };
 
 export type HookPanelProps = {
+  contentStore?: 'Sheet' | 'database';
   libraryId: string;
   platform: string;
   currentHook: string;
@@ -60,7 +61,7 @@ export type HookPanelProps = {
 };
 
 export function HookPanel(props: HookPanelProps) {
-  const { libraryId, platform, currentHook, text, dirty, markdownOk, sheetRevision, sectionHash, canEdit, onChanged } = props;
+  const { libraryId, platform, currentHook, text, dirty, markdownOk, sheetRevision, sectionHash, canEdit, onChanged, contentStore = 'Sheet' } = props;
   const headingId = useId();
   const groupName = useId();
   const [gen, setGen] = useState<Gen>({ kind: 'idle' });
@@ -146,7 +147,7 @@ export function HookPanel(props: HookPanelProps) {
         message:
           body.details?.reason === 'opening_mismatch'
             ? 'The draft no longer opens with the current hook, so the opening cannot be swapped safely. Edit the opening by hand, save, then generate again.'
-            : 'The Sheet and the Markdown disagree, so nothing was written. Reconcile the draft first, then generate again.',
+            : `The ${contentStore} and the Markdown disagree, so nothing was written. Reconcile the draft first, then generate again.`,
       });
       return;
     }
@@ -191,8 +192,8 @@ export function HookPanel(props: HookPanelProps) {
       {sel.kind === 'done' ? (
         <InlineResult tone="success">
           {sel.choice === 'alternative'
-            ? 'Hook updated: the Sheet hook fields and the opening of the draft were saved together.'
-            : 'Kept the current hook. The three suggestions were recorded as alternatives in the Sheet.'}
+            ? `Hook updated: the ${contentStore} hook fields and the opening of the draft were saved together.`
+            : `Kept the current hook. The three suggestions were recorded as alternatives in the ${contentStore}.`}
         </InlineResult>
       ) : null}
       {sel.kind === 'stale' || (proposal && stale) ? (

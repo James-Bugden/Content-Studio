@@ -294,13 +294,14 @@ async function writeRow<T>(
 ): Promise<{ ok: true; record: ScheduleRecord; replayed: boolean } | { ok: false; code: ErrorCode; details?: Record<string, unknown> }> {
   assertSyncFields(patch);
   const res = await repo.updateSchedule({ operationId: input.operationId, actor, target: { contentId: input.contentId }, expectedRevision: input.expectedRevision, patch });
-  const provider = contentProvider(repo);
+  const provider = repo.mutationProvider?.() ?? contentProvider(repo);
   const sheetStep = res.steps.find((s) => s.provider === provider);
   if (!res.ok) {
     run.step(stepName, provider, 'failed', { errorCode: res.code });
     return { ok: false, code: res.code, ...(res.details ? { details: res.details } : {}) };
   }
   run.step(stepName, provider, sheetStep?.status ?? 'done', { revision: res.value.revision });
+  for (const step of res.steps.filter(s => s.step === 'refresh_pending' || s.step === 'write_through')) run.step(step.step, step.provider, step.status, step);
   return { ok: true, record: res.value, replayed: res.replayed };
 }
 
@@ -434,7 +435,7 @@ async function createDraftOnce(
   if (row.typefullyDraftId) {
     if (mine && mine.id === row.typefullyDraftId) {
       run.step('create Typefully draft', 'typefully', 'skipped_already_applied');
-      run.step('link Schedule row', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
+      run.step('link Schedule row', repo.mutationProvider?.() ?? contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
       return run.ok({ record: loaded.record, draft: mine }, true, { path: 'already_linked' });
     }
     return run.fail('CONFLICT', { reason: 'already_linked' });
@@ -565,7 +566,7 @@ export async function syncFromTypefully(
     patch.finalSyncedAt = formatSyncStamp(now(), text);
   }
   if (Object.keys(patch).length === 0) {
-    run.step('write Schedule row', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
+    run.step('write Schedule row', repo.mutationProvider?.() ?? contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
     return run.ok({ record: loaded.record, comparison }, true, { path: 'in_sync' });
   }
   const w = await writeRow(run, repo, actor, input, patch, 'write Schedule row');
@@ -619,7 +620,7 @@ export async function pushToTypefully(
   if (stamp?.textHash !== finalTextHash(text)) patch.finalSyncedAt = formatSyncStamp(now(), text);
   if (loaded.record.cells.typefullyStatus !== current.status) patch.typefullyStatus = current.status;
   if (Object.keys(patch).length === 0) {
-    run.step('write Schedule row', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
+    run.step('write Schedule row', repo.mutationProvider?.() ?? contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
     return run.ok({ record: loaded.record, comparison: compareCopy(row, current) }, true, { path: 'in_sync' });
   }
   const w = await writeRow(run, repo, actor, input, patch, 'write Schedule row');
@@ -685,7 +686,7 @@ export async function syncAnalytics(
   }
   // Unavailable metrics are not in the patch: blank stays blank, a recorded value is never erased.
   if (Object.keys(patch).length === 0) {
-    run.step('write analytics', contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
+    run.step('write analytics', repo.mutationProvider?.() ?? contentProvider(repo), 'skipped_already_applied', { revision: loaded.record.revision });
     return run.ok({ record: loaded.record, supplied, unavailable }, true, { path: 'unchanged', supplied: supplied.length });
   }
   patch.analyticsSyncedAt = toTaipeiIso(now());

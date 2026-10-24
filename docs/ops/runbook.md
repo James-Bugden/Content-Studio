@@ -131,3 +131,149 @@ the Sheet remains authoritative throughout this work.
 ## Rollback (CS-019)
 
 Rollback restores the previous verified **app deployment and configuration** only. It never deletes, restores or rewrites Sheet, Drive or Typefully content. Follow the rollback steps in [the deployment guide](deploy.md#rollback-dep-07).
+## Phase C Content read cutover (DB-5 / MIG-11)
+
+This build defaults to `CS_CONTENT_STORE=sheet`. All live database modes are
+refused by `serverEnv`; the production composition has no live typed client.
+The following is the exact owner/live rehearsal and rollout checklist, **not
+evidence that a cutover or any measurement has passed**. DB-1 through DB-5
+migrations must not be applied to production as part of local verification.
+
+## Authority and local recovery
+
+In `db-read`, Content reads use the imported `sheet_revision`, never a DB
+version token. Library, Queue, Schedule and new Queue ideas write to the Sheet
+first with its existing authentication, allowlists, operation replay, fresh
+revision comparison and read-back. Only that read-back is converted and sent
+to `content_studio_write_through`; its separate deterministic operation ID is
+derived from the Sheet operation ID. The version observed before the Sheet
+mutation protects the derived copy against an overlapping import/copy. The DB
+is never a precondition for accepting a Sheet mutation.
+
+Copy failures, including conversion failures for nonrepresentable Sheet cells,
+return success plus a `refresh_pending` step. The editor keeps the saved text
+and revision. An instance-local overlay supplies that record on subsequent
+reads until the DB has the same Sheet fingerprint. A successful later copy or
+typed import repairs it. `/reconcile` reconstructs pending items by comparing
+the three authoritative Sheet collections with the DB, including after an
+instance restart. A failed scan is labelled unknown, not clear. Normal page
+reads do not perform this Sheet scan. The Sheet cache in the Phase C composition
+is three seconds; the DB reader has no retained read cache.
+
+The overlay is disposable and is not a durable authority or cross-instance
+cache. After a restart, or on a different instance, a failed copy can be served
+stale until import/reconciliation. Its Sheet token still causes `STALE_READ`
+instead of lost data. The editor save saga checks the fresh Sheet before Drive
+and propagates pending-copy steps. Drive remains canonical; no export, DB write
+authority, or Drive-authority change is included here. Typed conversion uses
+DB-4's exception rules; a Sheet value the integer/timestamp/size constraints
+cannot represent remains saved in Sheet and needs explicit repair, never
+silent coercion. Replaying an older successful Sheet operation never copies
+its historical result over a newer Sheet/DB row.
+
+## Immediate Phase C rollback
+
+1. Record the deployed SHA, environment, current store mode, last completed
+   import, pending items and failure times in private operations evidence.
+2. Through the repository-supported deployment/configuration process set
+   **only `CS_CONTENT_STORE=sheet`**, then redeploy/restart that runtime so all
+   service instances pick up the flag. Do not change data mode, credentials,
+   workbook target, or write permissions. Stop the typed import scheduler for
+   that environment; an in-flight copy/import can affect only derived DB data.
+3. Check authenticated health and `/reconcile` on the exact deployed SHA:
+   mode is `sheet`, Sheet capability is ready (or deliberately read-only),
+   typed import is inactive. DB network access may be denied to prove it is
+   ignored. No DB read, comparison, ledger, export or final copy is required.
+4. Read every synthetic row saved during the rehearsal, including the save
+   whose DB copy failed, and compare exact copy, hyperlinks, unknown columns
+   and Sheet revision with the private pre-rollback inventory. Save one new
+   synthetic edit and confirm the Sheet read-back and Markdown saga.
+5. Run the unchanged browser journeys at 375 and 1280 pixels against the
+   rolled-back build. Check Backlog totals/filters, schedule, Typefully scan,
+   read-your-writes and conflict recovery. Record commands, environment and SHA.
+   Only after positive results can MIG-11's live rollback part be called passed.
+
+Rollback never exports or copies DB values to Sheet, never truncates a table,
+and never discards an authoritative mutation. Re-enable read cutover only
+after repair, exact parity and all entry gates have been evidenced again.
+
+## T3 copied-workbook / Supabase branch rehearsal — OWNER/LIVE GATED
+
+Use a private synthetic copied workbook and a disposable Supabase branch, never
+production data. A later explicitly reviewed owner-gate change must first wire
+the live client; this build deliberately cannot start that mode.
+
+1. Pin code SHA, migration list/schema version, deployment ID and environment;
+   keep branch/workbook identifiers and credentials in private evidence only.
+   Confirm preview contains no production service key, owner auth denies other
+   identities and `anon`/`authenticated` cannot access any Content object/RPC.
+2. Apply reviewed migrations only to the disposable branch with explicit owner
+   authority. Import the synthetic workbook three times. Record stable-ID sets,
+   counts, hashes, exception classes, unchanged-row versions, audit/history and
+   durable replay. Include child-before-parent Schedule lineage, blank booleans,
+   hyperlinks, formula displays, passthrough, numeric and timestamp formatting.
+3. With `db-shadow`, meet and privately record Phase B's 7 days **and** 200
+   compared requests, exact ID sets, >=99.9% fields per collection, no
+   unclassified differences, import lag p95 <=15 minutes and no failure older
+   than one hour. A short synthetic rehearsal cannot satisfy the time gate.
+4. With owner approval and the gated runtime, select `db-read`; prove health
+   mode and DB reads. Save synthetic Library, Queue, Schedule and Queue idea
+   records from DB-served tokens. Check Sheet first, exact Sheet read-back in DB,
+   operation replay/different-patch conflict, content-identical version guard,
+   history/audit, and immediate read-your-writes. Run editor, hook, review,
+   Backlog filters/counts, calendar and `/reconcile` Typefully scan journeys.
+5. Edit the copied Sheet after import while an editor is open. Assert
+   `STALE_READ`, unchanged external Sheet value and unchanged Drive preflight.
+   Exercise a concurrent copy/import and require derived CAS refusal, never a
+   veto or overwrite of the authoritative Sheet save. Use independent database
+   backends to exercise overlapping requests/retries; PGlite cannot prove this.
+6. Deny the DB copy request after a successful Sheet write. Require successful
+   mutation, returned saved record, visible pending state and reconcile item.
+   Restart one server and use a second instance: pending lag must remain
+   discoverable. Run the next scheduled import from **Sheet**, verify exact
+   fingerprint parity and disappearance of the item. Repeat with a malformed
+   numeric/timestamp cell and demonstrate explicit repair without coercion.
+7. Execute all immediate rollback steps above with the DB unreachable. Run
+   every unchanged journey in Sheet mode; compare the complete synthetic
+   authority inventory before/after, including failed-copy saves and Queue
+   appends. Record MIG-11 separately from MIG-12/13 (DB-6 export/restore work).
+
+## T4 exact deployed commit smoke — OWNER/LIVE GATED
+
+On the exact SHA produced by the gated deployment, sign in as owner in a real
+browser. Record health build/mode and capability, open a synthetic record,
+perform one mutation, inspect its private Sheet result and DB copy/history/audit,
+verify the returned record in the UI, inspect Backlog/calendar/reconcile and
+exercise the Sheet rollback once on preview. Repeat required phone/browser
+checks. Synthetic browser emulation and screenshots are T1/T2, not T3/T4.
+
+## Phase C exit measurement ledger — NOT MEASURED IN THIS LOCAL BUILD
+
+For each observation retain exact SHA, deployment/environment, store mode,
+window start/end, counts, sampling definitions and private raw evidence. Collect
+across **all** runtime instances, not only the disposable process event buffer.
+
+| Acceptance measurement | Required exit | Current local status |
+| --- | --- | --- |
+| Observation duration | 7 consecutive days in `db-read` | Not measured; owner/live gated |
+| Sheet read `RATE_LIMITED` events | 0 across all Content read flows, including reconciliation/import | Not measured; owner/live gated |
+| Lag-caused `STALE_READ` | 0 refusals with served `sheet_revision` older than last completed import at request time | Not measured; owner/live gated |
+| Backlog warm p95 server time | <1000 ms | Not measured; owner/live gated |
+| Backlog cold p95 server time | <2500 ms | Not measured; owner/live gated |
+| Failed-copy reconciliation | Successful Sheet save; next completed import clears pending | Local fake/PGlite evidence in CODEX_REPORT.md; live rehearsal gated |
+
+Measure warm requests after priming the exact build; cold requests from fresh
+instances with cleared disposable caches. Capture the server's `backlog.load`
+durations separately and calculate nearest-rank p95 over each recorded sample
+set. Count read-rate-limit events by provider and read operation; do not mix
+write failures into that metric. For each stale refusal, privately correlate
+target, served Sheet token, request timestamp, latest completed import at that
+timestamp and that import's token for the same target. Attribute a refusal to
+lag only when the served token predates that imported target; separately count
+genuine edits after import and unresolved/unknown attribution. Unknown cases
+block the zero-lag claim. Export only synthetic or aggregate evidence publicly.
+The in-process parity/timing display alone cannot satisfy a seven-day gate.
+
+No live exit number is inferred from unit or browser test counts. Missing,
+skipped or failed observations are not passes; Phase C and production MIG-11
+remain incomplete until the above private owner/live evidence exists.

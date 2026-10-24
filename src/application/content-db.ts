@@ -53,6 +53,7 @@ export interface ContentDb {
   getSchedule(id: string): Promise<ContentScheduleRow | null>;
   queueSummary(): Promise<ContentSummaryRow[]>;
   workflowSettings(): Promise<ContentSettingRow[]>;
+  writeThrough(write: ContentWrite): Promise<ContentWriteResult>;
   applyPatch(write: ContentWrite): Promise<ContentWriteResult>;
   insertQueueIdea(write: ContentWrite): Promise<ContentWriteResult>;
   /** Exact successful revision, recovered from before-images on durable replay. */

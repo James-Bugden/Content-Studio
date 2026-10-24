@@ -43,9 +43,9 @@ export function classifyDifference(expected: unknown, actual: unknown, field = '
   return null;
 }
 
-/** Importing after read/write authority changes would overwrite the new authority. */
+/** Imports repair derived copies only while the Sheet retains authority. */
 export function assertImportMode(): void {
-  if (process.env.CS_CONTENT_STORE !== 'db-shadow') throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
+  if (!['db-shadow', 'db-read'].includes(process.env.CS_CONTENT_STORE ?? '')) throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
 }
 
 /** Capture versions BEFORE the Sheet read, including absence. SQL CAS fails closed. */
@@ -87,50 +87,9 @@ export function buildTypedImport(snapshot: SheetMirrorSnapshot, versions: Map<st
       continue;
     }
     if (!['library', 'queue', 'schedule'].includes(source.collection)) continue;
-    const collection = source.collection as ImportCollection;
+    const collection = source.collection as Exclude<ImportCollection, 'workflow_settings'>;
     const record = source.payload as LibraryRecord | ScheduleRecord;
-    const row: Record<string, unknown> = { source_sheet_row: record.row, sheet_revision: record.revision, passthrough: record.passthrough ?? {} };
-    for (const [field, text] of Object.entries(record.cells)) {
-      if ((field === 'contentId' || field === 'libraryId') && text !== source.stableId) throw blocked();
-      const column = importColumn(field);
-      if (field === 'contentId' || field === 'libraryId') continue;
-      let value: unknown = text;
-      let rendered = text;
-      if (numeric.has(field)) {
-        if (text.trim() === '') value = null;
-        else {
-          if (!/^-?(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text.trim())) throw blocked();
-          value = Number(text.trim().replace(/,/g, ''));
-          if (!Number.isSafeInteger(value) || Number(value) < -2147483648 || Number(value) > 2147483647) throw blocked();
-        }
-        rendered = value === null ? '' : String(value);
-      } else if (field === 'posted' || field === 'queueForSchedule') {
-        value = parseBoolean(text);
-        if (value === null) throw blocked();
-        rendered = value ? 'TRUE' : 'FALSE';
-      } else if (stamps.has(field)) {
-        const parts = field === 'finalSyncedAt' ? text.split(' #') : [text];
-        if (parts.length > 2 || (parts.length === 2 && (!parts[0] || !parts[1]))) throw blocked();
-        const [stamp, hash = ''] = parts;
-        if (stamp && (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d\d:\d\d)$/.test(stamp) || !Number.isFinite(Date.parse(stamp)))) throw blocked();
-        value = stamp || null;
-        rendered = stamp ? new Date(Date.parse(stamp) + 8 * 3600_000).toISOString().replace(/\.000Z$/, '+08:00').replace(/Z$/, '+08:00') : '';
-        if (field === 'finalSyncedAt' && hash) rendered += ` #${hash}`;
-        if (field === 'finalSyncedAt') row.final_synced_hash = hash;
-      } else if (field === 'parentContentId') value = text || null;
-      if (rendered !== text) {
-        const kind = classifyDifference(text, rendered, field);
-        if (!kind) throw blocked();
-        exception(collection, column, source.stableId, kind, text);
-      }
-      row[column] = value;
-      if (record.formulaFields.includes(field as never)) exception(collection, column, source.stableId, 'formula_display', text);
-    }
-    for (const [field, column] of Object.entries(collection === 'schedule'
-      ? { sourceLink: 'source_link_url', imageFile: 'image_file_url' }
-      : { sourceMarkdown: 'source_markdown_url', sourceMasterFile: 'source_master_file_url', imageFile: 'image_file_url' })) {
-      row[column] = (record.links as Record<string, string>)[field] ?? '';
-    }
+    const row = typedContentRow(collection, source.stableId, record, exception);
     rows.push({ target_kind: collection, target_id: source.stableId, expected_version: versions.get(`${collection}\0${source.stableId}`) ?? null, row });
   }
   rows.sort((a, b) => `${a.target_kind}\0${a.target_id}` < `${b.target_kind}\0${b.target_id}` ? -1 : 1);
@@ -148,4 +107,52 @@ export async function runTypedImport(repo: ContentRepository, store: ContentImpo
   const envelope = buildTypedImport(snapshot, versions, actorHash);
   await store.applyImport(envelope);
   return { counts: envelope.counts, hashes: envelope.hashes, exceptions: envelope.exceptions, snapshotHash: envelope.snapshotHash };
+}
+
+/** Shared import/write-through conversion: never coerce unclassified Sheet content. */
+export function typedContentRow(collection: Exclude<ImportCollection, 'workflow_settings'>, stableId: string, record: LibraryRecord | ScheduleRecord,
+  exception: (collection: ImportCollection, field: string, id: string, kind: ExceptionClass, value: unknown) => void = () => {}): Record<string, unknown> {
+  const row: Record<string, unknown> = { source_sheet_row: record.row, sheet_revision: record.revision, passthrough: record.passthrough ?? {} };
+  for (const [field, text] of Object.entries(record.cells)) {
+    if ((field === 'contentId' || field === 'libraryId') && text !== stableId) throw blocked();
+    const column = importColumn(field);
+    if (field === 'contentId' || field === 'libraryId') continue;
+    let value: unknown = text;
+    let rendered = text;
+    if (numeric.has(field)) {
+      if (text.trim() === '') value = null;
+      else {
+        if (!/^-?(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text.trim())) throw blocked();
+        value = Number(text.trim().replace(/,/g, ''));
+        if (!Number.isSafeInteger(value) || Number(value) < -2147483648 || Number(value) > 2147483647) throw blocked();
+      }
+      rendered = value === null ? '' : String(value);
+    } else if (field === 'posted' || field === 'queueForSchedule') {
+      value = parseBoolean(text);
+      if (value === null) throw blocked();
+      rendered = value ? 'TRUE' : 'FALSE';
+    } else if (stamps.has(field)) {
+      const parts = field === 'finalSyncedAt' ? text.split(' #') : [text];
+      if (parts.length > 2 || (parts.length === 2 && (!parts[0] || !parts[1]))) throw blocked();
+      const [stamp, hash = ''] = parts;
+      if (stamp && (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d\d:\d\d)$/.test(stamp) || !Number.isFinite(Date.parse(stamp)))) throw blocked();
+      value = stamp || null;
+      rendered = stamp ? new Date(Date.parse(stamp) + 8 * 3600_000).toISOString().replace(/\.000Z$/, '+08:00').replace(/Z$/, '+08:00') : '';
+      if (field === 'finalSyncedAt' && hash) rendered += ` #${hash}`;
+      if (field === 'finalSyncedAt') row.final_synced_hash = hash;
+    } else if (field === 'parentContentId') value = text || null;
+    if (rendered !== text) {
+      const kind = classifyDifference(text, rendered, field);
+      if (!kind) throw blocked();
+      exception(collection, column, stableId, kind, text);
+    }
+    row[column] = value;
+    if (record.formulaFields.includes(field as never)) exception(collection, column, stableId, 'formula_display', text);
+  }
+  for (const [field, column] of Object.entries(collection === 'schedule'
+    ? { sourceLink: 'source_link_url', imageFile: 'image_file_url' }
+    : { sourceMarkdown: 'source_markdown_url', sourceMasterFile: 'source_master_file_url', imageFile: 'image_file_url' })) {
+    row[column] = (record.links as Record<string, string>)[field] ?? '';
+  }
+  return row;
 }

@@ -74,6 +74,8 @@ export class SupabaseContentDb implements ContentDb {
       }
     }
   }
+  writeThrough(w: ContentWrite) { return this.rpc('write_through', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
+    p_target_kind: w.kind, p_target_id: w.id, p_expected_version: w.expectedVersion, p_row: w.data }); }
   applyPatch(w: ContentWrite) { return this.rpc('apply_patch', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
     p_target_kind: w.kind, p_target_id: w.id, p_expected_version: w.expectedVersion, p_patch: w.data }); }
   insertQueueIdea(w: ContentWrite) { return this.rpc('insert_queue_idea', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash, p_library_id: w.id, p_row: w.data }); }

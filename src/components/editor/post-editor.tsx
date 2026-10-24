@@ -26,13 +26,13 @@ import { useDirtyGuard } from '../use-dirty-guard';
  */
 type SaveResponse =
   | { ok: true; replayed: boolean; steps: StepResult[]; value: { record: { revision: string }; sectionHash: string; driveRevision: string } }
-  | { ok: false; code: string; message?: string; steps?: StepResult[]; conflict?: { provider: 'sheet' | 'drive'; current: string }; details?: { reason?: string } };
+  | { ok: false; code: string; message?: string; steps?: StepResult[]; conflict?: { provider: 'sheet' | 'db' | 'drive'; current: string }; details?: { reason?: string } };
 
 type Status =
   | { kind: 'idle' }
   | { kind: 'saving' }
-  | { kind: 'saved'; replayed: boolean }
-  | { kind: 'conflict'; provider: 'sheet' | 'drive'; current: string }
+  | { kind: 'saved'; replayed: boolean; refreshPending: boolean }
+  | { kind: 'conflict'; provider: 'sheet' | 'db' | 'drive'; current: string }
   | { kind: 'partial'; steps: StepResult[]; operationId: string }
   | { kind: 'error'; code: string; message: string };
 
@@ -45,7 +45,7 @@ export function initialEditorText(model: EditorModel): string {
 }
 
 function markdownFailure(model: Extract<EditorModel['markdown'], { state: 'unavailable' }>): string {
-  if (model.reason === 'no_link') return 'This row has no usable master Markdown link. Check its source link in the Sheet.';
+  if (model.reason === 'no_link') return 'This row has no usable master Markdown link. Check its saved source link.';
   if (model.reason === 'missing_section') return 'The master file has no section for this post. Check the source file.';
   if (model.reason === 'duplicate_section') return 'The master file has more than one section for this post. Resolve the duplicate before editing.';
   if (model.reason === 'trashed') return 'The master file is in the Drive bin. Restore it before editing.';
@@ -81,6 +81,7 @@ const serverHydrated = () => false;
 export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false }: PostEditorProps) {
   // SSR copy is readable immediately, but input must wait until React owns the
   // textarea. Otherwise hydration can reset a selection during a fill/keystroke.
+  const contentStore = model.contentProvider === 'db' ? 'database' : 'Sheet';
   const hydrated = useSyncExternalStore(subscribeHydration, clientHydrated, serverHydrated);
   const textId = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -169,7 +170,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       clearRecovery(ns, model.libraryId);
       setMismatch(false);
       notifySaved.current = true;
-      setStatus({ kind: 'saved', replayed: body.replayed });
+      setStatus({ kind: 'saved', replayed: body.replayed, refreshPending: body.steps.some(s => s.step === 'refresh_pending') });
       return true;
     }
     if (res.status === 401) {
@@ -277,7 +278,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
 
       {model.markdown.state !== 'ok' ? (
         <InlineResult tone="warning">
-          {markdownFailure(model.markdown)} Saving is disabled so the Sheet and Markdown cannot drift apart. Any Sheet draft shown below can still be copied.
+          {markdownFailure(model.markdown)} Saving is disabled so the {contentStore} and Markdown cannot drift apart. Any saved draft shown below can still be copied.
         </InlineResult>
       ) : null}
 
@@ -313,8 +314,9 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       </p>
 
       {status.kind === 'saved' ? (
-        <InlineResult tone="success">{status.replayed ? 'Already saved: the Markdown and the Sheet both hold this text.' : 'Saved to the master Markdown and mirrored to the Sheet.'}</InlineResult>
+        <InlineResult tone="success">{status.replayed ? `Already saved: the Markdown and the ${contentStore} both hold this text.` : `Saved to the master Markdown and mirrored to the ${contentStore}.`}</InlineResult>
       ) : null}
+      {(status.kind === 'saved' && status.refreshPending || model.refreshPending) ? <InlineResult tone="warning">Saved in the Sheet. Database refresh pending; your saved text is shown here. The next import will repair the copy.</InlineResult> : null}
       {status.kind === 'error' ? <InlineResult tone="error">{status.message}</InlineResult> : null}
       {status.kind === 'partial' ? (
         <RecoveryPanel operationId={status.operationId} steps={status.steps.map((s) => ({ step: s.step, status: s.status, provider: s.provider }))} onRetry={() => void save()} />
@@ -323,7 +325,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
           <button type="button" data-shortcut="save-draft" aria-keyshortcuts="Control+S Meta+S" className={buttonClass('primary')} disabled={!markdownOk || (!dirty && !mismatch) || status.kind === 'saving'} onClick={() => void save()}>
-            {status.kind === 'saving' ? 'Saving…' : !dirty && mismatch ? 'Make the Sheet match the Markdown' : 'Save draft'}
+            {status.kind === 'saving' ? 'Saving…' : !dirty && mismatch ? `Make the ${contentStore} match the Markdown` : 'Save draft'}
           </button>
           <button type="button" className={buttonClass()} disabled={!dirty || status.kind === 'saving'} onClick={() => setText(base)}>
             Undo changes
@@ -343,7 +345,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         <ConflictDialog
           open
           onClose={() => setStatus({ kind: 'idle' })}
-          title={status.provider === 'drive' ? 'The Markdown section changed after you opened it' : 'The Sheet row changed after you opened it'}
+          title={status.provider === 'drive' ? 'The Markdown section changed after you opened it' : status.provider === 'db' ? 'The database row changed after you opened it' : 'The Sheet row changed after you opened it'}
           description="Nothing was overwritten. Compare the three versions, then choose. Your edit stays in this tab either way."
           base={base}
           current={status.current}

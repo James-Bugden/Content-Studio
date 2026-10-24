@@ -30,6 +30,11 @@ export type QueueIdeaCreate = {
 
 export interface ContentRepository {
   capability(): Capability;
+  /** Write authority can differ from the read provider during Phase C. */
+  mutationProvider?(): 'sheet' | 'db';
+  authorityLibrary?(id: string): Promise<LibraryRecord>;
+  pendingRefresh?(kind: 'library' | 'queue' | 'schedule', id: string): boolean;
+  refreshPending?(): Promise<{ kind: 'library' | 'queue' | 'schedule'; id: string; operationId: string }[]>;
   schema(): Promise<SchemaStatus>;
   listLibrary(): Promise<LibraryRecord[]>;
   /** Recent cached rows for an explicitly labelled read-only list after a transient failure. */

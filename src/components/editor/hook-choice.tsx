@@ -16,7 +16,8 @@ import { StateView } from '../state-view';
 type Outcome = { ok: true; currentHook: string; revision: string; replayed: boolean } | { ok: false; code: string; message?: string };
 type Status = { kind: 'saving' } | { kind: 'saved'; note?: string } | { kind: 'error'; message: string };
 
-export function HookChoice({ libraryId, alternatives, currentHook, revision, canEdit, blockedReason, onSaved }: {
+export function HookChoice({ libraryId, alternatives, currentHook, revision, canEdit, blockedReason, onSaved, contentStore = 'Sheet' }: {
+  contentStore?: 'Sheet' | 'database';
   libraryId: string;
   alternatives: string;
   currentHook: string;
@@ -47,7 +48,7 @@ export function HookChoice({ libraryId, alternatives, currentHook, revision, can
     }
     setStatus({
       kind: 'error',
-      message: body.code === 'STALE_READ' ? 'This post changed in the Sheet. Reload, then try again.'
+      message: body.code === 'STALE_READ' ? `This post changed in the ${contentStore}. Reload, then try again.`
         : body.code === 'FORBIDDEN' ? 'Not saved: this account cannot edit posts.'
           : body.message || 'Not saved. Nothing was written.',
     });
@@ -56,7 +57,7 @@ export function HookChoice({ libraryId, alternatives, currentHook, revision, can
   return (
     <section aria-labelledby={`hooks-${libraryId}`} className="flex flex-col gap-3">
       <h3 id={`hooks-${libraryId}`} className="text-sm font-semibold">Hook alternatives</h3>
-      {items.length === 0 ? <StateView kind="empty" title="No alternatives in the Sheet for this post." nextStep={null} /> : (
+      {items.length === 0 ? <StateView kind="empty" title={`No alternatives in the ${contentStore} for this post.`} nextStep={null} /> : (
         <ol className="flex flex-col gap-2">
           {items.map((alt, i) => (
             <li key={i} className="flex items-start gap-3 rounded-md border border-line bg-card p-2.5">

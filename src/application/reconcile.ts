@@ -27,6 +27,7 @@ import { fixIssuesCount, rememberNavigationCount } from './navigation-counts';
  */
 export type ReconcileKind =
   | 'schema_drift'
+  | 'refresh_pending'
   | 'import_lag'
   | 'content_parity'
   | 'provider_config'
@@ -262,6 +263,12 @@ export async function buildReconcileReport(
     }
     if (parity.collections.some(c => c.blocking > 0)) items.push(item('content_parity', 'blocking', 'Sheet and database comparison found differences',
       parity.collections.filter(c => c.blocking).map(c => `${c.collection}: ${c.blocking} blocking differences.`), [], { label: 'Review' }));
+  }
+  let pendingRows: Awaited<ReturnType<NonNullable<ContentRepository['refreshPending']>>> = [];
+  try { pendingRows = await repo.refreshPending?.() ?? []; } catch { unreadable.push('Database refresh status'); }
+  for (const pending of pendingRows) {
+    items.push(item('refresh_pending', 'attention', `${pending.id}: database refresh pending`,
+      ['Saved in the Sheet. The database copy will be repaired by the next import.'], [pending.id], { label: 'Review' }, pending.operationId));
   }
   const order: Record<ReconcileItem['severity'], number> = { blocking: 0, attention: 1 };
   items.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind));

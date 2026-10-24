@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContentRepository } from '@/application/ports';
+import { ContentReadCutoverRepository } from '@/application/content-read-cutover';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { FakeContentDb, syntheticContentDbSeed } from '@/integrations/supabase/fake-content-db';
@@ -24,7 +25,7 @@ function sheet() {
   return new SheetsContentRepository(new FakeSheetTransport({ [SHEET_TABS.schedule.name]: [...rows.slice(0, 2), ...ordered] }));
 }
 const factories: [string, () => ContentRepository][] = [
-  ['Sheet fake', sheet], ['DB fake', () => new SupabaseContentRepository(new FakeContentDb())],
+  ['Sheet fake', sheet], ['DB-read / Sheet authority', () => new ContentReadCutoverRepository(sheet(), new FakeContentDb())], ['DB fake', () => new SupabaseContentRepository(new FakeContentDb())],
 ];
 const listMethods = ['listLibrary', 'listQueue', 'listReadyQueue', 'listSchedule'] as const;
 const visible = (row: Awaited<ReturnType<ContentRepository['listLibrary']>>[number] | Awaited<ReturnType<ContentRepository['listSchedule']>>[number]) => ({ value: row.value, cells: row.cells, links: row.links });
@@ -137,7 +138,7 @@ describe('composition', () => {
     vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', mode); resetEnvCache(); resetServices();
     const repo = getServices().repo;
     expect(repo.capability().provider).toBe(mode === 'db' || mode === 'db-read' ? 'db' : 'sheet');
-    expect(repo.capability().state).toBe(mode === 'db' || mode === 'sheet' || mode === 'db-shadow' ? 'ready' : 'read_only');
+    expect(repo.capability().state).toBe('ready');
     expect(capabilities().some(c => c.provider === 'db')).toBe(mode === 'db' || mode === 'db-read');
     expect((await repo.listLibrary()).length).toBeGreaterThan(0);
     expect((await repo.listReadyQueue()).length).toBeGreaterThan(0);

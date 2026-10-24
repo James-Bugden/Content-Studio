@@ -53,7 +53,7 @@ export type DraftSaveResult = MutationResult<DraftSaveValue> & { conflict?: Draf
 const MAX_DRAFT_CHARS = 40_000;
 
 export async function saveDraft(repo: ContentRepository, drive: DriveGateway, input: DraftSaveInput): Promise<DraftSaveResult> {
-  const store = repo.capability().provider === 'db' ? 'db' : 'sheet';
+  const store = repo.mutationProvider?.() ?? (repo.capability().provider === 'db' ? 'db' : 'sheet');
   const mirrorStep = store === 'db' ? 'mirror Draft Content to database' : 'mirror Draft Content to Sheet';
   const steps: StepResult[] = [];
   const op = input.operationId;
@@ -77,7 +77,7 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
   // Load the authoritative row.
   let record: LibraryRecord;
   try {
-    record = await repo.getLibrary(input.libraryId);
+    record = await (repo.authorityLibrary?.(input.libraryId) ?? repo.getLibrary(input.libraryId));
   } catch (error) {
     return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE');
   }
@@ -157,5 +157,6 @@ export async function saveDraft(repo: ContentRepository, drive: DriveGateway, in
     return fail(driveDone ? 'PARTIAL_FAILURE' : res.code);
   }
   steps.push({ step: mirrorStep, provider: store, status: res.replayed ? 'skipped_already_applied' : 'done', revision: res.value.revision });
+  steps.push(...res.steps.filter(s => s.step === 'refresh_pending' || s.step === 'write_through'));
   return finish({ ok: true, operationId: op, replayed: false, value: { record: res.value, sectionHash, driveRevision }, steps });
 }

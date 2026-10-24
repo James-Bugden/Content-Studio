@@ -123,7 +123,8 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
 
 /** Plain-words heading for each kind of disagreement (CS-048). Unknown kinds fall back to their name. */
 const KIND_LABEL: Record<string, string> = {
-  schema_drift: 'Sheet columns changed',
+  refresh_pending: 'Database refresh pending',
+  schema_drift: 'Content schema changed',
   provider_config: 'Connection not set up',
   markdown_mismatch: 'Sheet draft differs from the Markdown',
   markdown_missing: 'Markdown section missing or duplicated',

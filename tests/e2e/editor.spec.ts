@@ -10,6 +10,11 @@ async function signInAs(request: APIRequestContext, as: 'owner' | 'viewer') {
 }
 async function control(request: APIRequestContext, data: Record<string, unknown>) {
   expect((await request.post('/api/test-control', { data })).status()).toBe(200);
+  if (process.env.CS_E2E_CONTENT_STORE === 'db-read' && data.kind === 'sheet_edit') {
+    // Display a deliberately mismatched imported Sheet snapshot. Stale-since-
+    // import refusal is covered separately by the Phase C contract tests.
+    expect((await request.post('/api/ops/sheet-mirror', { headers: { 'Idempotency-Key': crypto.randomUUID(), origin: 'http://127.0.0.1:3200' } })).status()).toBe(200);
+  }
 }
 const editor = (page: Page) => page.getByLabel(/Post copy/);
 

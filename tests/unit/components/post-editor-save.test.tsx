@@ -43,6 +43,24 @@ afterEach(() => {
 });
 
 describe('PostEditor save notification (CS-050)', () => {
+  it('names database save outcomes in database mode', async () => {
+    const complete = pendingSave();
+    render(<PostEditor model={{ ...model, contentProvider: 'db' }} canEdit ns="synthetic" />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Database synthetic copy' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await complete(success);
+    expect(screen.getByText('Saved to the master Markdown and mirrored to the database.')).toBeTruthy();
+  });
+  it('confirms a Sheet save with a pending derived copy without leaving the draft dirty', async () => {
+    const complete = pendingSave();
+    render(<PostEditor model={model} canEdit ns="synthetic" />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Pending synthetic copy' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await complete({ ...success, steps: [{ step: 'refresh_pending', provider: 'db', status: 'pending' }] });
+    expect(screen.getByText('Saved in the Sheet. Database refresh pending;', { exact: false })).toBeTruthy();
+    expect(isAnyDirty()).toBe(false);
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('Pending synthetic copy');
+  });
   it('keeps server-rendered copy read-only until hydration, then permits owner edits', () => {
     const html = document.createElement('div');
     html.innerHTML = renderToString(<PostEditor model={model} canEdit ns="synthetic" />);

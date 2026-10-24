@@ -8,7 +8,7 @@ export function capabilities(): Capability[] {
   const includeDb = env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read';
   const active = (caps: Capability[]) => caps.filter(c => c.provider !== 'db' || includeDb);
   if (env.CS_DATA_MODE === 'fake') {
-    return active((['auth', 'sheet', 'db', 'drive', 'typefully', 'ai'] as const).map((provider) => ({ provider, state: provider === 'db' && env.CS_CONTENT_STORE !== 'db' ? 'read_only' : 'ready', mode: 'fake' })));
+    return active((['auth', 'sheet', 'db', 'drive', 'typefully', 'ai'] as const).map((provider) => ({ provider, state: 'ready', mode: 'fake' })));
   }
   const googleCreds = Boolean(env.GOOGLE_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
   const google = (hasTarget: boolean): Capability['state'] =>

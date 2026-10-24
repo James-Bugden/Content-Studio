@@ -4,7 +4,7 @@ import { compareCopy, pushToTypefully, reconcile, syncAnalytics, syncFromTypeful
 import { SCHEDULE_SYNC_FIELDS } from '@/domain/sheet-schema';
 import { NOW, captureTelemetry, owner, setup as setupStore, writtenFields } from './harness';
 
-describe.each(['sheet', 'db'] as const)('%s repository', mode => {
+describe.each(['sheet', 'db', 'db-read'] as const)('%s repository', mode => {
 const setup = (extra: Parameters<typeof setupStore>[0] = []) => setupStore(extra, mode);
 
 afterEach(() => setTelemetrySink(null));
@@ -22,7 +22,7 @@ describe('TYPE-04: exact Typefully text lands in Final Content; working Content 
     const before = await row(X2);
     const r = await syncFromTypefully(repo, tf, owner, await input(X2, 'op_sync_exotic'), { now: NOW });
     expect(r.ok).toBe(true);
-    expect(r.steps).toContainEqual(expect.objectContaining({step:'write Schedule row',provider:mode,status:'done'}));
+    expect(r.steps).toContainEqual(expect.objectContaining({step:'write Schedule row',provider:mode === 'db' ? 'db' : 'sheet',status:'done'}));
     const after = await row(X2);
     expect(after.cells.finalContent).toBe(EXOTIC);
     expect(after.cells.content).toBe(before.cells.content);
@@ -38,7 +38,7 @@ describe('TYPE-04: exact Typefully text lands in Final Content; working Content 
     const writes = sheet.writes.length;
     const again = await syncFromTypefully(repo, tf, owner, await input(X2, 'op_sync_second'), { now: NOW });
     expect(again).toMatchObject({ ok: true, replayed: true });
-    expect(again.steps).toContainEqual(expect.objectContaining({step:'write Schedule row',provider:mode,status:'skipped_already_applied'}));
+    expect(again.steps).toContainEqual(expect.objectContaining({step:'write Schedule row',provider:mode === 'db' ? 'db' : 'sheet',status:'skipped_already_applied'}));
     expect(sheet.writes.length).toBe(writes);
   });
 
@@ -169,7 +169,7 @@ describe('PUB-01/02/03: per-platform analytics, blank versus zero, idempotent', 
     const r = await syncAnalytics(repo, tf, owner, await input(X1, 'op_an_same'), { now: NOW });
     expect(r).toMatchObject({ ok: true, replayed: true });
     expect(r.steps.at(-1)?.status).toBe('skipped_already_applied');
-    expect(r.steps.at(-1)?.provider).toBe(mode);
+    expect(r.steps.at(-1)?.provider).toBe(mode === 'db' ? 'db' : 'sheet');
     expect(sheet.writes.length).toBe(mark);
   });
 
@@ -179,7 +179,7 @@ describe('PUB-01/02/03: per-platform analytics, blank versus zero, idempotent', 
     tf.setMetrics('SYNTH-TF-1001', { views: 1600, likes: 0, reposts: 6, replies: 0 });
     const r = await syncAnalytics(repo, tf, owner, await input(X1, 'op_an_update'), { now: NOW });
     expect(r.ok).toBe(true);
-    expect(r.steps).toContainEqual(expect.objectContaining({step:'write analytics',provider:mode,status:'done'}));
+    expect(r.steps).toContainEqual(expect.objectContaining({step:'write analytics',provider:mode === 'db' ? 'db' : 'sheet',status:'done'}));
     if (r.ok) expect(r.value.unavailable).toEqual(['bookmarks', 'newFollowers']);
     const c = (await row(X1)).cells;
     expect([c.views, c.likes, c.replies, c.bookmarks, c.newFollowers]).toEqual(['1600', '0', '0', '11', '']);

@@ -1,0 +1,31 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+
+test('MIG-11: Sheet save succeeds during copy failure, next import repairs the visible pending state', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const control = async (data: object) => expect((await page.request.post('/api/test-control', { data })).status()).toBe(200);
+  await control({ kind: 'reset' });
+  expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
+  await page.goto('/review/SYN-L001');
+  await page.getByLabel(/Post copy/).fill('Synthetic Phase C saved copy 漢字 🙂\n\nExact trailing spaces  ');
+  await control({ kind: 'db_fail_next', op: 'write', code: 'PROVIDER_UNAVAILABLE' });
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
+  await expect(page.getByText('Saved in the Sheet. Database refresh pending;', { exact: false })).toBeVisible();
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic Phase C saved copy 漢字 🙂\n\nExact trailing spaces  ');
+  await page.screenshot({ path: `test-results/cutover-save-${test.info().project.name}.png`, fullPage: true });
+  await page.goto('/reconcile');
+  await expect(page.getByText('Store mode: db-read. Sheet remains authoritative.')).toBeVisible();
+  const pending = page.locator('[data-reconcile-kind="refresh_pending"]');
+  await expect(pending).toContainText('SYN-L001: database refresh pending');
+  expect((await new AxeBuilder({ page }).include('[data-reconcile-kind="refresh_pending"]').analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `test-results/cutover-pending-${test.info().project.name}.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Run content import' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Content import completed.' })).toBeVisible();
+  await expect(pending).toHaveCount(0);
+  await page.goto('/review/SYN-L001');
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic Phase C saved copy 漢字 🙂\n\nExact trailing spaces  ');
+  expect(errors).toEqual([]);
+});

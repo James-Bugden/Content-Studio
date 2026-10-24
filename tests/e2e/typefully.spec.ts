@@ -41,6 +41,11 @@ async function detail(request: APIRequestContext, contentId: string): Promise<De
 
 async function scheduleEdit(request: APIRequestContext, contentId: string, header: string, value: string) {
   expect((await request.post('/api/test-control', { data: { kind: 'schedule_edit', contentId, header, value } })).status()).toBe(200);
+  // Phase C serves the imported copy: publish this external Sheet fixture edit
+  // through the actual import boundary before comparing it with Typefully.
+  if (process.env.CS_E2E_CONTENT_STORE === 'db-read') {
+    expect((await request.post('/api/ops/sheet-mirror', { headers: { 'Idempotency-Key': crypto.randomUUID(), origin: 'http://127.0.0.1:3200' } })).status()).toBe(200);
+  }
 }
 
 const pane = (page: Page, name: string) => page.getByRole('region', { name, exact: true });

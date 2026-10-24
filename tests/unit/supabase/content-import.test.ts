@@ -37,7 +37,7 @@ describe('MIG-09 typed complete imports', () => {
     row.rowHash = mirrorHash(row.payload);
     expect(() => buildTypedImport(source, new Map(), actor)).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }));
   });
-  it.each(['sheet', 'db-read', 'db', ''])('refuses imports in %s before reads or writes, including direct store calls', async mode => {
+  it.each(['sheet', 'db', ''])('refuses imports in %s before reads or writes, including direct store calls', async mode => {
     const source = await snapshot(), store = new FakeContentImportStore();
     const envelope = buildTypedImport(source, new Map(), actor);
     const read = vi.spyOn(store.db, 'listPosts');

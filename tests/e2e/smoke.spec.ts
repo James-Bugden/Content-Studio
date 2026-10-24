@@ -10,7 +10,7 @@ test('health reports commit and capabilities only, never cached', async ({ reque
   expect(body.commit.length).toBeGreaterThan(0);
   expect(body.ok).toBe(true);
   expect(body.mode).toBe('fake');
-  expect(body.capabilities.map((c) => c.provider).sort()).toEqual(['ai', 'auth', 'drive', 'sheet', 'typefully']);
+  expect(body.capabilities.map((c) => c.provider).sort()).toEqual(['ai', 'auth', ...(process.env.CS_E2E_CONTENT_STORE === 'db-read' || process.env.CS_E2E_CONTENT_STORE === 'db' ? ['db'] : []), 'drive', 'sheet', 'typefully']);
   for (const capability of body.capabilities) {
     expect(Object.keys(capability).sort()).toEqual(['mode', 'provider', 'state']);
     expect(capability.state).toBe('ready');
