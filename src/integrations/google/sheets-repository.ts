@@ -63,13 +63,13 @@ export class SheetsContentRepository implements ContentRepository {
   ) {}
 
   /**
-   * Read cache (live mode only). One page render asks for the same tab several
+   * One page render asks for the same tab several
    * times; against the real Sheets API that is several slow round trips and extra
    * quota. Concurrent identical reads share one request, results live for a few
    * seconds, and every write reads fresh and clears the cache, so a write never
    * compares against a cached revision.
    */
-  private readonly readCache = new Map<string, { at: number; rows: Promise<RawRow[]> }>();
+  private readonly readCache = new Map<string, { expiresAt: number | null; rows: Promise<RawRow[]> }>();
 
   private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<RawRow[]> {
     // Filter/search/editor navigation shares a short-lived Library snapshot.
@@ -78,13 +78,27 @@ export class SheetsContentRepository implements ContentRepository {
       : tabKey === 'readyQueue' || tabKey === 'schedule' ? this.options.readinessReadCacheMs ?? this.options.readCacheMs ?? 0
         : this.options.readCacheMs ?? 0;
     const key = `${tabKey}:${withExtras}`;
-    const hit = this.readCache.get(key);
-    if (!fresh && hit && Date.now() - hit.at <= ttl) return hit.rows;
-    const rows = this.readAll(tabKey, withExtras);
-    if (ttl > 0) {
-      this.readCache.set(key, { at: Date.now(), rows });
-      rows.catch(() => this.readCache.delete(key));
+    if (fresh) {
+      // Mutation preconditions/readbacks must never await or seed a display
+      // snapshot. Dropping it also lets STALE_READ recovery load current data.
+      this.readCache.delete(key);
+      return this.readAll(tabKey, withExtras);
     }
+    const hit = this.readCache.get(key);
+    if (hit && (hit.expiresAt === null || Date.now() < hit.expiresAt)) return hit.rows;
+    const rows = this.readAll(tabKey, withExtras);
+    const entry = { expiresAt: null as number | null, rows };
+    this.readCache.set(key, entry);
+    // In-flight de-duplication is independent of retention. A slow provider
+    // request stays shared until it settles, even if it outlasts the TTL.
+    void rows.then(() => {
+      if (this.readCache.get(key) !== entry) return;
+      if (ttl > 0) entry.expiresAt = Date.now() + ttl;
+      else this.readCache.delete(key);
+    }, () => {
+      // An old rejected read must not evict a post-invalidation replacement.
+      if (this.readCache.get(key) === entry) this.readCache.delete(key);
+    });
     return rows;
   }
 
@@ -102,8 +116,8 @@ export class SheetsContentRepository implements ContentRepository {
       let page: RawRow[];
       try {
         page = await timed(
-          { name: 'sheet.read', adapter: 'sheet', facts: { tab: tabKey, startRow: start } },
-          () => this.transport.readTab(tab.name, tab.lastColumn, { startRow: start, maxRows: PAGE_ROWS, formulas: withExtras, links: withExtras }),
+          { name: 'sheet.read', adapter: 'sheet', facts: { tab: tabKey, startRow: start, maxRows: PAGE_ROWS } },
+          () => this.transport.readTab(tab.name, tabKey === 'settings' ? 'C' : tab.lastColumn, { startRow: start, maxRows: PAGE_ROWS, formulas: withExtras, links: withExtras }),
         );
       } catch (error) {
         // A prior page already returned exactly PAGE_ROWS rows, so this request is shaped
@@ -146,7 +160,10 @@ export class SheetsContentRepository implements ContentRepository {
     const check = async <F extends string>(tabKey: 'library' | 'queue' | 'readyQueue' | 'schedule', headers: Record<F, string>) => {
       const tab = SHEET_TABS[tabKey];
       try {
-        const rows = await this.transport.readTab(tab.name, tab.lastColumn, { startRow: tab.headerRow, maxRows: 1, formulas: false, links: false });
+        const rows = await timed(
+          { name: 'sheet.read', adapter: 'sheet', facts: { tab: tabKey, startRow: tab.headerRow, maxRows: 1 } },
+          () => this.transport.readTab(tab.name, tab.lastColumn, { startRow: tab.headerRow, maxRows: 1, formulas: false, links: false }),
+        );
         const found = discoverHeaders(headers, rows[0]?.values ?? []);
         tabs.push(
           found.ok

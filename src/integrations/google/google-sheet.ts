@@ -68,7 +68,8 @@ export class GoogleSheetTransport implements SheetTransport {
     // CS-052: one request per page. Formatted values, formulas and hyperlinks
     // all come from the same grid read, instead of three separate calls that
     // each counted against Google's per-minute read quota.
-    const fields = 'sheets(data(rowData(values(formattedValue,userEnteredValue,hyperlink))))';
+    const cellFields = ['formattedValue', ...(options.formulas ? ['userEnteredValue'] : []), ...(options.links ? ['hyperlink'] : [])];
+    const fields = `sheets(data(rowData(values(${cellFields.join(',')}))))`;
     const url = `${API}/${encodeURIComponent(this.spreadsheetId)}?ranges=${encodeURIComponent(range)}&fields=${encodeURIComponent(fields)}`;
     return withReadRetry(async () => {
       const token = await this.auth();
