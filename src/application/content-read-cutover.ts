@@ -11,7 +11,8 @@ import { typedContentRow, copyRefusal } from './content-import';
 import { mirrorHash } from './sheet-mirror';
 
 type Record = LibraryRecord | ScheduleRecord;
-type Pending = { kind: ContentTarget; id: string; operationId: string; record: Record; expectedVersion: string | null };
+type Pending = { kind: ContentTarget; id: string; operationId: string; record: Record; expectedVersion: string | null;
+  checkedDb?: { version: string; revision: string | null } };
 
 /** Phase C only. DB failures can never veto a Sheet write or authorize one. */
 export class ContentReadCutoverRepository implements ContentRepository {
@@ -37,8 +38,15 @@ export class ContentReadCutoverRepository implements ContentRepository {
       // a raced import can contain an older Sheet snapshot. Confirm the current
       // Sheet token when a newer import/copy supersedes the overlay (including
       // metadata-only imports, which intentionally do not bump row_version).
+      const version = String(row.row_version);
+      if (row.sheet_revision !== entry.record.revision && entry.checkedDb?.version === version
+        && entry.checkedDb.revision === row.sheet_revision) continue;
       const revision = row.sheet_revision === entry.record.revision ? entry.record.revision
         : (await this.authority(entry.kind, entry.id).catch(() => null))?.revision;
+      // A failed authority read is retryable. A successful mismatch needs no
+      // further full-tab Sheet read until either DB token changes. This cache
+      // belongs to this save entry, so a newer save starts verification afresh.
+      if (revision !== undefined) entry.checkedDb = { version, revision: row.sheet_revision };
       if (row.sheet_revision === revision && this.pending.get(key) === entry) this.pending.delete(key);
     }
     return [...this.pending.values()].map(({ kind, id, operationId }) => ({ kind, id, operationId, source: 'save' as const }));

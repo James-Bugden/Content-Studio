@@ -105,6 +105,9 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
     const version = String((await db.getPost('library', ids.library))!.row_version);
     vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
     await repo.updateLibrary({ operationId: 'synthetic_metadata_overlay', actor: owner, target: { libraryId: ids.library }, expectedRevision: (await repo.getLibrary(ids.library)).revision, patch: { hookScore: `0${score}` } });
+    // Warm the mismatched pair before a revision-only import repairs it.
+    await repo.listLibrary();
+    expect(repo.pendingRefresh('library', ids.library)).toBe(true);
     transport.externalEdit(SHEET_TABS.library.name, before.row, transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore), `00${score}`);
     await importSheet();
     expect(String((await db.getPost('library', ids.library))!.row_version)).toBe(version);
@@ -124,6 +127,60 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
     if (mode === 'fake') db.externalEdit('library', ids.library, { current_hook: 'Concurrent snapshot' });
     else await pg.query('update content_studio_posts set current_hook=$1,row_version=row_version+1 where collection=$2 and library_id=$3', ['Concurrent snapshot', 'library', ids.library]);
   };
+  it.each(['library', 'queue', 'schedule'] as const)('CS-059b: repeated %s get/list checks read the Sheet once per pending DB pair', async kind => {
+    const before = await read(kind);
+    vi.spyOn(db, 'writeThrough').mockRejectedValue(new Error('synthetic outage'));
+    const pending = await write(kind, before.revision, 'Pending synthetic copy');
+    if (!pending.ok) throw new Error('synthetic save failed');
+    const list = () => kind === 'schedule' ? repo.listSchedule() : kind === 'library' ? repo.listLibrary() : repo.listQueue();
+    const reads = transport.reads;
+    await read(kind);
+    const checkedReads = transport.reads;
+    expect(checkedReads).toBeGreaterThan(reads);
+    for (let i = 0; i < 10; i++) {
+      expect((await read(kind)).revision).toBe(pending.value.revision);
+      expect((await list()).some(r => r.revision === pending.value.revision)).toBe(true);
+    }
+    expect(transport.reads).toBe(checkedReads);
+    expect(repo.pendingRefresh(kind, ids[kind])).toBe(true);
+    // Replacing the overlay must also discard its checked-pair cache.
+    const saved = await write(kind, (await read(kind)).revision, 'New pending save', 'synthetic_next_pending');
+    expect(saved.ok).toBe(true);
+    const afterSave = transport.reads;
+    await list();
+    expect(transport.reads).toBeGreaterThan(afterSave);
+    await list();
+    const afterCheck = transport.reads;
+    await read(kind);
+    expect(transport.reads).toBe(afterCheck);
+  });
+  it('CS-059b: row_version changes recheck even when sheet_revision stays unchanged', async () => {
+    const before = await read('library');
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Pending version check');
+    await repo.listLibrary();
+    const reads = transport.reads, old = await db.getPost('library', ids.library);
+    await advanceDb();
+    expect((await db.getPost('library', ids.library))!.sheet_revision).toBe(old!.sheet_revision);
+    await repo.listLibrary();
+    expect(transport.reads).toBeGreaterThan(reads);
+    const checkedReads = transport.reads;
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('Pending version check');
+    expect(transport.reads).toBe(checkedReads);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+  });
+  it('CS-059b: an unsuccessful authority check is retried for the same DB pair', async () => {
+    const before = await read('library');
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    await write('library', before.revision, 'Pending retry');
+    const authority = vi.spyOn(sheet, 'getLibrary').mockRejectedValueOnce(new Error('synthetic read outage'));
+    expect((await repo.getLibrary(ids.library)).value.draftContent).toBe('Pending retry');
+    expect(authority).toHaveBeenCalledTimes(1);
+    await repo.listLibrary();
+    expect(authority).toHaveBeenCalledTimes(2);
+    await repo.listLibrary();
+    expect(authority).toHaveBeenCalledTimes(2);
+  });
   it('M04: observes the copy version before the authority write, not after a raced import', async () => {
     const before = await read('library'), version = String((await db.getPost('library', ids.library))!.row_version);
     const original = sheet.updateLibrary.bind(sheet);

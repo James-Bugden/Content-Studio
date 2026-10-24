@@ -16,6 +16,21 @@ const actor = mirrorHash('synthetic-import-actor');
 const sheet = () => new SheetsContentRepository(new FakeSheetTransport());
 const snapshot = () => buildSheetMirrorSnapshot(sheet(), { sourceKey: 'synthetic_workbook' });
 describe('MIG-09 typed complete imports', () => {
+  it('CS-059b / R05: db-read aborts the entire import on an unclassified conversion failure', async () => {
+    vi.stubEnv('CS_CONTENT_STORE', 'db-read');
+    const repo = sheet(), store = new FakeContentImportStore();
+    const rows = await repo.listLibrary();
+    // A malformed boolean is neither a numeric nor size refusal. Keep the
+    // identity and snapshot hashes valid so failure reaches row conversion.
+    rows[0]!.cells.queueForSchedule = 'synthetic-unknown-boolean';
+    rows[1]!.cells.draftContent = 'Synthetic change that must not be imported';
+    vi.spyOn(repo, 'listLibrary').mockResolvedValue(rows);
+    const apply = vi.spyOn(store, 'applyImport');
+    const before = await store.db.listPosts('library');
+    await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(apply).not.toHaveBeenCalled();
+    expect(await store.db.listPosts('library')).toEqual(before);
+  });
   it('N1: includes jsonb separator overhead when refusing a boundary-size row, leaving the batch usable', async () => {
     vi.stubEnv('CS_CONTENT_STORE', 'db-read');
     const source = await snapshot(), post = source.rows.find(r => r.collection === 'library')!;

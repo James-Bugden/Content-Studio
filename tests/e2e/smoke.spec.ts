@@ -12,7 +12,9 @@ test('health reports commit and capabilities only, never cached', async ({ reque
   expect(body.mode).toBe('fake');
   expect(body.capabilities.map((c) => c.provider).sort()).toEqual(['ai', 'auth', ...(process.env.CS_E2E_CONTENT_STORE === 'db-read' || process.env.CS_E2E_CONTENT_STORE === 'db' ? ['db'] : []), 'drive', 'sheet', 'typefully']);
   for (const capability of body.capabilities) {
-    expect(Object.keys(capability).sort()).toEqual(['mode', 'provider', 'state']);
+    const derivedDb = capability.provider === 'db' && process.env.CS_E2E_CONTENT_STORE === 'db-read';
+    expect(Object.keys(capability).sort()).toEqual(derivedDb ? ['detail', 'mode', 'provider', 'state'] : ['mode', 'provider', 'state']);
+    if (derivedDb) expect(capability).toHaveProperty('detail', 'Derived database copy; Sheet remains authoritative');
     expect(capability.state).toBe('ready');
     expect(capability.mode).toBe('fake');
   }

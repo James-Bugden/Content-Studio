@@ -344,7 +344,11 @@ skipped or inconclusive measurement is not green.
   corrected; db-read imports count/classify it in the exception ledger and keep
   importing other rows. Unknown differences and CAS conflicts still fail closed.
   An overlay retires when its fingerprint is copied or the DB matches the
-  current Sheet fingerprint, even after a newer edit. Ordinary import lag never
+  current Sheet fingerprint, even after a newer edit. Pending reads avoid
+  repeated full-tab authority checks for an unchanged DB pair:
+  each saved overlay remembers its successfully checked `(row_version,
+  sheet_revision)` pair; either token changing rechecks, and failed reads retry.
+  Ordinary import lag never
   installs an app-save overlay. The 60-second Library cache is reduced to the
   shared `DB_READ_CACHE_TTL_MS` (3 seconds) in both compositions.
 - Exit: 7 days; zero Sheets `RATE_LIMITED` events on reads; zero `STALE_READ`

@@ -155,7 +155,10 @@ return success plus a `refresh_pending` step. The editor keeps the saved text
 and revision. An instance-local overlay supplies that record on subsequent
 reads until the DB has that Sheet fingerprint or a fingerprint matching the
 current Sheet row. The pre-save DB version is retained; a version advance alone
-does not prove repair. Pending-row checks can read that individual Sheet row.
+does not prove repair. Pending checks use a fresh full-tab Sheet read to locate
+the row, at most once per saved overlay and successfully checked DB
+`(row_version, sheet_revision)` pair. Either token changing triggers a new
+check; a failed Sheet read stays retryable. A new save discards that cache.
 A successful later copy or typed import repairs representable values.
 In db-read, `refused_numeric` and `refused_size` rows are excluded from accepted
 import counts and counted in the named exception ledger; other rows continue.
@@ -216,7 +219,15 @@ the live client; this build deliberately cannot start that mode.
    keep branch/workbook identifiers and credentials in private evidence only.
    Confirm preview contains no production service key, owner auth denies other
    identities and `anon`/`authenticated` cannot access any Content object/RPC.
-2. Apply reviewed migrations only to the disposable branch with explicit owner
+2. **Before any apply**, inspect that branch's migration history and catalog.
+   DB-1 (`20261024000100_content_authority.sql`) and DB-3
+   (`20261025000100_content_writes.sql`) were edited in place during local DB-5
+   review. Confirm neither version/name was applied there, and check that the
+   authority schema-version table and write RPCs do not already exist (manual
+   SQL applies may not appear in migration history). Record the check time and
+   file hashes in private rehearsal evidence. If either was applied, stop and
+   prepare a new forward migration; never replay the edited file over it.
+   Apply reviewed migrations only to the disposable branch with explicit owner
    authority. Import the synthetic workbook three times. Record stable-ID sets,
    counts, hashes, exception classes, unchanged-row versions, audit/history and
    durable replay. Include child-before-parent Schedule lineage, blank booleans,
