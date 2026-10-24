@@ -1,18 +1,19 @@
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 // Run through `bash ~/bin/heavy node scripts/verify-sweep.mjs` on this PC.
 // The inherited queue slot covers every sequential Playwright child process.
-await readFile('.next/BUILD_ID', 'utf8'); // require an already-verified production build
+const buildId = (await readFile('.next/BUILD_ID', 'utf8')).trim(); // require an already-verified production build
+const headSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const dir = path.resolve('sweep-report/validation');
 await mkdir(dir, { recursive: true });
 const cli = path.resolve('node_modules/@playwright/test/cli.js');
 const baseArgs = ['test', 'sweep', '--reporter=list,./tests/e2e/sweep-reporter.ts'];
 const env = { ...process.env, CS_E2E_PREBUILT: '1', CS_SWEEP_ISOLATED: '1', CS_E2E_PORT: process.env.CS_E2E_PORT ?? '3263' };
 delete env.CS_SWEEP_MUTATION;
-const evidence = { runs: [], mutations: [], status: 'running' };
+const evidence = { headSha, buildId, runs: [], mutations: [], status: 'running' };
 const save = () => writeFile(path.join(dir, 'validation.json'), JSON.stringify(evidence, null, 2));
 // A crash during the first run must not leave a previous validation marked green.
 await save();
@@ -28,7 +29,7 @@ async function run(name, args, overrides = {}) {
   const report = JSON.parse(await readFile('sweep-report/coverage.json', 'utf8'));
   await copyFile('sweep-report/coverage.json', path.join(dir, `${name}.json`));
   await copyFile('sweep-report/coverage.md', path.join(dir, `${name}.md`));
-  const result = { name, exitCode: child.status, elapsedMs: Math.round(performance.now() - start),
+  const result = { name, exitCode: child.status, elapsedMs: Math.round(performance.now() - start), executionMs: report.budget.durationMs,
     rows: report.rows.length, hash: createHash('sha256').update(JSON.stringify(report.rows)).digest('hex') };
   console.log(`${name}: exit=${child.status}, rows=${result.rows}, ${result.elapsedMs}ms`);
   return { report, result };

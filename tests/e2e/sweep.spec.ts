@@ -98,7 +98,6 @@ const mutations: { name: string; inject: (page: Page) => Promise<unknown>; detec
     dialog.showModal();
   }), detect: (p) => escapeDialog(p, 250) },
   { name: 'missing-state', inject: async () => {}, detect: (p) => designatedState(p, 'provider_error', 250) },
-  { name: 'unsafe-write', inject: async () => {}, detect: noWrites },
   { name: 'dead-end', inject: (p) => p.locator('main').evaluate((el) => { el.innerHTML = ''; }), detect: noDeadEnd },
 ];
 
@@ -108,16 +107,11 @@ for (const mutation of mutations) {
     await navigate(page, '/');
     await page.setContent('<!doctype html><html lang="en"><head><title>Synthetic mutation fixture</title><style>:focus { outline: 2px solid black; }</style></head><body><main><h1>Synthetic fixture</h1><button>Save draft</button><a href="/">Home</a></main></body></html>');
     // Positive control: never credit a mutation whose unmodified fixture fails.
-    if (!['missing-state', 'unsafe-write'].includes(mutation.name)) await mutation.detect(page);
+    if (mutation.name !== 'missing-state') await mutation.detect(page);
     if (mutation.name === 'missing-state') {
       await page.locator('main').evaluate((el) => { el.setAttribute('data-state', 'provider_error'); });
       await mutation.detect(page);
       await page.locator('main').evaluate((el) => el.removeAttribute('data-state'));
-    }
-    if (mutation.name === 'unsafe-write') {
-      await page.locator('button').evaluate((el: HTMLButtonElement) => { el.disabled = true; });
-      await mutation.detect(page);
-      await page.locator('button').evaluate((el: HTMLButtonElement) => { el.disabled = false; });
     }
     if (mutation.name === 'escape') {
       await page.evaluate(() => {
@@ -138,6 +132,47 @@ for (const mutation of mutations) {
     } finally { await coverage.finish(); }
   });
 }
+
+test('mutation proof: unsafe-write', async ({ page }, info) => {
+  await signIn(page, 'owner');
+  await navigate(page, '/');
+  const coverage = report(page, info, 'owner');
+  try {
+    // Each action must be detected independently, including portal actions and
+    // accessible-name-only controls. Read-only links must remain valid exits.
+    for (const label of ['Save draft', 'Approve', 'Promote', 'Create', 'Send', 'Publish',
+      'Delete', 'Schedule', 'Discard', 'Retry', 'Take this text', 'Link this', 'Remove',
+      'Archive', 'Upload', 'Import', 'Update', 'Apply', 'Sync', 'Unlink', 'Replace', 'Record', 'Confirm delete']) {
+      for (const surface of ['main', 'dialog', 'portal', 'icon', 'submit', 'menuitem', 'link-button'] as const) {
+        await page.setContent('<main><h1>Synthetic fault</h1><nav><a href="/schedule">Schedule</a><a href="/published">Published</a><a href="/review">Retry</a><button>Open schedule</button></nav></main>');
+        await page.evaluate(({ label, surface }) => {
+          const scope = surface === 'main' ? document.querySelector('main')! : document.body;
+          const el = document.createElement(surface === 'submit' ? 'input' : surface === 'link-button' ? 'a' : 'button');
+          if (el instanceof HTMLInputElement) { el.type = 'submit'; el.value = label; }
+          else if (surface === 'icon') el.setAttribute('aria-label', label);
+          else el.textContent = label;
+          if (surface === 'menuitem') el.setAttribute('role', 'menuitem');
+          if (el instanceof HTMLAnchorElement) { el.href = '#'; el.setAttribute('role', 'button'); }
+          el.id = 'synthetic-write';
+          // aria-disabled also exercises custom actions rather than just :disabled.
+          el.setAttribute('aria-disabled', 'true');
+          if (surface === 'dialog') {
+            const dialog = document.createElement('dialog');
+            document.body.append(dialog);
+            dialog.append(el);
+            dialog.showModal();
+          } else scope.append(el);
+        }, { label, surface });
+        await noWrites(page); // positive control, including read-only navigation
+        await page.locator('#synthetic-write').evaluate(el => el.removeAttribute('aria-disabled'));
+        await coverage.check(`(mutation fixture: ${surface}/${label})`, 'mutation/unsafe-write', async () => {
+          if (process.env.CS_SWEEP_MUTATION === 'unsafe-write') await noWrites(page);
+          else await expect(noWrites(page)).rejects.toThrow();
+        });
+      }
+    }
+  } finally { await coverage.finish(); }
+});
 
 test('mutation proof: data-loss-guard', async ({ page }, info) => {
   await control(page, { kind: 'reset' });

@@ -1,5 +1,5 @@
 import type { FullResult, Reporter, Suite, TestCase, TestResult } from '@playwright/test/reporter';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** A single stable artifact across both widths, including failures and partial runs. */
@@ -41,9 +41,18 @@ export default class SweepReporter implements Reporter {
     const complete = this.expectedTests > 0 && this.tests.length === this.expectedTests && this.tests.every((test) => test.status === 'passed') &&
       this.attachments.length === this.expectedTests && reportErrors.length === 0 && this.rows.length > 0 && this.rows.every((row) => row.result === 'pass');
     const status = result.status === 'passed' && complete ? 'passed' : 'failed';
-    await writeFile(path.join(dir, 'coverage.json'), JSON.stringify({ seed: 163, status, expectedTests: this.expectedTests, reportErrors, tests: this.tests, rows: this.rows }, null, 2));
+    const budget = { durationMs: result.duration, targetMs: 240_000, hardCeilingMs: 360_000,
+      status: result.duration > 240_000 ? 'over-budget' : 'within-budget' };
+    const timing = `Sweep execution: ${budget.durationMs} ms; reported budget: ${budget.targetMs} ms; hard ceiling: ${budget.hardCeilingMs} ms. Budget status: ${budget.status}.`;
+    console.log(timing);
+    if (budget.status === 'over-budget') {
+      console.warn(`${process.env.GITHUB_ACTIONS === 'true' ? '::warning::' : ''}${timing}`);
+    }
+    if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `${timing}\n`);
+    await writeFile(path.join(dir, 'coverage.json'), JSON.stringify({ seed: 163, status, budget, expectedTests: this.expectedTests, reportErrors, tests: this.tests, rows: this.rows }, null, 2));
     const table = ['# Synthetic exploratory sweep', '', `Status: ${status}. Completed tests: ${this.tests.length}/${this.expectedTests}.`, '',
       'Seed: 163. Widths: 375 and 1280 CSS px. Emulation only.', '',
+      timing, '',
       '| Route | Width | Role | Check | Result |', '|---|---:|---|---|---|',
       ...this.rows.map((r) => `| ${r.route} | ${r.width} | ${r.role} | ${r.check} | ${r.result} |`),
       '', 'See coverage.json for diagnostics and deterministic monkey action sequences.',

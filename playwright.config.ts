@@ -36,6 +36,8 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
+  // Budget overruns are reported by SweepReporter; leave 50% runner headroom.
+  globalTimeout: SWEEP_ISOLATED ? 360_000 : 0,
   workers: SWEEP_ISOLATED ? (process.env.CI ? 4 : 2) : 1,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   timeout: 60_000,

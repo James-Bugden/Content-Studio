@@ -4,14 +4,27 @@ The `sweep-375`/`sweep-1280` route projects run `tests/e2e/sweep.spec.ts`; the
 `sweep-fault-375`/`sweep-fault-1280` projects run `sweep-faults.spec.ts`. Both use
 the same detectors in `sweep-checks.ts`. Existing journey projects exclude both.
 CI runs all four groups on one free `ubuntu-latest` runner, with four workers,
-one server process per group, no retries and a 240-second global browser budget.
+one server process per group and no retries. The 240-second execution budget is
+reported separately in JSON, Markdown, the job summary and an over-budget warning
+annotation. It does not fail otherwise complete tests. Isolated sweeps have a
+360-second hard global timeout in the repository Playwright config; timed-out or
+incomplete tests still fail. This gives 50% headroom above the target, so ordinary
+10–20% runner variance does not fail PR, main or weekly runs on timing alone.
 This PC uses two workers to respect its 16 GB memory limit. Each file/project
 remains serial; mutable fakes are never shared between workers. The
 sweep reuses the synthetic production bundle already built by `verify`, downloaded
 with the runner's existing GitHub CLI and a read-only automatic job token. No
 repository secret or extra action/dependency is needed. Installation is a separate
 preparation step. The existing browser
-aggregate requires the sweep and all four journey shards to pass.
+aggregate requires the sweep and all four journey shards to pass. The verified
+`sweep-server` build artifact is retained for **one day**: re-running only failed
+jobs on an older run fails at download. Start a fresh whole workflow run instead.
+
+Plain `npm run test:e2e` also runs all four sweep projects, serially against the
+shared Sheet server, alongside the journey and shadow-parity projects. Use the
+explicit four-project isolated command below for repeatability measurements.
+The journey shards select `w375`, `w1280`, `shadow-w375` and `shadow-w1280` to keep
+the sweep separate while retaining main's Sheet/shadow parity coverage.
 
 All accounts, provider adapters, edits and screenshots are synthetic. These
 tests use the existing Playwright/axe dependencies and the existing fake-only
@@ -89,7 +102,11 @@ The proofs cover missing content, overflow, axe, tabindex, keyboard traps, focus
 Escape, missing fault states, enabled writes, dead ends, dirty-warning bypass,
 page errors, console errors/warnings, hydration diagnostics, failed requests and
 unexpected HTTP responses. Normal proofs pass only when the detector rejects
-the mutation. For an actual red Playwright run, select a proof and set
+the mutation. The unsafe-write proof independently exercises 23 action labels
+(including publish, delete, schedule, discard, retry, send and approve) on seven
+surfaces: main, external dialog, body portal, icon button, submit input, menu item
+and link with button semantics. Disabled actions and read-only Schedule,
+Published and Retry links are positive controls. For an actual red Playwright run, select a proof and set
 `CS_SWEEP_MUTATION` to its name; the failure is then deliberately uncaught.
 
 Example commands on this PC (all heavy commands use the shared queue):
@@ -121,7 +138,14 @@ check; `scripts/verify-sweep.mjs` recorded overall status `passed`.
 passed all 74 sweep tests on one `ubuntu-latest` runner. The test command ran
 from 16:59:19 to 17:03:11 UTC on 2026-10-24 (232 seconds); the whole job,
 including installation and artifact upload, took 279 seconds. The four-minute
-budget applies to sweep execution, enforced by Playwright's global timeout.
+budget applies to sweep execution. This historical run predates the separate
+budget warning and 360-second hard ceiling. A second reviewed CI run,
+[40115328434](https://github.com/James-Bugden/Content-Studio/actions/runs/40115328434),
+took approximately 225 seconds. Those 225–232 seconds consumed 93–97% of the old
+240-second kill timeout (only 8–15 seconds spare). The serial 1280 px route file
+included roughly 90 seconds for owner, 84 seconds for viewer and 28.5 seconds for
+stranger. The new hard ceiling leaves 128–135 seconds above these observed runs;
+the original 240-second target remains visible for performance follow-up.
 Main-branch acceptance remains pending merge and post-merge verification.
 
 Targeted board/reporter regressions passed (14 tests), as did the production
@@ -137,8 +161,6 @@ must be reverified rather than inheriting these results.
   levels and the Replies/forbidden-promotion page headings, preserving styles.
 - [#168](https://github.com/James-Bugden/Content-Studio/issues/168): give Published
   copy regions unique labels and remove the redundant Typefully wrapper landmark.
-- [#169](https://github.com/James-Bugden/Content-Studio/issues/169): catch the Ideas
-  tab read error using the existing typed ErrorState and retry link.
 - [#172](https://github.com/James-Bugden/Content-Studio/issues/172): Next up requires
   Schedule data through the shared board's `requireSchedule` option, as Calendar
   already does on current main. Their existing handlers show the typed recovery
@@ -149,3 +171,8 @@ The shared error-identity correction is a separate change,
 [PR #171](https://github.com/James-Bugden/Content-Studio/pull/171) for
 [#170](https://github.com/James-Bugden/Content-Studio/issues/170), merged before this
 sweep. It preserves the closed error-code vocabulary across Next server graphs.
+
+The Ideas tab read-error handler tracked by
+[#169](https://github.com/James-Bugden/Content-Studio/issues/169) came from main's
+[#166](https://github.com/James-Bugden/Content-Studio/pull/166) (`8e44fb7`), not this
+PR. It is exercised by the sweep without claiming its implementation here.

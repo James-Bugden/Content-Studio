@@ -213,7 +213,15 @@ export async function designatedState(page: Page, kind: string, timeout?: number
 }
 
 export async function noWrites(page: Page) {
-  expect(await page.locator('main button:not(:disabled)').filter({ hasText: /save|approve|promote|create|send|take .*text|link this/i }).count(), 'unsafe write control during fault').toBe(0);
+  // Use accessible names (including icon buttons and submit inputs), across the
+  // whole page: dialogs/portals need not be descendants of main. Ordinary links
+  // such as Schedule, Published and read-retry navigation are safe to follow;
+  // links with role=button are actions and must satisfy the same guard.
+  const name = /^(?:confirm\s+)?(?:save|approve|promote|create|send|publish|delete|schedule|discard|retry|remove|archive|upload|import|update|apply|sync|unlink|replace|record|take\s+.*text|link this)\b/i;
+  const controls = page.getByRole('button', { name }).or(page.getByRole('menuitem', { name }));
+  for (const control of await controls.all()) {
+    if (await control.isVisible()) expect(await control.isEnabled(), 'unsafe write control during fault').toBe(false);
+  }
 }
 
 export async function guardedDraft(page: Page, draft: string, timeout?: number) {

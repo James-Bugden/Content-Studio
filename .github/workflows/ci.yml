@@ -165,11 +165,11 @@ jobs:
         run: gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name sweep-server --dir "$RUNNER_TEMP/sweep-server"
       - name: Extract verified synthetic server
         run: tar -xf "$RUNNER_TEMP/sweep-server/sweep-server.tar"
-      - name: Run isolated sweep (four minute browser budget)
+      - name: Run isolated sweep (240s reported budget, 360s hard ceiling)
         env:
           CS_E2E_PREBUILT: '1'
           CS_SWEEP_ISOLATED: '1'
-        run: npm run test:e2e -- sweep --project=sweep-375 --project=sweep-1280 --project=sweep-fault-375 --project=sweep-fault-1280 --global-timeout=240000 --reporter=list,./tests/e2e/sweep-reporter.ts
+        run: npm run test:e2e -- sweep --project=sweep-375 --project=sweep-1280 --project=sweep-fault-375 --project=sweep-fault-1280 --reporter=list,./tests/e2e/sweep-reporter.ts
       - name: Upload synthetic sweep coverage and findings
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
