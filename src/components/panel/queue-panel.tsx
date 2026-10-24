@@ -34,9 +34,9 @@ export function QueuePanel({ libraryId }: { libraryId: string }) {
   const draftRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = useCallback(async () => {
-    const response = await fetch(`/api/backlog/${encodeURIComponent(libraryId)}`, { credentials: 'same-origin', cache: 'no-store' });
-    const body = (await response.json().catch(() => null)) as ItemResponse | null;
-    if (!response.ok || !body?.ok) {
+    const response = await fetch(`/api/backlog/${encodeURIComponent(libraryId)}`, { credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
+    const body = (await response?.json().catch(() => null)) as ItemResponse | null;
+    if (!response?.ok || !body?.ok) {
       setLoad({ state: 'error', message: (body && !body.ok && body.message) || 'The idea could not be loaded. Nothing was changed.' });
       return;
     }

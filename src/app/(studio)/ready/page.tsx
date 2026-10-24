@@ -62,7 +62,7 @@ export default async function ReadyPage() {
                 </h2>
                 <p className="text-sm text-ink-soft">{g.description}</p>
                 {items.length === 0 ? (
-                  <p className="mt-2 text-sm text-ink-soft">None.</p>
+                  <div className="mt-2"><StateView kind="empty" nextStep={null} /></div>
                 ) : (
                   <ul className="mt-3 flex flex-col gap-3">
                     {items.map((item) => (

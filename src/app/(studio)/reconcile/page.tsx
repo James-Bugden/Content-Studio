@@ -65,7 +65,7 @@ export default async function ReconcilePage() {
           <h2 id="items-h" className="text-lg font-semibold">
             Items to reconcile <span className="text-sm font-normal text-ink-soft">({report.items.length})</span>
           </h2>
-          {report.items.length === 0 ? (
+          {report.items.length === 0 ? report.unreadable.length > 0 ? null : (
             <div className="mt-2">
               <StateView kind="empty" title="Everything agrees" detail="The Sheet, Markdown and schedule lineage match for every readable source." nextStep={null} />
             </div>
@@ -85,7 +85,7 @@ export default async function ReconcilePage() {
             Adapter health (this server instance)
           </h3>
           {report.events.length === 0 ? (
-            <p className="mt-2 text-sm text-ink-soft">No provider calls recorded yet in this instance.</p>
+            <div className="mt-2"><StateView kind="empty" title="No provider calls recorded yet in this instance." nextStep={null} /></div>
           ) : (
             <div tabIndex={0} role="region" aria-label="Adapter health table (scrolls sideways)" className="mt-2 overflow-x-auto rounded-lg border border-line bg-card">
               <table className="w-full min-w-[32rem] text-left text-sm">

@@ -1,6 +1,7 @@
 'use client';
 
 import { buttonClass } from './button-styles';
+import { useId } from 'react';
 
 /**
  * Truthful account of a cross-provider saga (CS-006, MASTER-SPEC section 7).
@@ -26,14 +27,15 @@ export type RecoveryPanelProps = {
 };
 
 export function RecoveryPanel({ operationId, steps, onRetry }: RecoveryPanelProps) {
+  const headingId = useId();
   const finished = steps.filter((s) => s.status === 'done' || s.status === 'skipped_already_applied').length;
   const failed = steps.filter((s) => s.status === 'failed').length;
   const remaining = steps.length - finished;
   const complete = remaining === 0;
 
   return (
-    <section aria-label="Recovery" className={`rounded-lg border bg-card p-4 ${complete ? 'border-line' : 'border-block border-l-4'}`}>
-      <h3 className="font-semibold">{complete ? 'All steps finished' : 'Some steps still need to run'}</h3>
+    <section aria-labelledby={headingId} className={`rounded-lg border bg-card p-4 ${complete ? 'border-line' : 'border-block border-l-4'}`}>
+      <h3 id={headingId} className="font-semibold">{complete ? 'All steps finished' : 'Some steps still need to run'}</h3>
       <p className="mt-1 text-sm text-ink-soft">
         {finished} of {steps.length} steps finished
         {failed > 0 ? `, ${failed} failed` : ''}. Operation <code className="font-mono [overflow-wrap:anywhere]">{operationId}</code>

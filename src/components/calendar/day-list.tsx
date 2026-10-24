@@ -3,6 +3,7 @@ import { collapseEmptyRuns, dayWorthListing, formatDayLong, runSummary, slotStat
 import { addDays } from '@/domain/schedule';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { ListSlotCard } from './slot-card';
+import { StateView } from '../state-view';
 
 /**
  * List view (UX redesign), and the phone layout of the week view. Only days with
@@ -16,7 +17,7 @@ export function DayList({ start, today, slots, className = '' }: { start: string
   return (
     <div className={`flex-col gap-5 ${className}`} data-testid="day-list">
       {days.length === 0 ? (
-        <p className="rounded-md border border-dashed border-line bg-card p-4 text-sm text-ink-soft">Nothing is planned this week, and there are no open slots.</p>
+        <StateView kind="empty" title="Nothing is planned this week, and there are no open slots." nextStep={null} />
       ) : (
         days.map((d) => {
           const past = d.date < today;

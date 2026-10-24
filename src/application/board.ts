@@ -28,8 +28,13 @@ function taipeiNow(): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
 }
 
-export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number } = {}): Promise<Board> {
-  const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null), repo.workflowSettings()]);
+export async function loadBoard(repo: ContentRepository, opts: { from?: string; days?: number; requireSchedule?: boolean } = {}): Promise<Board> {
+  const [library, schedule, settings] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch((error: unknown) => {
+    // Calendar cannot present an unreadable Schedule as an empty date range.
+    // Other board consumers can still review Library posts without it.
+    if (opts.requireSchedule) throw error;
+    return null;
+  }), repo.workflowSettings()]);
   const day = today();
   const now = taipeiNow();
   const from = opts.from ?? weekStart(day);
