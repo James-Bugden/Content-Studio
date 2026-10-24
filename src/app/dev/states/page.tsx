@@ -9,6 +9,8 @@ import { AppShell } from '@/components/app-shell';
 import { buttonClass } from '@/components/button-styles';
 import { CapabilityBanner } from '@/components/capability-banner';
 import { FilterBar, type FilterDef } from '@/components/filter-bar';
+import { StaleBacklogBanner } from '@/components/backlog/stale-backlog-banner';
+import { BacklogNavigationProvider } from '@/components/backlog/backlog-navigation';
 import { InlineResult } from '@/components/inline-result';
 import { PageHeader } from '@/components/page-header';
 import { PillarTag } from '@/components/pillar-tag';
@@ -121,6 +123,7 @@ export default async function StatesGalleryPage() {
 
       <Section id="g-capability" title="Capability banner">
         <CapabilityBanner capabilities={capabilities} />
+        <BacklogNavigationProvider><StaleBacklogBanner /></BacklogNavigationProvider>
         <p className="text-sm text-ink-soft">When every provider is ready the banner renders nothing.</p>
       </Section>
 

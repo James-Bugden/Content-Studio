@@ -4,6 +4,8 @@ import { loadBacklogOptions, loadBacklogGroups, type BacklogFilters } from '@/ap
 import { ErrorState, PageHeader, StateView } from '@/components';
 import { BacklogGroupTable } from '@/components/backlog/backlog-group-table';
 import { LibraryBacklogExplorer } from '@/components/backlog/library-backlog-explorer';
+import { LibraryBacklogTable } from '@/components/backlog/library-backlog-table';
+import { StaleBacklogBanner } from '@/components/backlog/stale-backlog-banner';
 import { FilterBar } from '@/components/filter-bar';
 import { SortDirectionToggle } from '@/components/backlog/sort-direction-toggle';
 import { PLATFORMS, type Platform } from '@/domain/enums';
@@ -59,6 +61,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const ideas = one(params, 'view') === 'ideas';
   if (!ideas) {
+    let stale = false;
     let library: Awaited<ReturnType<typeof repo.listLibrary>>;
     let queue: Awaited<ReturnType<typeof repo.listReadyQueue>> | null;
     let schedule: Awaited<ReturnType<typeof repo.listSchedule>> | null;
@@ -67,7 +70,12 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         repo.listLibrary(), repo.listReadyQueue().catch(() => null), repo.listSchedule().catch(() => null),
       ]));
     } catch (error) {
-      return <><PageHeader title="Backlog" description="Posts from Content Library." /><ErrorState code={safeBacklogErrorCode(error)} action={<a href="/backlog" className="font-semibold underline">Try again</a>} /></>;
+      const cached = repo.lastGoodLibrary?.(error);
+      if (!cached) return <><PageHeader title="Backlog" description="Posts from Content Library." /><ErrorState code={safeBacklogErrorCode(error)} action={<a href="/backlog" className="font-semibold underline">Try again</a>} /></>;
+      library = cached;
+      queue = null;
+      schedule = null;
+      stale = true;
     }
     const readiness = backlogReadiness(library, queue, schedule);
     const requestedPage = Number(one(params, 'page'));
@@ -81,6 +89,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     return (
       <>
         <PageHeader title="Backlog" description="Posts from Content Library. Filter, review and edit them here." />
+        {stale ? <StaleBacklogBanner /> : null}
         <BacklogTotalsStrip initial={libraryBacklogTotals(library)} />
         <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><span aria-current="page" className="font-semibold">Posts ({library.length})</span><a className="text-primary underline" href="/backlog?view=ideas">Ideas in Content Queue</a></nav>
         <FilterBar filters={[
@@ -91,9 +100,9 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
           { key: 'group', label: 'Group', allLabel: 'None', options: BACKLOG_GROUP_OPTIONS },
           { key: 'sort', label: 'Sort', allLabel: 'Sheet order (#)', options: BACKLOG_SORT_OPTIONS },
         ]} variant="toolbar" trailing={<SortDirectionToggle />} />
-        <LibraryBacklogExplorer
+        {stale ? <LibraryBacklogTable rows={view.rows} readOnly statuses={Object.fromEntries(readiness)} sort={filters.sort} dir={filters.dir} group={filters.group} groupTotals={view.groupTotals} /> : <LibraryBacklogExplorer
           initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
-          filters={filters} canEdit={actor.role === 'owner'} pestoOptions={view.pestoOptions} />
+          filters={filters} canEdit={actor.role === 'owner'} pestoOptions={view.pestoOptions} />}
       </>
     );
   }
