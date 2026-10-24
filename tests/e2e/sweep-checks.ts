@@ -107,7 +107,7 @@ export function observe(page: Page) {
   };
 }
 
-export async function settled(page: Page, timeout?: number) {
+export async function settled(page: Page, timeout = 30_000) {
   // Batch the same readiness conditions into one browser round trip. The shell
   // can precede streamed route content; an empty shell is not a loaded page.
   await expect.poll(async () => ({ ...await page.evaluate(() => {
@@ -118,7 +118,8 @@ export async function settled(page: Page, timeout?: number) {
       busy: document.querySelectorAll('[aria-busy="true"]').length,
       dialogLoading: document.querySelectorAll('dialog[open] [data-state="loading"]').length,
       fonts: document.fonts.status };
-  }), pending: pendingRequests.get(page)?.size ?? 0 }), { timeout }).toEqual({ main: true, content: true, titleOrState: true, busy: 0, dialogLoading: 0, fonts: 'loaded', pending: 0 });
+  }), pending: [...pendingRequests.get(page) ?? []].map(request => `${request.method()} ${new URL(request.url()).pathname}`) }), { timeout })
+    .toEqual({ main: true, content: true, titleOrState: true, busy: 0, dialogLoading: 0, fonts: 'loaded', pending: [] });
 }
 
 export async function overflow(page: Page) {

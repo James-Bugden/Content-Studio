@@ -45,7 +45,7 @@ try {
     firstHash ??= result.hash;
     if (firstHash !== result.hash) throw new Error(`Coverage/action sequences differ on run ${index}`);
   }
-  for (const name of ['load', 'overflow', 'axe', 'tab-order', 'keyboard-trap', 'focus', 'escape',
+  for (const name of ['load', 'pending-read', 'overflow', 'axe', 'tab-order', 'keyboard-trap', 'focus', 'escape',
     'missing-state', 'unsafe-write', 'dead-end', 'data-loss-guard', 'pageerror', 'console-error',
     'console-warning', 'hydration', 'requestfailed', 'router-requestfailed', 'http']) {
     const { report, result } = await run(`red-${name}`, ['--project=sweep-375', '--grep', `mutation proof: ${name}$`], { CS_SWEEP_MUTATION: name, CS_SWEEP_ISOLATED: '0' });

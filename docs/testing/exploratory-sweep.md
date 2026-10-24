@@ -88,6 +88,12 @@ response actually observed by the browser. Unexpected same-origin HTTP errors
 and failed requests fail the sweep. Assertions wait for conditions; no timing
 sleeps or axe severity filters are used.
 
+Readiness retains every condition, including completion of all observed
+same-origin non-RSC fetch/XHR reads. It allows 30 seconds for a condition to
+settle, within the existing per-test and global ceilings. A failed wait lists
+pending request methods/paths rather than only their count. A held-read mutation
+proves that an unresolved request still fails; the longer wait is not a bypass.
+
 ## Reports and detector mutations
 
 The CI `exploratory-sweep` artifact contains `sweep-report/coverage.json`, a

@@ -83,6 +83,14 @@ test('dirty guard and conflict keep synthetic edits', async ({ page }, info) => 
 // corresponding proof: that run deliberately does not catch the detector error.
 const mutations: { name: string; inject: (page: Page) => Promise<unknown>; detect: (page: Page) => Promise<unknown> }[] = [
   { name: 'load', inject: (p) => p.locator('main').evaluate((el) => el.remove()), detect: (p) => settled(p, 250) },
+  { name: 'pending-read', inject: async (p) => {
+    observe(p);
+    // A routed read held open until page teardown must never count as settled.
+    await p.route('**/api/sweep-pending', () => { /* deliberately leave the read pending */ });
+    const started = p.waitForEvent('request', request => new URL(request.url()).pathname === '/api/sweep-pending');
+    await p.evaluate(() => { void fetch('/api/sweep-pending').catch(() => undefined); });
+    await started;
+  }, detect: (p) => settled(p, 250) },
   { name: 'overflow', inject: (p) => p.locator('main').evaluate((el) => { el.style.width = '200vw'; }), detect: overflow },
   { name: 'axe', inject: (p) => p.locator('button').evaluate((el) => { el.textContent = ''; }), detect: axe },
   { name: 'tab-order', inject: (p) => p.locator('button').evaluate((el) => { el.tabIndex = -1; }), detect: keyboard },
