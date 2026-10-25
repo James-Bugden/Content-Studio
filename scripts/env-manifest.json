@@ -1,0 +1,510 @@
+{
+  "variables": [
+    {
+      "name": "CS_DATA_MODE",
+      "required": true,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "live",
+      "schemaDefault": "fake",
+      "capabilities": [
+        "sheet"
+      ]
+    },
+    {
+      "name": "CS_CONTENT_STORE",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "sheet",
+      "schemaDefault": "sheet",
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
+      "name": "CS_CONTENT_WRITE_ENABLED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "false",
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
+      "name": "CS_PARITY_WINDOW_WAIVED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
+      "name": "APP_BASE_URL",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/APP_BASE_URL",
+      "field": "password"
+    },
+    {
+      "name": "APP_TIMEZONE",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "Asia/Taipei",
+      "schemaDefault": "Asia/Taipei",
+      "capabilities": [
+        "sheet"
+      ]
+    },
+    {
+      "name": "AUTH_SECRET",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/AUTH_SECRET",
+      "field": "password"
+    },
+    {
+      "name": "AUTH_GOOGLE_ID",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/AUTH_GOOGLE_ID",
+      "field": "password"
+    },
+    {
+      "name": "AUTH_GOOGLE_SECRET",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/AUTH_GOOGLE_SECRET",
+      "field": "password"
+    },
+    {
+      "name": "CS_OWNER_GOOGLE_SUB",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/CS_OWNER_GOOGLE_SUB",
+      "field": "password"
+    },
+    {
+      "name": "CS_OWNER_EMAIL",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/CS_OWNER_EMAIL",
+      "field": "password"
+    },
+    {
+      "name": "CS_VIEWER_GOOGLE_SUBS",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "auth"
+      ],
+      "lastpass": "content-studio/CS_VIEWER_GOOGLE_SUBS",
+      "field": "password"
+    },
+    {
+      "name": "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "sheet",
+        "drive"
+      ],
+      "lastpass": "content-studio/GOOGLE_SERVICE_ACCOUNT_EMAIL",
+      "field": "password"
+    },
+    {
+      "name": "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "sheet",
+        "drive"
+      ],
+      "lastpass": "content-studio/GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
+      "field": "password"
+    },
+    {
+      "name": "GOOGLE_WRITE_ENABLED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "false",
+      "schemaDefault": "false",
+      "capabilities": [
+        "sheet",
+        "drive"
+      ]
+    },
+    {
+      "name": "CS_SHEET_ID",
+      "required": true,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "sheet"
+      ],
+      "lastpass": "content-studio/CS_SHEET_ID",
+      "field": "password"
+    },
+    {
+      "name": "CS_DRIVE_ROOT_FOLDER_ID",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "drive"
+      ],
+      "lastpass": "content-studio/CS_DRIVE_ROOT_FOLDER_ID",
+      "field": "password"
+    },
+    {
+      "name": "CS_ASSET_FOLDER_ID",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "drive"
+      ],
+      "lastpass": "content-studio/CS_ASSET_FOLDER_ID",
+      "field": "password"
+    },
+    {
+      "name": "CS_HOOK_REFERENCE_FILE_IDS",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "drive"
+      ],
+      "lastpass": "content-studio/CS_HOOK_REFERENCE_FILE_IDS",
+      "field": "password"
+    },
+    {
+      "name": "TYPEFULLY_API_KEY",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "typefully"
+      ],
+      "lastpass": "content-studio/TYPEFULLY_API_KEY",
+      "field": "password"
+    },
+    {
+      "name": "TYPEFULLY_SOCIAL_SET_ID",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "typefully"
+      ],
+      "lastpass": "content-studio/TYPEFULLY_SOCIAL_SET_ID",
+      "field": "password"
+    },
+    {
+      "name": "SUPABASE_READ_MODEL_MODE",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "off",
+      "schemaDefault": "off",
+      "capabilities": [
+        "supabase"
+      ]
+    },
+    {
+      "name": "SUPABASE_READ_MODEL_URL",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ],
+      "lastpass": "content-studio/SUPABASE_READ_MODEL_URL",
+      "field": "password"
+    },
+    {
+      "name": "SUPABASE_READ_MODEL_SERVICE_KEY",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ],
+      "lastpass": "content-studio/SUPABASE_READ_MODEL_SERVICE_KEY",
+      "field": "password"
+    },
+    {
+      "name": "SUPABASE_READ_MODEL_SOURCE_KEY",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ],
+      "lastpass": "content-studio/SUPABASE_READ_MODEL_SOURCE_KEY",
+      "field": "password"
+    },
+    {
+      "name": "RESOURCE_BASE_URL",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ],
+      "lastpass": "content-studio/RESOURCE_BASE_URL",
+      "field": "password"
+    },
+    {
+      "name": "CRON_SECRET",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "cron"
+      ],
+      "lastpass": "content-studio/CRON_SECRET",
+      "field": "password"
+    },
+    {
+      "name": "AI_PROVIDER",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "anthropic",
+      "schemaDefault": "fake",
+      "capabilities": [
+        "ai"
+      ],
+      "when": "AI_API_KEY"
+    },
+    {
+      "name": "AI_MODEL",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": "claude-sonnet-5-5",
+      "schemaDefault": null,
+      "capabilities": [
+        "ai"
+      ],
+      "when": "AI_API_KEY"
+    },
+    {
+      "name": "AI_API_KEY",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "ai"
+      ],
+      "lastpass": "content-studio/AI_API_KEY",
+      "field": "password"
+    },
+    {
+      "name": "EMBEDDING_PROVIDER",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ]
+    },
+    {
+      "name": "EMBEDDING_MODEL",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ]
+    },
+    {
+      "name": "EMBEDDING_API_KEY",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "supabase"
+      ],
+      "lastpass": "content-studio/EMBEDDING_API_KEY",
+      "field": "password"
+    },
+    {
+      "name": "CS_COMMIT_SHA",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [],
+      "managed": true
+    },
+    {
+      "name": "VERCEL_GIT_COMMIT_SHA",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [],
+      "managed": true
+    },
+    {
+      "name": "VERCEL_ENV",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [],
+      "managed": true
+    },
+    {
+      "name": "CS_TEST_MODE",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [],
+      "managed": true
+    }
+  ],
+  "capabilities": {
+    "auth": {
+      "required": true,
+      "expected": [
+        "ready"
+      ]
+    },
+    "sheet": {
+      "required": true,
+      "expected": [
+        "read_only",
+        "ready"
+      ]
+    },
+    "drive": {
+      "required": true,
+      "expected": [
+        "read_only",
+        "ready"
+      ]
+    },
+    "typefully": {
+      "required": false,
+      "expected": [
+        "ready",
+        "not_configured"
+      ]
+    },
+    "ai": {
+      "required": false,
+      "expected": [
+        "ready",
+        "not_configured"
+      ]
+    },
+    "supabase": {
+      "required": false,
+      "expected": [],
+      "reported": false
+    },
+    "cron": {
+      "required": false,
+      "expected": [],
+      "reported": false
+    },
+    "db-store": {
+      "required": false,
+      "provider": "db",
+      "expected": [
+        "not_configured"
+      ],
+      "absent": true
+    }
+  }
+}
