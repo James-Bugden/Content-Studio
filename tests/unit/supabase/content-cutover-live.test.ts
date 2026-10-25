@@ -285,6 +285,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     const body = 'Synthetic retained DB-only recovery body';
     expect(await writer.applyPatch({ operationId: 'synthetic-unlinked-edit', patchHash: hash, actorHash: hash, kind: 'library', id: 'SYN-L001', expectedVersion: '1', data: { draft_content: body } })).toMatchObject({ ok: true });
     const before = await buildReconcileReport(services.repo, services.drive, undefined, { markdownExport: services.markdownExport });
+    expect(await services.markdownExport!.status()).toContainEqual(expect.objectContaining({ libraryId: 'SYN-L001', recovery: 'restore_markdown_link' }));
     expect(before.items).toContainEqual(expect.objectContaining({ kind: 'markdown_missing', stableIds: ['SYN-L001'], action: expect.objectContaining({ label: 'Restore Drive link' }) }));
     // A recovered URL is not permission to overwrite a conflicting section.
     const text = safeReplaceSectionBody(section.text, section.section, body)!;
@@ -477,6 +478,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     read.mockImplementation(async id => ({ ...await original(id), text: 'Synthetic document with no matching section' }));
     await services.markdownExport!.run();
     expect(await services.markdownExport!.status()).toContainEqual(expect.objectContaining({ libraryId: 'SYN-L001', reason: 'markdown_missing' }));
+    expect((await services.markdownExport!.status()).find(job => job.libraryId === 'SYN-L001')?.recovery).toBeUndefined();
     services.contentBackup!.folder = new FakePrivateBackupFolder();
     expect(await services.liveCutover!.backup()).toMatchObject({ status: 'verified' });
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'false'); services = mode('db');

@@ -42,22 +42,24 @@ export class MarkdownExporter {
     }
   }
   async status() {
-    const jobs: { libraryId: string; since: number; code?: string; reason?: string }[] = [];
+    const jobs: { libraryId: string; since: number; code?: string; reason?: string; recovery?: 'restore_markdown_link' }[] = [];
     for (const job of await this.store.pendingMarkdownExports()) {
       let failure = this.failures.get(job.libraryId);
+      let recovery: 'restore_markdown_link' | undefined;
       try {
         const record = await this.repo.getLibrary(job.libraryId);
         const read = await readSection(this.drive, record);
+        if (!read.ok && read.reason === 'no_link') recovery = 'restore_markdown_link';
         // Reconstruct named blockers after restart, without claiming a worker
         // or performing any Drive write during a reconcile inspection.
         if (!read.ok && ['no_link', 'missing_section', 'duplicate_section'].includes(read.reason)) failure = { code: read.code, reason: 'markdown_missing', since: job.since };
         else if (read.ok && read.section.body !== job.expectedBody && read.section.body !== job.body) failure = { code: 'CONFLICT', reason: 'markdown_mismatch', since: job.since };
       } catch { /* Keep any known failure; pending work never disappears. */ }
-      jobs.push({ libraryId: job.libraryId, since: job.since, ...failure });
+      jobs.push({ libraryId: job.libraryId, since: job.since, ...failure, ...(recovery ? { recovery } : {}) });
     }
     const edited = new Set(await this.store.markdownBodyEdits());
     for (const record of await this.repo.listLibrary()) if (edited.has(record.value.libraryId) && !markdownFileId(record) && !jobs.some(j => j.libraryId === record.value.libraryId)) {
-      jobs.push({ libraryId: record.value.libraryId, since: 0, code: 'NOT_FOUND', reason: 'markdown_missing' });
+      jobs.push({ libraryId: record.value.libraryId, since: 0, code: 'NOT_FOUND', reason: 'markdown_missing', recovery: 'restore_markdown_link' });
     }
     return jobs;
   }

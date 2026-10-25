@@ -197,9 +197,10 @@ export async function buildReconcileReport(
           [job.reason === 'queued_body_stale' ? 'The queued body differs from the saved draft. Save the intended draft with a new operation, then retry export. Rollback is blocked.'
             : job.code === 'CONFLICT' || job.code === 'STALE_READ' ? 'Drive changed or export could not be verified. Compare the master with the saved database draft before retrying.'
             : job.code === 'VALIDATION_FAILED' ? 'The draft cannot be exported safely. Remove section headings or close code fences, save again, then retry export.'
-            : job.code === 'NOT_FOUND' ? 'Restore Drive link: give this Library ID one section with the exact saved database body, then ask the coordinator to restore its link and retry export.'
+            : job.recovery === 'restore_markdown_link' ? 'Restore Drive link: give this Library ID one section with the exact saved database body, then ask the coordinator to restore its link and retry export.'
+            : job.code === 'NOT_FOUND' ? 'The master or its unique section could not be found. Restore the link and give this Library ID one section, then retry export.'
             : job.code ? 'Drive export is unavailable. The database draft is saved. Retry export when Drive is available.'
-            : 'Awaiting verified Drive export. The database draft is saved.'], [job.libraryId], { label: job.reason === 'markdown_missing' ? 'Restore Drive link' : 'Review', href: `/review/${encodeURIComponent(job.libraryId)}` }));
+            : 'Awaiting verified Drive export. The database draft is saved.'], [job.libraryId], { label: job.recovery === 'restore_markdown_link' ? 'Restore Drive link' : 'Review', href: `/review/${encodeURIComponent(job.libraryId)}` }));
       }
     } catch { unreadable.push('Markdown export queue'); }
   }
