@@ -237,6 +237,13 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     expect(await runConfiguredSheetMirror(trigger)).toMatchObject({ status: 'replayed' });
     expect((await mode('db-read').repo.listLibrary()).length).toBe(12);
   });
+  it('retains failed backup evidence after restart without releasing an ambiguous worker or advancing verification', async () => {
+    await admitRead(); const store = new ContentCutoverStore(options, build);
+    await expect(store.exclusive('backup', async () => { store.backupJournal.failureSince = 42; throw new Error('Synthetic Drive upload failure'); })).rejects.toThrow('Synthetic Drive upload failure');
+    const restarted = new ContentCutoverStore(options, build); await restarted.refreshBackup();
+    expect(restarted.backupJournal).toEqual({ lastVerified: null, failureSince: 42 });
+    await expect(restarted.exclusive('backup', async () => true)).rejects.toBeDefined();
+  });
   it('executes exact rollback preparation before authority and after DB saves, freezes writes, and permits the actual flag round trip', async () => {
     await admitWrite(); let services = mode('db-read');
     const first = await services.liveCutover!.rollback() as { readyToFlip: string; parity: { exact: boolean; dbHash: string; sheetHash: string } };

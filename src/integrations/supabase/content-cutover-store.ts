@@ -97,6 +97,14 @@ export class ContentCutoverStore implements ContentBackupSource {
       ok.parse(await this.rest.cutoverRpc('save', { p_name: name, p_token: token, p_state: state ?? null }));
       complete = true;
       return result;
+    } catch (error) {
+      if (name === 'backup') {
+        this.backupJournal.failureSince ??= Date.now();
+        // Keep the prior verified archive AND the failed attempt visible after
+        // restart. This is evidence only; the ambiguous worker stays locked.
+        await this.rest.cutoverRpc('save', { p_name: name, p_token: token, p_state: this.backupJournal }).catch(() => {});
+      }
+      throw error;
     } finally {
       if (complete) ok.parse(await this.rest.cutoverRpc('release', { p_name: name, p_token: token }));
     }
