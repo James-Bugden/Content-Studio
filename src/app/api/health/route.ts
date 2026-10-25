@@ -10,5 +10,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   const env = serverEnv();
-  return json({ ok: true, commit: commitSha(), mode: env.CS_DATA_MODE, capabilities: capabilities() });
+  const build = env.VERCEL_GIT_COMMIT_SHA ?? env.CS_COMMIT_SHA;
+  return json({ ok: true, commit: build && /^[a-f0-9]{40}$/.test(build) ? build : commitSha(),
+    ...(env.VERCEL_DEPLOYMENT_ID ? { deploymentId: env.VERCEL_DEPLOYMENT_ID } : {}), mode: env.CS_DATA_MODE, capabilities: capabilities() });
 }

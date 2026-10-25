@@ -46,6 +46,7 @@ export const schema = z.object({
   EMBEDDING_API_KEY: z.string().min(1).optional(),
   CS_COMMIT_SHA: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
+  VERCEL_DEPLOYMENT_ID: z.string().regex(/^dpl_[A-Za-z0-9]{1,128}$/).optional(),
   VERCEL_ENV: z.string().optional(),
   CS_TEST_MODE: z.enum(['unit', 'e2e', 'ci']).optional(),
 });

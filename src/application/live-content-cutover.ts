@@ -13,14 +13,15 @@ import { databaseBodyRepository, MarkdownExporter } from './markdown-export';
 import { compareContent, PARITY_COLLECTIONS } from './content-parity';
 import { createContentBackup } from './content-backup';
 import { AppError } from '@/domain/errors';
+import { assertExpectedCutoverBuild } from './cutover-build';
 
 export type LiveCutoverOps = {
-  execute(action: 'measure' | 'backup' | 'rollback' | 'activate-read' | 'activate-db', operationId: string): Promise<unknown>;
+  execute(action: 'measure' | 'backup' | 'rollback' | 'activate-read' | 'activate-db', operationId: string, expectedBuild?: string): Promise<unknown>;
   'activate-read'(): Promise<unknown>;
   'activate-db'(): Promise<unknown>;
   status(): Promise<{ blocking?: string; backupFailure?: boolean; backupWaiver?: { by: 'owner'; on: '2026-10-25'; recordedAt: string } | null }>;
   measure(): Promise<unknown>;
-  backup(): Promise<{ status: 'backup_waived' } | { status: 'verified'; manifestHash: string; verifiedAt: number }>;
+  backup(): Promise<{ status: 'backup_waived'; waiver: { audited: true; build: string; auditHash: string } } | { status: 'verified'; manifestHash: string; verifiedAt: number }>;
   rollback(): Promise<unknown>;
 };
 
@@ -61,7 +62,12 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
   // Preparation runs in shadow/read mode so backup and exact rollback evidence
   // exist BEFORE admitting DB authority. Neither changes the configured mode.
   services.liveCutover = {
-    async execute(action, operationId) {
+    async execute(action, operationId, expectedBuild) {
+      // Refuse before any provider work or idempotency claim/replay. The store
+      // retains this exact build for both the SQL gate and activation calls.
+      if (action === 'activate-read' || action === 'activate-db') {
+        assertExpectedCutoverBuild(expectedBuild, store.build);
+      }
       // Reverify even a completed operation, but preserve its original epoch
       // and result on replay instead of performing activation a second time.
       if (action === 'activate-db') await verifyDbActivation();
@@ -104,7 +110,10 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     },
     async backup() {
       await store.assertRecovery();
-      if (!env.CS_CONTENT_BACKUP_FOLDER_ID && await store.backupWaiver()) return { status: 'backup_waived' };
+      if (!env.CS_CONTENT_BACKUP_FOLDER_ID) {
+        const receipt = await store.backupReceipt();
+        if (receipt) return receipt;
+      }
       if (env.GOOGLE_WRITE_ENABLED !== 'true') throw new AppError('FORBIDDEN', { reason: 'google_writes_disabled' });
       if (!services.contentBackup) throw new AppError('CONFIG_MISSING', { reason: 'private_backup_folder' });
       return store.exclusive('backup', async (state, token) => {

@@ -21,7 +21,8 @@
     "verify:supabase": "node scripts/verify-supabase-read-model.mjs",
     "verify": "npm run typecheck && npm run lint && npm run check:private && npm run check:secrets && npm run test",
     "env:setup": "node scripts/env-setup.mjs",
-    "env:verify": "node scripts/env-verify.mjs"
+    "env:verify": "node scripts/env-verify.mjs",
+    "cutover": "node scripts/cutover.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.128.0",
