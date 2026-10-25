@@ -360,6 +360,114 @@ end $$;
 revoke all on function public.content_studio_restore_markdown_link(text,text,text,text,bigint,text) from public,anon,authenticated;
 grant execute on function public.content_studio_restore_markdown_link(text,text,text,text,bigint,text) to service_role;
 
+-- A Sheet-sourced write (typed import or Phase C copy/write-through) must never
+-- reach a DB that is the authority. The check runs inside the same transaction
+-- and under the same epoch lock as retirement and activation, so a deployment or
+-- env mistake (db-shadow while the epoch is db) or an old import cron fails
+-- closed instead of replacing newer DB-only saves. A db-read epoch (Phase C),
+-- no epoch (first import) and a retired epoch (mode sheet) stay allowed.
+create function content_studio_private.content_studio_cutover_assert_not_db()
+returns void language plpgsql security invoker set search_path=pg_catalog,public as $$
+begin
+  perform pg_advisory_xact_lock(198,2);
+  if exists(select 1 from public.content_studio_cutover_authority where singleton and mode='db') then
+    raise exception 'DB write epoch is authoritative; Sheet-sourced writes refused' using errcode='42501';
+  end if;
+end $$;
+revoke all on function content_studio_private.content_studio_cutover_assert_not_db() from public,anon,authenticated;
+grant execute on function content_studio_private.content_studio_cutover_assert_not_db() to service_role;
+
+create or replace function public.content_studio_write_through(
+  p_operation_id text, p_patch_hash text, p_actor_hash text, p_target_kind text,
+  p_target_id text, p_expected_version bigint, p_row jsonb
+) returns jsonb language plpgsql security invoker
+set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+  perform content_studio_private.content_studio_cutover_assert_not_db();
+  return content_studio_private.content_studio_mutate('copy', p_operation_id, p_patch_hash, p_actor_hash,
+    p_target_kind, p_target_id, p_expected_version, p_row);
+end $$;
+
+create or replace function public.content_studio_import_run(
+  p_operation_id text, p_snapshot_hash text, p_actor_hash text,
+  p_counts jsonb, p_hashes jsonb, p_exceptions jsonb, p_rows jsonb
+) returns jsonb language plpgsql security invoker
+set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+  item jsonb;
+  response jsonb;
+  old_operation public.content_studio_operations%rowtype;
+  kind text;
+begin
+  perform content_studio_private.content_studio_cutover_assert_not_db();
+  if p_operation_id is null or length(p_operation_id) not between 1 and 180
+     or p_snapshot_hash is null or p_snapshot_hash !~ '^[0-9a-f]{64}$'
+     or p_actor_hash is null or p_actor_hash !~ '^[0-9a-f]{64}$'
+     or p_rows is null or jsonb_typeof(p_rows) <> 'array'
+     or p_counts is null or jsonb_typeof(p_counts) <> 'object'
+     or p_hashes is null or jsonb_typeof(p_hashes) <> 'object'
+     or p_exceptions is null or jsonb_typeof(p_exceptions) <> 'array' then
+    raise exception 'invalid import envelope' using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_array_elements(p_exceptions) e
+    where jsonb_typeof(e) <> 'object' or e ->> 'class' is null
+      or e ->> 'class' not in ('formula_display','number_formatting','trailing_whitespace','blank_boolean','boolean_formatting','timestamp_formatting','refused_numeric','refused_size')
+      or not (e ?& array['class','collection','field','hash'])
+      or e - array['class','collection','field','hash'] <> '{}'
+      or e ->> 'hash' is null or e ->> 'hash' !~ '^[0-9a-f]{64}$'
+      or e ->> 'collection' is null or e ->> 'collection' not in ('library','queue','schedule','workflow_settings')
+      or e ->> 'field' is null or not (e ->> 'class' = 'refused_size' and e ->> 'field' = '@row') and not exists (
+        select 1 from pg_attribute a where a.attnum > 0 and not a.attisdropped
+          and a.attrelid = (case e ->> 'collection'
+            when 'schedule' then 'public.content_studio_schedule'
+            when 'workflow_settings' then 'public.content_studio_workflow_settings'
+            else 'public.content_studio_posts' end)::regclass
+          and a.attname = e ->> 'field')) then
+    raise exception 'unclassified import exception' using errcode = '22023';
+  end if;
+  foreach kind in array array['library','queue','schedule','workflow_settings'] loop
+    if (p_counts ->> kind)::integer is distinct from
+       (select count(*)::integer from jsonb_array_elements(p_rows) r where r ->> 'target_kind' = kind)
+       or p_hashes ->> kind is null or p_hashes ->> kind !~ '^[0-9a-f]{64}$' then
+      raise exception 'import count/hash mismatch' using errcode = '22023';
+    end if;
+  end loop;
+  if p_counts - array['library','queue','schedule','workflow_settings'] <> '{}'
+     or p_hashes - array['library','queue','schedule','workflow_settings'] <> '{}'
+     or exists (select 1 from jsonb_array_elements(p_rows) r group by r ->> 'target_kind', r ->> 'target_id' having count(*) > 1) then
+    raise exception 'invalid import collections or duplicate target' using errcode = '22023';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended('content_studio_authority', 0));
+  select * into old_operation from public.content_studio_operations where operation_id = p_operation_id;
+  if found then
+    if old_operation.mode <> 'import' or old_operation.patch_hash <> p_snapshot_hash or old_operation.target_kind <> 'import'
+       or old_operation.actor_hash <> p_actor_hash then
+      return jsonb_build_object('ok',false,'code','CONFLICT','steps',
+        jsonb_build_array(jsonb_build_object('state','conflict','reason','operation_reused_with_different_patch')), 'revision',null);
+    end if;
+    return old_operation.result || jsonb_build_object('replayed', true);
+  end if;
+  -- Children may precede their parent in a complete snapshot.
+  set constraints content_studio_schedule_parent_content_id_fkey deferred;
+  for item in select value from jsonb_array_elements(p_rows) loop
+    response := content_studio_private.content_studio_mutate('import', p_operation_id,
+      encode(sha256(convert_to(item::text, 'UTF8')), 'hex'), p_actor_hash,
+      item ->> 'target_kind', item ->> 'target_id', (item ->> 'expected_version')::bigint, item -> 'row');
+    if not (response ->> 'ok')::boolean then
+      raise exception 'import row conflict' using errcode = '40001';
+    end if;
+  end loop;
+  insert into public.content_studio_import_runs(operation_id,snapshot_hash,counts,hashes,exceptions)
+    values (p_operation_id,p_snapshot_hash,p_counts,p_hashes,p_exceptions);
+  response := jsonb_build_object('ok',true,'code',null,'steps',jsonb_build_array(jsonb_build_object('state','applied')), 'revision',null);
+  insert into public.content_studio_operations(operation_id,patch_hash,target_kind,target_id,actor_hash,result,mode)
+    values (p_operation_id,p_snapshot_hash,'import','import',p_actor_hash,response,'import');
+  return response;
+end;
+$$;
+
 -- Explicit inventory, no grants to browser roles or PUBLIC execution.
 do $$ declare f regprocedure; begin
   for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid=p.pronamespace

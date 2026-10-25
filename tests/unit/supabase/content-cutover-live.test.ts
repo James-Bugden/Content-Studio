@@ -343,6 +343,50 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     expect((await query('select * from content_studio_operations where operation_id=$1', [w.operationId])).rows).toHaveLength(0);
     expect((await query("select * from content_studio_posts where library_id='SYN-RACE' or current_hook='Must never commit'")).rows).toHaveLength(0);
   });
+  it('R2 epoch import: a db-shadow Sheet import cannot overwrite a DB-only save while the epoch is db', async () => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    const dbOnly = 'Synthetic DB-only hook the Sheet never received';
+    const services = mode('db'); const row = await services.repo.getLibrary('SYN-L001');
+    // Sheet writes fail with 503 for the whole scenario; the DB save is still durable.
+    vi.mocked(GoogleSheetTransport.prototype.writeCells).mockRejectedValue(new AppError('PROVIDER_UNAVAILABLE'));
+    expect(await services.repo.updateLibrary({ operationId: 'synthetic-db-only-save', actor: { role: 'owner', sub: 'synthetic-owner' }, target: { libraryId: 'SYN-L001' }, expectedRevision: row.revision, patch: { currentHook: dbOnly } })).toMatchObject({ ok: true });
+    const hook = async () => (await query("select current_hook from content_studio_posts where library_id='SYN-L001'")).rows[0]!.current_hook;
+    expect(await hook()).toBe(dbOnly);
+    const counts = async () => (await query('select (select count(*) from content_studio_import_runs)::int as runs, (select count(*) from content_studio_operations)::int as ops')).rows[0];
+    const before = await counts();
+    // A deployment or env mistake puts the importer back into db-shadow.
+    mode('db-shadow');
+    await expect(runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: '55555555-5555-4555-8555-555555555555' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(await hook()).toBe(dbOnly);
+    expect((await query('select mode from content_studio_cutover_authority')).rows[0]).toMatchObject({ mode: 'db' });
+    expect(await counts()).toEqual(before);
+    // The SQL itself refuses both Sheet-sourced paths, not only the TypeScript guard.
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(new SheetsContentRepository(sheet), { sourceKey: 'synthetic_source' }), await importVersions(new SupabaseContentDb(options)), hash);
+    await expect(query('select content_studio_import_run($1,$2,$3,$4,$5,$6,$7)', ['synthetic-db-epoch-import', e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows])).rejects.toMatchObject({ code: '42501' });
+    const version = (await query("select row_version from content_studio_posts where library_id='SYN-L001'")).rows[0]!.row_version;
+    await expect(query('select content_studio_write_through($1,$2,$3,$4,$5,$6,$7)', ['synthetic-db-epoch-copy', hash, hash, 'library', 'SYN-L001', version, { current_hook: 'Sheet value' }])).rejects.toMatchObject({ code: '42501' });
+    expect(await hook()).toBe(dbOnly);
+    expect(await counts()).toEqual(before);
+    expect((await query("select * from content_studio_operations where operation_id in ('synthetic-db-epoch-import','synthetic-db-epoch-copy')")).rows).toHaveLength(0);
+  });
+  it('R2 epoch import: imports before activation, Phase C db-read imports and write-through, and post-retirement reimports still work', async () => {
+    // Before any epoch: the beforeEach import already succeeded; a repair import must too.
+    await admitRead(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    expect(await runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: '66666666-6666-4666-8666-666666666666' })).toMatchObject({ status: 'completed' });
+    await admitRead();
+    await new ContentCutoverStore(options, build).activate('db-read');
+    expect((await query('select mode from content_studio_cutover_authority')).rows[0]).toMatchObject({ mode: 'db-read' });
+    // Phase C: epoch db-read, Sheet-first save copies through, and a repair import still runs.
+    const services = mode('db-read'), first = (await services.repo.listLibrary())[0]!;
+    const saved = await services.repo.updateLibrary({ operationId: 'synthetic-db-read-copy', actor: { role: 'owner', sub: 'synthetic-owner' }, target: { libraryId: first.value.libraryId }, expectedRevision: first.revision, patch: { currentHook: 'Synthetic Phase C copied hook' } });
+    expect(saved.steps).toContainEqual(expect.objectContaining({ step: 'write_through', status: 'done' }));
+    expect(await runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: '77777777-7777-4777-8777-777777777777' })).toMatchObject({ status: 'completed' });
+    expect((await query('select current_hook from content_studio_posts where library_id=$1', [first.value.libraryId])).rows[0]).toMatchObject({ current_hook: 'Synthetic Phase C copied hook' });
+    // After retirement the Sheet is authoritative again and a reimport is the only way back.
+    await query("update content_studio_cutover_authority set mode='sheet'");
+    mode('db-shadow');
+    expect(await runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: '88888888-8888-4888-8888-888888888888' })).toMatchObject({ status: 'completed' });
+  });
   it('R2 parity: inspection reloads a durable conflict into a fresh exporter without claiming or saving', async () => {
     await admitWrite(); const exporter = mode('db').contentCutover!.exporter; await exporter.run();
     sheet.externalEdit(SHEET_TABS.library.name, 2, 2, 'Synthetic external edit'); await exporter.run();

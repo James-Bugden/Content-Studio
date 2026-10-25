@@ -292,9 +292,17 @@ the stated mode/write flag rather than reusing an old deployment environment.
 
 ## Every deployment after DB activation
 
-**Never use Vercel instant rollback, or promote a pre-db/Sheet/db-read
+**Never use Vercel instant rollback, or promote a pre-db/Sheet/`db-shadow`/db-read
 deployment, while a DB epoch is active.** Its embedded flags/code can resume
-Sheet-first writes or omit the epoch checks. To roll back code safely, retain
+Sheet-first writes, run Sheet imports or omit the epoch checks. `db-shadow`
+imports must stay OFF during a DB epoch: keep typed and legacy import
+schedules disabled and never start an owner import. The database refuses
+`content_studio_import_run` and `content_studio_write_through` inside the
+transaction while the recorded epoch mode is `db` (error 42501, nothing
+recorded), so a wrong flag or an old import cron fails closed instead of
+replacing DB-only saves. Imports remain valid before activation, in the
+`db-read` Phase C epoch and after a retire, where the new import is required
+before re-activation. To roll back code safely, retain
 `CS_CONTENT_STORE=db` and freeze writes, then redeploy forward from a reviewed
 epoch-compatible commit with the current Production flags. Verify the deployed
 SHA and DB epoch before resuming. To roll back authority, follow the full
