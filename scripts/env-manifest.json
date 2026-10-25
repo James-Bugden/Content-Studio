@@ -34,6 +34,17 @@
       ]
     },
     {
+      "name": "CS_PARITY_WINDOW_WAIVED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
       "name": "APP_BASE_URL",
       "required": true,
       "schemaRequired": false,
