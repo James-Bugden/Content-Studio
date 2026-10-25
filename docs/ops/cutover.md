@@ -65,6 +65,35 @@ function Invoke-Cutover([string] $action, [string] $operationId = [guid]::NewGui
 }
 ```
 
+For every flag change below, run this deployment procedure from a clean
+checkout of the reviewed SHA, linked to the existing **Content Studio** project.
+`vercel link` is needed only if that private link is absent; select the existing
+project and verify the team/project before proceeding. Do not create a project.
+For a variable absent from Production use `vercel env add NAME production`
+once; for subsequent changes use `update`. Enter the value from the ordered
+step interactively. Environment changes require a new deployment; promoting an
+old deployment does not inject new flags. ([Vercel env](https://vercel.com/docs/cli/env),
+[deploy](https://vercel.com/docs/cli/deploy), [inspect](https://vercel.com/docs/cli/inspect).)
+
+```powershell
+git status --porcelain # must be empty
+git rev-parse HEAD     # must equal the full independently reviewed SHA
+vercel project inspect
+vercel env update CS_CONTENT_STORE production
+vercel env update CS_CONTENT_WRITE_ENABLED production
+# Also add/update the per-mode enable flag named by the current step.
+# CLI deployments must have CS_COMMIT_SHA set to this exact reviewed SHA if
+# VERCEL_GIT_COMMIT_SHA is not supplied by the Git-integrated deployment.
+vercel deploy --prod
+# Set cutoverBase to the newly returned deployment URL before these checks.
+vercel inspect $cutoverBase --wait
+Invoke-RestMethod -Uri "$cutoverBase/api/health"
+```
+
+Verify the full deployment Git identity in Vercel and health's displayed
+SHA/store. The same procedure implements each rollback command below: supply
+the stated mode/write flag rather than reusing an old deployment environment.
+
 ## Ordered commands, checks and rollback
 
 1. **Prepare while Sheet remains authoritative.** Keep store `sheet`. Disable
