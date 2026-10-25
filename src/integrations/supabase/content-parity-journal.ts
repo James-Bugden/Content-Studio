@@ -23,17 +23,31 @@ const imported = z.object({ snapshotAt: count, evidence });
 export class SupabaseContentParityJournal extends ContentParityJournal {
   override readonly scope = 'durable database history';
   private readonly store: ContentShadowStore;
+  private persistenceGap = false;
+  private persistenceFailureVersion = 0;
   constructor(options: SupabaseContentDbOptions) { super(); this.store = new ContentShadowStore(options); }
+  override samplePersistenceFailed() {
+    this.persistenceGap = true; this.persistenceFailureVersion++;
+    super.samplePersistenceFailed();
+  }
   override async prepare() {
     const rows = await this.store.rows({ kind: 'eq.imported', order: 'at.desc,event_id.desc', limit: '1' });
     this.lastImport = rows.length ? imported.parse(eventSchema.parse(rows[0]).payload).snapshotAt : null;
   }
   override async record(sample: ParitySample) {
     const payload = sampleSchema.parse(sample);
+    const failureVersion = this.persistenceFailureVersion;
     try {
       z.object({ ok: z.literal(true) }).parse(await this.store.rpc('sample', { p_event_id: randomUUID(), p_sample: payload }));
-    } catch (error) { this.available = false; this.gap = 'SAMPLE_PERSISTENCE_FAILED'; throw error; }
+    } catch (error) { this.samplePersistenceFailed(); throw error; }
     super.record(payload);
+    // Only a subsequent save can recover a persistence gap. A late completion
+    // or overlapping save started before the failure cannot erase it, and saving
+    // a sample cannot establish that unavailable history is readable again.
+    if (failureVersion === this.persistenceFailureVersion) {
+      this.persistenceGap = false;
+      if (this.gap === 'SAMPLE_PERSISTENCE_FAILED') { this.gap = null; this.available = true; }
+    }
   }
   override async refresh() {
     try {
@@ -51,8 +65,8 @@ export class SupabaseContentParityJournal extends ContentParityJournal {
           this.lastRun = payload.evidence;
         }
       }
-      this.available = this.gap !== 'SAMPLE_PERSISTENCE_FAILED';
-      if (this.gap !== 'SAMPLE_PERSISTENCE_FAILED') this.gap = null;
+      this.available = !this.persistenceGap;
+      this.gap = this.persistenceGap ? 'SAMPLE_PERSISTENCE_FAILED' : null;
     } catch {
       // Never present stale cached measurements as a pass after failed reload.
       this.available = false; this.gap = 'HISTORY_UNAVAILABLE'; this.samples.length = 0; this.lastImport = null; this.lastRun = null;

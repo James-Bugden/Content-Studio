@@ -87,6 +87,7 @@ export class ContentParityJournal {
     if (evidence) this.lastRun = structuredClone({ counts: evidence.counts, hashes: evidence.hashes, exceptions: evidence.exceptions, snapshotHash: evidence.snapshotHash });
   }
   failed(at: number) { this.failureSince ??= at; }
+  samplePersistenceFailed() { this.available = false; this.gap = 'SAMPLE_PERSISTENCE_FAILED'; }
   record(sample: ParitySample): void | Promise<void> {
     this.samples.push(sample);
     if (this.samples.length > 10_000) this.samples.shift();
@@ -130,10 +131,15 @@ export class ContentParityJournal {
     const comparisons = samples.filter(s => !s.facts.some(f => f.field === 'provider'));
     const sampledEquality = PARITY_COLLECTIONS.every(collection => {
       const rows = comparisons.filter(s => s.collection === collection);
+      const failedReads = samples.filter(s => s.collection === collection && s.facts.some(f => f.field === 'provider')).length;
       const fields = rows.reduce((n, s) => n + s.fields, 0), equal = rows.reduce((n, s) => n + s.equal, 0);
-      return rows.every(s => s.idsEqual && s.blocking === 0 && s.lagMs !== null) && (fields === 0 || equal / fields >= .999);
+      // Full-import read-back cannot prove adapters or derived views. Every
+      // collection needs a measured comparison; tolerate just one failed read
+      // alongside it, never an unmeasured or persistently failing read path.
+      return rows.length > 0 && failedReads <= 1 && rows.every(s => s.idsEqual && s.blocking === 0 && s.lagMs !== null) && (fields === 0 || equal / fields >= .999);
     });
-    const measuredReady = fullImportReady && sampledEquality && lagP95 !== null && lagP95 <= 900_000 && !longFailure(windowStart, now);
+    const measuredReady = fullImportReady && sampledEquality && lagP95 !== null && lagP95 <= 900_000
+      && lagMs !== null && lagMs <= 900_000 && !longFailure(windowStart, now);
     const windowReady = fullImportReady && this.available && samples.length >= 200 && samples.every(s => s.lagMs !== null) && daysGreen >= 7 && collections.every(c => c.idsEqual === true && c.fieldEquality !== null && c.fieldEquality >= 99.9 && c.blocking === 0)
       && lagP95 !== null && lagP95 <= 900_000 && lagMs !== null && lagMs <= 900_000 && !longFailure(windowStart, now);
     const ready = this.available && this.gap === null && (waiver ? measuredReady : windowReady);
@@ -170,8 +176,8 @@ export function shadowContentRepository(sheet: ContentRepository, db: ContentRep
             : { at: Date.now(), collection, idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
               facts: [{ collection, field: 'provider', kind: 'changed' as const, fingerprint: evidenceHash(collection).slice(0, 16) }] };
           const saved = await boundedComparison(Promise.resolve(journal.record(observation)).then(() => true).catch(() => false));
-          if (!saved) { journal.available = false; journal.gap = 'SAMPLE_PERSISTENCE_FAILED'; }
-        } catch { journal.available = false; journal.gap = 'SAMPLE_PERSISTENCE_FAILED'; }
+          if (!saved) journal.samplePersistenceFailed();
+        } catch { journal.samplePersistenceFailed(); }
       }
       return result;
     };

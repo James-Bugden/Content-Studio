@@ -150,10 +150,27 @@ from pg_proc p where p.proname like 'content_studio_shadow_%';
    remain classified in the exception ledger (blank checkboxes are equivalent;
    formula display is preserved). All stored-field differences are unclassified
    and block. Refused rows block. Missing old-format full-import evidence blocks.
-   Lag p95 over measured samples must be <=15 minutes; no samples means unknown.
-   A provider timeout is counted and displayed, but does not veto exact full-import
-   parity. Failed equality, unknown exceptions, failed persistence and failed lag
-   remain red, as does an import failure lasting over one hour. Current snapshot age remains visible as an import-lag item.
+   Full-import parity is close to a read-back: it compares typed inputs with the
+   rows `import_run` just wrote, using `jsonb_populate_record` on both sides.
+   It catches missing/retained rows and stored-field defects; it does not prove
+   adapter, derived-view or read-path parity. Independent sampled comparisons
+   therefore stay mandatory for **all six collections**: library, queue, ready,
+   schedule, queue_summary and workflow_settings. Each needs at least one
+   successful comparison in the evaluation window, including explicitly measured
+   empty results. Unmeasured collections and 100% provider failures never pass.
+   At most **one provider failure per collection** in that window is tolerated,
+   and only alongside a successful comparison for that collection. A second
+   failure blocks even if equality among successful comparisons is 100%.
+   Provider failures are counted and displayed, not treated as equal comparisons.
+   Sampled ID equality, >=99.9% field equality and zero unclassified blocking
+   differences remain required. Lag p95 over measured samples and **current
+   import age at evaluation time** must both be <=15 minutes; missing lag blocks.
+   Failed equality, unknown exceptions, failed persistence and failed lag remain
+   red, as does an import failure lasting over one hour. A sample-persistence gap
+   survives history refresh (including failed refresh); it clears on a subsequent
+   successfully persisted sample. A late completion of the timed-out sample or
+   a concurrent save begun before the failure cannot clear it. History outages
+   still require a successful refresh before availability returns.
    Without the waiver, 199 samples or six days fail; all collection, freshness,
    unknown-lag and one-hour failure checks still apply. The legacy per-day rule
    remains for that unwaived historical gate only.

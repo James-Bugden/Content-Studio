@@ -14,6 +14,15 @@ const sample = (at = now, collection: ParitySample['collection'] = 'library'): P
 const counts = { library: 1, queue: 1, schedule: 1, workflow_settings: 1 };
 const evidence = { snapshotHash: 'a'.repeat(64), counts, hashes: { library: 'a'.repeat(64), queue: 'a'.repeat(64), schedule: 'a'.repeat(64), workflow_settings: 'a'.repeat(64) }, exceptions: [] };
 const event = (kind: string, at: number, payload: unknown) => ({ event_id: crypto.randomUUID(), kind, at: new Date(at).toISOString(), payload });
+function waived() {
+  const j = new ContentParityJournal();
+  j.lastImport = now;
+  j.lastRun = { ...evidence, fullParity: { rows: 4, idsEqual: true, fields: 10000, equal: 10000, unclassified: 0 },
+    windowWaiver: { by: 'owner', on: '2026-10-25', recordedAt: new Date(now).toISOString() } };
+  return j;
+}
+const provider = (collection: ParitySample['collection']): ParitySample => ({ ...sample(now, collection), idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
+  facts: [{ collection, field: 'provider', kind: 'changed', fingerprint: 'b'.repeat(16) }] });
 function green(n = 200, days = 7) {
   const j = new ContentParityJournal();
   for (let i = 0; i < n; i++) j.record(sample(now - (i % days + 1) * day + i, PARITY_COLLECTIONS[i % 6]!));
@@ -23,7 +32,7 @@ function green(n = 200, days = 7) {
   j.lastRun = { ...evidence, fullParity: { rows: 4, fields: 4, equal: 4, idsEqual: true, unclassified: 0 } };
   return j;
 }
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); setTelemetrySink(null); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); setTelemetrySink(null); });
 
 it('pins Authorization, API key, no-store and the configured abort deadline at the REST boundary', async () => {
   const request = vi.fn<typeof fetch>(async (_, init) => {
@@ -76,6 +85,52 @@ it('a failed sample RPC preserves the Sheet response but names a persistence gap
   expect(j.samples).toHaveLength(0);
   expect(j.summary()).toMatchObject({ ready: false, available: false, gap: 'SAMPLE_PERSISTENCE_FAILED' });
 });
+it('refresh cannot erase a genuine sample-persistence gap; a later saved sample recovers it', async () => {
+  const request = vi.fn<typeof fetch>(async () => { throw new DOMException('Synthetic timeout', 'TimeoutError'); });
+  const j = new SupabaseContentParityJournal({ ...options, fetch: request });
+  await expect(j.record(sample())).rejects.toThrow();
+  request.mockImplementation(async () => json([]));
+  await j.refresh();
+  expect(j.summary(now)).toMatchObject({ available: false, gap: 'SAMPLE_PERSISTENCE_FAILED', ready: false, sampleCount: 0 });
+  // A history outage must not forget the unsaved sample either.
+  request.mockImplementation(async () => json({}, 500)); await j.refresh();
+  expect(j.summary(now)).toMatchObject({ gap: 'HISTORY_UNAVAILABLE', ready: false });
+  request.mockImplementation(async () => json([])); await j.refresh();
+  expect(j.summary(now)).toMatchObject({ available: false, gap: 'SAMPLE_PERSISTENCE_FAILED', ready: false });
+  request.mockImplementation(async () => json({ ok: true })); await j.record(sample());
+  expect(j.summary(now)).toMatchObject({ available: true, gap: null, sampleCount: 1 });
+});
+it('an earlier in-flight save cannot clear a newer persistence failure or a history outage', async () => {
+  let finish!: (response: Response) => void;
+  const request = vi.fn<typeof fetch>().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    .mockImplementation(async () => json({}, 500));
+  const j = new SupabaseContentParityJournal({ ...options, fetch: request });
+  const earlier = j.record(sample());
+  await expect(j.record(sample())).rejects.toThrow();
+  finish(json({ ok: true })); await earlier;
+  expect(j.summary(now)).toMatchObject({ available: false, gap: 'SAMPLE_PERSISTENCE_FAILED' });
+  await j.refresh();
+  request.mockImplementation(async () => json({ ok: true })); await j.record(sample());
+  expect(j.summary(now)).toMatchObject({ available: false, gap: 'HISTORY_UNAVAILABLE' });
+  request.mockImplementation(async () => json([])); await j.refresh();
+  expect(j.summary(now)).toMatchObject({ available: true, gap: null });
+});
+it('a persistence-budget timeout survives late success and refresh until the next saved sample', async () => {
+  vi.useFakeTimers();
+  let finish!: (response: Response) => void;
+  const request = vi.fn<typeof fetch>().mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    .mockImplementation(async () => json([]));
+  const j = new SupabaseContentParityJournal({ ...options, fetch: request });
+  vi.spyOn(j, 'prepare').mockResolvedValue();
+  const repo = new SheetsContentRepository(new FakeSheetTransport());
+  const pending = shadowContentRepository(repo, repo, j, () => true).listLibrary();
+  await vi.advanceTimersByTimeAsync(501); await pending;
+  expect(j.summary()).toMatchObject({ available: false, gap: 'SAMPLE_PERSISTENCE_FAILED' });
+  finish(json({ ok: true })); await vi.advanceTimersByTimeAsync(0); await j.refresh();
+  expect(j.summary()).toMatchObject({ available: false, gap: 'SAMPLE_PERSISTENCE_FAILED' });
+  request.mockImplementation(async () => json({ ok: true })); await j.record(sample());
+  expect(j.summary()).toMatchObject({ available: true, gap: null });
+});
 it('reload is idempotent, uses capture lag, loads prepare and reconstructs failures across restarts', async () => {
   const rows = [event('imported', now - 1000, { snapshotAt: now - 900000, evidence: { ...evidence, fullParity: { rows: 4, fields: 4, equal: 4, idsEqual: true, unclassified: 0 } } }), event('sample', now, sample()), event('failed', now - 3600001, {})];
   const request = vi.fn<typeof fetch>(async url => String(url).includes('/rpc/') ? json([...rows].sort((a,b) => a.at.localeCompare(b.at))) : json([rows[0]]));
@@ -120,12 +175,13 @@ it.each([[3600000, true], [3600001, false]])('pins one-hour repaired failure dur
 it('owner waiver requires durable audit and full-import measurements, preserves every measured gate', () => {
   vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25');
   const j = new ContentParityJournal();
-  j.record(sample());
+  PARITY_COLLECTIONS.forEach(c => j.record(sample(now, c)));
+  j.lastImport = now;
   const fullParity = { rows: 4, idsEqual: true, fields: 10000, equal: 10000, unclassified: 0 };
   j.lastRun = { ...evidence, fullParity };
   expect(j.summary(now).ready).toBe(false); // switch alone is not evidence
   j.lastRun.windowWaiver = { by: 'owner', on: '2026-10-25', recordedAt: new Date(now).toISOString() };
-  expect(j.summary(now)).toMatchObject({ ready: true, daysGreen: 0, sampleCount: 1, windowWaiver: { by: 'owner', on: '2026-10-25' } });
+  expect(j.summary(now)).toMatchObject({ ready: true, daysGreen: 0, sampleCount: 6, windowWaiver: { by: 'owner', on: '2026-10-25' } });
   // Outlier >15 minutes does not veto p95; neither does a named timeout.
   j.samples.push(...Array.from({ length: 99 }, () => sample()), { ...sample(), lagMs: 910000 }, { ...sample(), lagMs: null, blocking: 1, idsEqual: false, facts: [{ collection: 'library', field: 'provider', kind: 'changed', fingerprint: 'a'.repeat(16) }] });
   expect(j.summary(now)).toMatchObject({ ready: true, providerFailures: 1, lagP95: 100 });
@@ -143,4 +199,43 @@ it('owner waiver requires durable audit and full-import measurements, preserves 
   j.record(sample()); j.lastRun.fullParity = undefined; expect(j.summary(now).ready).toBe(false);
   j.lastRun.fullParity = fullParity; j.gap = 'SAMPLE_PERSISTENCE_FAILED'; expect(j.summary(now).ready).toBe(false);
   j.gap = null; vi.stubEnv('CS_PARITY_WINDOW_WAIVED', undefined); expect(j.summary(now).ready).toBe(false);
+});
+
+it('waiver probe W-A: a lone equal library comparison cannot stand in for five unmeasured read paths', () => {
+  vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25');
+  const j = waived(); j.samples.push(sample());
+  expect(j.summary(now)).toMatchObject({ ready: false, sampleCount: 1 });
+});
+it('waiver probe W-B: permanently failing derived views never pass exact full-import parity', () => {
+  vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25');
+  const j = waived();
+  for (const c of ['library', 'queue', 'schedule', 'workflow_settings'] as const) j.samples.push(sample(now, c));
+  for (let i = 0; i < 50; i++) j.samples.push(provider('queue_summary'), provider('ready'));
+  expect(j.summary(now)).toMatchObject({ ready: false, providerFailures: 100 });
+});
+it.each(PARITY_COLLECTIONS)('waiver requires an independent successful comparison for %s, even when its DB rows are empty', collection => {
+  vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25');
+  const j = waived();
+  j.samples.push(...PARITY_COLLECTIONS.filter(c => c !== collection).map(c => sample(now, c)));
+  expect(j.summary(now).ready).toBe(false);
+  j.samples.push(provider(collection)); expect(j.summary(now).ready).toBe(false);
+  // A measured empty result is a successful comparison; no observation is not.
+  j.samples.push({ ...sample(now, collection), fields: 0, equal: 0 });
+  expect(j.summary(now)).toMatchObject({ ready: true, providerFailures: 1 });
+  j.samples.push(provider(collection));
+  expect(j.summary(now)).toMatchObject({ ready: false, providerFailures: 2 });
+});
+it.each([[null, false], [900000, true], [900001, false], [3 * day, false]] as const)('waiver probe W-C: current import age %s must satisfy the 15-minute boundary', (age, ready) => {
+  vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25');
+  const j = waived(); j.lastImport = age === null ? null : now - age;
+  for (const c of PARITY_COLLECTIONS) j.samples.push(sample(now - 3 * day, c));
+  expect(j.summary(now)).toMatchObject({ ready, lagMs: age });
+});
+it('waiver blocks an unclassified sampled mismatch even at exactly 99.9 percent equality', () => {
+  vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25');
+  const j = waived(); j.samples.push(...PARITY_COLLECTIONS.map(c => sample(now, c)));
+  j.samples[0]!.equal = 9990;
+  expect(j.summary(now).ready).toBe(true);
+  j.samples[0]!.blocking = 1;
+  expect(j.summary(now).ready).toBe(false);
 });

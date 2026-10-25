@@ -134,6 +134,39 @@ describe('DB-9 unapplied migration / actual SQL fencing and durable evidence', (
       expect((await claim(operation,next)).result).toMatchObject({ fullParity: { rows: 1, fields: 1, equal: 0, idsEqual: true, unclassified: 1 } });
     } finally { await db.raw.exec('drop trigger synthetic_corrupt on content_studio_posts; drop function public.synthetic_corrupt()'); }
   });
+  it('subtracts classified source differences but preserves formula-display and blank-boolean equivalences', async () => {
+    await claim();
+    const counts = {library:1,queue:0,schedule:0,workflow_settings:0}, hashes = Object.fromEntries(Object.keys(counts).map(k=>[k,hash]));
+    const rows = [{ target_kind: 'library', target_id: 'SYN-199', expected_version: null,
+      row: { hook_score: 1, next_action: 'Synthetic', queue_for_schedule: false, has_image: 'No', content_angle: 2, review_status: 'Approved', current_hook: 'Synthetic' } }];
+    const exceptions = [
+      { class: 'number_formatting', collection: 'library', field: 'hook_score', hash },
+      { class: 'trailing_whitespace', collection: 'library', field: 'next_action', hash },
+      { class: 'blank_boolean', collection: 'library', field: 'queue_for_schedule', hash },
+      { class: 'formula_display', collection: 'library', field: 'has_image', hash },
+    ];
+    await query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8)', [operation,token,hash,hash,counts,hashes,exceptions,rows]);
+    expect((await claim(operation,next)).result).toMatchObject({ fullParity: { rows: 1, fields: 7, equal: 5, idsEqual: true, unclassified: 0 } });
+  });
+  it('detects a missing imported ID even when a retained row keeps total counts equal', async () => {
+    await claim();
+    await db.raw.exec("create function public.synthetic_replace() returns trigger language plpgsql as $$ begin new.library_id := 'SYN-RETAINED'; return new; end $$; create trigger synthetic_replace before insert on content_studio_posts for each row execute function public.synthetic_replace();");
+    try {
+      const counts = {library:1,queue:0,schedule:0,workflow_settings:0}, hashes = Object.fromEntries(Object.keys(counts).map(k=>[k,hash]));
+      const rows = [{ target_kind: 'library', target_id: 'SYN-199', expected_version: null, row: { current_hook: 'Synthetic' } }];
+      await query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8)', [operation,token,hash,hash,counts,hashes,[],rows]);
+      expect((await query('select count(*)::int as n from content_studio_posts')).rows).toEqual([{ n: 1 }]);
+      expect((await claim(operation,next)).result).toMatchObject({ fullParity: { rows: 1, fields: 1, equal: 0, idsEqual: false, unclassified: 1 } });
+    } finally { await db.raw.exec('drop trigger synthetic_replace on content_studio_posts; drop function public.synthetic_replace()'); }
+  });
+  it.each(['2026-10-26', '', 'owner'])('rejects invalid SQL waiver %s before importing or recording evidence', async waiver => {
+    await claim();
+    const counts = {library:0,queue:0,schedule:0,workflow_settings:0}, hashes = Object.fromEntries(Object.keys(counts).map(k=>[k,hash]));
+    expect(sqlState(await expectRejection(query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8,$9)', [operation,token,hash,hash,counts,hashes,[],[],waiver])))).toBe('22023');
+    expect((await query('select * from content_studio_import_runs')).rows).toHaveLength(0);
+    expect((await query('select * from content_studio_shadow_events')).rows).toHaveLength(0);
+    expect((await query('select status from content_studio_shadow_jobs')).rows).toEqual([{ status: 'running' }]);
+  });
   it('history excludes old samples but preserves carry-in import/failure and limits the result', async () => {
     const insert = (kind: string, at: string) => query('insert into content_studio_shadow_events(event_id,at,kind,payload) values($1,$2,$3,$4)', [crypto.randomUUID(),at,kind,{}]);
     await insert('sample', '2020-01-01'); await insert('imported', '2020-01-01'); await insert('failed', '2020-01-02'); await insert('failed', '2020-01-03');
