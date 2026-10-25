@@ -18,9 +18,9 @@ export type LiveCutoverOps = {
   execute(action: 'measure' | 'backup' | 'rollback' | 'activate-read' | 'activate-db', operationId: string): Promise<unknown>;
   'activate-read'(): Promise<unknown>;
   'activate-db'(): Promise<unknown>;
-  status(): Promise<{ blocking?: string }>;
+  status(): Promise<{ blocking?: string; backupFailure?: boolean; backupWaiver?: { by: 'owner'; on: '2026-10-25'; recordedAt: string } | null }>;
   measure(): Promise<unknown>;
-  backup(): Promise<{ status: string; manifestHash: string; verifiedAt: number }>;
+  backup(): Promise<{ status: 'backup_waived' } | { status: 'verified'; manifestHash: string; verifiedAt: number }>;
   rollback(): Promise<unknown>;
 };
 
@@ -54,7 +54,16 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     execute: (action, operationId) => store.operation(action, operationId, () => services.liveCutover![action]()),
     'activate-read': () => store.activate('db-read'),
     'activate-db': () => store.activate('db'),
-    async status() { await store.assertGate(mode === 'db' ? 'db' : 'db-read'); return { blocking: store.blocking }; },
+    async status() {
+      // Read waiver independently: a red admission check must not conceal the
+      // recorded decision, and the decision must never conceal that failure.
+      const backupWaiver = env.CS_BACKUP_GATE_WAIVED && !env.CS_CONTENT_BACKUP_FOLDER_ID ? await store.backupWaiver() : undefined;
+      if (backupWaiver) await store.refreshBackup();
+      const waiverStatus = backupWaiver ? { backupWaiver, backupFailure: store.backupJournal.failureSince !== null } : {};
+      try { await store.assertGate(mode === 'db' ? 'db' : 'db-read'); }
+      catch (error) { if (!backupWaiver) throw error; return { blocking: 'cutover_admission_unavailable', ...waiverStatus }; }
+      return { blocking: store.blocking, ...waiverStatus };
+    },
     async measure() {
       if (mode === 'db') throw new AppError('FORBIDDEN', { reason: 'imports_disabled_in_db_mode' });
       await services.contentParity!.prepare();
@@ -77,6 +86,7 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     },
     async backup() {
       await store.assertRecovery();
+      if (!env.CS_CONTENT_BACKUP_FOLDER_ID && await store.backupWaiver()) return { status: 'backup_waived' };
       if (env.GOOGLE_WRITE_ENABLED !== 'true') throw new AppError('FORBIDDEN', { reason: 'google_writes_disabled' });
       if (!services.contentBackup) throw new AppError('CONFIG_MISSING', { reason: 'private_backup_folder' });
       return store.exclusive('backup', async (state, token) => {

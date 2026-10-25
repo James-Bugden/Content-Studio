@@ -27,6 +27,7 @@ import { POST as draftRoute } from '@/app/api/library/[libraryId]/draft/route';
 import { POST as typefullyRoute } from '@/app/api/schedule/[contentId]/typefully/create/route';
 import { readSection } from '@/application/markdown-source';
 import { safeReplaceSectionBody } from '@/domain/markdown';
+import { GET as backupGET } from '@/app/api/ops/content-backup/reconcile/route';
 vi.mock('@/lib/auth/config', () => ({ auth: async () => ({ user: { id: '100000000000000000001' } }) }));
 
 let db: TestDatabase, sheet: FakeSheetTransport, transport: ReturnType<typeof vi.fn<typeof fetch>>;
@@ -47,7 +48,7 @@ afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
   for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
   vi.stubEnv('VERCEL_GIT_COMMIT_SHA', ''); resetServices(); resetEnvCache(); sheet = new FakeSheetTransport();
-  await db.raw.exec('truncate content_studio_cutover_authority,content_studio_cutover_jobs,content_studio_cutover_state,content_studio_cutover_evidence,content_studio_markdown_export,content_studio_shadow_jobs,content_studio_shadow_lease,content_studio_shadow_events,content_studio_import_runs,content_studio_operations,content_studio_posts,content_studio_schedule,content_studio_workflow_settings,content_studio_audit_events,content_studio_row_history restart identity cascade');
+  await db.raw.exec('truncate content_studio_backup_waivers,content_studio_cutover_authority,content_studio_cutover_jobs,content_studio_cutover_state,content_studio_cutover_evidence,content_studio_markdown_export,content_studio_shadow_jobs,content_studio_shadow_lease,content_studio_shadow_events,content_studio_import_runs,content_studio_operations,content_studio_posts,content_studio_schedule,content_studio_workflow_settings,content_studio_audit_events,content_studio_row_history restart identity cascade');
   const e = buildTypedImport(await buildSheetMirrorSnapshot(new SheetsContentRepository(sheet), { sourceKey: 'synthetic_source' }), new Map(), hash);
   e.operationId = 'owner:synthetic_source:22222222-2222-4222-8222-222222222222';
   await query('select content_studio_import_run($1,$2,$3,$4,$5,$6,$7)', [e.operationId, e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows]);
@@ -112,6 +113,118 @@ async function admitWrite(activate = true) {
 }
 
 describe('DB-10 live composition / real SQL over mocked REST and Google boundaries', () => {
+  async function waiveBackup() {
+    const importId = await new SupabaseContentDb(options).latestImportId();
+    return query('select content_studio_cutover_waive_backup($1,$2,$3,$4,$5) as result', [token, build, importId, '2026-10-25', hash]);
+  }
+  async function waivedPreparation() {
+    await admitWrite(false);
+    await query("delete from content_studio_cutover_evidence where name='backup'");
+    vi.stubEnv('CS_BACKUP_GATE_WAIVED', '2026-10-25');
+    vi.stubEnv('CS_CONTENT_BACKUP_FOLDER_ID', '');
+    await waiveBackup();
+    return mode('db-read');
+  }
+  it('CS-066: reapplying the additive migration is safe', async () => {
+    await waivedPreparation();
+    const before = (await query('select * from content_studio_backup_waivers')).rows;
+    await db.raw.exec(readFileSync('supabase/migrations/20261025000700_content_backup_gate_waiver.sql', 'utf8'));
+    expect((await query('select * from content_studio_backup_waivers')).rows).toEqual(before);
+    await expect(new ContentCutoverStore(options, build).activate('db')).resolves.toBeDefined();
+  });
+  it.each(['date', 'build', 'actor', 'import', 'id'])('CS-066: audited action rejects invalid %s without a record', async fault => {
+    const importId = await new SupabaseContentDb(options).latestImportId();
+    const args = [token, build, importId, '2026-10-25', hash];
+    args[{ date: 3, build: 1, actor: 4, import: 2, id: 0 }[fault]!] = fault === 'id' ? null : 'invalid';
+    await expect(query('select content_studio_cutover_waive_backup($1,$2,$3,$4,$5)', args)).rejects.toBeDefined();
+    expect((await query('select * from content_studio_backup_waivers')).rows).toHaveLength(0);
+  });
+  it('CS-066: completed activation and waived backup replays cannot outlive env/audit revocation', async () => {
+    await waivedPreparation();
+    const store = new ContentCutoverStore(options, build);
+    await store.operation('activate-db', '33333333-3333-4333-8333-333333333333', () => store.activate('db'));
+    const services = mode('db');
+    const backupId = '44444444-4444-4444-8444-444444444444';
+    expect(await services.liveCutover!.execute('backup', backupId)).toEqual({ status: 'backup_waived' });
+    await db.raw.exec('delete from content_studio_backup_waivers');
+    await expect(store.operation('activate-db', '33333333-3333-4333-8333-333333333333', () => store.activate('db'))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(services.liveCutover!.execute('backup', backupId)).rejects.toMatchObject({ code: 'CONFIG_MISSING' });
+    await waiveBackup(); vi.stubEnv('CS_BACKUP_GATE_WAIVED', undefined);
+    await expect(store.operation('activate-db', '33333333-3333-4333-8333-333333333333', () => store.activate('db'))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it('CS-066: red admission and a past backup failure stay visible beside the waiver', async () => {
+    await waivedPreparation();
+    await query("insert into content_studio_cutover_state(name,state) values('backup',$1) on conflict(name) do update set state=excluded.state", [{ lastVerified: null, failureSince: Date.now() }]);
+    await query("delete from content_studio_cutover_evidence where name='parity'");
+    const services = mode('db-read');
+    const report = await buildReconcileReport(services.repo, services.drive, Date.now(), { liveCutover: services.liveCutover });
+    expect(report.items.map(i => i.kind)).toEqual(expect.arrayContaining(['backup_waived', 'cutover_blocked', 'backup_fresh']));
+  });
+  it('CS-066: requires env AND an audited owner decision; env removal revokes waiver', async () => {
+    const services = await waivedPreparation();
+    expect(await services.liveCutover!['activate-db']()).toMatchObject({ mode: 'db' });
+    const rows = (await query('select * from content_studio_backup_waivers')).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ by: 'owner', on: '2026-10-25', actor_hash: hash, build });
+    expect(rows[0]!.recorded_at).toBeDefined();
+    await waiveBackup(); expect((await query('select * from content_studio_backup_waivers')).rows).toEqual(rows);
+    await expect(query('select content_studio_cutover_waive_backup($1,$2,$3,$4,$5)', [token, build, rows[0]!.import_id, '2026-10-25', 'c'.repeat(64)])).rejects.toMatchObject({ code: '23505' });
+    vi.stubEnv('CS_BACKUP_GATE_WAIVED', undefined);
+    await expect(new ContentCutoverStore(options, build).activate('db')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    vi.stubEnv('CS_BACKUP_GATE_WAIVED', '2026-10-25');
+    await db.raw.exec('delete from content_studio_backup_waivers');
+    await expect(new ContentCutoverStore(options, build).activate('db')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it.each(['missing-rehearsal', 'inexact', 'hash', 'issues', 'stale', 'plan', 'private-reference', 'parity', 'lag', 'freeze', 'sha', 'import', 'failed-backup', 'obsolete-backup', 'backup-failure'])('CS-066: waiver never hides %s', async fault => {
+    const services = await waivedPreparation();
+    await expect(new ContentCutoverStore(options, build).assertFlip('db')).resolves.toBeUndefined();
+    if (fault === 'missing-rehearsal') await query("delete from content_studio_cutover_evidence where name='rehearsal'");
+    if (fault === 'inexact') await query("update content_studio_cutover_evidence set payload=payload || '{\"exact\":false}' where name='rehearsal'");
+    if (fault === 'hash') await query("update content_studio_cutover_evidence set payload=payload || jsonb_build_object('sheetHash',$1::text) where name='rehearsal'", ['c'.repeat(64)]);
+    if (fault === 'issues') await query("update content_studio_cutover_evidence set payload=payload || '{\"differences\":[{}]}' where name='rehearsal'");
+    if (fault === 'stale') await query("update content_studio_cutover_evidence set at=clock_timestamp()-interval '25 hours' where name='rehearsal'");
+    if (fault === 'plan') await query("update content_studio_cutover_evidence set payload=payload-'dailyPlanBackup' where name='phase-c'");
+    if (fault === 'private-reference') await query("update content_studio_cutover_evidence set payload=payload-'privateEvidence' where name='phase-c'");
+    if (fault === 'parity') await query("update content_studio_cutover_evidence set payload=jsonb_set(payload,'{samples,library,idsEqual}','false') where name='parity'");
+    if (fault === 'lag') await query("update content_studio_cutover_evidence set payload=jsonb_set(payload,'{samples,library,lagMs}','900001') where name='parity'");
+    if (fault === 'freeze') await query("update content_studio_cutover_evidence set payload=payload || '{\"freeze\":false}' where name='phase-c'");
+    if (fault === 'sha') await db.raw.query("update content_studio_backup_waivers set build=$1", ['c'.repeat(40)]);
+    if (fault === 'import') await db.raw.query("update content_studio_backup_waivers set import_id='synthetic-old'");
+    if (fault === 'failed-backup') await query("insert into content_studio_cutover_evidence select 'backup',build,import_id,'{\"manifestHash\":\"bad\"}',clock_timestamp() from content_studio_cutover_evidence where name='rehearsal'");
+    if (fault === 'obsolete-backup') await query("insert into content_studio_cutover_evidence select 'backup',build,'synthetic-old-import',jsonb_build_object('manifestHash',$1::text),clock_timestamp() from content_studio_cutover_evidence where name='rehearsal'", [hash]);
+    if (fault === 'backup-failure') await query("insert into content_studio_cutover_state(name,state) values('backup',$1) on conflict(name) do update set state=excluded.state", [{ lastVerified: null, failureSince: Date.now() }]);
+    await expect(services.liveCutover!['activate-db']()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it('CS-066: waiver reports honestly through worker/cron/reconcile, preserves export mismatch and emergency rollback', async () => {
+    const preparation = await waivedPreparation();
+    expect(await preparation.liveCutover!.backup()).toEqual({ status: 'backup_waived' });
+    await preparation.liveCutover!['activate-db']();
+    const services = mode('db'); // env admission permits missing folder, but never creates an archive
+    const response = await backupGET(new Request('https://synthetic.example/api/ops/content-backup/reconcile', { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }));
+    expect(response.status).toBe(200); expect(await response.json()).toEqual({ ok: true, status: 'backup_waived' });
+    const col = sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === 'Current Hook');
+    await services.contentCutover!.exporter.run();
+    sheet.externalEdit(SHEET_TABS.library.name, 2, col, 'Synthetic hand edit');
+    const report = await buildReconcileReport(services.repo, services.drive, Date.now(), { liveCutover: services.liveCutover, contentCutover: services.contentCutover });
+    expect(report.items.some(i => i.title === 'Backup gate waived by owner' && i.facts.join(' ').includes('2026-10-25'))).toBe(true);
+    expect(report.items.some(i => i.kind === 'backup_fresh')).toBe(false);
+    expect(report.items.some(i => i.kind === 'export_mismatch' && i.severity === 'blocking')).toBe(true);
+    await expect(services.liveCutover!.rollback()).rejects.toMatchObject({ code: 'CONFLICT' });
+    vi.stubEnv('CS_BACKUP_GATE_WAIVED', undefined); resetEnvCache();
+    await expect(new ContentCutoverStore(options, build).backupWaiver()).resolves.toBeNull();
+  });
+  it('CS-066: configured folder still verifies backups, even with an audit and env switch', async () => {
+    await waivedPreparation();
+    vi.stubEnv('CS_CONTENT_BACKUP_FOLDER_ID', env.CS_CONTENT_BACKUP_FOLDER_ID);
+    const services = mode('db-read');
+    await expect(services.liveCutover!['activate-db']()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    services.contentBackup!.folder = new FakePrivateBackupFolder();
+    expect(await services.liveCutover!.backup()).toMatchObject({ status: 'verified', manifestHash: expect.any(String) });
+    expect(await services.liveCutover!['activate-db']()).toMatchObject({ mode: 'db' });
+    vi.spyOn(services.contentBackup!.folder, 'assertPrivate').mockRejectedValue(new AppError('FORBIDDEN'));
+    await expect(services.liveCutover!.backup()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
   it.each(['db', 'db-read'].flatMap(storeMode => ['draft', 'typefully'].map(action => [storeMode, action])))('R2 route: refreshes an initially green %s status and blocks %s before any provider call', async (storeMode, action) => {
     if (storeMode === 'db') await admitWrite();
     else { await admitRead(); await new ContentCutoverStore(options, build).activate('db-read'); }
