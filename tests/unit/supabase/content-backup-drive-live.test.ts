@@ -52,6 +52,7 @@ describe('DB-10 real private service-account Drive backup transport', () => {
       { permissions: [{ ...permission, type: 'domain' }] },
       { permissions: [{ ...permission, emailAddress: 'unexpected@example.com' }] },
       { permissions: [{ ...permission, role: 'unknown' }] },
+      { permissions: [{ ...permission, deleted: true }] },
       { permissions: [{ ...permission, permissionDetails: [] }] },
     ]) {
       request.mockImplementation(async (url, init) => new URL(String(url)).pathname.endsWith(`/${id}/permissions`) ? Response.json(bad) : original(url, init));

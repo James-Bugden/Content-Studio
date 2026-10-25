@@ -292,6 +292,15 @@ the stated mode/write flag rather than reusing an old deployment environment.
 
 ## Every deployment after DB activation
 
+**Never use Vercel instant rollback, or promote a pre-db/Sheet/db-read
+deployment, while a DB epoch is active.** Its embedded flags/code can resume
+Sheet-first writes or omit the epoch checks. To roll back code safely, retain
+`CS_CONTENT_STORE=db` and freeze writes, then redeploy forward from a reviewed
+epoch-compatible commit with the current Production flags. Verify the deployed
+SHA and DB epoch before resuming. To roll back authority, follow the full
+freeze/drain -> backup -> exact rollback -> frozen Sheet redeploy -> retire ->
+resume sequence below. Changing a flag without redeploying is insufficient.
+
 Merges to main deploy Production, including the authority-notes PR. Keep store
 `db`, both authority flags and the deliberate write freeze/resume setting.
 Inspect the deployed SHA, read epoch and compiled `CUTOVER_CONTRACT`; compatible
@@ -313,7 +322,10 @@ select public.content_studio_cutover_retire(
   '<dbHash-from-the-successful-rollback-response>');
 ```
 
-Use the generated exact rehearsal hash within 15 minutes. This idempotent,
+Use the generated exact rehearsal hash within **15 minutes**. Retirement
+refuses a rehearsal older than that, any non-exact rehearsal, and any post or
+Schedule write after the rehearsal. If deployment/smoke takes longer, repeat
+the frozen rollback operation and use its new hash before retiring. This idempotent,
 audited operation marks the epoch `sheet`; stale DB deployments then refuse
 instead of serving a database that has missed new Sheet writes. Only after
 retirement may Sheet writes resume. A later DB cutover requires a **new import
@@ -328,7 +340,22 @@ parity and required linked Markdown sections. It never disables an enabled local
 write boundary permanently on a refusal. Do not flip to Sheet until readiness
 succeeds. A DB body on a row without a Markdown destination is named
 `markdown_missing` with a relink/restore action; it creates no impossible outbox
-job and rolls back through its exact Sheet body. Missing/duplicate/externally
+job and rolls back through its exact Sheet body. The named coordinator recovery
+**Restore Drive link** (`restore_markdown_link`) clears this item in db mode:
+privately restore one unique Library-ID section containing the exact saved DB
+body, verify its Drive revision, then call the existing service-role
+`content_studio_restore_markdown_link` RPC with a fresh operation ID, SHA-256
+request and actor hashes, the stable Library ID, the freshly read `row_version`,
+and that verified Drive URL. This fixed-field RPC refuses invalid URLs, missing
+rows and rows already linked; normal patches still cannot edit source identity.
+It preserves the other source fields. Never patch tables directly, import over DB
+authority, erase history, or invent an export baseline. The RPC rechecks the
+epoch inside its transaction and records the before-image/audit. A stale
+version refuses and the same operation replays without a second write. Run
+Markdown repair and Sheet export; require no pending job, exact linked body,
+and disappearance of that Library ID's `markdown_missing` item. The Review link
+opens the affected post; this is a coordinator recovery procedure, not a new
+browser link editor. Missing/duplicate/externally
 edited *linked* sections remain named blockers for dependent Markdown recovery;
 backups continue even while these jobs are pending. Restore the unique section
 and exact expected body from private evidence, then retry export. No external
@@ -349,8 +376,10 @@ without changing content row versions. Read-only parity never claims or saves
 an export lease. Workers release in `finally` on settled failures. A lost claim
 or release response cannot strand a lock forever: leases expire in two minutes.
 A stale/expired token cannot renew, persist or release a newer worker's lease.
-The worker rechecks/renews its token immediately before a Google write; provider
-requests have bounded timeouts. Independent-backend tests must retain Google's
+The worker rechecks/renews its token immediately before a Google write.
+Sheet writes/appends have a **30-second client timeout**, below the two-minute
+lease; a timeout is ambiguous and is never automatically retried.
+Independent-backend tests must retain Google's
 residual non-CAS race acceptance, including a process paused across a provider
 request. Token fencing cannot cancel a Google write already accepted upstream.
 

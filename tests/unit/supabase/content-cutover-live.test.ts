@@ -23,6 +23,11 @@ import { ContentExporter } from '@/application/content-export';
 import { SupabaseContentDb } from '@/integrations/supabase/content-db';
 import { POST } from '@/app/api/ops/content-cutover/route';
 import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
+import { POST as draftRoute } from '@/app/api/library/[libraryId]/draft/route';
+import { POST as typefullyRoute } from '@/app/api/schedule/[contentId]/typefully/create/route';
+import { readSection } from '@/application/markdown-source';
+import { safeReplaceSectionBody } from '@/domain/markdown';
+vi.mock('@/lib/auth/config', () => ({ auth: async () => ({ user: { id: '100000000000000000001' } }) }));
 
 let db: TestDatabase, sheet: FakeSheetTransport, transport: ReturnType<typeof vi.fn<typeof fetch>>;
 const build = 'a'.repeat(40), hash = 'b'.repeat(64), token = '11111111-1111-4111-8111-111111111111';
@@ -107,6 +112,262 @@ async function admitWrite(activate = true) {
 }
 
 describe('DB-10 live composition / real SQL over mocked REST and Google boundaries', () => {
+  it.each(['db', 'db-read'].flatMap(storeMode => ['draft', 'typefully'].map(action => [storeMode, action])))('R2 route: refreshes an initially green %s status and blocks %s before any provider call', async (storeMode, action) => {
+    if (storeMode === 'db') await admitWrite();
+    else { await admitRead(); await new ContentCutoverStore(options, build).activate('db-read'); }
+    vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    vi.stubEnv('APP_BASE_URL', 'https://synthetic.example');
+    vi.stubEnv('CS_OWNER_GOOGLE_SUB', '100000000000000000001'); vi.stubEnv('AUTH_GOOGLE_ID', 'synthetic-client'); vi.stubEnv('AUTH_GOOGLE_SECRET', 'synthetic-secret');
+    const services = mode(storeMode);
+    const library = await services.repo.getLibrary('SYN-L001'), schedule = (await services.repo.listSchedule())[0]!;
+    const section = await readSection(services.drive, library); expect(section.ok).toBe(true);
+    // Prime the cached status green, then change durable authority WITHOUT
+    // recreating Services. Both the route check and its refresh are necessary.
+    expect(await services.liveCutover!.status()).toEqual({ blocking: undefined });
+    await query("update content_studio_cutover_authority set contract='schema-2:older-contract'");
+    const providerSpies = [vi.mocked(GoogleDriveGateway.prototype.readText), vi.mocked(GoogleDriveGateway.prototype.writeText),
+      vi.spyOn(services.typefully, 'findByIdempotencyKey'), vi.spyOn(services.typefully, 'listDrafts'), vi.spyOn(services.typefully, 'createDraft'),
+      vi.spyOn(services.typefully, 'getDraft'), vi.spyOn(services.typefully, 'updateDraft'), vi.spyOn(services.typefully, 'getPublication')];
+    for (const spy of providerSpies) spy.mockClear();
+    const path = action === 'draft' ? '/api/library/SYN-L001/draft' : `/api/schedule/${schedule.value.contentId}/typefully/create`;
+    const request = new Request(`https://synthetic.example${path}`, { method: 'POST', headers: { origin: 'https://synthetic.example', 'content-type': 'application/json' },
+      body: JSON.stringify({ operationId: 'synthetic-blocked-route', expectedRevision: schedule.revision, expectedSheetRevision: library.revision, expectedSectionHash: section.ok ? section.section.bodyHash : '', proposed: 'Synthetic blocked draft' }) });
+    const response = action === 'draft' ? await draftRoute(request, { params: Promise.resolve({ libraryId: 'SYN-L001' }) }) : await typefullyRoute(request, { params: Promise.resolve({ contentId: schedule.value.contentId }) });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'FORBIDDEN', details: { reason: 'cutover_contract_mismatch' } });
+    for (const spy of providerSpies) expect(spy).not.toHaveBeenCalled();
+  });
+  it('R2 epochs: refuses a db-read deployment against DB authority before any Sheet-first write', async () => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    const stale = mode('db-read');
+    const write = vi.spyOn(sheet, 'writeCells'), append = vi.spyOn(sheet, 'appendRow');
+    await expect(stale.repo.listLibrary()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(stale.repo.updateLibrary({ operationId: 'synthetic-old-deployment', actor: { role: 'owner', sub: 'synthetic-owner' }, target: { libraryId: 'SYN-L001' }, expectedRevision: 'old', patch: { currentHook: 'Must not overwrite DB' } })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(write).not.toHaveBeenCalled(); expect(append).not.toHaveBeenCalled();
+  });
+  it('R2 epochs: cannot downgrade an active DB epoch with otherwise green read evidence', async () => {
+    await admitWrite();
+    await expect(query('select content_studio_cutover_gate($1,$2)', ['db-read', build])).resolves.toBeDefined();
+    await expect(query('select content_studio_cutover_activate($1,$2,$3)', ['db-read', build, CUTOVER_CONTRACT])).rejects.toMatchObject({ code: '42501', message: 'DB authority exists' });
+    expect((await query('select mode from content_studio_cutover_authority')).rows[0]!.mode).toBe('db');
+  });
+  it('R2 epochs: activation refuses only the contract mismatch with all proofs green', async () => {
+    await admitWrite(false);
+    await expect(query('select content_studio_cutover_gate($1,$2)', ['db', build])).resolves.toBeDefined();
+    await expect(query('select content_studio_cutover_activate($1,$2,$3)', ['db', build, 'schema-2:cutover-9'])).rejects.toMatchObject({ code: '42501', message: 'contract mismatch' });
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it.each(['post-write', 'schedule-write', 'expired', 'inexact'])('R2 retire: refuses %s with every other retirement precondition green', async fault => {
+    await admitWrite();
+    const ready = await mode('db').liveCutover!.rollback() as { parity: { dbHash: string } };
+    if (fault === 'post-write' || fault === 'schedule-write') {
+      vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+      const writer = mode('db').contentCutover!.exporter.db as SupabaseContentDb;
+      const schedule = (await writer.listSchedule())[0]!;
+      expect(await writer.applyPatch({ operationId: `synthetic-after-rehearsal-${fault}`, actorHash: hash, patchHash: hash,
+        kind: fault === 'post-write' ? 'library' : 'schedule', id: fault === 'post-write' ? 'SYN-L001' : schedule.content_id,
+        expectedVersion: fault === 'post-write' ? '1' : String(schedule.row_version), data: { [fault === 'post-write' ? 'current_hook' : 'hook']: 'Synthetic post-rehearsal write' } })).toMatchObject({ ok: true });
+    } else if (fault === 'expired') {
+      // Put all content before the rehearsal: age must be the ONLY red guard.
+      await query("update content_studio_posts set updated_at=clock_timestamp()-interval '17 minutes'");
+      await query("update content_studio_schedule set updated_at=clock_timestamp()-interval '17 minutes'");
+      await query("update content_studio_cutover_evidence set at=clock_timestamp()-interval '16 minutes' where name='rehearsal'");
+    } else await query("update content_studio_cutover_evidence set payload=jsonb_set(payload,'{exact}','false') where name='rehearsal'");
+    await expect(query('select content_studio_cutover_retire($1,$2,$3)', [token, build, ready.parity.dbHash])).rejects.toMatchObject({ code: '42501', message: 'verified rollback required' });
+    expect((await query('select mode from content_studio_cutover_authority')).rows[0]!.mode).toBe('db');
+  });
+  it('R2 lease: an expired owner cannot save even before another worker claims', async () => {
+    await query('select content_studio_cutover_claim($1,$2)', ['sheet-export', token]);
+    const before = (await query("select state from content_studio_cutover_state where name='sheet-export'")).rows[0]!.state;
+    await query("update content_studio_cutover_state set lease_until=clock_timestamp()-interval '1 second' where name='sheet-export'");
+    await expect(query('select content_studio_cutover_save($1,$2,$3)', ['sheet-export', token, { checkpoints: [], issues: [], reports: [] }])).rejects.toMatchObject({ code: '42501', message: 'stale worker' });
+    expect((await query("select state from content_studio_cutover_state where name='sheet-export'")).rows[0]!.state).toEqual(before);
+  });
+  it('R2 lease: an operation is taken over only after expiry and its old completion is fenced', async () => {
+    const next = '33333333-3333-4333-8333-333333333333';
+    const claim = (t: string, result: unknown = null) => query('select content_studio_cutover_operation($1,$2,$3,$4) as result', [token, hash, t, result]);
+    expect((await claim(token)).rows[0]!.result).toEqual({ status: 'acquired' });
+    await expect(claim(next)).rejects.toMatchObject({ code: '55000', message: 'operation in progress' });
+    expect((await query('select token from content_studio_cutover_jobs')).rows[0]!.token).toBe(token);
+    await query("update content_studio_cutover_jobs set at=clock_timestamp()-interval '121 seconds'");
+    expect((await claim(next)).rows[0]!.result).toEqual({ status: 'acquired' });
+    await expect(claim(token, { ok: true })).rejects.toMatchObject({ code: '55000' });
+    expect((await claim(next, { ok: true })).rows[0]!.result).toEqual({ status: 'completed', result: { ok: true } });
+  });
+  it.each(['writeCells', 'appendRow'] as const)('R2 fence: expired export refuses before Sheet %s', async action => {
+    await admitWrite(); const services = mode('db'), exporter = services.contentCutover!.exporter;
+    await exporter.run();
+    if (action === 'writeCells') await query("update content_studio_posts set current_hook='Synthetic fenced change',row_version=row_version+1 where library_id='SYN-L001'");
+    else {
+      vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+      const writer = mode('db').contentCutover!.exporter.db as SupabaseContentDb;
+      expect(await writer.insertQueueIdea({ operationId: 'synthetic-fenced-append', actorHash: hash, patchHash: hash, kind: 'queue', id: 'SYN-FENCED', expectedVersion: null, data: { current_hook: 'Synthetic fenced idea' } })).toMatchObject({ ok: true });
+    }
+    const provider = vi.mocked(GoogleSheetTransport.prototype[action]); provider.mockClear();
+    const read = vi.mocked(GoogleSheetTransport.prototype.readTab), readOriginal = read.getMockImplementation()!;
+    let reads = 0;
+    read.mockImplementation(async (...args) => {
+      const result = await readOriginal(...args);
+      // The second read is the fresh row precondition, immediately before the
+      // fence/write. Expiry occurs even if the fence is deleted by a mutant.
+      if (args[0] === SHEET_TABS[action === 'writeCells' ? 'library' : 'queue'].name && ++reads === 2) {
+        await query("update content_studio_cutover_state set lease_until=clock_timestamp()-interval '1 second' where name='sheet-export'");
+      }
+      return result;
+    });
+    const original = ContentShadowStore.prototype.cutoverRpc;
+    let fences = 0;
+    vi.spyOn(ContentShadowStore.prototype, 'cutoverRpc').mockImplementation(async function(this: ContentShadowStore, name, params) {
+      if (name === 'fence' && params.p_name === 'sheet-export') fences++;
+      return original.call(this, name, params);
+    });
+    await exporter.run().catch(error => expect(error).toMatchObject({ code: 'FORBIDDEN' }));
+    expect(provider).not.toHaveBeenCalled(); expect(fences).toBeGreaterThan(0);
+    expect(exporter.journal.issues.size).toBeGreaterThan(0);
+  });
+  it('R2 fence: expired Markdown worker refuses before Drive write', async () => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true'); const services = mode('db');
+    const writer = services.contentCutover!.exporter.db as SupabaseContentDb;
+    expect(await writer.applyPatch({ operationId: 'synthetic-fenced-markdown', patchHash: hash, actorHash: hash, kind: 'library', id: 'SYN-L001', expectedVersion: '1', data: { draft_content: 'Synthetic fenced body' } })).toMatchObject({ ok: true });
+    const read = vi.mocked(GoogleDriveGateway.prototype.readText), readOriginal = read.getMockImplementation()!;
+    read.mockImplementation(async (...args) => {
+      const result = await readOriginal(...args);
+      await query("update content_studio_cutover_state set lease_until=clock_timestamp()-interval '1 second' where name='markdown-export'");
+      return result;
+    });
+    const original = ContentShadowStore.prototype.cutoverRpc; let fences = 0;
+    vi.spyOn(ContentShadowStore.prototype, 'cutoverRpc').mockImplementation(async function(this: ContentShadowStore, name, params) {
+      if (name === 'fence' && params.p_name === 'markdown-export') fences++;
+      return original.call(this, name, params);
+    });
+    vi.mocked(GoogleDriveGateway.prototype.writeText).mockClear();
+    await services.markdownExport!.run().catch(error => expect(error).toMatchObject({ code: 'FORBIDDEN' }));
+    expect(GoogleDriveGateway.prototype.writeText).not.toHaveBeenCalled(); expect(fences).toBe(1);
+    expect((await writer.pendingMarkdownExports()).map(j => j.libraryId)).toEqual(['SYN-L001']);
+    expect(services.markdownExport!.failures.get('SYN-L001')).toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it.each([1, 2, 3, 4, 5, 6, 7])('R2 fence: expiry refuses backup create number %i including the manifest', async boundary => {
+    await admitWrite(); const services = mode('db'), folder = new FakePrivateBackupFolder(); services.contentBackup!.folder = folder;
+    const previous = (await query("select payload->>'manifestHash' as hash from content_studio_cutover_evidence where name='backup'")).rows[0]!.hash;
+    const createOriginal = folder.create.bind(folder);
+    const expire = () => query("update content_studio_cutover_state set lease_until=clock_timestamp()-interval '1 second' where name='backup'");
+    const create = vi.spyOn(folder, 'create').mockImplementation(async (...args) => {
+      const id = await createOriginal(...args);
+      if (create.mock.calls.length === boundary - 1) await expire();
+      return id;
+    });
+    const original = ContentShadowStore.prototype.cutoverRpc; let fences = 0;
+    vi.spyOn(ContentShadowStore.prototype, 'cutoverRpc').mockImplementation(async function(this: ContentShadowStore, name, params) {
+      if (name === 'fence' && params.p_name === 'backup') fences++;
+      const result = await original.call(this, name, params);
+      if (name === 'snapshot' && boundary === 1) await expire();
+      return result;
+    });
+    await expect(services.liveCutover!.backup()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(create).toHaveBeenCalledTimes(boundary - 1); expect(fences).toBe(boundary);
+    expect(services.contentBackup!.journal.lastVerified!.manifestHash).toBe(previous);
+  });
+  it('R2 no-link: a legacy queued job completes without Drive calls', async () => {
+    await admitWrite();
+    await query("update content_studio_posts set source_markdown_url='',source_master_file_url='' where library_id='SYN-L002'");
+    await query("insert into content_studio_markdown_export(library_id,row_version,expected_body,body) select library_id,row_version,draft_content,draft_content from content_studio_posts where library_id='SYN-L002'");
+    const services = mode('db'); vi.mocked(GoogleDriveGateway.prototype.readText).mockClear(); vi.mocked(GoogleDriveGateway.prototype.writeText).mockClear();
+    await services.markdownExport!.run();
+    expect((await query('select * from content_studio_markdown_export')).rows).toHaveLength(0);
+    expect(GoogleDriveGateway.prototype.readText).not.toHaveBeenCalled(); expect(GoogleDriveGateway.prototype.writeText).not.toHaveBeenCalled();
+  });
+  it('R2 no-link recovery: Restore Drive link clears an edited no-link blocker using an audited CAS patch', async () => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true'); const services = mode('db');
+    const writer = services.contentCutover!.exporter.db as SupabaseContentDb;
+    const linked = await services.repo.getLibrary('SYN-L001'), section = await readSection(services.drive, linked);
+    expect(section.ok).toBe(true); if (!section.ok) throw new Error('synthetic section missing');
+    await query("update content_studio_posts set source_markdown_url='',source_master_file_url='',source_markdown='',source_master_file='' where library_id='SYN-L001'");
+    const body = 'Synthetic retained DB-only recovery body';
+    expect(await writer.applyPatch({ operationId: 'synthetic-unlinked-edit', patchHash: hash, actorHash: hash, kind: 'library', id: 'SYN-L001', expectedVersion: '1', data: { draft_content: body } })).toMatchObject({ ok: true });
+    const before = await buildReconcileReport(services.repo, services.drive, undefined, { markdownExport: services.markdownExport });
+    expect(before.items).toContainEqual(expect.objectContaining({ kind: 'markdown_missing', stableIds: ['SYN-L001'], action: expect.objectContaining({ label: 'Restore Drive link' }) }));
+    // A recovered URL is not permission to overwrite a conflicting section.
+    const text = safeReplaceSectionBody(section.text, section.section, body)!;
+    const link = `https://drive.google.com/file/d/${section.fileId}/view`;
+    const recovery = { operationId: 'synthetic-restore-markdown-link', patchHash: hash, actorHash: hash, id: 'SYN-L001', expectedVersion: '2', url: link };
+    await expect(writer.restoreMarkdownLink({ ...recovery, url: 'https://unexpected.example/file' })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(writer.restoreMarkdownLink({ ...recovery, url: `https://drive.google.com/file/d/${'a'.repeat(201)}/view` })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(writer.restoreMarkdownLink({ ...recovery, id: 'SYN-NOT-FOUND' })).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(await writer.restoreMarkdownLink({ ...recovery, operationId: 'synthetic-stale-link-recovery', expectedVersion: '1' })).toMatchObject({ ok: false, code: 'STALE_READ' });
+    expect(await writer.restoreMarkdownLink(recovery)).toMatchObject({ ok: true, revision: 3 });
+    expect(await writer.restoreMarkdownLink(recovery)).toMatchObject({ ok: true, replayed: true, revision: 3 });
+    await expect(writer.restoreMarkdownLink({ ...recovery, operationId: 'synthetic-already-linked', expectedVersion: '3' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(db.asAnon(q => q.query('select content_studio_restore_markdown_link($1,$2,$3,$4,$5,$6)', [recovery.operationId, hash, hash, recovery.id, '3', link]))).rejects.toMatchObject({ code: '42501' });
+    vi.mocked(GoogleDriveGateway.prototype.writeText).mockClear();
+    await services.markdownExport!.run();
+    expect(GoogleDriveGateway.prototype.writeText).not.toHaveBeenCalled();
+    expect((await services.drive.readText(section.fileId)).text).toBe(section.text);
+    expect(await services.markdownExport!.status()).toContainEqual(expect.objectContaining({ libraryId: 'SYN-L001', reason: 'markdown_mismatch' }));
+    // Only the explicit owner restoration supplies the exact body. The next
+    // repair acknowledges it without rewriting the file or losing history.
+    await services.drive.writeText(section.fileId, text, section.meta.revision);
+    await services.markdownExport!.run();
+    expect(await services.markdownExport!.status()).not.toContainEqual(expect.objectContaining({ libraryId: 'SYN-L001' }));
+    const after = await buildReconcileReport(services.repo, services.drive, undefined, { markdownExport: services.markdownExport });
+    expect(after.items.filter(i => i.kind === 'markdown_missing' && i.stableIds.includes('SYN-L001'))).toHaveLength(0);
+    expect((await query("select changed_fields from content_studio_row_history where operation_id='synthetic-restore-markdown-link'")).rows).toHaveLength(1);
+  });
+  it('R2 RPC: the direct RPC write gate refuses a contract mismatch before sending a patch', async () => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    const writer = mode('db').contentCutover!.exporter.db as SupabaseContentDb;
+    await query("update content_studio_cutover_authority set contract='schema-2:older-contract'"); transport.mockClear();
+    await expect(writer.applyPatch({ operationId: 'synthetic-rpc-blocked', patchHash: hash, actorHash: hash, kind: 'library', id: 'SYN-L001', expectedVersion: '1', data: { current_hook: 'Must refuse' } })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(transport.mock.calls.some(([url]) => String(url).endsWith('/content_studio_apply_patch'))).toBe(false);
+  });
+  it.each(['apply_patch', 'insert_queue_idea'] as const)('R2 transaction: %s refuses an epoch changed between authorization and the SQL write', async rpc => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    const writer = mode('db').contentCutover!.exporter.db as SupabaseContentDb;
+    const original = transport.getMockImplementation()!; let authorized = false, changed = false;
+    transport.mockImplementation(async (url, init) => {
+      const name = String(url).split('/').at(-1);
+      if (name === 'content_studio_cutover_authorize') {
+        const result = await original(url, init); expect(result.ok).toBe(true); authorized = true; return result;
+      }
+      if (name === `content_studio_${rpc}`) {
+        expect(authorized).toBe(true);
+        // Another transaction commits retirement after authorize returns. The
+        // real write RPC now has to recheck under the retirement lock.
+        await query("update content_studio_cutover_authority set mode='sheet'"); changed = true;
+      }
+      return original(url, init);
+    });
+    const w = { operationId: `synthetic-racing-${rpc}`, patchHash: hash, actorHash: hash, kind: 'library' as const, id: 'SYN-L001', expectedVersion: '1', data: { current_hook: 'Must never commit' } };
+    await expect(rpc === 'apply_patch' ? writer.applyPatch(w) : writer.insertQueueIdea({ ...w, kind: 'queue', id: 'SYN-RACE', expectedVersion: null })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(changed).toBe(true);
+    expect((await query('select * from content_studio_operations where operation_id=$1', [w.operationId])).rows).toHaveLength(0);
+    expect((await query("select * from content_studio_posts where library_id='SYN-RACE' or current_hook='Must never commit'")).rows).toHaveLength(0);
+  });
+  it('R2 parity: inspection reloads a durable conflict into a fresh exporter without claiming or saving', async () => {
+    await admitWrite(); const exporter = mode('db').contentCutover!.exporter; await exporter.run();
+    sheet.externalEdit(SHEET_TABS.library.name, 2, 2, 'Synthetic external edit'); await exporter.run();
+    const fresh = mode('db').contentCutover!.exporter;
+    expect(fresh.journal.issues.size).toBe(0); transport.mockClear();
+    await fresh.parity();
+    expect(fresh.journal.issues.get('library\0SYN-L001')).toMatchObject({ reason: 'export_mismatch' });
+    expect(transport.mock.calls.some(([url]) => /cutover_(claim|save)$/.test(String(url)))).toBe(false);
+  });
+  it('R2 activation: the operation identity binds its build even when an old UUID is replayed', async () => {
+    await admitWrite(false); const store = new ContentCutoverStore(options, build);
+    await store.operation('activate-db', token, () => store.activate('db'));
+    const next = new ContentCutoverStore(options, 'c'.repeat(40)); const run = vi.fn(() => next.activate('db'));
+    await expect(next.operation('activate-db', token, run)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(run).not.toHaveBeenCalled();
+  });
+  it('R2 Markdown completion: recovery drains an existing job during contract mismatch and freeze', async () => {
+    await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    const writer = mode('db').contentCutover!.exporter.db as SupabaseContentDb;
+    expect(await writer.applyPatch({ operationId: 'synthetic-before-contract-change', patchHash: hash, actorHash: hash, kind: 'library', id: 'SYN-L001', expectedVersion: '1', data: { draft_content: 'Synthetic recovery body' } })).toMatchObject({ ok: true });
+    await query("update content_studio_cutover_authority set contract='schema-2:older-contract'");
+    vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'false'); const services = mode('db');
+    await services.markdownExport!.run();
+    expect((await writer.pendingMarkdownExports()).length).toBe(0);
+    expect(GoogleDriveGateway.prototype.writeText).toHaveBeenCalledTimes(1);
+  });
   it('retires DB authority before Sheet writes resume; a stale epoch cannot be reused without a new import and activation', async () => {
     await admitWrite();
     const services = mode('db');
@@ -505,7 +766,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     expect((await query('select * from content_studio_markdown_export')).rows).toHaveLength(0);
     expect(await services.markdownExport!.status()).toContainEqual(expect.objectContaining({ libraryId: 'SYN-L002', reason: 'markdown_missing' }));
     const report = await buildReconcileReport(services.repo, services.drive, undefined, { markdownExport: services.markdownExport });
-    expect(report.items).toContainEqual(expect.objectContaining({ kind: 'markdown_missing', severity: 'blocking', action: expect.objectContaining({ label: 'Review' }) }));
+    expect(report.items).toContainEqual(expect.objectContaining({ kind: 'markdown_missing', severity: 'blocking', action: expect.objectContaining({ label: 'Restore Drive link' }) }));
     services.contentBackup!.folder = new FakePrivateBackupFolder(); expect(await services.liveCutover!.backup()).toMatchObject({ status: 'verified' });
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'false'); services = mode('db');
     expect(await services.liveCutover!.rollback()).toMatchObject({ readyToFlip: 'sheet' });

@@ -35,7 +35,7 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
   const db = new SupabaseContentDb({ ...options, authorizeWrite: async name => {
     if (mode === 'db-read' && name !== 'write_through') throw new AppError('FORBIDDEN');
     if (mode === 'db-shadow') throw new AppError('FORBIDDEN');
-    if (mode === 'db' && !['apply_patch', 'insert_queue_idea', 'complete_markdown_export'].includes(name)) throw new AppError('FORBIDDEN');
+    if (mode === 'db' && !['apply_patch', 'insert_queue_idea', 'restore_markdown_link', 'complete_markdown_export'].includes(name)) throw new AppError('FORBIDDEN');
     if (mode === 'db' && env.CS_CONTENT_WRITE_ENABLED !== 'true' && name !== 'complete_markdown_export') throw new AppError('FORBIDDEN');
     if (name === 'complete_markdown_export' && mode === 'db') await store.assertRecovery();
     else await store.assertGate(mode === 'db' ? 'db' : 'db-read', true);

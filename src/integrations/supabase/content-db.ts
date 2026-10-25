@@ -98,6 +98,11 @@ export class SupabaseContentDb implements ContentDb {
   applyPatch(w: ContentWrite) { return this.rpc('apply_patch', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
     p_target_kind: w.kind, p_target_id: w.id, p_expected_version: w.expectedVersion, p_patch: w.data }); }
   insertQueueIdea(w: ContentWrite) { return this.rpc('insert_queue_idea', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash, p_library_id: w.id, p_row: w.data }); }
+  /** Coordinator-only no-link recovery; SQL fixes the writable fields and CAS. */
+  restoreMarkdownLink(w: Omit<ContentWrite, 'kind' | 'data'> & { url: string }) {
+    return this.rpc('restore_markdown_link', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
+      p_library_id: w.id, p_expected_version: w.expectedVersion, p_url: w.url });
+  }
   async mutationRow(kind: ContentTarget, id: string, version: string) {
     const history = () => this.select<{ before_image: ContentPostRow | ContentScheduleRow }>('row_history', {
       target_kind: `eq.${kind}`, target_id: `eq.${id}`, row_version_before: `eq.${version}`, order: 'history_id.asc',

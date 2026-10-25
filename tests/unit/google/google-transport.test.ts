@@ -1,7 +1,7 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { exportPKCS8, generateKeyPair } from 'jose';
 import { ServiceAccountTokens, SCOPES, withReadRetry } from '@/integrations/google/service-account';
-import { GoogleSheetTransport } from '@/integrations/google/google-sheet';
+import { GoogleSheetTransport, SHEET_WRITE_TIMEOUT_MS } from '@/integrations/google/google-sheet';
 import { GoogleDriveGateway } from '@/integrations/google/google-drive';
 import { AppError } from '@/domain/errors';
 
@@ -56,6 +56,28 @@ describe('service account tokens', () => {
 });
 
 describe('GoogleSheetTransport', () => {
+  it.each(['writeCells', 'appendRow'] as const)('bounds %s to 30 seconds, below the two-minute worker lease, without retrying an ambiguous timeout', async action => {
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => { expect(ms).toBe(30_000); return controller.signal; });
+    let landed = false;
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      expect(init?.signal).toBe(controller.signal);
+      return new Promise<Response>((_resolve, reject) => {
+        init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true });
+        // Model the client deadline firing before the remote write completes.
+        controller.abort(new DOMException('Synthetic deadline', 'TimeoutError'));
+        if (!init!.signal!.aborted) landed = true;
+      });
+    });
+    try {
+      const tokens = { token: async () => 'synthetic' } as unknown as ServiceAccountTokens;
+      const sheet = new GoogleSheetTransport('synthetic', tokens, true, fetch);
+      const result = action === 'writeCells' ? sheet.writeCells('Content Library', [{ row: 2, column: 1, value: 'Synthetic' }]) : sheet.appendRow('Content Queue', 'AG', ['Synthetic']);
+      await expect(result).rejects.toMatchObject({ name: 'TimeoutError' });
+      expect(SHEET_WRITE_TIMEOUT_MS).toBeLessThan(120_000); expect(timeout).toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledTimes(1); expect(landed).toBe(false);
+    } finally { timeout.mockRestore(); }
+  });
   it('reads a page in one request: values, formulas and links from the same grid (CS-052)', async () => {
     const { impl, calls } = scripted([
       tokenOk,
