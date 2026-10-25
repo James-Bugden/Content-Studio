@@ -479,6 +479,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     await admitWrite(); vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true'); let services = mode('db');
     const row = await services.repo.getLibrary('SYN-L002');
     expect((await services.repo.updateLibrary({ operationId: 'synthetic-no-link-body', actor: { role: 'owner', sub: 'synthetic-owner' }, target: { libraryId: 'SYN-L002' }, expectedRevision: row.revision, patch: { draftContent: 'Synthetic DB-only body' } })).ok).toBe(true);
+    expect((await query('select * from content_studio_markdown_export')).rows).toHaveLength(0);
     await services.markdownExport!.run(); await services.markdownExport!.run();
     expect((await query('select * from content_studio_markdown_export')).rows).toHaveLength(0);
     expect(await services.markdownExport!.status()).toContainEqual(expect.objectContaining({ libraryId: 'SYN-L002', reason: 'markdown_missing' }));
