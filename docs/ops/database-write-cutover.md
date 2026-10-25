@@ -19,7 +19,7 @@ DB-5 follow-ups remain separate [#179](https://github.com/James-Bugden/Content-S
 
 Owner decision in chat, 2026-10-25: the private Drive archive requirement may
 be skipped because a personal Gmail account has no shared drives and a service
-account cannot own files in My Drive. Follow [cutover steps 5?6](cutover.md):
+account cannot own files in My Drive. Follow [cutover steps 5-6](cutover.md):
 explicit Production `CS_BACKUP_GATE_WAIVED=2026-10-25` **and** the idempotent
 `content_studio_cutover_waive_backup` coordinator action (verified owner hash,
 server timestamp, full build/import identity) are both required. Env-setup never
