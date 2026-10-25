@@ -19,7 +19,9 @@ export type ImportEnvelope = {
 };
 export interface ContentImportStore {
   readonly db: ContentDb;
-  applyImport(envelope: ImportEnvelope): Promise<void>;
+  applyImport(envelope: ImportEnvelope, leaseToken?: string): Promise<void>;
+  claim?(operationId: string, requestHash: string): Promise<{ status: 'acquired' | 'in_progress' | 'replayed'; token: string; result?: unknown }>;
+  release?(operationId: string, token: string): Promise<void>;
 }
 export const importColumn = (field: string) => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
 const numeric = new Set(['hookScore', 'contentAngle', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers']);
@@ -61,6 +63,7 @@ export function classifyDifference(expected: unknown, actual: unknown, field = '
 
 /** Imports repair derived copies only while the Sheet retains authority. */
 export function assertImportMode(): void {
+  if (process.env.CS_DATA_MODE === 'live' && process.env.CS_CONTENT_STORE !== 'db-shadow') throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
   if (!['db-shadow', 'db-read'].includes(process.env.CS_CONTENT_STORE ?? '')) throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
 }
 

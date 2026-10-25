@@ -147,7 +147,7 @@ describe('composition', () => {
   it('names the selected database read-only capability', () => {
     expect(capabilityMessage({ provider: 'db', state: 'read_only', mode: 'fake' })).toBe('Content database read-only: content saving is disabled; review still works');
   });
-  it.each(['db-shadow', 'db-read', 'db'])('blocks premature live cutover to %s', mode => {
+  it.each(['db-read', 'db'])('blocks premature live cutover to %s', mode => {
     vi.stubEnv('CS_DATA_MODE', 'live'); vi.stubEnv('CS_CONTENT_STORE', mode); resetEnvCache(); resetServices();
     expect(() => getServices()).toThrow('not enabled for live data');
   });

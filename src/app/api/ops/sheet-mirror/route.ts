@@ -3,6 +3,7 @@ import { errorResponse, json } from '@/lib/http';
 import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 /**
  * Owner-triggered complete Sheet snapshot. Sheets are read first and remain the

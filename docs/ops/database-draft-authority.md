@@ -8,8 +8,9 @@ not evidence that any live gate has passed.
 
 Only the `db` composition opts into body authority. `sheet`, `db-shadow` and
 `db-read` retain the Drive-first saga and its existing conflict/recovery rules.
-The default stays `sheet`; all live database modes remain refused before
+The default stays `sheet`; live `db-read` and `db` remain refused before
 provider construction. Assets, reference files and workflow files stay in Drive.
+DB-9 prepares live `db-shadow` separately; it retains Drive body authority.
 
 ## Save and repair
 

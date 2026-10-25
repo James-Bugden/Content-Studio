@@ -1,7 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { getServices } from '@/application/container';
-import { buildSheetMirrorSnapshot, evidenceHash } from '@/application/sheet-mirror';
+import { buildSheetMirrorSnapshot, evidenceHash, mirrorHash } from '@/application/sheet-mirror';
 import { assertImportMode, buildTypedImport, importVersions } from '@/application/content-import';
 import { AppError } from '@/domain/errors';
 import { SupabaseSheetMirrorStore } from '@/integrations/supabase/sheet-mirror-store';
@@ -22,18 +22,27 @@ async function execute(trigger: Trigger, requestId: string): Promise<RunResult> 
   if (!sourceKey) throw new AppError('CONFIG_MISSING', { provider: 'supabase' });
   if (services.contentImport) {
     assertImportMode();
+    const operationId = `${trigger.kind}:${sourceKey}:${requestId}`;
+    let token: string | undefined;
     try {
+      if (services.contentImport.claim) {
+        const claim = await services.contentImport.claim(operationId, mirrorHash(['phase-a', trigger.kind, sourceKey, requestId]));
+        if (claim.status === 'in_progress') return { status: 'in_progress', runId: requestId };
+        if (claim.status === 'replayed') return { status: 'replayed', runId: requestId, ...(claim.result as object) };
+        token = claim.token;
+      }
       const versions = await importVersions(services.contentImport.db);
       const snapshot = await buildSheetMirrorSnapshot(services.importRepo ?? services.repo, { sourceKey, runId: requestId });
       const typed = buildTypedImport(snapshot, versions, evidenceHash(['content-import', trigger.kind, sourceKey]));
       // Durable ledger identity records the non-personal trigger class and configured
       // source key. The owner request key is reused on network retries.
-      typed.operationId = `${trigger.kind}:${sourceKey}:${requestId}`;
-      await services.contentImport.applyImport(typed);
+      typed.operationId = operationId;
+      await services.contentImport.applyImport(typed, token);
       services.contentParity?.imported(Date.parse(snapshot.startedAt), typed);
       return { status: 'completed', runId: snapshot.runId, snapshotHash: typed.snapshotHash, counts: typed.counts, hashes: typed.hashes, exceptions: typed.exceptions };
     } catch (error) {
       services.contentParity?.failed(Date.now());
+      if (token) await services.contentImport.release?.(operationId, token).catch(() => { /* Expiry fences abandoned work if the DB is unavailable. */ });
       throw error;
     }
   }
@@ -59,6 +68,12 @@ export async function runConfiguredSheetMirror(trigger: Trigger): Promise<RunRes
     throw new AppError('VALIDATION_FAILED', { reason: 'import_idempotency_key' });
   }
   const services = getServices();
+  if (services.mode === 'live' && services.contentImport) {
+    // A scheduled redelivery in the same 15-minute slot has durable identity.
+    const digest = mirrorHash(['scheduled', serverEnv().SUPABASE_READ_MODEL_SOURCE_KEY, Math.floor(Date.now() / 900_000)]);
+    const scheduledId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+    return execute(trigger, trigger.kind === 'owner' ? trigger.idempotencyKey : scheduledId);
+  }
   const state = states.get(services) ?? { completed: new Map<string, RunResult>() };
   states.set(services, state);
   const requestId = trigger.kind === 'owner' ? trigger.idempotencyKey : randomUUID();

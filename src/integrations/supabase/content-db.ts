@@ -4,7 +4,7 @@ import type { ContentCollection, ContentDb, ContentPostRow, ContentScheduleRow, 
 import { z } from 'zod';
 import { AppError, isAppError } from '@/domain/errors';
 
-export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number };
+export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number; readOnly?: boolean };
 
 /**
  * Server-only PostgREST client. Explicit range continuation also handles hosted row caps.
@@ -47,6 +47,7 @@ export class SupabaseContentDb implements ContentDb {
     }
   }
   private async rpc(name: string, params: Record<string, unknown>): Promise<ContentWriteResult> {
+    if (this.options.readOnly || process.env.CS_DATA_MODE === 'live') throw new AppError('FORBIDDEN', { provider: 'db', reason: 'live_db_writes_disabled' });
     for (let attempt = 0; ; attempt++) {
       try {
         const response = await (this.options.fetch ?? fetch)(`${this.base}/rest/v1/rpc/content_studio_${name}`, {

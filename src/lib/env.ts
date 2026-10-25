@@ -60,12 +60,11 @@ export function serverEnv(): ServerEnv {
   if (parsed.data.CS_DATA_MODE === 'fake' && parsed.data.VERCEL_ENV === 'production') {
     throw new Error('CS_DATA_MODE=fake is refused in production');
   }
-  // Local DB adapters are exercised with fakes/PGlite only. The owner/live
-  // rehearsal and deployment evidence must precede a separately reviewed gate change.
-  if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE !== 'sheet') {
+  // Phase A alone is authorised. Read/write authority gates remain closed.
+  if (parsed.data.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(parsed.data.CS_CONTENT_STORE)) {
     throw new Error('CS_CONTENT_STORE database modes are not enabled for live data');
   }
-  if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off') {
+  if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off' || parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE === 'db-shadow') {
     const missing = [
       ['SUPABASE_READ_MODEL_URL', parsed.data.SUPABASE_READ_MODEL_URL],
       ['SUPABASE_READ_MODEL_SERVICE_KEY', parsed.data.SUPABASE_READ_MODEL_SERVICE_KEY],

@@ -67,10 +67,14 @@ export function compareContent(collection: ParityCollection, expected: unknown, 
 
 /** Content-free recorded facts. Instance-scoped until a durable deployment sink is wired. */
 export class ContentParityJournal {
+  readonly scope: string = 'this server instance';
+  available = true;
+  async prepare(): Promise<void> { /* Instance journal needs no I/O. */ }
+  async refresh(): Promise<void> { /* Durable implementation reloads recorded facts. */ }
   readonly samples: ParitySample[] = [];
   lastImport: number | null = null;
   failureSince: number | null = null;
-  private readonly repairedFailures: { since: number; repairedAt: number }[] = [];
+  protected readonly repairedFailures: { since: number; repairedAt: number }[] = [];
   lastRun: Pick<ImportEnvelope, 'counts' | 'hashes' | 'exceptions' | 'snapshotHash'> | null = null;
   imported(at: number, evidence?: ImportEnvelope) {
     if (this.failureSince !== null) this.repairedFailures.push({ since: this.failureSince, repairedAt: at });
@@ -79,7 +83,7 @@ export class ContentParityJournal {
     if (evidence) this.lastRun = structuredClone({ counts: evidence.counts, hashes: evidence.hashes, exceptions: evidence.exceptions, snapshotHash: evidence.snapshotHash });
   }
   failed(at: number) { this.failureSince ??= at; }
-  record(sample: ParitySample) {
+  record(sample: ParitySample): void | Promise<void> {
     this.samples.push(sample);
     if (this.samples.length > 10_000) this.samples.shift();
     emit({ name: 'content.parity', adapter: 'app', outcome: sample.blocking || !sample.idsEqual ? 'blocked' : 'ok',
@@ -113,14 +117,14 @@ export class ContentParityJournal {
       daysGreen++;
     }
     const lagMs = this.lastImport === null ? null : Math.max(0, now - this.lastImport);
-    const ready = samples.length >= 200 && daysGreen >= 7 && collections.every(c => c.idsEqual === true && c.fieldEquality !== null && c.fieldEquality >= 99.9 && c.blocking === 0)
+    const ready = this.available && samples.length >= 200 && samples.every(s => s.lagMs !== null) && daysGreen >= 7 && collections.every(c => c.idsEqual === true && c.fieldEquality !== null && c.fieldEquality >= 99.9 && c.blocking === 0)
       && lagP95 !== null && lagP95 <= 900_000 && lagMs !== null && lagMs <= 900_000 && !longFailure(windowStart, now);
-    return { collections, sampleCount: samples.length, lagP95, daysGreen, lagMs, failureSince: this.failureSince, lastRun: this.lastRun, ready, scope: 'this server instance' as const };
+    return { collections, sampleCount: samples.length, lagP95, daysGreen, lagMs, failureSince: this.failureSince, lastRun: this.lastRun, ready, scope: this.scope, available: this.available };
   }
 }
 
 const methods = { listLibrary: 'library', listQueue: 'queue', listReadyQueue: 'ready', listSchedule: 'schedule', queueSummary: 'queue_summary', workflowSettings: 'workflow_settings' } as const;
-async function boundedComparison(read: Promise<{ value: unknown } | null>): Promise<{ value: unknown } | null> {
+async function boundedComparison<T>(read: Promise<T>): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try { return await Promise.race([read, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 500); })]); }
   finally { clearTimeout(timer); }
@@ -132,14 +136,24 @@ export function shadowContentRepository(sheet: ContentRepository, db: ContentRep
     const collection = methods[property as keyof typeof methods];
     if (!collection || typeof original !== 'function') return typeof original === 'function' ? original.bind(target) : original;
     return async () => {
-      const selected = sample();
-      const dbRead = selected ? boundedComparison((db[property as keyof typeof methods] as () => Promise<unknown>).call(db).then(value => ({ value }), () => null)) : null;
+      // Resolve synchronous throws, async failures and journal failures behind
+      // the same fail-open boundary. No shadow code can reject the Sheet call.
+      let selected = false;
+      try { selected = sample(); } catch { journal.available = false; }
+      const dbRead = selected ? boundedComparison(Promise.resolve().then(async () => {
+        await journal.prepare();
+        return { value: await (db[property as keyof typeof methods] as () => Promise<unknown>).call(db), lastImport: journal.lastImport };
+      }).catch(() => null)) : null;
       const result = await original.call(target);
       if (selected) {
-        const compared = await dbRead;
-        if (compared) journal.record(compareContent(collection, result, compared.value, Date.now(), journal.lastImport));
-        else journal.record({ at: Date.now(), collection, idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
-          facts: [{ collection, field: 'provider', kind: 'changed', fingerprint: evidenceHash(collection).slice(0, 16) }] });
+        try {
+          const compared = await dbRead;
+          const observation = compared ? compareContent(collection, result, compared.value, Date.now(), compared.lastImport)
+            : { at: Date.now(), collection, idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
+              facts: [{ collection, field: 'provider', kind: 'changed' as const, fingerprint: evidenceHash(collection).slice(0, 16) }] };
+          const saved = await boundedComparison(Promise.resolve(journal.record(observation)).then(() => true).catch(() => false));
+          if (!saved) journal.available = false;
+        } catch { journal.available = false; }
       }
       return result;
     };
