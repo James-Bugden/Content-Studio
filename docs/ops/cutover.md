@@ -1,5 +1,26 @@
 # DB-10: measured live cutover in one coordinator session
 
+## Owner terminal and coordinator responsibilities (CS-067)
+
+The owner runs secret-bearing HTTP operations in their own terminal using
+[the numbered owner quickstart](cutover-owner-quickstart.md). The coordinator
+must never enter, receive or hold CRON_SECRET. The coordinator handles migration
+inspection/application, SQL proofs, review/CI, freeze/drain verification, Vercel
+configuration/deployment and independent deployed checks. The owner runs
+`status`, `all-prepare`/`measure`, deliberate `activate-read`/`activate-db`,
+`backup`, `rollback`, `export`, `backup --scheduled` and `smoke` when instructed
+at the corresponding ordered step below. The runner never changes deployment
+flags or directly accesses providers. App repair/rollback routes can write
+derived Sheet/Drive copies and require the ordered freeze/recovery procedure.
+
+**Integration blocker:** the merged cutover route is POST-only. It exposes no
+read-only gate verdict, deployment ID or audited backup waiver. The CLI refuses
+status/activation on HTTP 405; health/capabilities cannot replace measured gate
+proofs. The quickstart specifies the proposed status contract for a separately
+reviewed server follow-up. Do not advertise production cutover as ready until
+that contract and all live gates are evidenced. Calendar-wait waivers never
+waive backups. Mocked CLI tests are not production evidence.
+
 Implementation preparation only. No migration, live provider request, deployment,
 or authority flip was performed by the builder. Issue [#198](https://github.com/James-Bugden/Content-Studio/issues/198)
 follows merged [#199](https://github.com/James-Bugden/Content-Studio/pull/199).
@@ -58,16 +79,16 @@ epoch without new Sheet imports or SHA evidence. Phase C measurements must
 remain fresh; stale/red evidence blocks writes and shows a blocking item.
 Activation is an authority decision, so never replay it against a different SHA.
 
-For the command examples, privately set PowerShell `$cutoverBase` to the actual
-deployment URL and `$cutoverCron` to its existing cron secret; do not print them.
-The authenticated coordinator operations use a bearer secret, accept no
-caller-supplied content, and return private, no-store responses. Keep each UUID for retries; use a fresh UUID for a new measurement/backup. Rollback retries always reverify fresh provider parity:
+For the historical ordered examples below, `Invoke-Cutover` means an **owner
+terminal** operation. Use `npm run cutover -- <action>` from the quickstart
+instead; the coordinator must not set or hold `$cutoverCron`. The authenticated
+operations accept no caller-supplied content and return private, no-store
+responses. The runner keeps each UUID for retries and rotates after verified
+completion. Rollback retries always reverify fresh provider parity:
 
 ```powershell
-$cutoverHeaders = @{ Authorization = "Bearer $cutoverCron" }
-function Invoke-Cutover([string] $action, [string] $operationId = [guid]::NewGuid().ToString()) {
-  Invoke-RestMethod -Method Post -Uri "$cutoverBase/api/ops/content-cutover" -Headers (@{ Authorization = "Bearer $cutoverCron"; 'Idempotency-Key' = $operationId }) -ContentType 'application/json' -Body (@{action=$action} | ConvertTo-Json)
-}
+# OWNER terminal only; prompts privately for the existing secret.
+npm run cutover -- measure
 ```
 
 For every flag change below, run this deployment procedure from a clean
@@ -144,7 +165,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    capture. Then run:
 
    ```powershell
-   $fullParity = Invoke-Cutover 'measure'
+   npm run cutover -- measure
    ```
 
    Require its six collection reports green, full coverage and zero refused
@@ -163,7 +184,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    **Rollback:** `CS_CONTENT_STORE=sheet`, redeploy and smoke; DB is ignored.
 
 4. **Read flip and immediate measured Phase C.** On the measured deployed SHA,
-   run `Invoke-Cutover 'activate-read'` with a fresh UUID and require success.
+   run `npm run cutover -- activate-read --sha <reviewed-full-sha>` with a fresh UUID and require success.
    This records the read epoch; it does not change deployment flags. Set
    `CS_CONTENT_READ_ENABLED=true`, `CS_CONTENT_STORE=db-read`,
    `CS_CONTENT_WRITE_ENABLED=true`; redeploy exact SHA. Prove health/build/store
@@ -188,12 +209,12 @@ the stated mode/write flag rather than reusing an old deployment environment.
    external edit inside Google's non-CAS window. Never claim otherwise.
    Set `CS_CONTENT_WRITE_ENABLED=false` in `db-read`, redeploy, stop other
    writers, drain all old deployments/in-flight sagas, prove write refusals.
-   Run final owner import, then `Invoke-Cutover 'measure'` again. Stop **both**
+   Run final owner import, then `npm run cutover -- measure` again. Stop **both**
    typed and legacy imports/schedules now. Verify no active shadow lease.
 
    ```powershell
-   $privateBackup = Invoke-Cutover 'backup'
-   $rollbackProof = Invoke-Cutover 'rollback'
+   npm run cutover -- backup
+   npm run cutover -- rollback
    ```
 
    Backup reads all six authority/history tables in one SQL statement snapshot,
@@ -247,12 +268,12 @@ the stated mode/write flag rather than reusing an old deployment environment.
    select public.content_studio_cutover_gate('db','<reviewed-full-sha>');
    ```
 
-   Require `{ok:true}`. On this deployed SHA run `Invoke-Cutover 'activate-db'`
+   Require `{ok:true}`. On this deployed SHA run `npm run cutover -- activate-db --sha <reviewed-full-sha>`
    with a fresh UUID, retaining its build/contract/epoch evidence. This checks
    every proof again atomically and records DB authority. Only then set `CS_CONTENT_DB_ENABLED=true`, store `db`, keep writes
    false and deploy exact SHA. Prove DB revisions/DB body authority, read-only
    mutation refusals, full Sheet parity and outbox state. **Rollback:** while
-   frozen, `Invoke-Cutover 'rollback'`; only after its success set store `sheet`
+   frozen, `npm run cutover -- rollback`; only after its success set store `sheet`
    and redeploy/smoke. Never flip first after DB-only saves begin.
 
 7. **Resume, export, rehearse DB rollback, final smoke.** Set
@@ -261,7 +282,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    Typefully field rendering. Never mutate real copy for a smoke test. Invoke:
 
    ```powershell
-   Invoke-RestMethod -Uri "$cutoverBase/api/ops/content-export/reconcile" -Headers $cutoverHeaders
+   npm run cutover -- export
    ```
 
    Require exact export parity and no pending Markdown jobs. On the synthetic
@@ -272,7 +293,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    two-minute token-fenced leases/checkpoints; see recovery below.
 
    Freeze/drain **all** instances again (`CS_CONTENT_WRITE_ENABLED=false`, store
-   `db`, redeploy), run backup and `Invoke-Cutover 'rollback'`. Retain generated
+   `db`, redeploy), run backup and `npm run cutover -- rollback`. Retain generated
    exact hashes, then actually flip to `sheet`, redeploy/smoke; flip back to `db`
    frozen and verify. Do not run imports during this round trip: Sheet received
    no authority writes, so DB ledger/history/outbox remain the sole authority.

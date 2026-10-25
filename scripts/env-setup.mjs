@@ -34,6 +34,7 @@ export function command(file, args, input) {
       const executable = launch(file);
       const env = { ...process.env, NO_COLOR: '1' };
       for (const item of manifest.variables) delete env[item.name];
+      delete env.CS_CUTOVER_BEARER;
       delete env.VERCEL_PROJECT_ID;
       delete env.VERCEL_ORG_ID;
       const child = spawn(executable.file, [...executable.prefix, ...args], { env, shell: false, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, timeout: 60_000 });
