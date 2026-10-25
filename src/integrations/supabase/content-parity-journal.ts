@@ -13,6 +13,8 @@ const sampleSchema = z.object({ at: count, collection: z.enum(PARITY_COLLECTIONS
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const evidence = z.object({ snapshotHash: hash, counts: z.object({ library: count, queue: count, schedule: count, workflow_settings: count }),
   hashes: z.object({ library: hash, queue: hash, schedule: hash, workflow_settings: hash }),
+  fullParity: z.object({ rows: count, idsEqual: z.boolean(), fields: count, equal: count, unclassified: count }).refine(p => p.equal <= p.fields).optional(),
+  windowWaiver: z.object({ by: z.literal('owner'), on: z.literal('2026-10-25'), recordedAt: z.string().datetime({ offset: true }) }).nullable().optional(),
   exceptions: z.array(z.object({ class: z.enum(['formula_display', 'number_formatting', 'trailing_whitespace', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting', 'refused_numeric', 'refused_size']), collection: z.enum(['library', 'queue', 'schedule', 'workflow_settings']), field: z.string(), hash })) });
 const eventSchema = z.object({ event_id: z.string().uuid(), at: z.string().refine(s => Number.isFinite(Date.parse(s))), kind: z.enum(['sample', 'imported', 'failed']), payload: z.unknown() });
 const imported = z.object({ snapshotAt: count, evidence });
@@ -28,14 +30,15 @@ export class SupabaseContentParityJournal extends ContentParityJournal {
   }
   override async record(sample: ParitySample) {
     const payload = sampleSchema.parse(sample);
-    z.object({ ok: z.literal(true) }).parse(await this.store.rpc('sample', { p_event_id: randomUUID(), p_sample: payload }));
+    try {
+      z.object({ ok: z.literal(true) }).parse(await this.store.rpc('sample', { p_event_id: randomUUID(), p_sample: payload }));
+    } catch (error) { this.available = false; this.gap = 'SAMPLE_PERSISTENCE_FAILED'; throw error; }
     super.record(payload);
   }
   override async refresh() {
     try {
-      // Read all events: do not truncate a high-volume history and then call it
-      // a complete window. The calculator itself selects the last 30 days.
-      const rows = z.array(eventSchema).parse(await this.store.rpc('history', {}));
+      // RPC selects one bounded 30-day snapshot, with a failure carry-in and latest import.
+      const rows = z.array(eventSchema).max(50000).parse(await this.store.rpc('history', {}));
       this.samples.length = 0; this.repairedFailures.length = 0;
       this.lastImport = null; this.failureSince = null; this.lastRun = null;
       for (const row of rows) {
@@ -48,10 +51,12 @@ export class SupabaseContentParityJournal extends ContentParityJournal {
           this.lastRun = payload.evidence;
         }
       }
-      this.available = true;
+      this.available = this.gap !== 'SAMPLE_PERSISTENCE_FAILED';
+      if (this.gap !== 'SAMPLE_PERSISTENCE_FAILED') this.gap = null;
     } catch {
       // Never present stale cached measurements as a pass after failed reload.
-      this.available = false; this.samples.length = 0; this.lastImport = null; this.lastRun = null;
+      this.available = false; this.gap = 'HISTORY_UNAVAILABLE'; this.samples.length = 0; this.lastImport = null; this.lastRun = null;
+      this.failureSince = null; this.repairedFailures.length = 0;
     }
   }
 }

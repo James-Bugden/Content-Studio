@@ -259,3 +259,8 @@ DB-4 conversion/exception ledger and DB-3 CAS/history/audit transaction.
 See [the Phase A apply, verification and rollback runbook](../ops/database-shadow-live.md).
 No live migration, phase flip, scheduled run, hosted denial proof, independent
 backend concurrency proof or seven-day production window is claimed here.
+
+Owner update 2026-10-25: the explicit audited `CS_PARITY_WINDOW_WAIVED=2026-10-25`
+switch replaces only the calendar/sample-count wait for one cutover. Full-import
+row/ID/field/exception measurements and sampled lag p95 remain required; see
+[Phase A operations](../ops/database-shadow-live.md). No production flip is claimed.

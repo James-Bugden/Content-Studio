@@ -7,12 +7,13 @@ import { syntheticContentDbSeed } from '@/integrations/supabase/fake-content-db'
 import { SupabaseContentImportStore } from '@/integrations/supabase/content-import-store';
 import { SupabaseContentParityJournal } from '@/integrations/supabase/content-parity-journal';
 import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
-import { assertImportMode } from '@/application/content-import';
+import { assertImportMode, buildTypedImport } from '@/application/content-import';
 import { ContentParityJournal, PARITY_COLLECTIONS, shadowContentRepository } from '@/application/content-parity';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
 import { LIBRARY_ORDER } from '@/fixtures/synthetic';
+import { buildSheetMirrorSnapshot } from '@/application/sheet-mirror';
 import { SHEET_TABS } from '@/domain/sheet-schema';
 
 const key = '11111111-1111-4111-8111-111111111111';
@@ -38,7 +39,9 @@ beforeEach(() => {
     const p = init?.body ? JSON.parse(String(init.body)) : {};
     if (name === 'content_studio_shadow_claim') return response(completed.has(p.p_operation_id) ? { status: 'replayed', result: completed.get(p.p_operation_id) } : { status: 'acquired' });
     if (name === 'content_studio_shadow_import') {
-      const result = { snapshotHash: p.p_snapshot_hash, counts: p.p_counts, hashes: p.p_hashes, exceptions: p.p_exceptions };
+      const result = { snapshotHash: p.p_snapshot_hash, counts: p.p_counts, hashes: p.p_hashes, exceptions: p.p_exceptions,
+        fullParity: { rows: p.p_rows.length, fields: 10000, equal: 10000, idsEqual: true, unclassified: 0 },
+        windowWaiver: p.p_window_waiver ? { by: 'owner', on: p.p_window_waiver, recordedAt: new Date().toISOString() } : null };
       completed.set(p.p_operation_id, result);
       events.push({ event_id: p.p_token, at: new Date().toISOString(), kind: 'imported', payload: { snapshotAt: Date.now(), evidence: result } });
       return response({ ok: true });
@@ -75,10 +78,19 @@ describe('DB-9 live Phase A composition over synthetic REST', () => {
     expect(() => assertImportMode()).toThrowError(expect.objectContaining({ code: 'FORBIDDEN' }));
     expect(request).not.toHaveBeenCalled();
   });
-  it('requires the existing production variables even with the legacy mirror off', () => {
-    vi.stubEnv('SUPABASE_READ_MODEL_SERVICE_KEY', undefined); resetEnvCache();
-    expect(() => serverEnv()).toThrow('SUPABASE_READ_MODEL_SERVICE_KEY');
+  it.each(['not-a-url', 'https://example.com', ''])('keeps Sheet reads/writes available for invalid shadow URL %s', async url => {
+    vi.stubEnv('SUPABASE_READ_MODEL_URL', url); resetEnvCache();
+    const services = getServices();
+    const row = (await services.repo.listLibrary())[0]!;
+    expect(await services.repo.updateLibrary({ operationId: 'synthetic_config_write', actor: { sub: 'synthetic-owner', role: 'owner' }, target: { libraryId: row.value.libraryId }, expectedRevision: row.revision, patch: { currentHook: 'Synthetic config hook' } })).toMatchObject({ ok: true });
+    expect(services.contentParity!.summary()).toMatchObject({ ready: false, available: false, gap: 'CONFIG_MISSING' });
+    await expect(runConfiguredSheetMirror(owner)).rejects.toMatchObject({ code: 'CONFIG_MISSING' });
     expect(request).not.toHaveBeenCalled();
+  });
+  it('keeps a short/missing shadow key as a visible configuration gap', async () => {
+    vi.stubEnv('SUPABASE_READ_MODEL_SERVICE_KEY', 'short'); resetEnvCache();
+    expect((await getServices().repo.listLibrary()).length).toBeGreaterThan(0);
+    expect(getServices().contentParity!.summary().gap).toBe('CONFIG_MISSING');
   });
   it('imports real-composition Sheet records, persists exception evidence, and replays after restart without reading Sheet', async () => {
     const services = getServices();
@@ -111,7 +123,13 @@ describe('DB-9 live Phase A composition over synthetic REST', () => {
     expect(bodies[0].p_operation_id).toBe(bodies[1].p_operation_id); expect(read).not.toHaveBeenCalled();
   });
   it.each([401, 403, 500, 'timeout'])('shadow %s cannot change any Sheet list, detail or mutation response', async failure => {
-    request.mockImplementation(async () => { if (failure === 'timeout') throw new DOMException('Synthetic timeout', 'TimeoutError'); return response({ code: '42501' }, Number(failure)); });
+    const originalFetch = request.getMockImplementation()!;
+    request.mockImplementation(async (url, init) => {
+      // Prepare and persistence stay healthy; failure is at the actual DB read.
+      if (String(url).includes('content_studio_shadow_')) return originalFetch(url, init);
+      if (failure === 'timeout') throw new DOMException('Synthetic timeout', 'TimeoutError');
+      return response({ code: '42501' }, Number(failure));
+    });
     const run = async (store: string) => {
       sheet = new FakeSheetTransport(); vi.stubEnv('CS_CONTENT_STORE', store); resetServices(); resetEnvCache();
       const repo = getServices().repo;
@@ -124,7 +142,12 @@ describe('DB-9 live Phase A composition over synthetic REST', () => {
       const conflict = await repo.updateLibrary({ ...mutation, patch: { currentHook: 'Synthetic conflict' } });
       return JSON.stringify({ lists, saved, replay, conflict, detail: await repo.getLibrary(row.value.libraryId) });
     };
-    expect(await run('db-shadow')).toBe(await run('sheet'));
+    const shadow = await run('db-shadow');
+    expect(events.filter(e => (e as { kind: string }).kind === 'sample')).toHaveLength(7);
+    expect(request.mock.calls.some(([url]) => String(url).includes('content_studio_schema_version'))).toBe(true);
+    expect(request.mock.calls.filter(([url]) => String(url).endsWith('content_studio_shadow_sample'))).toHaveLength(7);
+    expect(getServices().contentParity!.samples.every(s => s.facts[0]?.field === 'provider')).toBe(true);
+    expect(shadow).toBe(await run('sheet'));
   });
   it('refuses every DB writer through the shadow client before fetch', async () => {
     const db = getServices().contentImport!.db;
@@ -159,4 +182,62 @@ describe('DB-9 live Phase A composition over synthetic REST', () => {
     request.mockRejectedValue(new Error('Synthetic offline')); await journal.refresh();
     expect(journal.summary(now).ready).toBe(false);
   });
+  it('always samples reconcile even when normal request sampling selects nothing', async () => {
+    vi.mocked(Math.random).mockReturnValue(1);
+    const services = getServices();
+    await services.repo.listLibrary(); expect(events).toHaveLength(0);
+    expect(services.reconcileRepo).toBeDefined();
+    await services.reconcileRepo!.listLibrary();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ kind: 'sample', payload: { collection: 'library', fields: expect.any(Number) } });
+    expect(request.mock.calls.some(([url]) => String(url).includes('content_studio_posts'))).toBe(true);
+  });
+  it('forwards the explicit waiver to import and reloads its durable owner audit', async () => {
+    vi.stubEnv('CS_PARITY_WINDOW_WAIVED', '2026-10-25'); resetEnvCache();
+    await runConfiguredSheetMirror(owner);
+    const payload = JSON.parse(String(request.mock.calls.find(([url]) => String(url).endsWith('content_studio_shadow_import'))![1]!.body));
+    expect(payload.p_window_waiver).toBe('2026-10-25');
+    await getServices().contentParity!.refresh();
+    expect(getServices().contentParity!.summary()).toMatchObject({ windowWaiver: { by: 'owner', on: '2026-10-25', recordedAt: expect.any(String) }, fullParity: { rows: 56, idsEqual: true }, ready: false });
+  });
+  it('normalises uppercase owner UUID before durable SQL claim', async () => {
+    const upper = 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA';
+    request.mockImplementation(async () => response({ status: 'in_progress' }));
+    await runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: upper });
+    const payload = JSON.parse(String(request.mock.calls[0]![1]!.body));
+    expect(payload.p_operation_id).toBe(`owner:synthetic_source:${upper.toLowerCase()}`);
+  });
+  it('explicitly refuses legacy mirror cron takeover before claim', async () => {
+    vi.stubEnv('SUPABASE_READ_MODEL_MODE', 'mirror'); resetEnvCache();
+    await expect(runConfiguredSheetMirror({ kind: 'scheduled' })).rejects.toMatchObject({ code: 'CONFIG_MISSING', details: { reason: 'legacy_mirror_refused_in_db_shadow_disable_mirror_mode' } });
+    expect(request).not.toHaveBeenCalled();
+  });
+  it('releases the exact claimed operation and token after import failure', async () => {
+    const originalFetch = request.getMockImplementation()!;
+    request.mockImplementation((url, init) => String(url).endsWith('content_studio_shadow_import') ? Promise.resolve(response({ ok: false })) : originalFetch(url, init));
+    await expect(runConfiguredSheetMirror(owner)).rejects.toMatchObject({ code: 'CONFLICT' });
+    const payload = (suffix: string) => JSON.parse(String(request.mock.calls.find(([url]) => String(url).endsWith(suffix))![1]!.body));
+    expect(payload('content_studio_shadow_release')).toEqual({ p_operation_id: `owner:synthetic_source:${key}`, p_token: payload('content_studio_shadow_claim').p_token });
+  });
+  it('live store requires a lease, validates replay, and refuses non-success import responses', async () => {
+    const store = getServices().contentImport!;
+    const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(sheet), { sourceKey: 'synthetic_source' });
+    const envelope = buildTypedImport(snapshot, new Map(), 'a'.repeat(64));
+    await expect(store.applyImport(envelope)).rejects.toMatchObject({ code: 'FORBIDDEN', details: { reason: 'import_lease_required' } });
+    expect(request).not.toHaveBeenCalled();
+    for (const result of [{ ok: false }, {}, { ok: 'true' }]) {
+      request.mockImplementation(async () => response(result));
+      await expect(store.applyImport(envelope, crypto.randomUUID())).rejects.toMatchObject({ code: 'CONFLICT' });
+    }
+    request.mockImplementation(async () => response({ status: 'replayed', result: { snapshotHash: 'invalid' } }));
+    await expect(store.claim!('synthetic-op', 'b'.repeat(64))).rejects.toThrow();
+    const valid = { snapshotHash: 'a'.repeat(64), counts: { library: 0, queue: 0, schedule: 0, workflow_settings: 0 }, hashes: { library: 'a'.repeat(64), queue: 'a'.repeat(64), schedule: 'a'.repeat(64), workflow_settings: 'a'.repeat(64) }, exceptions: [] };
+    request.mockImplementation(async () => response({ status: 'replayed', result: { ...valid, body: 'Synthetic unexpected private payload' } }));
+    expect((await store.claim!('synthetic-op', 'b'.repeat(64))).result).toEqual(valid);
+    vi.stubEnv('CS_DATA_MODE', 'fake');
+    request.mockImplementation(async () => response({ ok: true, code: null, steps: [], revision: null }));
+    await store.applyImport(envelope);
+    expect(JSON.parse(String(request.mock.calls.at(-1)![1]!.body))).toEqual({ p_operation_id: envelope.operationId, p_snapshot_hash: envelope.snapshotHash, p_actor_hash: envelope.actorHash, p_counts: envelope.counts, p_hashes: envelope.hashes, p_exceptions: envelope.exceptions, p_rows: envelope.rows });
+  });
+
 });

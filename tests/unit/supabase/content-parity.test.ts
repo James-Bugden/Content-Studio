@@ -8,6 +8,8 @@ import { recentEvents } from '@/observability/events';
 import { buildReconcileReport } from '@/application/reconcile';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 
+const fullEvidence = { snapshotHash: 'a'.repeat(64), counts: { library: 0, queue: 0, schedule: 0, workflow_settings: 0 }, hashes: { library: 'a'.repeat(64), queue: 'a'.repeat(64), schedule: 'a'.repeat(64), workflow_settings: 'a'.repeat(64) }, exceptions: [], fullParity: { rows: 0, fields: 0, equal: 0, idsEqual: true, unclassified: 0 } };
+
 describe('MIG-10 shadow comparisons', () => {
   it('names blank checkbox equivalence without masking any other field or true checkbox', () => {
     const record = (posted: string, content: string) => [{ value: { contentId: 'SYN-1', posted: false }, cells: { posted, content } }];
@@ -57,7 +59,7 @@ describe('MIG-10 shadow comparisons', () => {
     for (let d = 1; d <= 7; d++) for (const c of PARITY_COLLECTIONS) for (let n = 0; n < 5; n++) {
       green.record({ at: now - d * day + n, collection: c, idsEqual: true, fields: c === 'ready' ? 0 : 10, equal: c === 'ready' ? 0 : 10, blocking: 0, lagMs: 0, facts: [] });
     }
-    green.imported(now);
+    green.imported(now); green.lastRun = fullEvidence;
     expect(green.summary(now)).toMatchObject({ ready: true, daysGreen: 7, sampleCount: 210 });
   });
   it('emits only one aggregate event per collection observation even for many differing fields', () => {
@@ -115,7 +117,7 @@ describe('MIG-10 shadow comparisons', () => {
     for (let d = 1; d <= 7; d++) for (const c of PARITY_COLLECTIONS) for (let n = 0; n < 5; n++) {
       journal.record({ at: now - d * day + n, collection: c, idsEqual: true, fields: 1000, equal: 1000, blocking: 0, lagMs: 100, facts: [] });
     }
-    journal.imported(now);
+    journal.imported(now); journal.lastRun = fullEvidence;
     expect(journal.summary(now)).toMatchObject({ sampleCount: 210, daysGreen: 7, lagP95: 100, ready: true });
     journal.record({ at: now, collection: 'library', idsEqual: false, fields: 2, equal: 1, blocking: 1, lagMs: 1000,
       facts: [{ collection: 'library', field: 'cells.draftContent', kind: 'changed', fingerprint: '1234567890123456' }] });
@@ -136,9 +138,9 @@ describe('MIG-10 shadow comparisons', () => {
     const journal = new ContentParityJournal(), day = 86400_000, now = Date.UTC(2026, 9, 25);
     journal.record({ at: now - 10 * day, collection: 'library', idsEqual: false, fields: 1, equal: 0, blocking: 1, lagMs: 0, facts: [] });
     for (let d = 1; d <= 7; d++) for (const c of PARITY_COLLECTIONS) for (let n = 0; n < 5; n++) journal.record({ at: now - d * day + n, collection: c, idsEqual: true, fields: 100, equal: 100, blocking: 0, lagMs: 100, facts: [] });
-    journal.imported(now);
+    journal.imported(now); journal.lastRun = fullEvidence;
     expect(journal.summary(now)).toMatchObject({ ready: true, daysGreen: 7, sampleCount: 210 });
-    journal.failed(now - 7200_000); journal.imported(now);
+    journal.failed(now - 7200_000); journal.imported(now); journal.lastRun = fullEvidence;
     expect(journal.summary(now).ready).toBe(false);
   });
   it('shows unknown/15-minute/60-minute import lag and blocking differences in reconcile', async () => {

@@ -20,7 +20,9 @@ export class SupabaseContentImportStore implements ContentImportStore {
       const hash = z.string().regex(/^[a-f0-9]{64}$/);
       const collections = z.object({ library: z.number().int().nonnegative(), queue: z.number().int().nonnegative(), schedule: z.number().int().nonnegative(), workflow_settings: z.number().int().nonnegative() });
       result.result = z.object({ snapshotHash: hash, counts: collections, hashes: z.object({ library: hash, queue: hash, schedule: hash, workflow_settings: hash }),
-        exceptions: z.array(z.object({ class: z.enum(['formula_display', 'number_formatting', 'trailing_whitespace', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting']), collection: z.enum(['library', 'queue', 'schedule', 'workflow_settings']), field: z.string(), hash })) }).parse(result.result);
+        fullParity: z.object({ rows: z.number().int().nonnegative(), idsEqual: z.boolean(), fields: z.number().int().nonnegative(), equal: z.number().int().nonnegative(), unclassified: z.number().int().nonnegative() }).refine(p => p.equal <= p.fields).optional(),
+        windowWaiver: z.object({ by: z.literal('owner'), on: z.literal('2026-10-25'), recordedAt: z.string().datetime({ offset: true }) }).nullable().optional(),
+        exceptions: z.array(z.object({ class: z.enum(['formula_display', 'number_formatting', 'trailing_whitespace', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting', 'refused_numeric', 'refused_size']), collection: z.enum(['library', 'queue', 'schedule', 'workflow_settings']), field: z.string(), hash })) }).parse(result.result);
     }
     return { ...result, token };
   }
@@ -33,6 +35,7 @@ export class SupabaseContentImportStore implements ContentImportStore {
     if (process.env.CS_DATA_MODE === 'live' && !leaseToken) throw new AppError('FORBIDDEN', { reason: 'import_lease_required' });
     if (leaseToken) {
       const result = await new ContentShadowStore(this.options).rpc('import', { p_operation_id: e.operationId, p_token: leaseToken,
+        p_window_waiver: process.env.CS_PARITY_WINDOW_WAIVED ?? null,
         p_snapshot_hash: e.snapshotHash, p_actor_hash: e.actorHash, p_counts: e.counts, p_hashes: e.hashes, p_exceptions: e.exceptions, p_rows: e.rows });
       if (!z.object({ ok: z.literal(true) }).safeParse(result).success) throw new AppError('CONFLICT', { provider: 'db' });
       return;

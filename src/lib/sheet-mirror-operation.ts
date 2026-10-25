@@ -18,6 +18,7 @@ const states = globalState[stateKey] ??= new WeakMap();
 async function execute(trigger: Trigger, requestId: string): Promise<RunResult> {
   const env = serverEnv();
   const services = getServices();
+  if (services.contentParity?.gap === 'CONFIG_MISSING') throw new AppError('CONFIG_MISSING', { provider: 'db' });
   const sourceKey = env.SUPABASE_READ_MODEL_SOURCE_KEY ?? (env.CS_DATA_MODE === 'fake' ? 'synthetic_workbook' : undefined);
   if (!sourceKey) throw new AppError('CONFIG_MISSING', { provider: 'supabase' });
   if (services.contentImport) {
@@ -63,10 +64,14 @@ async function execute(trigger: Trigger, requestId: string): Promise<RunResult> 
 export async function runConfiguredSheetMirror(trigger: Trigger): Promise<RunResult> {
   // Neither the typed importer nor the legacy mirror may read/copy Sheet
   // authority after write cutover, even when legacy mirror flags remain set.
+  if (serverEnv().CS_CONTENT_STORE === 'db-shadow' && serverEnv().SUPABASE_READ_MODEL_MODE === 'mirror') {
+    throw new AppError('CONFIG_MISSING', { reason: 'legacy_mirror_refused_in_db_shadow_disable_mirror_mode', message: 'Legacy mirror refresh is refused in db-shadow. Set SUPABASE_READ_MODEL_MODE=off before typed imports; the legacy mirror will no longer refresh.' });
+  }
   if (serverEnv().CS_CONTENT_STORE === 'db') throw new AppError('FORBIDDEN', { reason: 'imports_disabled_in_db_mode' });
   if (trigger.kind === 'owner' && !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trigger.idempotencyKey)) {
     throw new AppError('VALIDATION_FAILED', { reason: 'import_idempotency_key' });
   }
+  if (trigger.kind === 'owner') trigger = { ...trigger, idempotencyKey: trigger.idempotencyKey.toLowerCase() };
   const services = getServices();
   if (services.mode === 'live' && services.contentImport) {
     // A scheduled redelivery in the same 15-minute slot has durable identity.

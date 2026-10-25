@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const session = vi.hoisted(() => ({ sub: null as string | null }));
 vi.mock('@/lib/auth/config', () => ({ auth: async () => session.sub ? { user: { id: session.sub } } : null }));
-import { POST } from '@/app/api/ops/sheet-mirror/route';
-import { GET } from '@/app/api/ops/sheet-mirror/reconcile/route';
+import { POST, maxDuration as ownerDuration } from '@/app/api/ops/sheet-mirror/route';
+import { GET, maxDuration as cronDuration } from '@/app/api/ops/sheet-mirror/reconcile/route';
 import { resetEnvCache } from '@/lib/env';
 import { resetServices } from '@/application/container';
 
@@ -37,4 +37,22 @@ it('scheduled route rejects bad/missing bearer before providers; correct bearer 
   expect(fetchBoundary).not.toHaveBeenCalled();
   expect((await GET(request({authorization:`Bearer ${cron}`}))).status).toBe(200);
   expect(String(fetchBoundary.mock.calls[0]?.[0])).toContain('content_studio_shadow_claim');
+});
+
+it('both import routes have the documented 60-second kill budget', () => { expect(ownerDuration).toBe(60); expect(cronDuration).toBe(60); });
+
+it('accepts uppercase Idempotency-Key and claims only its canonical lowercase identity', async () => {
+  session.sub = owner;
+  const upper = 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA';
+  const result = await POST(request({ 'Idempotency-Key': upper }));
+  expect(result.status).toBe(200);
+  expect(JSON.parse(String(fetchBoundary.mock.calls[0]![1].body)).p_operation_id).toBe(`owner:synthetic_source:${upper.toLowerCase()}`);
+});
+
+it('cron explicitly explains refusal of the legacy mirror in db-shadow before provider calls', async () => {
+  vi.stubEnv('SUPABASE_READ_MODEL_MODE', 'mirror'); resetEnvCache();
+  const result = await GET(request({ authorization: `Bearer ${cron}` }));
+  expect(result.status).toBe(503);
+  expect((await result.json()).details.message).toContain('Set SUPABASE_READ_MODEL_MODE=off');
+  expect(fetchBoundary).not.toHaveBeenCalled();
 });

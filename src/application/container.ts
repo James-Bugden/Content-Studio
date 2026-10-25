@@ -5,7 +5,7 @@ import { ContentExporter, ContentWriteCutover } from './content-export';
 import { FakePrivateBackupFolder } from '@/integrations/supabase/fake-content-backup';
 import type { BackupJournal, ContentBackupSource, PrivateBackupFolder } from './content-backup';
 import { contentSheetCacheOptions } from './content-cache';
-import { AppError } from '@/domain/errors';
+import { AppError, isAppError } from '@/domain/errors';
 import { serverEnv } from '@/lib/env';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
@@ -165,18 +165,25 @@ function build(): Services {
     typefully: createTypefullyGateway(env),
   };
   if (env.CS_CONTENT_STORE === 'db-shadow') {
-    const options = { url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY! };
-    const contentImport = new SupabaseContentImportStore(options);
-    const parity = new SupabaseContentParityJournal(options);
-    const sheetRepo = services.repo;
-    const dbRepo = new SupabaseContentRepository(contentImport.db, 'db-read');
-    // Scheduled capture must not reuse a display cache warmed by an earlier
-    // request. This read-only repository adds reads only during explicit import.
-    services.importRepo = new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, false), { writable: false });
-    services.repo = shadowContentRepository(sheetRepo, dbRepo, parity);
-    services.reconcileRepo = shadowContentRepository(sheetRepo, dbRepo, parity, () => true);
-    services.contentImport = contentImport;
-    services.contentParity = parity;
+    const options = { url: env.SUPABASE_READ_MODEL_URL ?? '', serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY ?? '' };
+    try {
+      const contentImport = new SupabaseContentImportStore(options);
+      const parity = new SupabaseContentParityJournal(options);
+      const sheetRepo = services.repo;
+      const dbRepo = new SupabaseContentRepository(contentImport.db, 'db-read');
+      // Scheduled capture must not reuse a display cache warmed by an earlier
+      // request. This read-only repository adds reads only during explicit import.
+      services.importRepo = new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, false), { writable: false });
+      services.repo = shadowContentRepository(sheetRepo, dbRepo, parity);
+      services.reconcileRepo = shadowContentRepository(sheetRepo, dbRepo, parity, () => true);
+      services.contentImport = contentImport;
+      services.contentParity = parity;
+    } catch (error) {
+      if (!isAppError(error) || error.code !== 'CONFIG_MISSING') throw error;
+      const parity = new ContentParityJournal();
+      parity.available = false; parity.gap = 'CONFIG_MISSING';
+      services.contentParity = parity;
+    }
   }
   return services;
 }

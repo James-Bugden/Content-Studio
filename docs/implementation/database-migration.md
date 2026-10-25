@@ -794,3 +794,8 @@ Follow [the exact apply order and first-import checklist](../ops/database-shadow
 for all unapplied migrations, hosted denial/advisor checks, cron configuration,
 independent-backend concurrency rehearsal and flag rollback. Section 6's
 fake/PGlite/browser evidence does not replace those live gates.
+
+Owner update 2026-10-25: the explicit audited `CS_PARITY_WINDOW_WAIVED=2026-10-25`
+switch replaces only the calendar/sample-count wait for one cutover. Full-import
+row/ID/field/exception measurements and sampled lag p95 remain required; see
+[Phase A operations](../ops/database-shadow-live.md). No production flip is claimed.

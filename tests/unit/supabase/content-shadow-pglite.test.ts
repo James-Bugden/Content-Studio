@@ -91,6 +91,58 @@ describe('DB-9 unapplied migration / actual SQL fencing and durable evidence', (
     expect((await query('select payload from content_studio_shadow_events where event_id=$1',[next])).rows[0]!.payload).toEqual(sample);
     expect(sqlState(await expectRejection(query('select content_studio_shadow_sample($1,$2)',[crypto.randomUUID(),{...sample,equal:101}])))).toBe('22023');
   });
+  it('bounds lease lifetime to route maxDuration plus the five-second kill-recovery margin', async () => {
+    await claim();
+    const seconds = (await query<{ seconds: number }>('select extract(epoch from expires_at-clock_timestamp())::float8 as seconds from content_studio_shadow_lease')).rows[0]!.seconds;
+    expect(seconds).toBeGreaterThan(60); expect(seconds).toBeLessThanOrEqual(65);
+  });
+  it('stale release cannot fail a reclaimed job with the SAME operation identity', async () => {
+    await claim(); await query("update content_studio_shadow_lease set expires_at=clock_timestamp()-interval '1 second'");
+    await claim(operation, next);
+    await query('select content_studio_shadow_release($1,$2)', [operation, token]);
+    expect((await query('select status,token from content_studio_shadow_jobs')).rows).toEqual([{ status: 'running', token: next }]);
+    expect((await query('select token from content_studio_shadow_lease')).rows).toEqual([{ token: next }]);
+  });
+  it('import requires the claimed job to still be running even with a valid lease', async () => {
+    await claim(); await query("update content_studio_shadow_jobs set status='failed' where operation_id=$1", [operation]);
+    const counts = {library:0,queue:0,schedule:0,workflow_settings:0}, hashes = Object.fromEntries(Object.keys(counts).map(k=>[k,hash]));
+    await expect(query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8)', [operation,token,hash,hash,counts,hashes,[],[]])).rejects.toThrow();
+    expect((await query('select * from content_studio_import_runs')).rows).toHaveLength(0);
+  });
+  it('measures all imported rows and fields, persists owner waiver audit, and exposes unexpected retained IDs', async () => {
+    await claim();
+    const counts = {library:1,queue:0,schedule:0,workflow_settings:0}, hashes = Object.fromEntries(Object.keys(counts).map(k=>[k,hash]));
+    const rows = [{ target_kind: 'library', target_id: 'SYN-199', expected_version: null, row: { current_hook: 'Synthetic hook', source_sheet_row: 2 } }];
+    await query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8,$9)', [operation,token,hash,hash,counts,hashes,[],rows,'2026-10-25']);
+    let result = (await claim(operation,next)).result;
+    expect(result).toMatchObject({ fullParity: { rows: 1, fields: 2, equal: 2, idsEqual: true, unclassified: 0 }, windowWaiver: { by: 'owner', on: '2026-10-25', recordedAt: expect.any(String) } });
+    const imported = (await query<{ payload: { evidence: unknown } }>("select payload from content_studio_shadow_events where kind='imported'")).rows[0]!;
+    expect(imported.payload.evidence).toEqual(result);
+    await claim(other,next);
+    await query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8)', [other,next,hash,hash,{...counts,library:0},hashes,[],[]]);
+    result = (await claim(other,token)).result;
+    expect(result).toMatchObject({ fullParity: { rows: 0, idsEqual: false }, windowWaiver: null });
+  });
+  it('detects stored-field changes across the full import instead of trusting submitted counts', async () => {
+    await claim();
+    // A trigger simulates a storage/projection defect after the importer writes.
+    await db.raw.exec("create function public.synthetic_corrupt() returns trigger language plpgsql as $$ begin new.current_hook := 'Synthetic changed'; return new; end $$; create trigger synthetic_corrupt before insert on content_studio_posts for each row execute function public.synthetic_corrupt();");
+    try {
+      const counts = {library:1,queue:0,schedule:0,workflow_settings:0}, hashes = Object.fromEntries(Object.keys(counts).map(k=>[k,hash]));
+      const rows = [{ target_kind: 'library', target_id: 'SYN-199', expected_version: null, row: { current_hook: 'Synthetic original' } }];
+      await query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8)', [operation,token,hash,hash,counts,hashes,[],rows]);
+      expect((await claim(operation,next)).result).toMatchObject({ fullParity: { rows: 1, fields: 1, equal: 0, idsEqual: true, unclassified: 1 } });
+    } finally { await db.raw.exec('drop trigger synthetic_corrupt on content_studio_posts; drop function public.synthetic_corrupt()'); }
+  });
+  it('history excludes old samples but preserves carry-in import/failure and limits the result', async () => {
+    const insert = (kind: string, at: string) => query('insert into content_studio_shadow_events(event_id,at,kind,payload) values($1,$2,$3,$4)', [crypto.randomUUID(),at,kind,{}]);
+    await insert('sample', '2020-01-01'); await insert('imported', '2020-01-01'); await insert('failed', '2020-01-02'); await insert('failed', '2020-01-03');
+    await insert('sample', new Date().toISOString());
+    const history = () => query<{ r: {kind:string}[] }>('select content_studio_shadow_history() as r').then(r => r.rows[0]!.r);
+    expect((await history()).map(r => r.kind)).toEqual(['imported','failed','sample']);
+    await query("insert into content_studio_shadow_events(event_id,kind,payload) select gen_random_uuid(),'sample','{}'::jsonb from generate_series(1,50005)");
+    expect(await history()).toHaveLength(50001);
+  });
   it('executes the exact documented rollback, preserving legacy mirror and Replies catalogs', async () => {
     const doc = readFileSync('docs/ops/database-shadow-live.md','utf8');
     const sql = [...doc.matchAll(/```sql\r?\n([\s\S]*?)```/g)].at(-1)?.[1];

@@ -107,7 +107,12 @@ from pg_proc p where p.proname like 'content_studio_shadow_%';
    field differences are required. Absent Sheet rows are retained in DB and
    reported as unexpected IDs; deletion/retirement is not automatic.
 4. Force an overlapping request from another instance. Expect `in_progress`
-   before Sheet capture. Expired leases (120 seconds) may be replaced; stale
+   before Sheet capture. Both routes have maxDuration=60 seconds; the lease is
+   65 seconds (5-second kill-recovery margin). A killed run may block another
+   key until expiry while capturing source data; the next claim records failure
+   and replaces it. An in-flight SQL transaction retains its row lock until
+   commit/rollback: the hosted kill-recovery rehearsal must also verify that
+   abandoned transactions drain before retry. Stale
    tokens cannot commit. Rehearse with independent Postgres backends on a
    branch, including delayed/lost responses. Do not infer this from PGlite.
 5. Configure the **existing Vercel project's production cron configuration**
@@ -132,23 +137,39 @@ from pg_proc p where p.proname like 'content_studio_shadow_%';
    evidence contains hashes/counts and the private exception ledger. Never
    publish production hashes. Full history is read in one MVCC snapshot via
    a scalar JSON RPC, avoiding REST row caps and shifting offset pages.
-7. Gate advancement requires both 7 complete UTC green days and >=200
-   observations, every collection measured, 100% stable-ID equality,
-   >=99.9% field equality per collection, no unclassified mismatch, lag p95
-   <=15 minutes, current import <=15 minutes old, and no >1-hour failure.
-   Missing providers, malformed/unavailable history and insufficient data
-   cannot pass. A sampled timeout records a blocking sample where storage is
-   available. Shadow work is bounded (500 ms read and 500 ms evidence budget)
-   and all comparison/sink errors fail open to the original Sheet result.
-   Lost requests/outages cannot be proven by missing samples; review hosted
-   cron logs and coverage before accepting the production window.
+7. Owner instruction **2026-10-25** waives the multi-day/sample-count wait for
+   this one cutover. Set `CS_PARITY_WINDOW_WAIVED=2026-10-25` explicitly and run
+   a fresh import. The import event and replay job record `windowWaiver` with
+   `by: owner`, the authorisation date, and database `recordedAt`. `/reconcile`
+   shows **Window waived by owner** only when both the switch and this durable
+   audit exist. Unset the switch to restore the seven-day/200-sample gate.
+   The waiver never substitutes for measurements: the same import transaction
+   measures **100% of typed source rows** against stored rows, checks exact ID
+   sets including unexpected retained DB rows, counts field equality >=99.9%,
+   and requires zero unclassified differences. Source conversion differences
+   remain classified in the exception ledger (blank checkboxes are equivalent;
+   formula display is preserved). All stored-field differences are unclassified
+   and block. Refused rows block. Missing old-format full-import evidence blocks.
+   Lag p95 over measured samples must be <=15 minutes; no samples means unknown.
+   A provider timeout is counted and displayed, but does not veto exact full-import
+   parity. Failed equality, unknown exceptions, failed persistence and failed lag
+   remain red, as does an import failure lasting over one hour. Current snapshot age remains visible as an import-lag item.
+   Without the waiver, 199 samples or six days fail; all collection, freshness,
+   unknown-lag and one-hour failure checks still apply. The legacy per-day rule
+   remains for that unwaived historical gate only.
+   History is one MVCC snapshot of the last 30 days, plus the last prior import
+   and first unresolved prior failure (carry-in preserves the one-hour gate).
+   It returns at most 50,001 events; over 50,000 is explicitly unavailable, never
+   truncated into a pass. Archive/volume remediation is needed at that bound.
+   Shadow work is bounded (500 ms read and 500 ms persistence budgets); failures
+   preserve the Sheet result and are visible as named gaps.
 8. Live `db-read` and `db` remain errors even after these numbers pass.
    Read/write phase enablement requires separately reviewed code and gates.
 
 ## Rollback (Phase A only)
 
 First remove/disable the cron, set `CS_CONTENT_STORE=sheet`, redeploy and
-drain old invocations for at least the route/lease lifetime (120 seconds).
+drain old invocations for at least the route/lease lifetime (65 seconds).
 Check the exact deployed SHA serves Sheet responses. Setting legacy mirror
 mode `off` alone does **not** disable the typed importer. Flag rollback
 requires no data movement; preserve evidence privately if needed.
@@ -163,7 +184,7 @@ Replies objects. This is not the Phase D rollback procedure.
 begin;
 drop function if exists public.content_studio_shadow_history();
 drop function if exists public.content_studio_shadow_sample(uuid,jsonb);
-drop function if exists public.content_studio_shadow_import(text,uuid,text,text,jsonb,jsonb,jsonb,jsonb);
+drop function if exists public.content_studio_shadow_import(text,uuid,text,text,jsonb,jsonb,jsonb,jsonb,text);
 drop function if exists public.content_studio_shadow_release(text,uuid);
 drop function if exists public.content_studio_shadow_claim(text,text,uuid);
 drop table if exists public.content_studio_shadow_events;
@@ -194,3 +215,16 @@ After rollback verify the typed tables/functions are absent, Replies and the
 legacy Sheet mirror match their prior catalog inventory, and the app's
 normal Sheet read/save/replay/conflict flows still work. Re-enablement needs
 the same migration/apply/security/import checklist from the start.
+
+## Configuration and verification limits
+
+`SUPABASE_READ_MODEL_MODE=mirror` with `db-shadow` is explicitly refused by
+the cron/import entry point with `legacy_mirror_refused_in_db_shadow_disable_mirror_mode`.
+Set it to `off` before using typed imports. The legacy jsonb mirror will no
+longer refresh and must not be used as current data; this is not a silent cron
+takeover. Invalid/missing shadow URL/key leaves Sheet reads and writes working
+and shows `CONFIG_MISSING` on `/reconcile`; import refuses until corrected.
+
+PGlite has one connection: it verifies token/status/expiry predicates and
+transaction rollback, but cannot falsify a missing advisory lock or establish
+independent-backend concurrency. That hosted rehearsal remains required.
