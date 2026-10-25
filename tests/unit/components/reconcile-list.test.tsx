@@ -17,6 +17,17 @@ const item = (id: string, kind: string, severity: 'blocking' | 'attention'): Rec
 });
 
 describe('Fix issues grouping (CS-048)', () => {
+  it('CS-066: shows the owner waiver beside blocking export failures', () => {
+    const { container } = render(<ReconcileList items={[
+      { ...item('waiver', 'backup_waived', 'attention'), title: 'Backup gate waived by owner',
+        facts: ['Owner decision on 2026-10-25; recorded 2026-10-25T00:00:00Z. Supabase daily plan backups plus Sheet export; no independent archive of history or ledger.'] },
+      { ...item('export', 'export_mismatch', 'blocking'), title: 'Sheet export differs; row preserved' },
+    ]} />);
+    expect(screen.getByRole('heading', { name: 'Backup gate waived by owner' })).toBeTruthy();
+    expect(screen.getByText(/Owner decision on 2026-10-25/)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Sheet export differs; row preserved' })).toBeTruthy();
+    expect(container.querySelector('details[data-reconcile-kind="export_mismatch"]')?.hasAttribute('open')).toBe(true);
+  });
   it('groups by kind, keeps report order within a group, and lists blocking groups first', () => {
     const groups = groupByKind([
       item('A', 'markdown_missing', 'attention'),

@@ -36,7 +36,15 @@ separate PR only after the final deployed smoke succeeds.
 
 ## Private evidence and environment
 
-Use a private coordinator session. Service accounts cannot own files or use personal Drive storage; use a private shared-drive folder and verify both drive membership and inherited folder/file ACLs ([Google Drive documentation](https://developers.google.com/workspace/drive/api/guides/about-shareddrives)). Never paste keys, real IDs, source text,
+Use a private coordinator session. Owner decision 2026-10-25 (#204) waives the
+private Drive archive gate only, with the switch and audited action below. A
+personal Gmail account has no shared drives; a service account cannot own files
+in My Drive. Recovery then relies on Supabase daily Pro plan backups plus the
+exact one-way Sheet export. There is **no independent archive of history/ledger
+outside the project**; project-level loss relies on those plan backups and the
+Sheet export, which does not contain the complete history/ledger. Exact rollback
+rehearsal remains mandatory. If a folder is configured, use a private shared-drive
+folder and verify both drive membership and inherited folder/file ACLs ([Google Drive documentation](https://developers.google.com/workspace/drive/api/guides/about-shareddrives)). Never paste keys, real IDs, source text,
 manifests, row fingerprints, parity hashes or screenshots into GitHub. Every
 step records UTC time, environment, full 40-character SHA, deployment ID, input
 and output counts/hashes, classified exceptions, expected/actual outcome and
@@ -57,7 +65,8 @@ or `vercel env update NAME production` (interactive input; never shell history):
 | `CS_CONTENT_READ_ENABLED` | `true` only after the first full measured gate |
 | `CS_CONTENT_DB_ENABLED` | `true` only after every write gate below |
 | `CS_CONTENT_WRITE_ENABLED` | `false` while frozen; `true` only at explicit resume |
-| `CS_CONTENT_BACKUP_FOLDER_ID` | private folder in a shared drive with only the configured CS_OWNER_EMAIL and GOOGLE_SERVICE_ACCOUNT_EMAIL; no anyone/domain/group sharing |
+| `CS_BACKUP_GATE_WAIVED` | optional `2026-10-25`; coordinator sets explicitly; env-setup never sets it. Effective only with the durable owner audit; removing it revokes the waiver |
+| `CS_CONTENT_BACKUP_FOLDER_ID` | optional only under the audited waiver; if configured, still requires a private folder in a shared drive with only the configured CS_OWNER_EMAIL and GOOGLE_SERVICE_ACCOUNT_EMAIL; no anyone/domain/group sharing |
 | `GOOGLE_WRITE_ENABLED` | `true` for Sheet authority/export and Drive export; `CS_CONTENT_WRITE_ENABLED=false` freezes app authority writes in every store mode, **not repairs** |
 | `SUPABASE_READ_MODEL_MODE` | `off`; disable legacy import schedule |
 | `SUPABASE_READ_MODEL_URL`, `SUPABASE_READ_MODEL_SERVICE_KEY` | existing approved shared Career project's server-only credentials |
@@ -72,6 +81,14 @@ platform does not provide `VERCEL_GIT_COMMIT_SHA`. Preview stays `fake`; never
 copy Production provider credentials into Preview. Flags admit construction;
 flip admission checks the latest typed import and exact deployed SHA. Parity
 evidence expires after 15 minutes; other flip proofs expire after 24 hours.
+Under the backup waiver, SQL admission also requires the latest completed Sheet
+export report within 15 minutes: exact, equal valid hashes, no differences and
+no retained issues. A newer failed report blocks even with an exact rehearsal.
+Every `activate-db` action (including a completed-operation retry) additionally
+reads fresh Sheet parity without writing Sheet cells. Unequal hashes, unexpected
+IDs, retained conflicts or unavailable provider reads refuse activation. SQL
+checks the durable journal again at the flip; do not replace this action with
+a direct SQL activation based only on a historical provider observation.
 Changing a flag alone cannot create DB authority. Explicit activation records
 a private epoch containing the admitted SHA, schema version and compiled
 `CUTOVER_CONTRACT` (`schema-2:cutover-1`). Compatible later deployments use this
@@ -126,14 +143,15 @@ the stated mode/write flag rather than reusing an old deployment environment.
    typed and legacy schedules. Take the current private Sheet/Drive backup.
    Confirm the shared project and daily plan backups are actually enabled;
    record a restorable plan backup, not just the tier name. Confirm existing
-   account permissions and the private service-account backup folder. Repeat
+   account permissions and either the audited waiver or the private
+   service-account backup folder. The waiver does not attest plan backups. Repeat
    the entire sequence on a copied synthetic workbook and Supabase branch,
    with independent SQL backends, before Production. Measure the 60-second
    rate-limit/backoff window and old-overlay duration; no calendar wait.
    **Rollback:** retain `CS_CONTENT_STORE=sheet`, redeploy the same SHA, smoke;
    no SQL drops, Sheet clearing or reverse imports.
 
-2. **Apply only the seven reviewed, still-unapplied migrations via Supabase
+2. **Apply only the eight reviewed, still-unapplied migrations via Supabase
    MCP `apply_migration`, one call per file, exact file contents in `query` and
    the timestamp/name as `name`, using the privately verified project ID.**
    Inspect migration history and definitions first. If a file was applied in
@@ -147,10 +165,14 @@ the stated mode/write flag rather than reusing an old deployment environment.
    20261025000400_content_markdown_export.sql
    20261025000500_content_shadow_live.sql
    20261025000600_content_cutover_live.sql
+   20261025000700_content_backup_gate_waiver.sql
    ```
 
    Run every denial/catalog query from [DB-9](database-shadow-live.md), including
-   the four `content_studio_cutover_*` tables and twelve cutover RPCs. All tables
+   the four `content_studio_cutover_*` tables, append-only
+   `content_studio_backup_waivers` and every cutover RPC (including
+   `waive_backup` / `backup_waiver`). Verify service_role cannot UPDATE/DELETE
+   waiver records. Check gate/activate have only their new defaulted signatures. All tables
    force zero-policy RLS; every function is invoker with pinned search_path.
    Prove anon/authenticated denial through hosted REST, and run security/database
    advisors. Replies inventory must be identical. **Rollback:** keep `sheet`
@@ -212,12 +234,42 @@ the stated mode/write flag rather than reusing an old deployment environment.
    Run final owner import, then `npm run cutover -- measure` again. Stop **both**
    typed and legacy imports/schedules now. Verify no active shadow lease.
 
+   **With the owner waiver:** explicitly set `CS_BACKUP_GATE_WAIVED=2026-10-25`
+   on Production and redeploy this reviewed SHA. After the final import, use
+   authenticated private Supabase MCP `execute_sql` to record the decision:
+
+   ```sql
+   select public.content_studio_cutover_waive_backup(
+     '<fresh-operation-uuid>','<reviewed-full-sha>','<latest-import-operation-id>',
+     '2026-10-25','<sha256-of-verified-owner-identity>');
+   ```
+
+   The coordinator verifies the owner decision in chat dated 2026-10-25 and
+   hashes the verified owner identity privately (no raw identifier in GitHub).
+   Retain UUID, actor hash, build, import, by/on and server `recordedAt` privately.
+   Same UUID/identical action replays; changed identity/build/import conflicts.
+   A new final import/build needs a fresh audited action and UUID.
+   No env-only or audit-only waiver is admitted. SQL cannot read Vercel env:
+   the server supplies the switch to each gate/activation call. A private direct
+   SQL check must explicitly supply that current deployed value as argument 3;
+   two-argument `content_studio_cutover_gate('db',sha)` remains conservative
+   and requires an archive. Do not supply the waiver argument when a folder is
+   configured. Removing the switch revokes it; never delete audit history.
+
+   With no folder, `backup` and its scheduled route return `backup_waived`,
+   never a fabricated manifest/verification. `/reconcile` shows **Backup gate
+   waived by owner**, date/time and the recovery limitation, alongside every
+   failed check. A configured folder keeps the existing verification and
+   failure behavior. A present red/expired/mismatched backup proof is never
+   skipped by the waiver. Do not delete failed proofs to make admission pass;
+   fix/reverify the configured backup.
+
    ```powershell
    npm run cutover -- backup
    npm run cutover -- rollback
    ```
 
-   Backup reads all six authority/history tables in one SQL statement snapshot,
+   **Without the waiver (or with a configured folder):** backup reads all six authority/history tables in one SQL statement snapshot,
    writes six gzip JSONL files plus manifest privately, and re-reads every hash.
    Pending Markdown jobs do not block backup: DB bodies and history are the
    authoritative snapshot. Record trusted manifest hash separately;
@@ -238,6 +290,10 @@ the stated mode/write flag rather than reusing an old deployment environment.
    returns `readyToFlip: sheet`, **does not change Vercel**. Execute the actual
    Sheet flag flip, redeploy/smoke, then flip back to frozen `db-read` and smoke.
    This is the measured rollback rehearsal, executed once and retained privately.
+   It is required with or without the archive waiver: IDs/counts/fields/links/
+   entered types exact, equal hashes, zero differences/issues, same build/import,
+   and no older than 24 hours at activation. Repeat on staleness or any change.
+   The waiver never permits skipping or relabelling this check.
    Repeat measurement if a new import/build was introduced.
    **Rollback on any failure:** remain frozen `db-read`; if no DB-only save
    has ever occurred, `sheet` is safe. Preserve every hand edit byte-for-byte;
@@ -254,6 +310,14 @@ the stated mode/write flag rather than reusing an old deployment environment.
    actual build/import identity and measured numbers. Do not use sample values
    as evidence. The record RPC checks latest import identity; the gate validates
    all fields, numeric limits and generated parity/backup/rehearsal records.
+   `dailyPlanBackup:true` and a `privateEvidence` JSON string of 1–2048 characters
+   containing a visible printable character after removing Unicode whitespace,
+   invisible characters and format controls must attest
+   actual daily Pro plan backup configuration and a restorable backup; a plan
+   name alone is insufficient. `restoreExact:true` still needs a proven restore
+   (use the plan backup restore evidence on the waiver path). The owner waiver
+   only accepts the absence of the Drive manifest; all Phase C fields, freeze,
+   parity/lag and exact rehearsal remain mandatory.
 
    ```sql
    select public.content_studio_cutover_record(
@@ -265,7 +329,10 @@ the stated mode/write flag rather than reusing an old deployment environment.
        'sheetRaceAccepted',true,'privateEvidence','<private-evidence-reference>',
        'sheetRead429',0,'lagStale',0,
        'warmP95Ms',<measured-number>,'coldP95Ms',<measured-number>));
-   select public.content_studio_cutover_gate('db','<reviewed-full-sha>');
+   -- Use argument 3 ONLY when the deployed switch is set and no folder exists.
+   select public.content_studio_cutover_gate('db','<reviewed-full-sha>',
+     '2026-10-25');
+   -- Otherwise omit argument 3: the original verified archive gate applies.
    ```
 
    Require `{ok:true}`. On this deployed SHA run `npm run cutover -- activate-db --sha <reviewed-full-sha>`
@@ -298,14 +365,16 @@ the stated mode/write flag rather than reusing an old deployment environment.
    frozen and verify. Do not run imports during this round trip: Sheet received
    no authority writes, so DB ledger/history/outbox remain the sole authority.
    Resume only after the final db deployment's T4 owner smoke, exact parity,
-   health/build identity, backup freshness, read/save/replay/stale/append and
+   health/build identity, backup freshness (or displayed audited waiver plus
+   plan-backup evidence), read/save/replay/stale/append and
    Markdown/Typefully checks pass. **Rollback:** same freeze -> backup ->
    rollback operation -> exact parity -> Sheet flag -> deployed smoke order.
 
 8. **Schedule and close evidence.** Configure only export repair every 15
    minutes (`/api/ops/content-export/reconcile`) and private backup daily
    19:00 UTC (`/api/ops/content-backup/reconcile`), preserving other project cron
-   jobs. Both use the existing cron bearer; confirm actual scheduled runs and
+   jobs. With the audited waiver and no folder, the backup job truthfully reports
+   `backup_waived`; do not record it as a verified archive. Both use the existing cron bearer; confirm actual scheduled runs and
    permitted plan frequency. Keep typed/legacy import schedules off; `db` also
    refuses imports in code. Keep export comparisons, failure intervals and
    checkpoint cells private and durable. No Phase E retirement. Only now prepare

@@ -18,9 +18,9 @@ export type LiveCutoverOps = {
   execute(action: 'measure' | 'backup' | 'rollback' | 'activate-read' | 'activate-db', operationId: string): Promise<unknown>;
   'activate-read'(): Promise<unknown>;
   'activate-db'(): Promise<unknown>;
-  status(): Promise<{ blocking?: string }>;
+  status(): Promise<{ blocking?: string; backupFailure?: boolean; backupWaiver?: { by: 'owner'; on: '2026-10-25'; recordedAt: string } | null }>;
   measure(): Promise<unknown>;
-  backup(): Promise<{ status: string; manifestHash: string; verifiedAt: number }>;
+  backup(): Promise<{ status: 'backup_waived' } | { status: 'verified'; manifestHash: string; verifiedAt: number }>;
   rollback(): Promise<unknown>;
 };
 
@@ -48,13 +48,40 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     markdownToken = token;
     try { await run(); } finally { markdownToken = undefined; }
   }), () => store.fence('markdown-export', markdownToken));
+  const verifyDbActivation = async () => {
+    if (!env.CS_CONTENT_BACKUP_FOLDER_ID && await store.backupWaiver()) {
+      // Admission observes the Sheet again, without exporting over an edit.
+      // Refresh also reloads retained issues from independent/crashed workers.
+      const parity = await exporter.parity();
+      if (!parity.exact || parity.dbHash !== parity.sheetHash || parity.differences.length || exporter.journal.issues.size) {
+        throw new AppError('FORBIDDEN', { reason: 'backup_waiver_export_not_exact' });
+      }
+    }
+  };
   // Preparation runs in shadow/read mode so backup and exact rollback evidence
   // exist BEFORE admitting DB authority. Neither changes the configured mode.
   services.liveCutover = {
-    execute: (action, operationId) => store.operation(action, operationId, () => services.liveCutover![action]()),
+    async execute(action, operationId) {
+      // Reverify even a completed operation, but preserve its original epoch
+      // and result on replay instead of performing activation a second time.
+      if (action === 'activate-db') await verifyDbActivation();
+      return store.operation(action, operationId, () => action === 'activate-db' ? store.activate('db') : services.liveCutover![action]());
+    },
     'activate-read': () => store.activate('db-read'),
-    'activate-db': () => store.activate('db'),
-    async status() { await store.assertGate(mode === 'db' ? 'db' : 'db-read'); return { blocking: store.blocking }; },
+    async 'activate-db'() {
+      await verifyDbActivation();
+      return store.activate('db');
+    },
+    async status() {
+      // Read waiver independently: a red admission check must not conceal the
+      // recorded decision, and the decision must never conceal that failure.
+      const backupWaiver = env.CS_BACKUP_GATE_WAIVED && !env.CS_CONTENT_BACKUP_FOLDER_ID ? await store.backupWaiver() : undefined;
+      if (backupWaiver) await store.refreshBackup();
+      const waiverStatus = backupWaiver ? { backupWaiver, backupFailure: store.backupJournal.failureSince !== null } : {};
+      try { await store.assertGate(mode === 'db' ? 'db' : 'db-read'); }
+      catch (error) { if (!backupWaiver) throw error; return { blocking: 'cutover_admission_unavailable', ...waiverStatus }; }
+      return { blocking: store.blocking, ...waiverStatus };
+    },
     async measure() {
       if (mode === 'db') throw new AppError('FORBIDDEN', { reason: 'imports_disabled_in_db_mode' });
       await services.contentParity!.prepare();
@@ -77,6 +104,7 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     },
     async backup() {
       await store.assertRecovery();
+      if (!env.CS_CONTENT_BACKUP_FOLDER_ID && await store.backupWaiver()) return { status: 'backup_waived' };
       if (env.GOOGLE_WRITE_ENABLED !== 'true') throw new AppError('FORBIDDEN', { reason: 'google_writes_disabled' });
       if (!services.contentBackup) throw new AppError('CONFIG_MISSING', { reason: 'private_backup_folder' });
       return store.exclusive('backup', async (state, token) => {

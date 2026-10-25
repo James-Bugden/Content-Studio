@@ -79,7 +79,10 @@ export class ContentCutoverStore implements ContentBackupSource {
     const claim = z.object({ status: z.enum(['acquired', 'replayed']), result: z.unknown().optional() }).parse(await this.rest.cutoverRpc('operation', params));
     // Readiness to flip is never replayed from a historical Sheet observation.
     // Repeat verification even for a lost-response retry of rollback.
-    if (claim.status === 'replayed') return action === 'rollback' ? run() : claim.result;
+    if (claim.status === 'replayed') {
+      if (action === 'activate-db') await this.assertFlip('db');
+      return action === 'rollback' || (claim.result as { status?: string } | null)?.status === 'backup_waived' ? run() : claim.result;
+    }
     try {
       const result = await run();
       z.object({ status: z.literal('completed') }).parse(await this.rest.cutoverRpc('operation', { ...params, p_result: result }));
@@ -90,10 +93,18 @@ export class ContentCutoverStore implements ContentBackupSource {
     }
   }
   async assertFlip(mode: 'db-read' | 'db') {
-    ok.parse(await this.rest.cutoverRpc('gate', { p_mode: mode, p_build: this.build }));
+    ok.parse(await this.rest.cutoverRpc('gate', { p_mode: mode, p_build: this.build, p_backup_waiver: this.waiverSwitch() }));
+  }
+  private waiverSwitch() {
+    // A configured folder retains every verified-backup gate, including errors.
+    return process.env.CS_CONTENT_BACKUP_FOLDER_ID ? null : process.env.CS_BACKUP_GATE_WAIVED ?? null;
+  }
+  async backupWaiver() {
+    return z.object({ by: z.literal('owner'), on: z.literal('2026-10-25'), recordedAt: z.string().datetime({ offset: true }) }).nullable().parse(
+      await this.rest.cutoverRpc('backup_waiver', { p_backup_waiver: this.waiverSwitch(), p_build: null }));
   }
   async activate(mode: 'db-read' | 'db') {
-    ok.parse(await this.rest.cutoverRpc('activate', { p_mode: mode, p_build: this.build, p_contract: this.contract }));
+    ok.parse(await this.rest.cutoverRpc('activate', { p_mode: mode, p_build: this.build, p_contract: this.contract, p_backup_waiver: this.waiverSwitch() }));
     return { mode, build: this.build, contract: this.contract };
   }
   async assertGate(mode: 'db-read' | 'db', write = false, recovery = false) {

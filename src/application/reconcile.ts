@@ -41,6 +41,7 @@ export type ReconcileKind =
   | 'export_mismatch'
   | 'export_parity'
   | 'backup_fresh'
+  | 'backup_waived'
   | 'provider_config'
   | 'markdown_export_lag'
   | 'markdown_mismatch'
@@ -102,10 +103,18 @@ export async function buildReconcileReport(
   rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
   const unreadable: string[] = [];
+  let backupWaived = false;
   if (options.liveCutover) {
     const status = await options.liveCutover.status().catch(() => ({ blocking: 'cutover_admission_unavailable' }));
     if (status.blocking) items.push(item('cutover_blocked', 'blocking', 'Content writes are blocked',
       [status.blocking, 'Deploy the recorded compatible contract or run the owner rollback procedure. Private backup and rollback remain available while database authority exists.'], [], { label: 'Review' }));
+    if ('backupWaiver' in status && status.backupWaiver) {
+      backupWaived = true;
+      items.push(item('backup_waived', 'attention', 'Backup gate waived by owner',
+        [`Owner decision on ${status.backupWaiver.on}; recorded ${status.backupWaiver.recordedAt}. Recovery relies on Supabase daily plan backups and the exact one-way Sheet export. No independent archive of history or ledger exists outside the project. Rollback and all measured gates still apply.`], [], { label: 'Review' }));
+      if (status.backupFailure) items.push(item('backup_fresh', 'attention', 'Verified backup needs attention',
+        ['A previous private backup attempt failed. The owner waiver does not erase this failure.'], [], { label: 'Review' }));
+    }
   }
   if (options.contentCutover) {
     const exporter = options.contentCutover.exporter;
@@ -140,7 +149,7 @@ export async function buildReconcileReport(
         [`${Math.floor(age / 60000)} minutes since the first failed export.`], [issue.id], { label: 'Retry' }));
     }
     const last = options.backupJournal?.lastVerified;
-    if (!last || now - last.verifiedAt > 36 * 3600_000 || options.backupJournal?.failureSince !== null) items.push(item('backup_fresh', 'attention', 'Verified backup needs attention',
+    if ((!backupWaived && (!last || now - last.verifiedAt > 36 * 3600_000)) || options.backupJournal?.failureSince != null) items.push(item('backup_fresh', 'attention', 'Verified backup needs attention',
       [last ? 'Last verified backup is older than 36 hours or a later backup failed.' : 'No verified backup has been recorded. Supabase plan backups still require owner confirmation.'], [], { label: 'Review' }));
   }
 

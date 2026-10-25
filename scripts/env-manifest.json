@@ -45,6 +45,18 @@
       ]
     },
     {
+      "name": "CS_BACKUP_GATE_WAIVED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ],
+      "managed": true
+    },
+    {
       "name": "CS_CONTENT_READ_ENABLED",
       "required": false,
       "schemaRequired": false,
