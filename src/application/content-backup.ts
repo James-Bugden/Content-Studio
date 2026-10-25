@@ -34,6 +34,8 @@ const manifestSchema = z.object({ format: z.literal(1), schemaVersion: z.literal
 export type BackupManifest = z.infer<typeof manifestSchema>;
 export type VerifiedBackup = { manifestId: string; manifestHash: string; verifiedAt: number; manifest: BackupManifest };
 export type BackupJournal = { lastVerified: VerifiedBackup | null; failureSince: number | null };
+export const backupJournalSchema = z.object({ lastVerified: z.object({ manifestId: z.string().min(1), manifestHash: z.string().regex(/^[a-f0-9]{64}$/),
+  verifiedAt: z.number().nonnegative(), manifest: manifestSchema }).nullable(), failureSince: z.number().nonnegative().nullable() });
 const invalid = () => new AppError('CONFLICT', { reason: 'backup_integrity' });
 
 /** Stable row order makes branch parity independent of SELECT delivery order. */

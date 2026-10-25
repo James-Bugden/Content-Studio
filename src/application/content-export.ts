@@ -14,7 +14,7 @@ import { operationIdSchema, type Actor } from '@/domain/mutation';
 
 export type ExportKind = 'library' | 'queue' | 'schedule' | 'workflow_settings';
 export type ExportCell = { value: string; formula?: string; link?: string; type?: 'boolean' };
-export type ExportRow = { kind: ExportKind; id: string; version: string; importedRevision: string | null; dbOrigin?: boolean; cells: Record<string, ExportCell> };
+export type ExportRow = { kind: ExportKind; id: string; version: string; importedRevision: string | null; changedAt?: number; dbOrigin?: boolean; cells: Record<string, ExportCell> };
 export type ExportCheckpoint = { fingerprint: string; cells: Record<string, ExportCell>; version: string; at: number };
 export type ExportIssue = { kind: ExportKind; id: string; fields: string[]; since: number; reason: 'export_mismatch' | 'export_lag'; lagSince?: number; recovery?: 'change_authoritative_value' };
 export type ExportParity = { at: number; exact: boolean; counts: Record<ExportKind, number>; dbHash: string; sheetHash: string; differences: ExportIssue[] };
@@ -22,6 +22,9 @@ export type ExportParity = { at: number; exact: boolean; counts: Record<ExportKi
 /** Private durable implementation required before live wiring. Checkpoints must
  * survive restarts; storing a DB version alone cannot detect Sheet hand edits. */
 export interface ContentExportJournal {
+  lagSamples?: { at: number; lagMs: number }[];
+  repairedFailures?: { since: number; repairedAt: number }[];
+  live?: { exclusive<T>(run: () => Promise<T>): Promise<T>; persist(): Promise<void>; refresh?(): Promise<void>; fence?(): Promise<void> };
   checkpoints: Map<string, ExportCheckpoint>;
   issues: Map<string, ExportIssue>;
   reports: ExportParity[];
@@ -59,7 +62,9 @@ export async function contentExportRows(db: ContentDb): Promise<ExportRow[]> {
         if (typeof p.header !== 'string' || p.header in cells) throw new AppError('SCHEMA_DRIFT');
         cells[p.header] = { value: p.value, ...(p.formula?.startsWith('=') ? { formula: p.formula } : {}), ...(p.link ? { link: p.link } : {}) };
       }
-      rows.push({ kind, id, version: String(source.row_version), importedRevision: source.sheet_revision,
+      const changedAt = Date.parse(String((source as unknown as { updated_at?: string }).updated_at));
+      if (db.mode === 'live' && !Number.isFinite(changedAt)) throw new AppError('SCHEMA_DRIFT', { reason: 'export_change_time' });
+      rows.push({ kind, id, version: String(source.row_version), importedRevision: source.sheet_revision, ...(Number.isFinite(changedAt) ? { changedAt } : {}),
         dbOrigin: kind === 'queue' && source.source_sheet_row === null && source.sheet_revision === null, cells });
     }
   }
@@ -70,15 +75,15 @@ export async function contentExportRows(db: ContentDb): Promise<ExportRow[]> {
   return rows;
 }
 
-/** Only fake transport is enabled in DB-6. No Google/DB live client is wired. */
+/** Live callers require a durable, distributed journal; fake callers stay local. */
 export class ContentExporter {
   private tail: Promise<unknown> = Promise.resolve();
   private readonly pending = new Map<string, number>();
-  readonly lagSamples: { at: number; lagMs: number }[] = [];
-  readonly repairedFailures: { since: number; repairedAt: number }[] = [];
+  get lagSamples() { return this.journal.lagSamples ??= []; }
+  get repairedFailures() { return this.journal.repairedFailures ??= []; }
   constructor(readonly db: ContentDb, private readonly sheet: SheetTransport, readonly journal: ContentExportJournal,
     private readonly now = Date.now) {
-    if (db.mode !== 'fake' || sheet.mode !== 'fake') throw new AppError('FORBIDDEN', { reason: 'live_cutover_gates_pending' });
+    if ((db.mode !== 'fake' || sheet.mode !== 'fake') && !journal.live) throw new AppError('FORBIDDEN', { reason: 'live_cutover_gates_pending' });
   }
   private async tab(kind: ExportKind) {
     const spec = kind === 'workflow_settings' ? SHEET_TABS.settings : SHEET_TABS[kind];
@@ -107,7 +112,7 @@ export class ContentExporter {
   }
   /** Single flight protects checkpoint+Sheet writes against overlapping repair/save. */
   run(): Promise<ExportParity> {
-    const next = this.tail.then(() => this.execute());
+    const next = this.tail.then(() => this.journal.live ? this.journal.live.exclusive(() => this.execute()) : this.execute());
     this.tail = next.catch(() => {});
     return next;
   }
@@ -116,6 +121,9 @@ export class ContentExporter {
    * never called by repair. Copy-Sheet-into-DB uses an ordinary audited repo
    * patch with a new operation ID, then this explicit export authorization. */
   resolveMismatch(input: { actor: Actor; operationId: string; kind: ExportKind; id: string; expectedSheetFingerprint: string; expectedDbVersion: string }): Promise<ExportParity> {
+    // Live repair never exposes a force-overwrite escape hatch. Deliberate
+    // direction resolution must be a separately reviewed, audited operation.
+    if (this.journal.live) return Promise.reject(new AppError('FORBIDDEN'));
     const next = this.tail.then(async () => {
       if (input.actor.role !== 'owner') throw new AppError('FORBIDDEN');
       if (!operationIdSchema.safeParse(input.operationId).success || !/^[0-9a-f]{16}$/.test(input.expectedSheetFingerprint)) throw new AppError('VALIDATION_FAILED');
@@ -148,6 +156,7 @@ export class ContentExporter {
     for (const row of rows) {
       if (duplicateTabs.has(row.kind)) continue;
       const key = exportKey(row.kind, row.id);
+      let persistRow = false;
       try {
         const checkpoint = this.journal.checkpoints.get(key);
         let inventory = inventories.get(row.kind);
@@ -155,8 +164,19 @@ export class ContentExporter {
         const observed = inventory.data.find(r => r.id === row.id);
         if (checkpoint && !this.journal.issues.has(key) && checkpoint.version === row.version && observed
           && revision(observed.raw, inventory.headers.length) === checkpoint.fingerprint
-          && different(checkpoint.cells, this.observed(observed.raw, inventory.headers)).length === 0) continue;
-        this.pending.set(key, this.pending.get(key) ?? this.now());
+          && different(checkpoint.cells, this.observed(observed.raw, inventory.headers)).length === 0
+          && this.parityFields(row.cells, this.ownedCells(row, checkpoint.cells)).length === 0) continue;
+        // Initial full import already supplies the baseline. If every owned
+        // byte/type/link is equal, capturing it needs no write or per-row
+        // re-read. A later hand edit still fails the fresh write precondition.
+        if (this.journal.live && !checkpoint && observed && (row.kind === 'workflow_settings'
+          || row.importedRevision === revision(observed.raw, inventory.headers.length))
+          && this.parityFields(row.cells, this.ownedCells(row, this.observed(observed.raw, inventory.headers))).length === 0) {
+          this.journal.checkpoints.set(key, { fingerprint: revision(observed.raw, inventory.headers.length), cells: this.observed(observed.raw, inventory.headers), version: row.version, at: this.now() });
+          continue;
+        }
+        persistRow = true;
+        this.pending.set(key, this.pending.get(key) ?? row.changedAt ?? this.now());
         const { spec, headers, data } = await this.tab(row.kind);
         if (Object.keys(row.cells).some(h => !headers.includes(h))) { this.issue(row, ['@headers'], 'export_mismatch'); continue; }
         // A leading '=' is RAW text, but the formula projection cannot yet
@@ -170,6 +190,7 @@ export class ContentExporter {
           // row is a deletion conflict, never a license to recreate it.
           if (row.kind !== 'queue' || row.importedRevision || checkpoint) { this.issue(row, ['@missing'], 'export_mismatch'); continue; }
           if (Object.values(row.cells).some(c => c.formula || c.link && c.link !== c.value)) { this.issue(row, ['@links'], 'export_mismatch'); continue; }
+          await this.journal.live?.fence?.();
           await this.sheet.appendRow(spec.name, 'ZZ', headers.map(h => row.cells[h] ? sheetCellValue(h, row.cells[h].value) : ''));
         } else {
           const actual = this.observed(current.raw, headers);
@@ -189,7 +210,7 @@ export class ContentExporter {
             if (existing.formula || wanted.formula || wanted.link && wanted.link !== wanted.value) continue;
             if (different({ cell: wanted }, { cell: existing }).length) writes.push({ row: current.row, column, value: sheetCellValue(header, wanted.value) });
           }
-          if (writes.length) await this.sheet.writeCells(spec.name, writes);
+          if (writes.length) { await this.journal.live?.fence?.(); await this.sheet.writeCells(spec.name, writes); }
         }
         const fresh = await this.tab(row.kind), readback = fresh.data.find(r => r.id === row.id);
         if (!readback) { this.issue(row, ['@missing'], 'export_lag'); continue; }
@@ -205,9 +226,13 @@ export class ContentExporter {
         if (failure) this.repairedFailures.push({ since: failure.since, repairedAt: this.now() });
         this.journal.issues.delete(key);
       } catch (error) {
+        persistRow = true;
         // Duplicate IDs invalidate the whole tab, not each individual row.
         if (isAppError(error) && error.details.reason === 'duplicate_export_id') duplicateTabs.add(row.kind);
         this.issue(row, ['@provider'], 'export_lag');
+      } finally {
+        // A persistence failure stops the run before touching another row.
+        if (persistRow) await this.journal.live?.persist();
       }
     }
     return this.measureParity(true);
@@ -239,7 +264,7 @@ export class ContentExporter {
   /** Read-only inspection shares the export single flight, without feeding the
    * comparison ledger. Only completed export/repair runs record samples. */
   parity(): Promise<ExportParity> {
-    const next = this.tail.then(() => this.measureParity());
+    const next = this.tail.then(async () => { await this.journal.live?.refresh?.(); return this.measureParity(); });
     this.tail = next.catch(() => {});
     return next;
   }
@@ -287,6 +312,7 @@ export class ContentWriteCutover {
       if (property === 'capability') return () => ({ ...target.capability(), ...(this.readOnly ? { state: 'read_only' as const } : {}) });
       if (!['updateLibrary', 'updateQueue', 'updateSchedule', 'createQueueIdea'].includes(String(property))) return typeof original === 'function' ? original.bind(target) : original;
       return (mutation: { operationId: string }) => {
+        if (this.readOnly) return Promise.resolve({ ok: false, operationId: mutation.operationId, code: 'FORBIDDEN', steps: [], details: { reason: 'rollback_read_only' } });
         const run = this.tail.then(async () => {
           if (this.readOnly) return { ok: false, operationId: mutation.operationId, code: 'FORBIDDEN', steps: [], details: { reason: 'rollback_read_only' } };
           const result = await original.call(target, mutation);
@@ -305,20 +331,22 @@ export class ContentWriteCutover {
   }
   get mutationCount() { return this.completed.size; }
   async disableWrites() { this.readOnly = true; await this.tail; }
-  /** Markdown refusal restores the prior write state; Sheet/flip failures stay frozen. */
+  /** Drain locally for final exactness. Refusal restores the prior write state;
+   * only a successful verified rollback keeps writes disabled. */
   async rollbackToSheet(flip: (mode: 'sheet') => Promise<void>) {
     const wasReadOnly = this.readOnly;
-    await this.disableWrites();
-    try {
+    const run = this.tail.then(async () => {
       await this.beforeSheetRollback?.();
-    } catch (error) {
-      this.readOnly = wasReadOnly;
-      throw error;
-    }
-    await this.exporter.run();
-    const parity = await this.exporter.parity();
-    if (!parity.exact || parity.dbHash !== parity.sheetHash || this.exporter.journal.issues.size) throw new AppError('CONFLICT', { reason: 'rollback_export_not_exact' });
-    await flip('sheet');
-    return { mode: 'sheet' as const, writesDisabled: true, parity };
+      await this.exporter.run();
+      const parity = await this.exporter.parity();
+      if (!parity.exact || parity.dbHash !== parity.sheetHash || this.exporter.journal.issues.size) throw new AppError('CONFLICT', { reason: 'rollback_export_not_exact' });
+      // Queued mutations wait for verification. Refusal never disables an
+      // enabled boundary; exactness is established before disabling writes.
+      this.readOnly = true;
+      try { await flip('sheet'); } catch (error) { this.readOnly = wasReadOnly; throw error; }
+      return { mode: 'sheet' as const, writesDisabled: true, parity };
+    });
+    this.tail = run.catch(() => {});
+    return run;
   }
 }

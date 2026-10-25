@@ -10,6 +10,9 @@ import type { CellWrite, ReadOptions, SheetTransport } from './sheet-transport';
  * that starts with `=` is stored as text, never evaluated (formula injection).
  */
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
+// A fenced worker has a two-minute lease. Bound the network request well below
+// it; an ambiguous timeout is never retried or promoted to a new checkpoint.
+export const SHEET_WRITE_TIMEOUT_MS = 30_000;
 
 function quoteTab(tab: string): string {
   return `'${tab.replace(/'/g, "''")}'`;
@@ -92,6 +95,7 @@ export class GoogleSheetTransport implements SheetTransport {
     // Writes are not retried automatically: the repository re-reads and decides.
     const res = await this.fetchImpl(`${API}/${encodeURIComponent(this.spreadsheetId)}/values:batchUpdate`, {
       method: 'POST',
+      signal: AbortSignal.timeout(SHEET_WRITE_TIMEOUT_MS),
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ valueInputOption: 'RAW', data }),
     });
@@ -107,6 +111,7 @@ export class GoogleSheetTransport implements SheetTransport {
       '?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
     const res = await this.fetchImpl(url, {
       method: 'POST',
+      signal: AbortSignal.timeout(SHEET_WRITE_TIMEOUT_MS),
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ majorDimension: 'ROWS', values: [[...values]] }),
     });

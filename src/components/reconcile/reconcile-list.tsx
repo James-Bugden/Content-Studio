@@ -123,6 +123,7 @@ export function ReconcileList({ items }: { items: ReconcileItemView[] }) {
 
 /** Plain-words heading for each kind of disagreement (CS-048). Unknown kinds fall back to their name. */
 const KIND_LABEL: Record<string, string> = {
+  cutover_blocked: 'Content writes are blocked',
   export_lag: 'Sheet export is behind',
   export_mismatch: 'Sheet export differs',
   export_parity: 'Sheet export comparison',

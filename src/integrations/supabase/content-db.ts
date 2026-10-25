@@ -4,7 +4,9 @@ import type { ContentCollection, ContentDb, ContentPostRow, ContentScheduleRow, 
 import { z } from 'zod';
 import { AppError, isAppError } from '@/domain/errors';
 
-export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number; readOnly?: boolean };
+export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number; readOnly?: boolean;
+  /** Live composition supplies a durable gate, checked afresh before each RPC. */
+  authorizeWrite?: (name: string) => Promise<void> };
 
 /**
  * Server-only PostgREST client. Explicit range continuation also handles hosted row caps.
@@ -47,7 +49,8 @@ export class SupabaseContentDb implements ContentDb {
     }
   }
   private async rpc(name: string, params: Record<string, unknown>): Promise<ContentWriteResult> {
-    if (this.options.readOnly || process.env.CS_DATA_MODE === 'live') throw new AppError('FORBIDDEN', { provider: 'db', reason: 'live_db_writes_disabled' });
+    if (this.options.readOnly || process.env.CS_DATA_MODE === 'live' && !this.options.authorizeWrite) throw new AppError('FORBIDDEN', { provider: 'db', reason: 'live_db_writes_disabled' });
+    await this.options.authorizeWrite?.(name);
     for (let attempt = 0; ; attempt++) {
       try {
         const response = await (this.options.fetch ?? fetch)(`${this.base}/rest/v1/rpc/content_studio_${name}`, {
@@ -95,6 +98,11 @@ export class SupabaseContentDb implements ContentDb {
   applyPatch(w: ContentWrite) { return this.rpc('apply_patch', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
     p_target_kind: w.kind, p_target_id: w.id, p_expected_version: w.expectedVersion, p_patch: w.data }); }
   insertQueueIdea(w: ContentWrite) { return this.rpc('insert_queue_idea', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash, p_library_id: w.id, p_row: w.data }); }
+  /** Coordinator-only no-link recovery; SQL fixes the writable fields and CAS. */
+  restoreMarkdownLink(w: Omit<ContentWrite, 'kind' | 'data'> & { url: string }) {
+    return this.rpc('restore_markdown_link', { p_operation_id: w.operationId, p_patch_hash: w.patchHash, p_actor_hash: w.actorHash,
+      p_library_id: w.id, p_expected_version: w.expectedVersion, p_url: w.url });
+  }
   async mutationRow(kind: ContentTarget, id: string, version: string) {
     const history = () => this.select<{ before_image: ContentPostRow | ContentScheduleRow }>('row_history', {
       target_kind: `eq.${kind}`, target_id: `eq.${id}`, row_version_before: `eq.${version}`, order: 'history_id.asc',

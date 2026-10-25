@@ -83,5 +83,23 @@ export function assertSameOrigin(request: Request): void {
 /** Every mutation route: same origin first, then an owner session. */
 export async function requireMutation(request: Request): Promise<Actor> {
   assertSameOrigin(request);
-  return requireActor('owner');
+  const actor = await requireActor('owner');
+  const env = serverEnv(), path = new URL(request.url).pathname;
+  const frozen = env.CS_CONTENT_STORE === 'db' ? env.CS_CONTENT_WRITE_ENABLED !== 'true' : env.CS_CONTENT_WRITE_ENABLED === 'false';
+  const maintenanceImport = path === '/api/ops/sheet-mirror' || path === '/api/ops/sheet-mirror/parity';
+  const replies = path === '/api/replies' || path.startsWith('/api/replies/');
+  // Refuse before a provider-first saga can mutate Drive or Typefully. Final
+  // import/parity and cron-authenticated repairs must remain available while
+  // frozen. Replies has a separate authority; Content inserts still hit the
+  // frozen Content repository boundary.
+  if (env.CS_DATA_MODE === 'live'
+    && frozen && !maintenanceImport && !replies) {
+    throw new AppError('FORBIDDEN', { reason: 'rollback_read_only' });
+  }
+  if (env.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(env.CS_CONTENT_STORE) && !maintenanceImport && !replies) {
+    const { getServices } = await import('@/application/container');
+    const status = await getServices().liveCutover!.status();
+    if (status.blocking) throw new AppError('FORBIDDEN', { reason: status.blocking });
+  }
+  return actor;
 }

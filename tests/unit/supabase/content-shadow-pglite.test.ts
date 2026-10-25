@@ -17,7 +17,9 @@ beforeAll(async () => {
   db = await createTestDatabase();
   await db.raw.exec(readFileSync('supabase/migrations/20260925030000_sheet_read_model.sql','utf8'));
   baseline = await catalog();
-  for (const file of readdirSync('supabase/migrations').filter(f => /^\d+_content_.*\.sql$/.test(f)).sort()) {
+  // This rollback inventory belongs to DB-9; later authority preparation has
+  // its own inventory/security tests and must not be dropped by DB-9 rollback.
+  for (const file of readdirSync('supabase/migrations').filter(f => /^\d+_content_.*\.sql$/.test(f) && f < '20261025000600').sort()) {
     if (file.endsWith('_content_shadow_live.sql')) await db.raw.exec('alter default privileges in schema public grant all on tables to anon,authenticated;');
     await db.raw.exec(readFileSync(`supabase/migrations/${file}`, 'utf8'));
   }

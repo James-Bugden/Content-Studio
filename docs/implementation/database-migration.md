@@ -1,5 +1,12 @@
 # Database migration design: Sheet authority to Postgres
 
+DB-10 (#198) preparation: the owner's 2026-10-25 instruction replaces calendar
+soak waits with immediate full-data measured gates, retaining thresholds,
+security, backups, rollback and deployed smoke. Live authority composition is
+implemented behind explicit flags and SHA/latest-import evidence at activation;
+ongoing DB authority uses a recorded schema/cutover contract epoch. Follow [the ordered coordinator runbook](../ops/cutover.md).
+This is not evidence of a production flip; Phase E retirement stays separate.
+
 Status: design for approval, 2026-10-24. Supersedes the scope limit in
 ADR-0001 (`docs/decisions/0001-defer-supabase-migration.md`) once DB-1 lands;
 until then nothing in production changes.

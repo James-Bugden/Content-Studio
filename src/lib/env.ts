@@ -9,7 +9,10 @@ export const schema = z.object({
   CS_DATA_MODE: z.enum(['fake', 'live']).default('fake'),
   CS_PARITY_WINDOW_WAIVED: z.literal('2026-10-25').optional(),
   CS_CONTENT_STORE: z.enum(['sheet', 'db-shadow', 'db-read', 'db']).default('sheet'),
-    CS_CONTENT_WRITE_ENABLED: z.enum(['true', 'false']).optional(),
+  CS_CONTENT_WRITE_ENABLED: z.enum(['true', 'false']).optional(),
+  CS_CONTENT_READ_ENABLED: z.enum(['true', 'false']).optional(),
+  CS_CONTENT_DB_ENABLED: z.enum(['true', 'false']).optional(),
+  CS_CONTENT_BACKUP_FOLDER_ID: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/).optional(),
   APP_BASE_URL: z.string().url().optional(),
   APP_TIMEZONE: z.literal('Asia/Taipei').default('Asia/Taipei'),
   AUTH_SECRET: z.string().min(32).optional(),
@@ -71,11 +74,16 @@ export function serverEnv(): ServerEnv {
     const names = invalid.filter(([, value, validator]) => value !== undefined && !validator.safeParse(value).success).map(([name]) => name);
     if (names.length) throw new Error(`Invalid environment for: ${names.join(', ')}`);
   }
-  // Phase A alone is authorised. Read/write authority gates remain closed.
-  if (parsed.data.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(parsed.data.CS_CONTENT_STORE)) {
+  // Synchronous configuration admission only. Durable measurements are checked
+  // by the live repository before every operation (env flags are not evidence).
+  if (parsed.data.CS_DATA_MODE === 'live' && (parsed.data.CS_CONTENT_STORE === 'db-read' && parsed.data.CS_CONTENT_READ_ENABLED !== 'true'
+    || parsed.data.CS_CONTENT_STORE === 'db' && parsed.data.CS_CONTENT_DB_ENABLED !== 'true')) {
     throw new Error('CS_CONTENT_STORE database modes are not enabled for live data');
   }
-  if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off' && parsed.data.CS_CONTENT_STORE !== 'db-shadow') {
+  if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE === 'db' && !parsed.data.CS_CONTENT_BACKUP_FOLDER_ID) {
+    throw new Error('Invalid environment for: CS_CONTENT_BACKUP_FOLDER_ID');
+  }
+  if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off' && parsed.data.CS_CONTENT_STORE !== 'db-shadow' || parsed.data.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(parsed.data.CS_CONTENT_STORE)) {
     const missing = [
       ['SUPABASE_READ_MODEL_URL', z.string().url().safeParse(parsed.data.SUPABASE_READ_MODEL_URL).success],
       ['SUPABASE_READ_MODEL_SERVICE_KEY', z.string().min(20).safeParse(parsed.data.SUPABASE_READ_MODEL_SERVICE_KEY).success],

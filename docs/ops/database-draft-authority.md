@@ -1,5 +1,13 @@
 # DB-7 draft body authority
 
+DB-10 wires this authority for live `db` behind durable measured gates and
+distributed worker locks; [cutover.md](cutover.md) supersedes the historical
+fake-only wiring/refusal statements below. DB-10 backup snapshots authoritative
+DB bodies even with pending Drive jobs. Rows without a Markdown destination
+create a named `markdown_missing` item instead of an impossible export job;
+their Sheet body is sufficient for exact rollback. Linked sections still need
+exact verification. No production flip is claimed.
+
 Status: local fake/PGlite preparation only; **no production cutover**.
 Issue: [#151](https://github.com/James-Bugden/Content-Studio/issues/151).
 The owner delegated section 3's choice to the coordinator, who selected (b):
@@ -96,7 +104,7 @@ Missing links/sections and ambiguous matches on legacy rows with no audited body
 edit are not export lag and do not block rollback: the Sheet/Drive editor already
 handled those rows as missing. Initial import inserts are not DB-authored bodies.
 
-Any audited Library body change with a before-image makes exact export mandatory,
+Any audited Library body change with a linked destination makes exact export mandatory,
 including after its outbox job is acknowledged or if the section later disappears.
 History is deliberately conservative: historical body-changing copies with a
 before-image also require parity. Do not erase history to bypass this check.

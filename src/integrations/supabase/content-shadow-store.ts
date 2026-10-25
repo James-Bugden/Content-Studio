@@ -12,6 +12,9 @@ export class ContentShadowStore {
   async rpc(name: string, body: Record<string, unknown>): Promise<unknown> {
     return this.request(`rpc/content_studio_shadow_${name}`, { method: 'POST', body: JSON.stringify(body) });
   }
+  async cutoverRpc(name: string, body: Record<string, unknown>): Promise<unknown> {
+    return this.request(`rpc/content_studio_cutover_${name}`, { method: 'POST', body: JSON.stringify(body) });
+  }
   async rows(params: Record<string, string>): Promise<unknown[]> {
     const rows: unknown[] = [];
     for (;;) {
