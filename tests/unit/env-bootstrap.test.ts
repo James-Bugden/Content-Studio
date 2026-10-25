@@ -103,7 +103,7 @@ describe('setup guards and mutation semantics', () => {
   it.each(['missing CLI','logged out'])('stops on LastPass %s with actionable redacted error', async () => {
     const h = harness();
     h.run.mockImplementation(async (file) => file === 'vercel' ? ok(header) : {ok:false,stdout:secret});
-    await expect(setup(['--only','auth'],h)).rejects.toThrow('lpass login');
+    await expect(setup(['--only','auth','--from','lastpass'],h)).rejects.toThrow('lpass login');
     expect(h.run.mock.calls.some(([,a])=>a[0] === 'show')).toBe(false);
   });
   it('reports missing required entries as failures and optional entries as skipped', async () => {
