@@ -111,3 +111,12 @@ Rollback restores the previous verified **deployment and configuration**. It nev
 2. If a variable change caused the problem, restore the previous value in Settings, then Environment Variables, and redeploy the same SHA.
 3. Emergency brake: set `GOOGLE_WRITE_ENABLED=false` and remove `TYPEFULLY_API_KEY`, then redeploy. The app becomes read-only; review keeps working.
 4. Record the rolled-back SHA, the reason and the time in the CS-019 issue.
+
+### DB-9 typed Phase A importer
+
+For `CS_CONTENT_STORE=db-shadow`, follow
+[database-shadow-live.md](database-shadow-live.md). The same existing
+`SUPABASE_READ_MODEL_URL` and `SUPABASE_READ_MODEL_SERVICE_KEY` are reused in
+the shared Career project; `SUPABASE_READ_MODEL_MODE=off` no longer disables
+the typed importer. Disable its cron and set `CS_CONTENT_STORE=sheet` to roll
+back. Keep every read/write-authority phase gate; live `db-read`/`db` refuse.

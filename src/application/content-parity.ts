@@ -8,6 +8,9 @@ import { emit } from '@/observability/events';
 export const PARITY_COLLECTIONS = ['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] as const;
 export type ParityCollection = typeof PARITY_COLLECTIONS[number];
 export type ParityFact = { collection: ParityCollection; field: string; kind: 'equal' | 'missing' | 'unexpected' | 'changed' | 'number_formatting' | 'trailing_whitespace' | 'blank_boolean' | 'boolean_formatting' | 'timestamp_formatting' | 'zero_row_source'; fingerprint: string };
+export type FullImportParity = { rows: number; idsEqual: boolean; fields: number; equal: number; unclassified: number };
+export type WindowWaiver = { by: 'owner'; on: '2026-10-25'; recordedAt: string };
+export type ImportEvidence = Pick<ImportEnvelope, 'counts' | 'hashes' | 'exceptions' | 'snapshotHash'> & { fullParity?: FullImportParity; windowWaiver?: WindowWaiver | null };
 export type ParitySample = { at: number; collection: ParityCollection; idsEqual: boolean; fields: number; equal: number; blocking: number; lagMs: number | null; facts: ParityFact[] };
 const object = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
 function flatten(value: unknown, prefix = ''): Record<string, unknown> {
@@ -67,11 +70,16 @@ export function compareContent(collection: ParityCollection, expected: unknown, 
 
 /** Content-free recorded facts. Instance-scoped until a durable deployment sink is wired. */
 export class ContentParityJournal {
+  readonly scope: string = 'this server instance';
+  available = true;
+  gap: 'CONFIG_MISSING' | 'SAMPLE_PERSISTENCE_FAILED' | 'HISTORY_UNAVAILABLE' | null = null;
+  async prepare(): Promise<void> { /* Instance journal needs no I/O. */ }
+  async refresh(): Promise<void> { /* Durable implementation reloads recorded facts. */ }
   readonly samples: ParitySample[] = [];
   lastImport: number | null = null;
   failureSince: number | null = null;
-  private readonly repairedFailures: { since: number; repairedAt: number }[] = [];
-  lastRun: Pick<ImportEnvelope, 'counts' | 'hashes' | 'exceptions' | 'snapshotHash'> | null = null;
+  protected readonly repairedFailures: { since: number; repairedAt: number }[] = [];
+  lastRun: ImportEvidence | null = null;
   imported(at: number, evidence?: ImportEnvelope) {
     if (this.failureSince !== null) this.repairedFailures.push({ since: this.failureSince, repairedAt: at });
     if (this.repairedFailures.length > 10_000) this.repairedFailures.shift();
@@ -79,7 +87,8 @@ export class ContentParityJournal {
     if (evidence) this.lastRun = structuredClone({ counts: evidence.counts, hashes: evidence.hashes, exceptions: evidence.exceptions, snapshotHash: evidence.snapshotHash });
   }
   failed(at: number) { this.failureSince ??= at; }
-  record(sample: ParitySample) {
+  samplePersistenceFailed() { this.available = false; this.gap = 'SAMPLE_PERSISTENCE_FAILED'; }
+  record(sample: ParitySample): void | Promise<void> {
     this.samples.push(sample);
     if (this.samples.length > 10_000) this.samples.shift();
     emit({ name: 'content.parity', adapter: 'app', outcome: sample.blocking || !sample.idsEqual ? 'blocked' : 'ok',
@@ -113,14 +122,33 @@ export class ContentParityJournal {
       daysGreen++;
     }
     const lagMs = this.lastImport === null ? null : Math.max(0, now - this.lastImport);
-    const ready = samples.length >= 200 && daysGreen >= 7 && collections.every(c => c.idsEqual === true && c.fieldEquality !== null && c.fieldEquality >= 99.9 && c.blocking === 0)
+    const full = this.lastRun?.fullParity;
+    const waiver = process.env.CS_PARITY_WINDOW_WAIVED === '2026-10-25' ? this.lastRun?.windowWaiver ?? null : null;
+    const providerFailures = samples.filter(s => s.facts.some(f => f.field === 'provider')).length;
+    const fullImportReady = !!full && full.rows === Object.values(this.lastRun!.counts).reduce((a, b) => a + b, 0) && full.idsEqual && full.unclassified === 0
+      && (full.fields === 0 ? full.rows === 0 && full.equal === 0 : full.equal / full.fields >= .999)
+      && !this.lastRun!.exceptions.some(e => e.class.startsWith('refused_'));
+    const comparisons = samples.filter(s => !s.facts.some(f => f.field === 'provider'));
+    const sampledEquality = PARITY_COLLECTIONS.every(collection => {
+      const rows = comparisons.filter(s => s.collection === collection);
+      const failedReads = samples.filter(s => s.collection === collection && s.facts.some(f => f.field === 'provider')).length;
+      const fields = rows.reduce((n, s) => n + s.fields, 0), equal = rows.reduce((n, s) => n + s.equal, 0);
+      // Full-import read-back cannot prove adapters or derived views. Every
+      // collection needs a measured comparison; tolerate just one failed read
+      // alongside it, never an unmeasured or persistently failing read path.
+      return rows.length > 0 && failedReads <= 1 && rows.every(s => s.idsEqual && s.blocking === 0 && s.lagMs !== null) && (fields === 0 || equal / fields >= .999);
+    });
+    const measuredReady = fullImportReady && sampledEquality && lagP95 !== null && lagP95 <= 900_000
+      && lagMs !== null && lagMs <= 900_000 && !longFailure(windowStart, now);
+    const windowReady = fullImportReady && this.available && samples.length >= 200 && samples.every(s => s.lagMs !== null) && daysGreen >= 7 && collections.every(c => c.idsEqual === true && c.fieldEquality !== null && c.fieldEquality >= 99.9 && c.blocking === 0)
       && lagP95 !== null && lagP95 <= 900_000 && lagMs !== null && lagMs <= 900_000 && !longFailure(windowStart, now);
-    return { collections, sampleCount: samples.length, lagP95, daysGreen, lagMs, failureSince: this.failureSince, lastRun: this.lastRun, ready, scope: 'this server instance' as const };
+    const ready = this.available && this.gap === null && (waiver ? measuredReady : windowReady);
+    return { gap: this.gap, windowWaiver: waiver, fullParity: full ?? null, providerFailures, collections, sampleCount: samples.length, lagP95, daysGreen, lagMs, failureSince: this.failureSince, lastRun: this.lastRun, ready, scope: this.scope, available: this.available };
   }
 }
 
 const methods = { listLibrary: 'library', listQueue: 'queue', listReadyQueue: 'ready', listSchedule: 'schedule', queueSummary: 'queue_summary', workflowSettings: 'workflow_settings' } as const;
-async function boundedComparison(read: Promise<{ value: unknown } | null>): Promise<{ value: unknown } | null> {
+async function boundedComparison<T>(read: Promise<T>): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try { return await Promise.race([read, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), 500); })]); }
   finally { clearTimeout(timer); }
@@ -132,14 +160,24 @@ export function shadowContentRepository(sheet: ContentRepository, db: ContentRep
     const collection = methods[property as keyof typeof methods];
     if (!collection || typeof original !== 'function') return typeof original === 'function' ? original.bind(target) : original;
     return async () => {
-      const selected = sample();
-      const dbRead = selected ? boundedComparison((db[property as keyof typeof methods] as () => Promise<unknown>).call(db).then(value => ({ value }), () => null)) : null;
+      // Resolve synchronous throws, async failures and journal failures behind
+      // the same fail-open boundary. No shadow code can reject the Sheet call.
+      let selected = false;
+      try { selected = sample(); } catch { journal.available = false; }
+      const dbRead = selected ? boundedComparison(Promise.resolve().then(async () => {
+        await journal.prepare();
+        return { value: await (db[property as keyof typeof methods] as () => Promise<unknown>).call(db), lastImport: journal.lastImport };
+      }).catch(() => null)) : null;
       const result = await original.call(target);
       if (selected) {
-        const compared = await dbRead;
-        if (compared) journal.record(compareContent(collection, result, compared.value, Date.now(), journal.lastImport));
-        else journal.record({ at: Date.now(), collection, idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
-          facts: [{ collection, field: 'provider', kind: 'changed', fingerprint: evidenceHash(collection).slice(0, 16) }] });
+        try {
+          const compared = await dbRead;
+          const observation = compared ? compareContent(collection, result, compared.value, Date.now(), compared.lastImport)
+            : { at: Date.now(), collection, idsEqual: false, fields: 0, equal: 0, blocking: 1, lagMs: null,
+              facts: [{ collection, field: 'provider', kind: 'changed' as const, fingerprint: evidenceHash(collection).slice(0, 16) }] };
+          const saved = await boundedComparison(Promise.resolve(journal.record(observation)).then(() => true).catch(() => false));
+          if (!saved) journal.samplePersistenceFailed();
+        } catch { journal.samplePersistenceFailed(); }
       }
       return result;
     };

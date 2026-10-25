@@ -330,6 +330,7 @@ export async function buildReconcileReport(
   }
 
   if (options.contentParity) {
+    await options.contentParity.refresh();
     const parity = options.contentParity.summary(Math.max(now, options.contentParity.samples.at(-1)?.at ?? now));
     if (parity.lagMs === null || parity.lagMs >= 900_000 || parity.failureSince !== null) {
       const blocking = parity.lagMs === null || parity.lagMs >= 3600_000 || parity.failureSince !== null && now - parity.failureSince >= 3600_000;
