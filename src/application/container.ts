@@ -1,4 +1,5 @@
 import 'server-only';
+import { composeLiveCutover, type LiveCutoverOps } from './live-content-cutover';
 import { databaseBodyRepository, MarkdownExporter } from './markdown-export';
 import { ContentReadCutoverRepository } from './content-read-cutover';
 import { ContentExporter, ContentWriteCutover } from './content-export';
@@ -40,11 +41,12 @@ export type Services = {
   /** Optional: when Typefully is down or unconfigured, manual scheduling keeps working. */
   typefully: TypefullyGateway;
   contentImport?: ContentImportStore;
+  liveCutover?: LiveCutoverOps;
   importRepo?: ContentRepository;
   contentParity?: ContentParityJournal;
   contentCutover?: ContentWriteCutover;
   markdownExport?: MarkdownExporter;
-  contentBackup?: { source: ContentBackupSource; folder: PrivateBackupFolder; journal: BackupJournal };
+  contentBackup?: { source: ContentBackupSource; folder: PrivateBackupFolder; journal: BackupJournal; prepare?: () => Promise<void> };
   reconcileRepo?: ContentRepository;
   /** Fake handles, exposed for e2e fault injection in fake mode only. */
   fakes?: { sheet: FakeSheetTransport; db: FakeContentDb; drive: FakeDriveGateway; ai?: FakeAiGateway; typefully?: FakeTypefullyGateway };
@@ -151,7 +153,7 @@ function build(): Services {
   if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || !env.CS_SHEET_ID) {
     throw new AppError('CONFIG_MISSING', { provider: 'sheet' });
   }
-  const writable = env.GOOGLE_WRITE_ENABLED === 'true';
+  const writable = env.GOOGLE_WRITE_ENABLED === 'true' && (!['db-read', 'db'].includes(env.CS_CONTENT_STORE) || env.CS_CONTENT_WRITE_ENABLED !== 'false');
   const tokens = new ServiceAccountTokens(env.GOOGLE_SERVICE_ACCOUNT_EMAIL, env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
   services = {
     mode: 'live',
@@ -160,7 +162,7 @@ function build(): Services {
     // cache and every mutation re-reads fresh against the expected revision, so a
     // stale display can be refused but never written over.
     repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'live') }),
-    drive: new GoogleDriveGateway(tokens, writable, fetch, env.CS_ASSET_FOLDER_ID),
+    drive: new GoogleDriveGateway(tokens, env.GOOGLE_WRITE_ENABLED === 'true', fetch, env.CS_ASSET_FOLDER_ID),
     ai: createAiGateway(env),
     typefully: createTypefullyGateway(env),
   };
@@ -178,12 +180,27 @@ function build(): Services {
       services.reconcileRepo = shadowContentRepository(sheetRepo, dbRepo, parity, () => true);
       services.contentImport = contentImport;
       services.contentParity = parity;
+      // The preparation endpoint is available when an exact deployment SHA exists.
+      if (/^[a-f0-9]{40}$/.test(env.VERCEL_GIT_COMMIT_SHA ?? env.CS_COMMIT_SHA ?? '')) composeLiveCutover(services, env, tokens);
     } catch (error) {
       if (!isAppError(error) || error.code !== 'CONFIG_MISSING') throw error;
       const parity = new ContentParityJournal();
       parity.available = false; parity.gap = 'CONFIG_MISSING';
       services.contentParity = parity;
     }
+  }
+  if (env.CS_CONTENT_STORE === 'db-read' || env.CS_CONTENT_STORE === 'db') {
+    const options = { url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY! };
+    const contentImport = new SupabaseContentImportStore(options);
+    const parity = new SupabaseContentParityJournal(options);
+    const sheetRepo = services.repo;
+    const dbRepo = new SupabaseContentRepository(contentImport.db, 'db-read');
+    // Scheduled capture must not reuse a display cache warmed by an earlier
+    // request. This read-only repository adds reads only during explicit import.
+    services.importRepo = new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, false), { writable: false });
+    if (env.CS_CONTENT_STORE !== 'db') services.contentImport = contentImport;
+    if (env.CS_CONTENT_STORE !== 'db') services.contentParity = parity;
+    composeLiveCutover(services, env, tokens);
   }
   return services;
 }

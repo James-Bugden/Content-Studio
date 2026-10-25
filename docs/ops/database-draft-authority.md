@@ -1,5 +1,9 @@
 # DB-7 draft body authority
 
+DB-10 wires this authority for live `db` behind durable measured gates and
+distributed worker locks; [cutover.md](cutover.md) supersedes the historical
+fake-only wiring/refusal statements below. No production flip is claimed.
+
 Status: local fake/PGlite preparation only; **no production cutover**.
 Issue: [#151](https://github.com/James-Bugden/Content-Studio/issues/151).
 The owner delegated section 3's choice to the coordinator, who selected (b):

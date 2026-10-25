@@ -77,7 +77,12 @@ export async function runConfiguredSheetMirror(trigger: Trigger): Promise<RunRes
     // A scheduled redelivery in the same 15-minute slot has durable identity.
     const digest = mirrorHash(['scheduled', serverEnv().SUPABASE_READ_MODEL_SOURCE_KEY, Math.floor(Date.now() / 900_000)]);
     const scheduledId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
-    return execute(trigger, trigger.kind === 'owner' ? trigger.idempotencyKey : scheduledId);
+    const result = await execute(trigger, trigger.kind === 'owner' ? trigger.idempotencyKey : scheduledId);
+    // A Phase C repair changes the admitted import identity. Re-measure the
+    // complete derived read model before this run can report success. Replays
+    // can finish this step after an interrupted measurement without reimport.
+    if (serverEnv().CS_CONTENT_STORE === 'db-read' && result.status !== 'in_progress') await services.liveCutover?.measure();
+    return result;
   }
   const state = states.get(services) ?? { completed: new Map<string, RunResult>() };
   states.set(services, state);

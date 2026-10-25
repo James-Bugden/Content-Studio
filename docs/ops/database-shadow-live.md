@@ -1,5 +1,10 @@
 # DB-9: enable live Phase A (db-shadow)
 
+DB-10's [cutover runbook](cutover.md) extends this preparation with live read
+and write compositions, an additional unapplied migration and measured gates
+in place of calendar waits. Its exact ordered procedure supersedes the earlier
+live-mode refusal and waiting instructions below. No production flip is claimed.
+
 Status: implementation only; **all SQL below is UNAPPLIED by the builder**.
 Issue [#197](https://github.com/James-Bugden/Content-Studio/issues/197).
 The owner authorised Phase A. This does not authorise live `db-read` or `db`:

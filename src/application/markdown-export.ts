@@ -25,7 +25,8 @@ export function databaseBodyRepository(repo: ContentRepository): ContentReposito
 export class MarkdownExporter {
   private active?: Promise<void>;
   readonly failures = new Map<string, { code: string; since: number; reason?: string }>();
-  constructor(private readonly repo: ContentRepository, private readonly drive: DriveGateway, private readonly store: MarkdownExportStore) {}
+  constructor(private readonly repo: ContentRepository, private readonly drive: DriveGateway, private readonly store: MarkdownExportStore,
+    private readonly exclusive?: (run: () => Promise<void>) => Promise<void>) {}
   async verifyRollback() {
     await this.run();
     if ((await this.store.pendingMarkdownExports()).length) throw new AppError('CONFLICT', { reason: 'rollback_markdown_export_pending' });
@@ -44,7 +45,7 @@ export class MarkdownExporter {
   editedLibraryIds() { return this.store.markdownBodyEdits(); }
   run(): Promise<void> {
     if (this.active) return this.active;
-    this.active = this.repair().finally(() => { this.active = undefined; });
+    this.active = (this.exclusive ? this.exclusive(() => this.repair()) : this.repair()).finally(() => { this.active = undefined; });
     return this.active;
   }
   private async repair() {

@@ -1,5 +1,10 @@
 # DB-6 write cutover, private backups and rollback
 
+DB-10 follow-up: live composition and the owner's measured-gate replacement for
+calendar waits are specified in [cutover.md](cutover.md). The historical local
+status below describes DB-6, not DB-10 admission. Production remains pending;
+all live evidence must be collected by the coordinator on the reviewed SHA.
+
 Status: **pending cutover**. This build implements fake/PGlite behavior only.
 `CS_CONTENT_STORE` defaults to `sheet`; live data refuses `db-read` and `db`
 before provider construction. DB-9 separately prepares live `db-shadow` only

@@ -23,6 +23,7 @@ export default async function ReconcilePage() {
   let report: ReconcileReport;
   try {
     const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport } = getServices();
+    await contentBackup?.prepare?.().catch(() => { /* Invalid/unavailable evidence is marked unverified by the adapter. */ });
     report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport });
   } catch (error) {
     return (

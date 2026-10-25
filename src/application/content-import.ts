@@ -63,7 +63,8 @@ export function classifyDifference(expected: unknown, actual: unknown, field = '
 
 /** Imports repair derived copies only while the Sheet retains authority. */
 export function assertImportMode(): void {
-  if (process.env.CS_DATA_MODE === 'live' && process.env.CS_CONTENT_STORE !== 'db-shadow') throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
+  if (process.env.CS_DATA_MODE === 'live' && process.env.CS_CONTENT_STORE !== 'db-shadow'
+    && !(process.env.CS_CONTENT_STORE === 'db-read' && process.env.CS_CONTENT_READ_ENABLED === 'true')) throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
   if (!['db-shadow', 'db-read'].includes(process.env.CS_CONTENT_STORE ?? '')) throw new AppError('FORBIDDEN', { reason: 'import_store_mode' });
 }
 

@@ -33,6 +33,14 @@ async function save(repo: SupabaseContentRepository | ContentWriteCutover['repo'
 }
 
 describe('MIG-12 one-way stable-ID export', () => {
+  it('does not treat a current checkpoint version with older rendered cells as already exported', async () => {
+    const { db, exporter } = setup(); await exporter.run();
+    db.externalEdit('library', 'SYN-L001', { current_hook: 'Synthetic newer authoritative hook' });
+    // Model independently selected render/meta versions during a concurrent
+    // change. A matching version alone must never skip mismatched content.
+    exporter.journal.checkpoints.get(exportKey('library', 'SYN-L001'))!.version = String((await db.getPost('library', 'SYN-L001'))!.row_version);
+    expect((await exporter.run()).exact).toBe(true);
+  });
   it('CS-059g: ordinary AppErrors do not skip the remaining rows of a tab', async () => {
     const { db, sheet, exporter } = setup(); await exporter.run();
     db.externalEdit('library', 'SYN-L001', { draft_content: 'Synthetic first change' });
