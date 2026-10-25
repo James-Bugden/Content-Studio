@@ -15,6 +15,41 @@ authorize bypassing that refusal. Follow all gates in
 [ADR-0002 including NOTES](../decisions/0002-content-authority-in-postgres.md).
 DB-5 follow-ups remain separate [#179](https://github.com/James-Bugden/Content-Studio/issues/179) work.
 
+## Owner-waived private Drive gate (CS-066 / #204)
+
+Owner decision in chat, 2026-10-25: the private Drive archive requirement may
+be skipped because a personal Gmail account has no shared drives and a service
+account cannot own files in My Drive. Follow [cutover steps 5-6](cutover.md):
+explicit Production `CS_BACKUP_GATE_WAIVED=2026-10-25` **and** the idempotent
+`content_studio_cutover_waive_backup` coordinator action (verified owner hash,
+server timestamp, full build/import identity) are both required. Env-setup never
+sets this switch. Removing it revokes the waiver; audit history remains.
+
+This waives only absent Drive archive evidence. Step 6 plan-backup attestation
+`dailyPlanBackup:true` with its private evidence reference, every Phase C proof,
+freeze, fresh parity/lag, and a fresh exact rollback rehearsal (equal hashes,
+IDs/counts/fields/links/types and zero issues; 24-hour flip bound) remain mandatory.
+With a configured folder, archive verification is unchanged. A failed backup
+proof or other failed check is never converted to success. `/reconcile` displays
+**Backup gate waived by owner** and retained failures; backup cron/worker return
+`backup_waived` when no folder exists, without a manifest or verification time.
+Waived admission also requires a completed exact Sheet export report no older
+than 15 minutes, equal valid hashes, zero differences and zero retained issues.
+The activation action reads current Sheet parity again, including on retries;
+it never exports over a hand edit to make admission pass. SQL rechecks the
+retained journal at activation. The Phase C private evidence reference must be
+a JSON string of 1–2048 characters containing a visible printable character
+after removing Unicode whitespace, invisible characters and format controls.
+The shared SQL reference validator preserves the original padded reference.
+
+Recovery is Supabase daily Pro plan backups plus the one-way exact Sheet export.
+There is **no independent archive of history/ledger outside the project**.
+Project-level loss relies on the plan backups plus Sheet export; the latter
+cannot reconstruct the complete history/ledger. Emergency backup (when a folder
+is configured) and exact rollback remain available; rollback ordering below is
+unchanged. No Phase E authority, billing change, production flip or SQL application
+is performed by this PR. The new migration is UNAPPLIED and coordinator-only.
+
 ## Gates before separately reviewed live enablement
 
 1. Confirm the migration files were never applied in an earlier form (#179).
@@ -34,7 +69,7 @@ DB-5 follow-ups remain separate [#179](https://github.com/James-Bugden/Content-S
    **daily plan backups are actually enabled**. Do not assume plan backups
    exist. Record private configuration evidence and a restorable backup. PITR
    is recommended and requires his billing choice.
-7. Owner shares a private backup Drive folder with the service account and
+7. Unless the audited owner waiver above is active, owner shares a private backup Drive folder with the service account and
    confirms no public/link sharing. Production credentials and CRON_SECRET
    stay Production-only; preview uses synthetic data.
 8. Separately review and wire durable checkpoints/decisions/measurements,
@@ -44,7 +79,7 @@ DB-5 follow-ups remain separate [#179](https://github.com/James-Bugden/Content-S
    atomically, without bumping content revisions. Cross-instance leases and
    durable decision/idempotency records are mandatory; instance mutexes alone
    cannot authorize live operation. No such live client is constructed here.
-9. Scheduled private backup must run once, with manifest and six file hashes
+9. Unless the audited owner waiver above is active, scheduled private backup must run once, with manifest and six file hashes
    re-read and verified. Restore into an empty Supabase branch with exact
    six-table parity. Keep the trusted manifest hash separately.
 10. Complete the copied synthetic workbook/Supabase-branch rehearsal below,

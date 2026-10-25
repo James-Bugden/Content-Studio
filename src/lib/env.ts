@@ -8,6 +8,7 @@ import { z } from 'zod';
 export const schema = z.object({
   CS_DATA_MODE: z.enum(['fake', 'live']).default('fake'),
   CS_PARITY_WINDOW_WAIVED: z.literal('2026-10-25').optional(),
+  CS_BACKUP_GATE_WAIVED: z.literal('2026-10-25').optional(),
   CS_CONTENT_STORE: z.enum(['sheet', 'db-shadow', 'db-read', 'db']).default('sheet'),
   CS_CONTENT_WRITE_ENABLED: z.enum(['true', 'false']).optional(),
   CS_CONTENT_READ_ENABLED: z.enum(['true', 'false']).optional(),
@@ -80,7 +81,7 @@ export function serverEnv(): ServerEnv {
     || parsed.data.CS_CONTENT_STORE === 'db' && parsed.data.CS_CONTENT_DB_ENABLED !== 'true')) {
     throw new Error('CS_CONTENT_STORE database modes are not enabled for live data');
   }
-  if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE === 'db' && !parsed.data.CS_CONTENT_BACKUP_FOLDER_ID) {
+  if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE === 'db' && !parsed.data.CS_CONTENT_BACKUP_FOLDER_ID && !parsed.data.CS_BACKUP_GATE_WAIVED) {
     throw new Error('Invalid environment for: CS_CONTENT_BACKUP_FOLDER_ID');
   }
   if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off' && parsed.data.CS_CONTENT_STORE !== 'db-shadow' || parsed.data.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(parsed.data.CS_CONTENT_STORE)) {

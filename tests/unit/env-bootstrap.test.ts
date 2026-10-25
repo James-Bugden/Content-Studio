@@ -65,7 +65,8 @@ describe('setup guards and mutation semantics', () => {
   it('never bootstraps deployment-owned or test variables', async () => {
     const h = harness();
     await setup(['--dry-run'],h);
-    for (const name of ['VERCEL_ENV','VERCEL_GIT_COMMIT_SHA','CS_COMMIT_SHA','CS_TEST_MODE']) expect(h.logs.join(' ')).not.toContain(name);
+    for (const name of ['VERCEL_ENV','VERCEL_GIT_COMMIT_SHA','CS_COMMIT_SHA','CS_TEST_MODE','CS_BACKUP_GATE_WAIVED']) expect(h.logs.join(' ')).not.toContain(name);
+    expect(() => options(['--rotate', 'CS_BACKUP_GATE_WAIVED'])).toThrow('Invalid arguments');
   });
   it('preserves all existing values and honors --only', async () => {
     const h = harness(['TYPEFULLY_API_KEY','TYPEFULLY_SOCIAL_SET_ID']);
