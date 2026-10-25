@@ -193,8 +193,6 @@ function build(): Services {
     const options = { url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY! };
     const contentImport = new SupabaseContentImportStore(options);
     const parity = new SupabaseContentParityJournal(options);
-    const sheetRepo = services.repo;
-    const dbRepo = new SupabaseContentRepository(contentImport.db, 'db-read');
     // Scheduled capture must not reuse a display cache warmed by an earlier
     // request. This read-only repository adds reads only during explicit import.
     services.importRepo = new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, false), { writable: false });
