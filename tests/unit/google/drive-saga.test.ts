@@ -1,7 +1,7 @@
 import type { ContentRepository } from '@/application/ports';
 import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
 import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
@@ -58,8 +58,10 @@ describe('links', () => {
   });
 
   it('preserves a closed Drive error code when its Error class comes from another module graph', async () => {
+    vi.resetModules();
+    const { AppError } = await import('@/domain/errors');
     const record = await repo.getLibrary('SYN-L001');
-    const foreign = { ...drive, readText: async () => { throw Object.assign(new Error('denied'), { code: 'FORBIDDEN' }); } } as unknown as DriveGateway;
+    const foreign = { ...drive, readText: async () => { throw new AppError('FORBIDDEN'); } } as unknown as DriveGateway;
     expect(await readSection(foreign, record)).toMatchObject({ ok: false, reason: 'provider', code: 'FORBIDDEN' });
     const unknown = { ...drive, readText: async () => { throw Object.assign(new Error('unknown'), { code: 'PRIVATE_DETAIL' }); } } as unknown as DriveGateway;
     expect(await readSection(unknown, record)).toMatchObject({ ok: false, reason: 'provider', code: 'PROVIDER_UNAVAILABLE' });

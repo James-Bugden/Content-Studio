@@ -1,6 +1,6 @@
 import 'server-only';
 import { fingerprint } from '@/domain/hash';
-import { AppError, ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
+import { AppError, isAppError, type ErrorCode } from '@/domain/errors';
 import { parseDriveFileId } from '@/domain/links';
 import { findSection, type MarkdownSection } from '@/domain/markdown';
 import type { LibraryRecord } from '@/domain/records';
@@ -28,11 +28,7 @@ export function markdownFileId(record: LibraryRecord): string | null {
 }
 
 function safeReadErrorCode(error: unknown): ErrorCode {
-  if (isAppError(error)) return error.code;
-  // Next may load the gateway and application in separate server module graphs,
-  // where instanceof AppError is false. Accept only the closed code vocabulary.
-  const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
-  return typeof code === 'string' && (ERROR_CODES as readonly string[]).includes(code) ? code as ErrorCode : 'PROVIDER_UNAVAILABLE';
+  return isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE';
 }
 
 export async function readSection(drive: DriveGateway, record: LibraryRecord, authority?: 'db'): Promise<SectionRead> {

@@ -83,7 +83,11 @@ export const ERROR_CATALOGUE: Record<ErrorCode, { status: number; message: strin
   UNKNOWN: { status: 500, message: 'Something unexpected went wrong. Nothing was confirmed as written.', recovery: 'reload', retryable: true },
 };
 
+// Shared by duplicated Next server modules and VM realms; distinct from Replies.
+const APP_ERROR_BRAND = Symbol.for('content-studio.AppError');
+
 export class AppError extends Error {
+  readonly [APP_ERROR_BRAND] = true;
   readonly code: ErrorCode;
   /** Safe, content-free details (field names, IDs, gate codes). */
   readonly details: Record<string, unknown>;
@@ -98,10 +102,12 @@ export class AppError extends Error {
 
 export function isAppError(value: unknown): value is AppError {
   if (value instanceof AppError) return true;
-  // Next can compile the adapter and SSR graphs with separate AppError class
-  // identities. Accept only an actual Error with our closed code vocabulary and
-  // details shape; arbitrary provider objects must still become UNKNOWN.
-  return value instanceof Error && value.name === 'AppError' &&
+  // Prototype identity is not shared by VM realms or duplicated Next modules.
+  // Plain data/JSON cannot carry the registry symbol. This is an in-process
+  // identity marker, not a security boundary against code deliberately applying
+  // our public Symbol.for key. Keep the closed vocabulary and details checks.
+  return typeof value === 'object' && value !== null &&
+    APP_ERROR_BRAND in value && value[APP_ERROR_BRAND] === true &&
     'code' in value && typeof value.code === 'string' &&
     (ERROR_CODES as readonly string[]).includes(value.code) &&
     'details' in value && value.details !== null && typeof value.details === 'object' && !Array.isArray(value.details);

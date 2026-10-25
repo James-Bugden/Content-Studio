@@ -10,7 +10,7 @@ import { PanelHost } from '@/components/panel/panel-host';
 import { FilterBar } from '@/components/filter-bar';
 import { SortDirectionToggle } from '@/components/backlog/sort-direction-toggle';
 import { PLATFORMS, type Platform } from '@/domain/enums';
-import { ERROR_CODES, isAppError, type ErrorCode } from '@/domain/errors';
+import { isAppError, type ErrorCode } from '@/domain/errors';
 import { libraryBacklogTotals, libraryBacklogView } from '@/domain/library-backlog';
 import { BacklogTotalsStrip } from '@/components/backlog/backlog-totals';
 import { BACKLOG_DIRECTIONS, BACKLOG_GROUPS, BACKLOG_SORTS, type BacklogDirection, type BacklogGroup, type BacklogSort } from '@/domain/library-backlog';
@@ -49,11 +49,7 @@ function grouping(params: Params): BacklogGroup | undefined {
   return raw && (BACKLOG_GROUPS as readonly string[]).includes(raw) ? raw as BacklogGroup : undefined;
 }
 function safeBacklogErrorCode(error: unknown): ErrorCode {
-  if (isAppError(error)) return error.code;
-  // Next's separate server module graphs can lose Error prototype identity.
-  // Accept only our closed, content-free code vocabulary across that boundary.
-  const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
-  return typeof code === 'string' && (ERROR_CODES as readonly string[]).includes(code) ? code as ErrorCode : 'UNKNOWN';
+  return isAppError(error) ? error.code : 'UNKNOWN';
 }
 
 export default async function BacklogPage({ searchParams }: { searchParams: Promise<Params> }) {
