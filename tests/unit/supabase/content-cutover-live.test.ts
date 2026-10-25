@@ -13,6 +13,8 @@ import { getServices, resetServices } from '@/application/container';
 import { resetEnvCache, serverEnv } from '@/lib/env';
 import { ContentShadowStore } from '@/integrations/supabase/content-shadow-store';
 import { AppError } from '@/domain/errors';
+import { fingerprintValues } from '@/domain/hash';
+import { rowRevision } from '@/domain/mapping';
 import { SHEET_TABS } from '@/domain/sheet-schema';
 import { FakePrivateBackupFolder } from '@/integrations/supabase/fake-content-backup';
 import { CUTOVER_CONTRACT } from '@/application/cutover-contract';
@@ -332,6 +334,26 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     expect(await services.liveCutover!.status()).toEqual({ blocking: 'cutover_measurement_required' });
     await expect(store.assertGate('db-read', true)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+  it.each(['phase-c', 'backup', 'rehearsal'])('bounds %s flip proof age without expiring ongoing DB authority', async name => {
+    await admitWrite(false);
+    await query("update content_studio_cutover_evidence set at=clock_timestamp()-interval '25 hours' where name=$1", [name]);
+    await expect(query('select content_studio_cutover_gate($1,$2)', ['db', build])).rejects.toMatchObject({ code: '42501', message: 'write proof expired' });
+  });
+  it('bounds persisted diagnostic state and refuses oversized checkpoint state without dropping recovery data', async () => {
+    await admitRead(); const store = new ContentCutoverStore(options, build);
+    await store.exportJournal.live!.exclusive(async () => {
+      store.exportJournal.reports = Array.from({ length: 2200 }, () => ({ at: 1, exact: true, counts: { library: 0, queue: 0, schedule: 0, workflow_settings: 0 }, dbHash: hash, sheetHash: hash, differences: [] }));
+      store.exportJournal.lagSamples = Array.from({ length: 4200 }, () => ({ at: 1, lagMs: 1 }));
+      store.exportJournal.repairedFailures = Array.from({ length: 2200 }, () => ({ since: 1, repairedAt: 2 }));
+    });
+    const before = (await query("select state from content_studio_cutover_state where name='sheet-export'")).rows[0]!.state as { reports: unknown[]; lagSamples: unknown[]; repairedFailures: unknown[] };
+    expect(before.reports).toHaveLength(2048); expect(before.lagSamples).toHaveLength(4096); expect(before.repairedFailures).toHaveLength(2048);
+    await expect(store.exportJournal.live!.exclusive(async () => {
+      for (let i = 0; i < 20001; i++) store.exportJournal.checkpoints.set(`workflow_settings\0SYN-${i}`, { fingerprint: 'a'.repeat(16), cells: {}, version: '1', at: 1 });
+    })).rejects.toMatchObject({ code: 'SCHEMA_DRIFT', details: { reason: 'export_state_bound' } });
+    const after = (await query("select state,token from content_studio_cutover_state where name='sheet-export'")).rows[0]!;
+    expect(after.state).toEqual(before); expect(after.token).toBeNull();
+  });
   it.each(['db', 'db-read', 'sheet'])('freezes the %s repository including the Replies Queue insert boundary', async value => {
     if (value === 'db') await admitWrite(); else if (value === 'db-read') await admitRead();
     const services = mode(value), writes = vi.spyOn(sheet, 'appendRow');
@@ -363,6 +385,8 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     await expect(writer.applyPatch(w)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(transport).not.toHaveBeenCalled();
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true'); const enabled = mode('db').contentCutover!.exporter.db as SupabaseContentDb;
+    await expect(enabled.writeThrough(w)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(transport).not.toHaveBeenCalled();
     await db.raw.exec('delete from content_studio_cutover_authority');
     await expect(enabled.applyPatch(w)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(transport.mock.calls.some(([url]) => String(url).endsWith('content_studio_apply_patch'))).toBe(false);
@@ -378,8 +402,16 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
   });
   it('refuses the live hand-edit force-overwrite with a valid owner decision and leaves every Sheet byte intact', async () => {
     await admitWrite(); const services = mode('db'), exporter = services.contentCutover!.exporter;
-    await exporter.run(); const bytes = JSON.stringify(sheet.rawTab(SHEET_TABS.library.name));
-    await expect(exporter.resolveMismatch({ actor: { role: 'owner', sub: 'synthetic-owner' }, operationId: 'synthetic-force', kind: 'library', id: 'SYN-L001', expectedSheetFingerprint: exporter.journal.checkpoints.get('library\0SYN-L001')!.fingerprint, expectedDbVersion: '1' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await exporter.run();
+    const grid = sheet.rawTab(SHEET_TABS.library.name), col = grid[0]!.findIndex(c => c.value === 'Current Hook');
+    sheet.externalEdit(SHEET_TABS.library.name, 2, col, 'Synthetic hand edit to preserve');
+    const bytes = JSON.stringify(grid), current = grid[1]!, width = grid[0]!.length;
+    const observed = fingerprintValues([rowRevision(current.map(c => c.value), width), rowRevision(current.map(c => c.formula ?? c.value), width)]);
+    const before = exporter.journal.checkpoints.get('library\0SYN-L001')!.fingerprint;
+    transport.mockClear(); vi.mocked(GoogleSheetTransport.prototype.readTab).mockClear();
+    await expect(exporter.resolveMismatch({ actor: { role: 'owner', sub: 'synthetic-owner' }, operationId: 'synthetic-force', kind: 'library', id: 'SYN-L001', expectedSheetFingerprint: observed, expectedDbVersion: '1' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(transport).not.toHaveBeenCalled(); expect(GoogleSheetTransport.prototype.readTab).not.toHaveBeenCalled();
+    expect(exporter.journal.checkpoints.get('library\0SYN-L001')!.fingerprint).toBe(before);
     expect(JSON.stringify(sheet.rawTab(SHEET_TABS.library.name))).toBe(bytes);
   });
   it('P1: admits SHA A once; compatible SHA B reads, writes, backs up and rolls back without fresh build evidence', async () => {
