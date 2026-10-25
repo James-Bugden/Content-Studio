@@ -5,7 +5,7 @@ import { z } from 'zod';
  * Server environment (CS-001). Parsed once; errors name variables, never values.
  * Values are never logged, returned by health output or sent to the browser.
  */
-const schema = z.object({
+export const schema = z.object({
   CS_DATA_MODE: z.enum(['fake', 'live']).default('fake'),
   CS_PARITY_WINDOW_WAIVED: z.literal('2026-10-25').optional(),
   CS_CONTENT_STORE: z.enum(['sheet', 'db-shadow', 'db-read', 'db']).default('sheet'),
