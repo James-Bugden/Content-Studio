@@ -20,7 +20,7 @@ async function parity(samples: unknown) {
 const samples = () => Object.fromEntries(['library','queue','ready','schedule','queue_summary','workflow_settings'].map(k => [k, { idsEqual: true, fields: 1000, equal: 1000, blocking: 0, lagMs: 100 }]));
 describe('DB-10 actual SQL measured gates / security / consistent snapshots', () => {
   it('forces zero-policy RLS and denies browser roles on every new table and RPC, despite hostile default grants', async () => {
-    for (const table of ['content_studio_cutover_state', 'content_studio_cutover_evidence', 'content_studio_cutover_jobs']) {
+    for (const table of ['content_studio_cutover_state', 'content_studio_cutover_evidence', 'content_studio_cutover_jobs', 'content_studio_cutover_authority']) {
       expect((await db.raw.query('select relrowsecurity,relforcerowsecurity from pg_class where oid=$1::regclass', [table])).rows[0]).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
       expect((await db.raw.query('select * from pg_policies where tablename=$1', [table])).rows).toHaveLength(0);
       for (const role of ['anon', 'authenticated']) for (const verb of ['SELECT','INSERT','UPDATE','DELETE']) {
@@ -29,7 +29,7 @@ describe('DB-10 actual SQL measured gates / security / consistent snapshots', ()
       for (const run of [db.asAnon, db.asOwner]) await expect(run(q => q.query(`select * from ${table}`))).rejects.toBeDefined();
     }
     const functions = (await db.raw.query<{ oid: string; prosecdef: boolean; proconfig: string[] }>("select oid::text,prosecdef,proconfig from pg_proc where proname like 'content_studio_cutover_%'")).rows;
-    expect(functions).toHaveLength(8);
+    expect(functions).toHaveLength(11);
     for (const fn of functions) {
       expect(fn.prosecdef).toBe(false); expect(fn.proconfig.join()).toContain('search_path=pg_catalog, public');
       for (const role of ['anon', 'authenticated']) expect((await db.raw.query<{ok: boolean}>('select has_function_privilege($1,$2::oid,$3) as ok', [role, fn.oid, 'EXECUTE'])).rows[0]!.ok).toBe(false);
@@ -50,10 +50,10 @@ describe('DB-10 actual SQL measured gates / security / consistent snapshots', ()
     await expect(query('select content_studio_cutover_gate($1,$2)', ['db', build])).rejects.toBeDefined();
     await expect(query('select content_studio_cutover_record($1,$2,$3,$4)', ['parity', build, 'synthetic-obsolete', {}])).rejects.toBeDefined();
   });
-  it('reads six tables in one SQL snapshot and refuses a pending Markdown outbox instead of guessing a restore baseline', async () => {
+  it('reads six authoritative tables in one SQL snapshot even with a pending Markdown export', async () => {
     const snapshot = (await query('select content_studio_cutover_snapshot() as s')).rows[0]!.s;
     expect(Object.keys(snapshot as object).sort()).toEqual(['posts','schedule','workflow_settings','row_history','operations','audit_events'].sort());
     await query("insert into content_studio_markdown_export(library_id,row_version,expected_body,body) values('SYN-missing',1,'','Synthetic')");
-    await expect(query('select content_studio_cutover_snapshot()')).rejects.toBeDefined();
+    expect((await query('select content_studio_cutover_snapshot() as s')).rows[0]!.s).toEqual(snapshot);
   });
 });

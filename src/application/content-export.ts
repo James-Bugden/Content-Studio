@@ -24,7 +24,7 @@ export type ExportParity = { at: number; exact: boolean; counts: Record<ExportKi
 export interface ContentExportJournal {
   lagSamples?: { at: number; lagMs: number }[];
   repairedFailures?: { since: number; repairedAt: number }[];
-  live?: { exclusive<T>(run: () => Promise<T>): Promise<T>; persist(): Promise<void> };
+  live?: { exclusive<T>(run: () => Promise<T>): Promise<T>; persist(): Promise<void>; refresh?(): Promise<void>; fence?(): Promise<void> };
   checkpoints: Map<string, ExportCheckpoint>;
   issues: Map<string, ExportIssue>;
   reports: ExportParity[];
@@ -190,6 +190,7 @@ export class ContentExporter {
           // row is a deletion conflict, never a license to recreate it.
           if (row.kind !== 'queue' || row.importedRevision || checkpoint) { this.issue(row, ['@missing'], 'export_mismatch'); continue; }
           if (Object.values(row.cells).some(c => c.formula || c.link && c.link !== c.value)) { this.issue(row, ['@links'], 'export_mismatch'); continue; }
+          await this.journal.live?.fence?.();
           await this.sheet.appendRow(spec.name, 'ZZ', headers.map(h => row.cells[h] ? sheetCellValue(h, row.cells[h].value) : ''));
         } else {
           const actual = this.observed(current.raw, headers);
@@ -209,7 +210,7 @@ export class ContentExporter {
             if (existing.formula || wanted.formula || wanted.link && wanted.link !== wanted.value) continue;
             if (different({ cell: wanted }, { cell: existing }).length) writes.push({ row: current.row, column, value: sheetCellValue(header, wanted.value) });
           }
-          if (writes.length) await this.sheet.writeCells(spec.name, writes);
+          if (writes.length) { await this.journal.live?.fence?.(); await this.sheet.writeCells(spec.name, writes); }
         }
         const fresh = await this.tab(row.kind), readback = fresh.data.find(r => r.id === row.id);
         if (!readback) { this.issue(row, ['@missing'], 'export_lag'); continue; }
@@ -263,7 +264,7 @@ export class ContentExporter {
   /** Read-only inspection shares the export single flight, without feeding the
    * comparison ledger. Only completed export/repair runs record samples. */
   parity(): Promise<ExportParity> {
-    const next = this.tail.then(() => this.journal.live ? this.journal.live.exclusive(() => this.measureParity()) : this.measureParity());
+    const next = this.tail.then(async () => { await this.journal.live?.refresh?.(); return this.measureParity(); });
     this.tail = next.catch(() => {});
     return next;
   }
@@ -311,6 +312,7 @@ export class ContentWriteCutover {
       if (property === 'capability') return () => ({ ...target.capability(), ...(this.readOnly ? { state: 'read_only' as const } : {}) });
       if (!['updateLibrary', 'updateQueue', 'updateSchedule', 'createQueueIdea'].includes(String(property))) return typeof original === 'function' ? original.bind(target) : original;
       return (mutation: { operationId: string }) => {
+        if (this.readOnly) return Promise.resolve({ ok: false, operationId: mutation.operationId, code: 'FORBIDDEN', steps: [], details: { reason: 'rollback_read_only' } });
         const run = this.tail.then(async () => {
           if (this.readOnly) return { ok: false, operationId: mutation.operationId, code: 'FORBIDDEN', steps: [], details: { reason: 'rollback_read_only' } };
           const result = await original.call(target, mutation);
@@ -329,20 +331,22 @@ export class ContentWriteCutover {
   }
   get mutationCount() { return this.completed.size; }
   async disableWrites() { this.readOnly = true; await this.tail; }
-  /** Markdown refusal restores the prior write state; Sheet/flip failures stay frozen. */
+  /** Drain locally for final exactness. Refusal restores the prior write state;
+   * only a successful verified rollback keeps writes disabled. */
   async rollbackToSheet(flip: (mode: 'sheet') => Promise<void>) {
     const wasReadOnly = this.readOnly;
-    await this.disableWrites();
-    try {
+    const run = this.tail.then(async () => {
       await this.beforeSheetRollback?.();
-    } catch (error) {
-      this.readOnly = wasReadOnly;
-      throw error;
-    }
-    await this.exporter.run();
-    const parity = await this.exporter.parity();
-    if (!parity.exact || parity.dbHash !== parity.sheetHash || this.exporter.journal.issues.size) throw new AppError('CONFLICT', { reason: 'rollback_export_not_exact' });
-    await flip('sheet');
-    return { mode: 'sheet' as const, writesDisabled: true, parity };
+      await this.exporter.run();
+      const parity = await this.exporter.parity();
+      if (!parity.exact || parity.dbHash !== parity.sheetHash || this.exporter.journal.issues.size) throw new AppError('CONFLICT', { reason: 'rollback_export_not_exact' });
+      // Queued mutations wait for verification. Refusal never disables an
+      // enabled boundary; exactness is established before disabling writes.
+      this.readOnly = true;
+      try { await flip('sheet'); } catch (error) { this.readOnly = wasReadOnly; throw error; }
+      return { mode: 'sheet' as const, writesDisabled: true, parity };
+    });
+    this.tail = run.catch(() => {});
+    return run;
   }
 }

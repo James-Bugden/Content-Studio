@@ -9,7 +9,8 @@ const validId = /^[A-Za-z0-9_-]{10,200}$/;
 /** Never creates permissions, public URLs, or updates an existing file. Only
  * the configured private folder and its direct children are accepted. */
 export class GooglePrivateBackupFolder implements PrivateBackupFolder {
-  constructor(private readonly tokens: ServiceAccountTokens, private readonly folderId: string, private readonly fetchImpl: typeof fetch = fetch) {
+  constructor(private readonly tokens: ServiceAccountTokens, private readonly folderId: string, private readonly fetchImpl: typeof fetch = fetch,
+    private readonly allowedEmails: readonly string[] = []) {
     if (!validId.test(folderId)) throw new AppError('CONFIG_MISSING');
   }
   private async request(url: string, init: RequestInit = {}) {
@@ -29,9 +30,13 @@ export class GooglePrivateBackupFolder implements PrivateBackupFolder {
     await this.privatePermissions(this.folderId);
   }
   private async privatePermissions(id: string) {
-    const data = await (await this.request(`${API}/${id}/permissions?fields=permissions(type,permissionDetails),nextPageToken&pageSize=100&supportsAllDrives=true`)).json();
+    const data = await (await this.request(`${API}/${id}/permissions?fields=permissions(type,emailAddress,role,deleted,permissionDetails),nextPageToken&pageSize=100&supportsAllDrives=true`)).json();
     if (!Array.isArray(data.permissions) || !data.permissions.length || data.nextPageToken
-      || data.permissions.some((p: { type?: string }) => p.type !== 'user')) throw new AppError('FORBIDDEN', { reason: 'backup_folder_not_private' });
+      || data.permissions.some((p: { type?: string; emailAddress?: string; role?: string; deleted?: boolean; permissionDetails?: { role?: string; permissionType?: string }[] }) =>
+        p.type !== 'user' || p.deleted || !p.emailAddress || !this.allowedEmails.filter(Boolean).map(e => e.toLowerCase()).includes(p.emailAddress.toLowerCase())
+        || !['owner', 'organizer', 'fileOrganizer', 'writer', 'reader'].includes(p.role ?? '')
+        || !p.permissionDetails?.length || p.permissionDetails.some(d => !['member', 'file'].includes(d.permissionType ?? '') || !['owner', 'organizer', 'fileOrganizer', 'writer', 'reader'].includes(d.role ?? ''))
+      )) throw new AppError('FORBIDDEN', { reason: 'backup_folder_not_private' });
   }
   async create(name: string, mimeType: 'application/gzip' | 'application/json', bytes: Uint8Array) {
     if (!/^[a-z0-9-]+\.(?:jsonl\.gz|json)$/.test(name)) throw new AppError('VALIDATION_FAILED');

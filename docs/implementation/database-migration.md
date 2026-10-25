@@ -3,8 +3,8 @@
 DB-10 (#198) preparation: the owner's 2026-10-25 instruction replaces calendar
 soak waits with immediate full-data measured gates, retaining thresholds,
 security, backups, rollback and deployed smoke. Live authority composition is
-implemented behind explicit flags plus durable evidence for the exact SHA and
-latest import. Follow [the ordered coordinator runbook](../ops/cutover.md).
+implemented behind explicit flags and SHA/latest-import evidence at activation;
+ongoing DB authority uses a recorded schema/cutover contract epoch. Follow [the ordered coordinator runbook](../ops/cutover.md).
 This is not evidence of a production flip; Phase E retirement stays separate.
 
 Status: design for approval, 2026-10-24. Supersedes the scope limit in

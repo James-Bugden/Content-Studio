@@ -34,7 +34,7 @@ it('fails closed before provider-first work when DB writes were never explicitly
   vi.stubEnv('CS_CONTENT_STORE','db'); vi.stubEnv('CS_CONTENT_WRITE_ENABLED',undefined); resetEnvCache();
   await expect(requireMutation(request('/api/schedule/SYN-001/typefully/create'))).rejects.toMatchObject({code:'FORBIDDEN',details:{reason:'rollback_read_only'}});
 });
-it.each(['sheet','db-shadow'])('does not change %s mutation authentication when the new write flag is false', async mode => {
+it.each(['sheet','db-shadow'])('honours the freeze in %s during flag round trips', async mode => {
   vi.stubEnv('CS_CONTENT_STORE',mode); resetEnvCache();
-  expect(await requireMutation(request('/api/library/SYN-L001/draft'))).toMatchObject({role:'owner'});
+  await expect(requireMutation(request('/api/library/SYN-L001/draft'))).rejects.toMatchObject({code:'FORBIDDEN',details:{reason:'rollback_read_only'}});
 });

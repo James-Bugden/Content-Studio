@@ -22,9 +22,9 @@ export default async function ReconcilePage() {
   const actor = await requireActor('viewer');
   let report: ReconcileReport;
   try {
-    const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport } = getServices();
+    const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport, liveCutover } = getServices();
     await contentBackup?.prepare?.().catch(() => { /* Invalid/unavailable evidence is marked unverified by the adapter. */ });
-    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport });
+    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport, liveCutover });
   } catch (error) {
     return (
       <>
@@ -43,7 +43,7 @@ export default async function ReconcilePage() {
         <CapabilityBanner capabilities={report.capabilities} />
         <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
-          <p>Store mode: {serverEnv().CS_CONTENT_STORE}. {serverEnv().CS_CONTENT_STORE === 'db' ? 'Database is authoritative; Sheet is a one-way comparison export. Live cutover is pending.' : 'Sheet remains authoritative.'}</p>
+          <p>Store mode: {serverEnv().CS_CONTENT_STORE}. {serverEnv().CS_CONTENT_STORE === 'db' ? 'Database is authoritative; Sheet is a one-way comparison export.' : 'Sheet remains authoritative.'}</p>
           {parity ? <>
             <p>{parity.sampleCount} compared requests · {parity.daysGreen} complete days green · import lag p95: {parity.lagP95 === null ? 'not measured' : `${Math.round(parity.lagP95 / 60000)} min`}.</p>
             <p>{!parity.available ? 'Durable measurements unavailable; thresholds unknown.' : parity.ready ? 'Shadow thresholds met.' : 'Shadow thresholds not yet met.'} Evidence covers {parity.scope}{parity.scope === 'this server instance' ? '; a restart loses this measurement window.' : '; measurements survive server restarts.'} This is not permission to switch reads; durable deployment evidence and the phase gates are still required.</p>

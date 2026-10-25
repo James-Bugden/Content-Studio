@@ -105,7 +105,7 @@ function build(): Services {
     const ai = createAiGateway(env);
     const typefully = createTypefullyGateway(env);
     const db = new FakeContentDb();
-    const sheetRepo = new SheetsContentRepository(sheet, { writable: true, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'fake') });
+    const sheetRepo = new SheetsContentRepository(sheet, { writable: env.CS_CONTENT_WRITE_ENABLED !== 'false', ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'fake') });
     services = {
       mode: 'fake',
       repo: env.CS_CONTENT_STORE === 'db-read' ? new ContentReadCutoverRepository(sheetRepo, db)
@@ -153,7 +153,7 @@ function build(): Services {
   if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || !env.CS_SHEET_ID) {
     throw new AppError('CONFIG_MISSING', { provider: 'sheet' });
   }
-  const writable = env.GOOGLE_WRITE_ENABLED === 'true' && (!['db-read', 'db'].includes(env.CS_CONTENT_STORE) || env.CS_CONTENT_WRITE_ENABLED !== 'false');
+  const writable = env.GOOGLE_WRITE_ENABLED === 'true' && env.CS_CONTENT_WRITE_ENABLED !== 'false';
   const tokens = new ServiceAccountTokens(env.GOOGLE_SERVICE_ACCOUNT_EMAIL, env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
   services = {
     mode: 'live',

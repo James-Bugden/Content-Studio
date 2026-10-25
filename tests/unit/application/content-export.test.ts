@@ -414,22 +414,22 @@ describe('MIG-05/MIG-12 rollback and authority', () => {
     expect(order).toEqual(['final export', 'sheet']); expect(result.parity.dbHash).toBe(result.parity.sheetHash);
     expect((await save(repo, 'synthetic-later')).ok).toBe(false);
   });
-  it('does not flip on a hand edit and leaves writes disabled', async () => {
+  it('does not flip on a hand edit and restores the prior enabled write state', async () => {
     const { sheet, exporter, cutover, repo } = setup(); await exporter.run();
     sheet.externalEdit(SHEET_TABS.library.name, 2, Object.keys(LIBRARY_HEADERS).indexOf('draftContent'), 'Synthetic rollback conflict');
     const flip = vi.fn(); await expect(cutover.rollbackToSheet(flip)).rejects.toMatchObject({ code: 'CONFLICT' });
-    expect(flip).not.toHaveBeenCalled(); expect((await save(repo)).ok).toBe(false);
+    expect(flip).not.toHaveBeenCalled(); expect((await save(repo)).ok).toBe(true);
   });
-  it('does not flip when the Sheet is actually unreadable and refuses Replies inserts while draining rollback', async () => {
+  it('does not flip when the Sheet is unreadable and resumes queued Replies inserts after refusal', async () => {
     const { sheet, exporter, cutover, repo } = setup(); await exporter.run();
     vi.spyOn(sheet, 'readTab').mockRejectedValue(new AppError('PROVIDER_UNAVAILABLE'));
     const flip = vi.fn(), rollback = cutover.rollbackToSheet(flip);
     const idea = { operationId: 'synthetic-rollback-idea', actor, libraryId: 'SYN-ROLLBACK-IDEA', sourcePlatform: 'X' as const, currentHook: 'Synthetic', draftContent: 'Synthetic' };
     const refusal = repo.createQueueIdea(idea);
     await expect(rollback).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
-    expect(await refusal).toMatchObject({ ok: false, code: 'FORBIDDEN' });
-    expect(flip).not.toHaveBeenCalled(); expect(repo.capability().state).toBe('read_only');
-    expect(await repo.createQueueIdea({ ...idea, operationId: 'synthetic-after-rollback' })).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+    expect(await refusal).toMatchObject({ ok: true });
+    expect(flip).not.toHaveBeenCalled(); expect(repo.capability().state).toBe('ready');
+    expect(await repo.createQueueIdea({ ...idea, operationId: 'synthetic-after-rollback' })).toMatchObject({ ok: true });
   });
   it('counts distinct committed mutations once, excluding replays and no-op saves', async () => {
     const { repo, cutover, db } = setup();

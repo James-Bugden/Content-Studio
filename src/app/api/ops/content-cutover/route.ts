@@ -12,7 +12,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     requireCronSecret(request, serverEnv().CRON_SECRET);
-    const parsed = z.object({ action: z.enum(['measure', 'backup', 'rollback']) }).strict().safeParse(await request.json());
+    const parsed = z.object({ action: z.enum(['measure', 'backup', 'rollback', 'activate-read', 'activate-db']) }).strict().safeParse(await request.json());
     const operationId = z.string().uuid().safeParse(request.headers.get('Idempotency-Key'));
     if (!parsed.success || !operationId.success) throw new AppError('VALIDATION_FAILED');
     const ops = getServices().liveCutover;

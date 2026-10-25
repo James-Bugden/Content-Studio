@@ -147,7 +147,8 @@ export class FakeContentDb implements ContentDb {
       if (mode === 'patch' && kind === 'library' && before && fields.some(f => ['draft_content', 'source_markdown_url', 'source_master_file_url'].includes(f))) {
         const post = row as ContentPostRow;
         const prior = this.markdownExports.get(id);
-        this.markdownExports.set(id, { libraryId: id, version: String(row.row_version), expectedBody: prior?.expectedBody ?? (before as ContentPostRow).draft_content,
+        if (!post.source_markdown_url && !post.source_master_file_url) this.markdownExports.delete(id);
+        else this.markdownExports.set(id, { libraryId: id, version: String(row.row_version), expectedBody: prior?.expectedBody ?? (before as ContentPostRow).draft_content,
           body: post.draft_content, since: prior?.since ?? Date.now() });
       }
       state = 'applied';

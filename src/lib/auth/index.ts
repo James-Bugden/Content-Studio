@@ -92,9 +92,14 @@ export async function requireMutation(request: Request): Promise<Actor> {
   // import/parity and cron-authenticated repairs must remain available while
   // frozen. Replies has a separate authority; Content inserts still hit the
   // frozen Content repository boundary.
-  if (env.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(env.CS_CONTENT_STORE)
+  if (env.CS_DATA_MODE === 'live'
     && frozen && !maintenanceImport && !replies) {
     throw new AppError('FORBIDDEN', { reason: 'rollback_read_only' });
+  }
+  if (env.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(env.CS_CONTENT_STORE) && !maintenanceImport && !replies) {
+    const { getServices } = await import('@/application/container');
+    const status = await getServices().liveCutover!.status();
+    if (status.blocking) throw new AppError('FORBIDDEN', { reason: status.blocking });
   }
   return actor;
 }

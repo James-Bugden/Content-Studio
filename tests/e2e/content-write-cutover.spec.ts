@@ -13,6 +13,7 @@ test('MIG-12: DB save exports, Sheet hand edit is preserved and shown as a block
   await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic first DB export with exact spaces  ');
   await page.goto('/reconcile');
   await expect(page.getByText('Store mode: db.', { exact: false })).toContainText('Database is authoritative');
+  await expect(page.getByText('Store mode: db.', { exact: false })).not.toContainText('Live cutover is pending');
   await expect(page.locator('[data-reconcile-kind="export_parity"]')).toContainText('Sheet export matches the database');
   await expect(page.locator('[data-reconcile-kind="backup_fresh"]')).toContainText('No verified backup');
   await expect(page.getByRole('button', { name: 'Run content import' })).toHaveCount(0);

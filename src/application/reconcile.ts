@@ -21,6 +21,7 @@ import { exportKey } from './content-export';
 import type { BackupJournal } from './content-backup';
 import type { MarkdownExporter } from './markdown-export';
 import { isAppError } from '@/domain/errors';
+import type { LiveCutoverOps } from './live-content-cutover';
 
 /**
  * Reconciliation centre (CS-017).
@@ -32,6 +33,7 @@ import { isAppError } from '@/domain/errors';
  */
 export type ReconcileKind =
   | 'schema_drift'
+  | 'cutover_blocked'
   | 'refresh_pending'
   | 'import_lag'
   | 'content_parity'
@@ -95,11 +97,16 @@ export async function buildReconcileReport(
   repo: ContentRepository,
   drive: DriveGateway,
   now = Date.now(),
-  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter } = {},
+  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter; liveCutover?: LiveCutoverOps } = {},
 ): Promise<ReconcileReport> {
   rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
   const unreadable: string[] = [];
+  if (options.liveCutover) {
+    const status = await options.liveCutover.status().catch(() => ({ blocking: 'cutover_admission_unavailable' }));
+    if (status.blocking) items.push(item('cutover_blocked', 'blocking', 'Content writes are blocked',
+      [status.blocking, 'Deploy the recorded compatible contract or run the owner rollback procedure. Private backup and rollback remain available while database authority exists.'], [], { label: 'Review' }));
+  }
   if (options.contentCutover) {
     const exporter = options.contentCutover.exporter;
     const mismatches = new Map<string, ExportIssue>();
@@ -112,7 +119,7 @@ export async function buildReconcileReport(
       }
       const comparison = exporter.comparison(now, options.contentCutover.mutationCount);
       items.push(item('export_parity', parity.exact ? 'attention' : 'blocking', parity.exact ? 'Sheet export matches the database' : 'Sheet export parity is blocked',
-        [`${Object.values(parity.counts).reduce((n, c) => n + c, 0)} rows; exact fields: ${parity.exact}. ${comparison.daily.filter(d => d.green).length}/14 complete days green; ${comparison.mutationCount}/50 mutations. Daily lag p95 must be at most 15 minutes; no failure may remain for an hour. Local instance evidence only; live cutover remains pending.`], [], { label: 'Review' }));
+        [`${Object.values(parity.counts).reduce((n, c) => n + c, 0)} rows; exact fields: ${parity.exact}. ${comparison.daily.filter(d => d.green).length}/14 complete days green; ${comparison.mutationCount}/50 mutations. Daily lag p95 must be at most 15 minutes; no failure may remain for an hour. Export observations do not change authority.`], [], { label: 'Review' }));
     } catch (error) {
       unreadable.push('Sheet export parity');
       if (isAppError(error) && error.details.reason === 'duplicate_export_id') items.push(item('export_mismatch', 'blocking', 'Duplicate Sheet export IDs',
@@ -186,7 +193,7 @@ export async function buildReconcileReport(
       for (const id of await options.markdownExport.editedLibraryIds()) editedMarkdown.add(id);
       for (const job of await options.markdownExport.status()) {
         queuedMarkdown.add(job.libraryId);
-        items.push(item('markdown_export_lag', ['CONFLICT', 'STALE_READ', 'VALIDATION_FAILED'].includes(job.code ?? '') || now - job.since >= 3600_000 ? 'blocking' : 'attention', `${job.libraryId}: Drive export is behind`,
+        items.push(item(job.reason === 'markdown_missing' ? 'markdown_missing' : job.reason === 'markdown_mismatch' ? 'markdown_mismatch' : 'markdown_export_lag', ['NOT_FOUND', 'CONFLICT', 'STALE_READ', 'VALIDATION_FAILED'].includes(job.code ?? '') || now - job.since >= 3600_000 ? 'blocking' : 'attention', `${job.libraryId}: Drive export is behind`,
           [job.reason === 'queued_body_stale' ? 'The queued body differs from the saved draft. Save the intended draft with a new operation, then retry export. Rollback is blocked.'
             : job.code === 'CONFLICT' || job.code === 'STALE_READ' ? 'Drive changed or export could not be verified. Compare the master with the saved database draft before retrying.'
             : job.code === 'VALIDATION_FAILED' ? 'The draft cannot be exported safely. Remove section headings or close code fences, save again, then retry export.'

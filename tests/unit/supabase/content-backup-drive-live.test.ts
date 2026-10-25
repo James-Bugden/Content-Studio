@@ -4,6 +4,8 @@ import { createContentBackup, verifyContentBackup } from '@/application/content-
 import { emptyBackupSnapshot } from '@/integrations/supabase/fake-content-backup';
 import type { ServiceAccountTokens } from '@/integrations/google/service-account';
 
+const allowed = ['svc@example.com', 'owner@example.com'];
+const permission = { type: 'user', emailAddress: allowed[0], role: 'writer', permissionDetails: [{ permissionType: 'member', role: 'writer' }] };
 const folderId = 'synthetic_private_folder';
 let files: Map<string, { name: string; bytes: Uint8Array }>, request: ReturnType<typeof vi.fn<typeof fetch>>;
 const tokens = { token: vi.fn(async () => 'synthetic-google-token') } as unknown as ServiceAccountTokens;
@@ -25,7 +27,7 @@ beforeEach(() => {
       files.set(id, { name: metadata.name, bytes: bytes.subarray(start, end) });
       return Response.json({ id });
     }
-    if (url.pathname.endsWith('/permissions')) return Response.json({ permissions: [{ type: 'user' }] });
+    if (url.pathname.endsWith('/permissions')) return Response.json({ permissions: [permission] });
     const id = url.pathname.split('/').at(-1)!;
     if (id === folderId) return Response.json({ id, mimeType: 'application/vnd.google-apps.folder', trashed: false, driveId: 'synthetic_shared_drive' });
     if (id === 'files') {
@@ -39,8 +41,32 @@ beforeEach(() => {
   });
 });
 describe('DB-10 real private service-account Drive backup transport', () => {
+  it.each(['synthetic_shared_drive', folderId, 'synthetic_file_1'])('checks permissions on %s, including pagination and unexpected principals', async id => {
+    const original = request.getMockImplementation()!;
+    files.set('synthetic_file_1', { name: 'synthetic.json', bytes: Buffer.from('{}') });
+    const folder = new GooglePrivateBackupFolder(tokens, folderId, request, allowed);
+    const run = () => id === 'synthetic_file_1' ? folder.read(id) : folder.assertPrivate();
+    for (const bad of [
+      { permissions: [permission], nextPageToken: 'synthetic-next-page' },
+      { permissions: [{ ...permission, type: 'anyone' }] },
+      { permissions: [{ ...permission, type: 'domain' }] },
+      { permissions: [{ ...permission, emailAddress: 'unexpected@example.com' }] },
+      { permissions: [{ ...permission, role: 'unknown' }] },
+      { permissions: [{ ...permission, permissionDetails: [] }] },
+    ]) {
+      request.mockImplementation(async (url, init) => new URL(String(url)).pathname.endsWith(`/${id}/permissions`) ? Response.json(bad) : original(url, init));
+      await expect(run()).rejects.toMatchObject({ code: 'FORBIDDEN', details: { reason: 'backup_folder_not_private' } });
+    }
+  });
+  it.each([undefined, '', 'bad'])('refuses missing or invalid shared-drive membership identity: %s', async driveId => {
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (url, init) => new URL(String(url)).pathname.endsWith(`/${folderId}`)
+      ? Response.json({ id: folderId, mimeType: 'application/vnd.google-apps.folder', trashed: false, driveId }) : original(url, init));
+    await expect(new GooglePrivateBackupFolder(tokens, folderId, request, allowed).assertPrivate()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(request.mock.calls.some(([url]) => String(url).includes('/permissions'))).toBe(false);
+  });
   it('creates private immutable gzip archives, verifies all six hashes and manifest, and replays same-name bytes', async () => {
-    const folder = new GooglePrivateBackupFolder(tokens, folderId, request);
+    const folder = new GooglePrivateBackupFolder(tokens, folderId, request, allowed);
     const journal = { lastVerified: null, failureSince: null };
     const snapshot = emptyBackupSnapshot(); snapshot.posts.push({ library_id: 'SYN-001', draft_content: 'Synthetic\r\n繁體中文  ' });
     const result = await createContentBackup({ snapshot: async () => snapshot }, folder, journal);
@@ -55,11 +81,11 @@ describe('DB-10 real private service-account Drive backup transport', () => {
   it.each(['anyone', 'domain', 'group', undefined])('refuses public/unknown/incompletely measured permissions: %s', async type => {
     const original = request.getMockImplementation()!;
     request.mockImplementation(async (url, init) => String(url).includes('/permissions') ? Response.json({ permissions: [{ type }] }) : original(url, init));
-    await expect(new GooglePrivateBackupFolder(tokens, folderId, request).assertPrivate()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(new GooglePrivateBackupFolder(tokens, folderId, request, allowed).assertPrivate()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(files.size).toBe(0);
   });
   it.each([429, 500])('keeps the previous verified backup on Drive %s', async status => {
-    const folder = new GooglePrivateBackupFolder(tokens, folderId, request), journal = { lastVerified: null, failureSince: null };
+    const folder = new GooglePrivateBackupFolder(tokens, folderId, request, allowed), journal = { lastVerified: null, failureSince: null };
     const previous = await createContentBackup({ snapshot: async () => emptyBackupSnapshot() }, folder, journal);
     request.mockResolvedValue(new Response(null, { status }));
     await expect(createContentBackup({ snapshot: async () => emptyBackupSnapshot() }, folder, journal)).rejects.toBeDefined();
@@ -67,6 +93,6 @@ describe('DB-10 real private service-account Drive backup transport', () => {
   });
   it('refuses reading a file outside the configured folder even with a valid private handle', async () => {
     request.mockResolvedValue(Response.json({ id: 'synthetic_other_file', parents: ['synthetic_other_folder'], size: '1' }));
-    await expect(new GooglePrivateBackupFolder(tokens, folderId, request).read('synthetic_other_file')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(new GooglePrivateBackupFolder(tokens, folderId, request, allowed).read('synthetic_other_file')).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });

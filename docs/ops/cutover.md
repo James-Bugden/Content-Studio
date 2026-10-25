@@ -2,9 +2,9 @@
 
 Implementation preparation only. No migration, live provider request, deployment,
 or authority flip was performed by the builder. Issue [#198](https://github.com/James-Bugden/Content-Studio/issues/198)
-is stacked on [#199](https://github.com/James-Bugden/Content-Studio/pull/199).
-Do not run this until both exact commits have independent Opus approval and all
-required CI is positively green. Do not merge an unreviewed stack replacement.
+follows merged [#199](https://github.com/James-Bugden/Content-Studio/pull/199).
+Do not run this until the exact cutover commit has independent Opus approval
+and every required CI context is positively green.
 
 The owner waived calendar waits on 2026-10-25, **not measurements**. This runbook
 supersedes the seven/fourteen-day admission waits in the earlier DB-5/6/9
@@ -36,8 +36,8 @@ or `vercel env update NAME production` (interactive input; never shell history):
 | `CS_CONTENT_READ_ENABLED` | `true` only after the first full measured gate |
 | `CS_CONTENT_DB_ENABLED` | `true` only after every write gate below |
 | `CS_CONTENT_WRITE_ENABLED` | `false` while frozen; `true` only at explicit resume |
-| `CS_CONTENT_BACKUP_FOLDER_ID` | private folder in a shared drive with individually approved users/service account only; no anyone/domain/group sharing |
-| `GOOGLE_WRITE_ENABLED` | `true` for Sheet authority/export and Drive export; `CS_CONTENT_WRITE_ENABLED=false` freezes app authority writes in db-read/db, **not repairs** |
+| `CS_CONTENT_BACKUP_FOLDER_ID` | private folder in a shared drive with only the configured CS_OWNER_EMAIL and GOOGLE_SERVICE_ACCOUNT_EMAIL; no anyone/domain/group sharing |
+| `GOOGLE_WRITE_ENABLED` | `true` for Sheet authority/export and Drive export; `CS_CONTENT_WRITE_ENABLED=false` freezes app authority writes in every store mode, **not repairs** |
 | `SUPABASE_READ_MODEL_MODE` | `off`; disable legacy import schedule |
 | `SUPABASE_READ_MODEL_URL`, `SUPABASE_READ_MODEL_SERVICE_KEY` | existing approved shared Career project's server-only credentials |
 | `SUPABASE_READ_MODEL_SOURCE_KEY` | existing stable opaque source alias |
@@ -49,9 +49,14 @@ or `vercel env update NAME production` (interactive input; never shell history):
 Outside Vercel only, use `CS_COMMIT_SHA` for the exact reviewed SHA when the
 platform does not provide `VERCEL_GIT_COMMIT_SHA`. Preview stays `fake`; never
 copy Production provider credentials into Preview. Flags admit construction;
-the repository and every live SQL write/worker check durable gate evidence.
-Changing a flag alone cannot pass. Evidence is bound to the latest committed
-typed import and full SHA; a new import/build needs new measurements.
+flip admission checks the latest typed import and exact deployed SHA. Parity
+evidence expires after 15 minutes; other flip proofs expire after 24 hours.
+Changing a flag alone cannot create DB authority. Explicit activation records
+a private epoch containing the admitted SHA, schema version and compiled
+`CUTOVER_CONTRACT` (`schema-2:cutover-1`). Compatible later deployments use this
+epoch without new Sheet imports or SHA evidence. Phase C measurements must
+remain fresh; stale/red evidence blocks writes and shows a blocking item.
+Activation is an authority decision, so never replay it against a different SHA.
 
 For the command examples, privately set PowerShell `$cutoverBase` to the actual
 deployment URL and `$cutoverCron` to its existing cron secret; do not print them.
@@ -124,7 +129,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    ```
 
    Run every denial/catalog query from [DB-9](database-shadow-live.md), including
-   the three `content_studio_cutover_*` tables and eight cutover RPCs. All tables
+   the four `content_studio_cutover_*` tables and eleven cutover RPCs. All tables
    force zero-policy RLS; every function is invoker with pinned search_path.
    Prove anon/authenticated denial through hosted REST, and run security/database
    advisors. Replies inventory must be identical. **Rollback:** keep `sheet`
@@ -157,7 +162,9 @@ the stated mode/write flag rather than reusing an old deployment environment.
    measured again. Do not relabel mismatches or hand-write parity numbers.
    **Rollback:** `CS_CONTENT_STORE=sheet`, redeploy and smoke; DB is ignored.
 
-4. **Read flip and immediate measured Phase C.** Set
+4. **Read flip and immediate measured Phase C.** On the measured deployed SHA,
+   run `Invoke-Cutover 'activate-read'` with a fresh UUID and require success.
+   This records the read epoch; it does not change deployment flags. Set
    `CS_CONTENT_READ_ENABLED=true`, `CS_CONTENT_STORE=db-read`,
    `CS_CONTENT_WRITE_ENABLED=true`; redeploy exact SHA. Prove health/build/store
    identity, owner login, Library/Backlog, Queue/Ready counts, Schedule, draft
@@ -191,15 +198,18 @@ the stated mode/write flag rather than reusing an old deployment environment.
 
    Backup reads all six authority/history tables in one SQL statement snapshot,
    writes six gzip JSONL files plus manifest privately, and re-reads every hash.
-   It refuses pending Markdown jobs. Record trusted manifest hash separately;
+   Pending Markdown jobs do not block backup: DB bodies and history are the
+   authoritative snapshot. Record trusted manifest hash separately;
    restore to an empty matching-schema branch with
    `SqlContentRestoreBranch` / `restoreContentBackup` from the reviewed build,
    using a branch-admin transaction port, never runtime sequence grants.
    Compare all six counts/hashes against the **backup-time** snapshot, test
    ledger replay and sequence advancement; follow [the DB-6 restore drill](database-write-cutover.md).
-   Do not guess an outbox baseline on restore: the verified snapshot has zero
-   pending jobs. Preserve original DB/outbox and export checkpoints privately
-   for any later production recovery; never delete pending jobs.
+   The six-table archive includes exact DB bodies/history, not the derived
+   Drive outbox or export checkpoints. Keep the original outbox/checkpoints
+   privately for operational recovery. After restoring an archive, keep export
+   and authority writes disabled until Drive destinations/baselines are compared
+   explicitly; never infer a baseline or resume export over external Drive edits.
 
    Rollback operation drains/verifies Markdown then runs final Sheet export and
    a separate fresh exact inventory, requiring IDs/counts/fields/links/types,
@@ -210,8 +220,12 @@ the stated mode/write flag rather than reusing an old deployment environment.
    Repeat measurement if a new import/build was introduced.
    **Rollback on any failure:** remain frozen `db-read`; if no DB-only save
    has ever occurred, `sheet` is safe. Preserve every hand edit byte-for-byte;
-   repair never force-overwrites it. Resolve differences deliberately using
-   ordinary audited patches and privately backed-up source text, then retry.
+   repair never force-overwrites it. A hand-edit mismatch clears only by
+   restoring the exact checkpoint Sheet bytes (including formulas, links and
+   types) from private before/after evidence, then retrying export. An audited
+   DB patch equal to the hand edit does not reset the checkpoint. Only the
+   separate leading-equals export refusal clears via an ordinary audited DB
+   patch to exportable text. No live force overwrite or baseline reset exists.
 
 6. **Record external measured proofs, then admit write authority.** These are
    coordinator attestations backed by raw private evidence, not values inferred
@@ -233,7 +247,9 @@ the stated mode/write flag rather than reusing an old deployment environment.
    select public.content_studio_cutover_gate('db','<reviewed-full-sha>');
    ```
 
-   Require `{ok:true}`. Set `CS_CONTENT_DB_ENABLED=true`, store `db`, keep writes
+   Require `{ok:true}`. On this deployed SHA run `Invoke-Cutover 'activate-db'`
+   with a fresh UUID, retaining its build/contract/epoch evidence. This checks
+   every proof again atomically and records DB authority. Only then set `CS_CONTENT_DB_ENABLED=true`, store `db`, keep writes
    false and deploy exact SHA. Prove DB revisions/DB body authority, read-only
    mutation refusals, full Sheet parity and outbox state. **Rollback:** while
    frozen, `Invoke-Cutover 'rollback'`; only after its success set store `sheet`
@@ -253,7 +269,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    concurrent DB saves and Sheet hand edits; preserve the entire hand-edited row
    byte-for-byte, skip it and show blocking `export_mismatch`. A committed DB
    save remains committed on export failure. Export workers use durable
-   non-expiring locks/checkpoints; see recovery below.
+   two-minute token-fenced leases/checkpoints; see recovery below.
 
    Freeze/drain **all** instances again (`CS_CONTENT_WRITE_ENABLED=false`, store
    `db`, redeploy), run backup and `Invoke-Cutover 'rollback'`. Retain generated
@@ -274,37 +290,67 @@ the stated mode/write flag rather than reusing an old deployment environment.
    checkpoint cells private and durable. No Phase E retirement. Only now prepare
    a separate authority-notes PR with actual flip date and evidence reference.
 
+## Every deployment after DB activation
+
+Merges to main deploy Production, including the authority-notes PR. Keep store
+`db`, both authority flags and the deliberate write freeze/resume setting.
+Inspect the deployed SHA, read epoch and compiled `CUTOVER_CONTRACT`; compatible
+builds continue reading/writing from the recorded DB epoch. Do **not** generate
+Sheet imports, invent measurements or reactivate just because the SHA changed.
+Run health, owner read/save/replay/stale smoke, export parity and backup checks
+on that deployed build. A changed contract/schema version blocks writes, reports
+`cutover_contract_mismatch` in Fix issues and leaves owner backup/rollback
+available. Deploy the compatible code again or follow the verified rollback
+sequence. A contract migration needs its own reviewed migration/cutover plan.
+
+The emergency backup/rollback paths check that DB authority exists, not fresh
+parity/Phase C/SHA evidence. Backup still verifies private ACLs and every archive
+hash. Rollback still requires the all-instance freeze/drain, exact current Sheet
+parity and required linked Markdown sections. It never disables an enabled local
+write boundary permanently on a refusal. Do not flip to Sheet until readiness
+succeeds. A DB body on a row without a Markdown destination is named
+`markdown_missing` with a relink/restore action; it creates no impossible outbox
+job and rolls back through its exact Sheet body. Missing/duplicate/externally
+edited *linked* sections remain named blockers for dependent Markdown recovery;
+backups continue even while these jobs are pending. Restore the unique section
+and exact expected body from private evidence, then retry export. No external
+Drive content is overwritten to clear a blocker.
+
+Preparation rollback in `db-read` deliberately performs an export while app
+writes are frozen. It can normalize the documented import equivalents (blank
+checkbox to FALSE, number formatting, non-copy trailing whitespace). Back up the
+workbook first, retain before/after evidence, and remeasure before the flip;
+never run this preparation while other Sheet writers are active. Post-copy
+whitespace is never an allowed normalization.
+
 ## Worker interruption and safe recovery
 
-`content_studio_cutover_state` persists full cells/formulas/links, issues,
-reports and lag samples. Checkpoint and `exported_sheet_revision` updates share
-one SQL transaction without changing Content row_version. A lost save/Google
-response cannot authorize another overwrite: ambiguous checkpoints block and
-require inspection. Locks **never expire automatically**. This trades automated
-crash recovery for avoiding concurrent delayed Google writes.
+`content_studio_cutover_state` persists cells/formulas/links and blocking issues.
+Checkpoint and changed `exported_sheet_revision` updates share one transaction
+without changing content row versions. Read-only parity never claims or saves
+an export lease. Workers release in `finally` on settled failures. A lost claim
+or release response cannot strand a lock forever: leases expire in two minutes.
+A stale/expired token cannot renew, persist or release a newer worker's lease.
+The worker rechecks/renews its token immediately before a Google write; provider
+requests have bounded timeouts. Independent-backend tests must retain Google's
+residual non-CAS race acceptance, including a process paused across a provider
+request. Token fencing cannot cancel a Google write already accepted upstream.
 
-For a locked worker: keep DB read-only; stop the schedule and every old
-deployment/worker, wait for all owned provider requests to finish, back up the
-private state row and inspect DB/Sheet/Drive. Do not clear checkpoints or
-outbox. Only after proving no worker can continue, use Supabase MCP with the
-exact observed token:
+On interruption stop/drain old writers, inspect the private state and exact
+DB/Sheet/Drive bytes, and retry after release/expiry. Do not clear checkpoints,
+conflicts or outbox rows. An ambiguous write blocks on the fresh precondition;
+restore the exact Sheet checkpoint bytes from private evidence before retrying.
+Diagnostic history is bounded to 2,048 parity/failure records and 4,096 lag
+samples; checkpoints/issues are never silently dropped. A 20,000-entry/64 MiB
+state cap refuses further export for inspection. Archive retention remains at
+least 30 daily and the first monthly archive for twelve months; automatic
+archive deletion remains unwired.
 
-```sql
-select name,token,updated_at from public.content_studio_cutover_state;
-select public.content_studio_cutover_release('<observed-name>','<observed-token>'::uuid);
-```
-
-Retry repair. If the Sheet already received a write but its checkpoint did not,
-the row blocks rather than treating equality as permission. Resolve deliberately
-with private before/after evidence; do not invent a baseline or force repair.
-Persistent failures keep DB authority read-only; no automatic rollback or write
-resume. Backups never delete archives; retain at least 30 daily and the first
-monthly archive for twelve months. No source or Sheet is deleted or cleared.
-
-Coordinator operations retain durable UUID request/result records. A crashed
-unfinished request stays in progress: after the drain and state inspection use
-a new UUID, retaining the original audit record. Never erase an idempotency
-record to make a retry look new. Scheduled backups use a deterministic daily
-UUID and replay a completed archive; manual new backup requests use new UUIDs.
-Legacy `/reconcile` soak summaries remain historical diagnostics, not DB-10
-admission: the durable `content_studio_cutover_gate` is the admission decision.
+Failed coordinator operations release their request claim for the same UUID
+retry. Abandoned requests have two-minute leases and token fencing; completed
+backups replay the verified archive. Their request identity binds action, mode
+and contract, so a compatible redeploy can retry the deterministic daily backup
+UUID. Rollback retries always inspect current providers rather than replaying
+historical readiness. Use a new UUID for a new backup/measurement/activation;
+never erase an operation record. Legacy soak summaries are diagnostics; only
+explicit activation runs the SHA-bound admission gate.
