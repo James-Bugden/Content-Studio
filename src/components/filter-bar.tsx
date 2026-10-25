@@ -155,8 +155,8 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
         </button>
       )}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {/* Remount only with committed results, never the optimistic pending query. */}
-        <span key={searchParams?.toString()}>
+        {/* A page-supplied announcement remounts only with committed results; the default text follows the optimistic filters and must not be announced again on commit. */}
+        <span key={announcement === undefined ? undefined : searchParams?.toString()}>
           {announcement ?? (active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`)}
         </span>
       </p>

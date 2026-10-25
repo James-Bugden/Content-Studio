@@ -221,3 +221,34 @@ it('CS-059j: pending navigation inserts nothing, then commits exactly one new re
     await act(async () => release());
   }
 });
+
+it('CS-059j: the default filter-count text is announced exactly once across pending and commit', async () => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  nav.push.mockImplementation(() => startTransition(async () => { await pending; }));
+  nav.params = new URLSearchParams('');
+  const chips = filters.map(f => ({ ...f, control: 'chips' as const }));
+  const { rerender } = render(<FilterBar filters={chips} />);
+  const region = document.querySelector('[aria-live="polite"]')!;
+  const events: string[] = [];
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      if (record.type === 'childList') for (const node of record.addedNodes) events.push(`insert: ${node.textContent}`);
+      if (record.type === 'characterData') events.push(`text: ${record.target.textContent}`);
+    }
+  });
+  observer.observe(region, { childList: true, subtree: true, characterData: true });
+  try {
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^X$/ })); });
+    await act(async () => {
+      nav.params = new URLSearchParams('platform=X');
+      rerender(<FilterBar filters={chips} />);
+      release();
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatch(/1 filter applied/);
+  } finally {
+    observer.disconnect();
+    await act(async () => release());
+  }
+});
