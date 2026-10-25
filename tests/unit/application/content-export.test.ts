@@ -448,9 +448,9 @@ describe('MIG-05/MIG-12 rollback and authority', () => {
     expect(getServices().contentImport).toBeUndefined();
     vi.stubEnv('CS_CONTENT_STORE', undefined); resetEnvCache(); expect(serverEnv().CS_CONTENT_STORE).toBe('sheet');
   });
-  it('explicitly refuses every live database mode without constructing a live client', () => {
+  it('explicitly refuses live read/write authority without constructing a live client', () => {
     vi.stubEnv('CS_DATA_MODE', 'live');
-    for (const mode of ['db', 'db-read', 'db-shadow']) {
+    for (const mode of ['db', 'db-read']) {
       vi.stubEnv('CS_CONTENT_STORE', mode); resetEnvCache(); resetServices();
       expect(() => getServices()).toThrow('database modes are not enabled for live data');
     }

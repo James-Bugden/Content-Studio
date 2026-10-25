@@ -11,7 +11,10 @@ test('MIG-09/10 reconcile exposes mode, measurements, import evidence and a safe
   const report = page.getByRole('region', { name: 'Content import and parity' });
   await expect(report).toContainText('Store mode: db-shadow');
   await expect(report).toContainText('not measured');
+  await expect(report).toContainText('provider failure samples');
+  await expect(report).toContainText('Full-import parity: not measured');
   await expect(report).toContainText('this server instance');
+  await expect(report).toContainText('Shadow thresholds not yet met.');
   await expect(report).toContainText('not permission to switch reads');
   const imported = page.waitForResponse(response => response.url().endsWith('/api/ops/sheet-mirror') && response.request().method() === 'POST');
   await report.getByRole('button', { name: 'Run content import' }).click();

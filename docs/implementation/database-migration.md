@@ -781,3 +781,21 @@ Before live `db-read`, rehearse the new migration
 migrations; none of the existing migration files was changed. It is unapplied
 in this work and has never been applied live. See the explicit owner/live gates
 in [the operations runbook](../ops/runbook.md#explicit-ownerlive-gates-carried-from-183184-186).
+
+### DB-9 Phase A live wiring preparation
+
+Issue #197 authorises live `db-shadow` wiring only. The default stays `sheet`;
+live `db-read` and `db` remain refused. Existing production
+`SUPABASE_READ_MODEL_URL` / `SUPABASE_READ_MODEL_SERVICE_KEY` are reused in
+Career, even with the legacy mirror mode off. Typed import coordination and
+parity history are durable across instances; no production thresholds are
+claimed from synthetic tests. The additive migration remains UNAPPLIED.
+Follow [the exact apply order and first-import checklist](../ops/database-shadow-live.md)
+for all unapplied migrations, hosted denial/advisor checks, cron configuration,
+independent-backend concurrency rehearsal and flag rollback. Section 6's
+fake/PGlite/browser evidence does not replace those live gates.
+
+Owner update 2026-10-25: the explicit audited `CS_PARITY_WINDOW_WAIVED=2026-10-25`
+switch replaces only the calendar/sample-count wait for one cutover. Full-import
+row/ID/field/exception measurements and sampled lag p95 remain required; see
+[Phase A operations](../ops/database-shadow-live.md). No production flip is claimed.

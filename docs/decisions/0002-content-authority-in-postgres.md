@@ -235,3 +235,32 @@ Rollback now requires exact verified Markdown bodies as well as Sheet parity.
 See [DB-7 operations and remaining gates](../ops/database-draft-authority.md),
 including the six-table archive/outbox reconstruction and cross-instance lease
 limits; PGlite/fakes cannot establish hosted security or concurrency.
+
+## DB-9: live Phase A composition (implementation, not deployment)
+
+The owner authorised preparation of live `db-shadow` in #197. The live
+composition now reuses `SUPABASE_READ_MODEL_URL` and
+`SUPABASE_READ_MODEL_SERVICE_KEY` in the existing shared Career project for
+`SupabaseContentDb`, typed imports and durable parity. `sheet` remains the
+default and sole write authority; live `db-read`/`db` remain refused. The
+legacy mirror flag may stay off. No new secret or parallel authority exists.
+
+The new additive `20261025000500_content_shadow_live.sql` is **UNAPPLIED**.
+A DB lease guards complete source capture across instances and the import RPC
+checks its token transactionally. Jobs retain request identity and successful
+redacted results for restart-safe replay. Import evidence and failure events
+are durable; parity samples use a separate idempotent/conflict-detecting RPC.
+The gate calculator reloads durable history from one MVCC snapshot; missing
+or unavailable data never passes. Ordinary comparison/sink failures are
+bounded and swallowed, preserving the Sheet response; the live ContentDb
+writer boundary refuses every ordinary database mutation. Imports retain the
+DB-4 conversion/exception ledger and DB-3 CAS/history/audit transaction.
+
+See [the Phase A apply, verification and rollback runbook](../ops/database-shadow-live.md).
+No live migration, phase flip, scheduled run, hosted denial proof, independent
+backend concurrency proof or seven-day production window is claimed here.
+
+Owner update 2026-10-25: the explicit audited `CS_PARITY_WINDOW_WAIVED=2026-10-25`
+switch replaces only the calendar/sample-count wait for one cutover. Full-import
+row/ID/field/exception measurements and sampled lag p95 remain required; see
+[Phase A operations](../ops/database-shadow-live.md). No production flip is claimed.

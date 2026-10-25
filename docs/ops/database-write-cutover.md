@@ -1,8 +1,9 @@
 # DB-6 write cutover, private backups and rollback
 
 Status: **pending cutover**. This build implements fake/PGlite behavior only.
-`CS_CONTENT_STORE` defaults to `sheet`; live data refuses all database modes
-before provider construction. The live DB client stays unwired. No live SQL,
+`CS_CONTENT_STORE` defaults to `sheet`; live data refuses `db-read` and `db`
+before provider construction. DB-9 separately prepares live `db-shadow` only
+([Phase A runbook](database-shadow-live.md)); write authority stays fake-only. No live SQL,
 workbook, Drive folder, flags or schedule were changed. This runbook does not
 authorize bypassing that refusal. Follow all gates in
 [the design](../implementation/database-migration.md) and
