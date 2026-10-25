@@ -196,9 +196,12 @@ it('owner waiver requires durable audit and full-import measurements, preserves 
   j.samples.forEach(s => { s.lagMs = 900000; }); expect(j.summary(now).ready).toBe(true);
   j.samples.forEach(s => { s.lagMs = 900001; }); expect(j.summary(now).ready).toBe(false);
   j.samples.length = 0; expect(j.summary(now).ready).toBe(false);
-  j.record(sample()); j.lastRun.fullParity = undefined; expect(j.summary(now).ready).toBe(false);
-  j.lastRun.fullParity = fullParity; j.gap = 'SAMPLE_PERSISTENCE_FAILED'; expect(j.summary(now).ready).toBe(false);
-  j.gap = null; vi.stubEnv('CS_PARITY_WINDOW_WAIVED', undefined); expect(j.summary(now).ready).toBe(false);
+  PARITY_COLLECTIONS.forEach(c => j.record(sample(now, c))); expect(j.summary(now).ready).toBe(true); // every collection measured again
+  j.lastRun.fullParity = undefined; expect(j.summary(now).ready).toBe(false);
+  j.lastRun.fullParity = fullParity; expect(j.summary(now).ready).toBe(true);
+  j.gap = 'SAMPLE_PERSISTENCE_FAILED'; expect(j.summary(now).ready).toBe(false);
+  j.gap = null; expect(j.summary(now).ready).toBe(true);
+  vi.stubEnv('CS_PARITY_WINDOW_WAIVED', undefined); expect(j.summary(now).ready).toBe(false);
 });
 
 it('waiver probe W-A: a lone equal library comparison cannot stand in for five unmeasured read paths', () => {
