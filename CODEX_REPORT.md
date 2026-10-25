@@ -83,3 +83,85 @@ and are not claimed as passing.
 Scratch was outside the repository. Its absolute path and absence of junctions
 were verified; files were deleted individually and the empty directory removed.
 No scratch leftovers remain. The original `node_modules` junction is preserved.
+
+
+# PR 201 source extension - build round 1 (2026-10-25)
+
+Tier: Standard. Role: build. Branch: `cs-200-env`.
+Implementation: `72a5141de66a786f6e9338718337d1aa7b479758`.
+Base: `8bd9fda` (prior bootstrap/report `b86550e`, `8bd9fda`).
+Read the prior external report, MASTER-SPEC, implementation skill, bootstrap
+scripts/tests and operations instructions before editing. Read-only GitHub PR
+and issue queries could not resolve 201; the supplied request is the contract.
+No push, GitHub write, deployment, live Vercel/LastPass/health call, install/ci,
+or dependency change occurred. This worktree remains isolated from main.
+
+## Acceptance evidence
+
+| ID | Outcome | Evidence |
+| --- | --- | --- |
+| SOURCE-1 | Explicit prompt/lastpass/file modes and logged-in-CLI default detection | `selectSource`, source option tests, existing dry-run and CI/project guards |
+| SOURCE-2 | Raw hidden TTY input, names/counter only, blank skip, no echo, no argv/env/disk value transport | mocked terminal output assertions, interruption/EOF cleanup, stdin pause restoration, UTF-8 and multiline bracketed paste; existing mocked child-process isolation tests |
+| SOURCE-3 | External plaintext file only, resolved and lexical path checks, other Git tree detection, regular-file and permission checks | independent containment tests, Windows ACL mocks, mocked POSIX mode checks, malformed/duplicate/unknown/non-secret line refusals, names-only summaries |
+| SOURCE-4 | Existing add conflicts, explicit update-only rotation and recoverable cron generation preserved | old bootstrap tests plus prompt/file rotation tests; missing file rotation fails; generation remains LastPass-only and never silently falls back |
+| SOURCE-5 | Three source modes and Windows without lpass documented | `docs/ops/env-setup.md`: web-vault copy into hidden prompt, permissions, multiline input, Git Bash winpty and troubleshooting |
+
+No new dependency. Optional `--shred` is not implemented; the plaintext input
+file is never copied/rewritten/deleted. Owner instructions explicitly require
+manual removal. Prompt blanks skip even required names, as requested; a skipped
+name is not evidence that Production configuration is complete.
+
+## Verification
+
+All Vitest, ESLint and typecheck commands used `bash ~/bin/heavy`. No full-suite
+run or unrelated process termination occurred. Provider/child-process and TTY
+interactions are mocked; file fixtures contain synthetic sentinels only and
+are created outside the repository and removed individually after each test.
+
+| Check | Result |
+| --- | --- |
+| `bash ~/bin/heavy npx vitest run tests/unit/env-sources.test.ts tests/unit/env-bootstrap.test.ts tests/unit/security --maxWorkers=1` | PASS: 134 tests, 8 files |
+| Final `bash ~/bin/heavy npx vitest run tests/unit/env-sources.test.ts --maxWorkers=1` | PASS: 41 tests after final fixture/type-only adjustments |
+| `bash ~/bin/heavy npm run lint` | PASS |
+| Final `bash ~/bin/heavy npx eslint scripts/env-setup.mjs tests/unit/env-sources.test.ts tests/unit/env-bootstrap.test.ts` | PASS |
+| `bash ~/bin/heavy npm run typecheck` | BLOCKED/RED: existing missing `@supabase/supabase-js`, `@electric-sql/pglite`, contrib module and downstream errors; no final bootstrap/source-test diagnostics |
+| `npm.cmd run check:private` and `npm.cmd run check:secrets` | PASS after staging final implementation; synthetic file fixtures use a shared line builder, without weakening scanner rules |
+| `git diff --cached --check` | PASS |
+| Guard mutations | PASS: all 29 distinct guards caught after strengthening two initially redundant containment tests; source restored after every attempt |
+
+Mutation coverage: input/output TTY and raw capability, raw no-echo enable and
+restoration, interrupt/EOF cancellation, stdin pause, blank skip, default and
+explicit source selection, source enum and file option coupling, explicit and
+automatic cron-generation refusal outside LastPass, --yes prompt bypass,
+resolved/lexical containment and other Git trees independently, regular files,
+POSIX permissions, failed/broad Windows ACL checks (including granular read
+rights), file syntax/duplicate/known-secret names, required file omissions,
+missing optional-secret rotation, and output-echo injection. Initial redundant
+path tests were corrected to isolate each guard; no selected mutation survives.
+
+T1-T4/browser QA is not applicable to this CLI/docs change. Native terminal and
+provider execution were not performed and are not claimed passing. Git Bash
+mintty may need `winpty node scripts/env-setup.mjs --from prompt`; multiline
+prompt input requires bracketed paste, with single-line escaped-newline file
+input or LastPass as alternatives. Windows ACL detection covers known English
+principal names and well-known SID strings where icacls exposes them; localized
+or custom groups require manual permission review. Names-only Vercel checking
+retains the prior limitation: no atomic compare-and-set or value verification.
+Overall verification is not green while the shared dependency/typecheck blocker
+remains. No production configuration, source-of-truth cutover or deployment
+status changed.
+
+## Scratch and handoff
+
+Mutation scratch was outside the repository at
+`C:/Users/jbbug/AppData/Local/Temp/cs-env-mutations-omochsjo` and contained only
+`mutate.py`, `results-first.json`, and `results.json`. Its exact resolved path
+and lack of junctions were checked before deleting each file and then the empty
+directory without recursive deletion. It is removed; no task scratch or test
+fixture leftovers remain. The original `node_modules` junction still points to
+`C:/Users/jbbug/projects/content-studio/node_modules` and was never detached,
+modified or traversed for deletion. No cleanup action touched main dependencies.
+
+This report is committed separately after the implementation. PR 201 requires
+an independent review/runtime verification outside this build-only handoff;
+no merge, CI-green, deployment, or issue closure is claimed.
