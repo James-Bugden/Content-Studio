@@ -114,6 +114,61 @@ describe('owner CLI boundaries',()=>{
 });
 
 describe('activation admission',()=>{
+  it.each(['health','status','receipt'])('build binding: refuses a shared-prefix %s build',async boundary=>{
+    const h=harness(), original=h.fetcher.getMockImplementation()!;
+    const different=sha.slice(0,39)+'b';
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(boundary==='health' && u.endsWith('/health')) return response({...health(),commit:different});
+      if(['health','status'].includes(boundary) && u.endsWith('content-cutover') && i.method==='GET') return response({...status(),status:{...status().status,build:different}});
+      if(boundary==='receipt' && i.method==='POST') return response({ok:true,result:{mode:'db',build:different,contract:'schema-2:cutover-1'}});
+      return original(u,i);
+    });
+    expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);
+    expect(h.logs.join()).not.toContain('activate-db | PASS');
+    if(boundary!=='receipt') { expect(mutations(h)).toHaveLength(0); expect(h.confirm).not.toHaveBeenCalled(); }
+  });
+  it.each(['activate-read','activate-db'])('build binding: sends --sha and never confirms a refused %s',async action=>{
+    const h=harness(), original=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(i.method!=='POST') return original(u,i); // Both status reads are green for A.
+      return response({ok:false,code:'CONFLICT',details:{reason:'cutover_build_mismatch',privateCopy:'synthetic-private'}},409);
+    });
+    expect(await cutover([action,'--sha',sha],h)).toBe(1);
+    expect(mutations(h)).toHaveLength(1);
+    expect(JSON.parse(String(mutations(h)[0]![1].body))).toEqual({action,expectedBuild:sha});
+    expect(h.logs.join()).toContain('cutover_build_mismatch');
+    expect(h.logs.join()).not.toContain(`${action} | PASS`);
+    expect(h.logs.join()).not.toContain('synthetic-private');
+    expect(Object.values(h.state())[0]!.status).toBe('pending');
+  });
+  it.each([200,409,422])('build binding: HTTP %s refusal cannot be disguised with a successful receipt',async code=>{
+    const h=harness(), original=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>i.method==='POST' ? response({ok:code===409,code:'CONFLICT',details:{reason:'cutover_build_mismatch'},result:{mode:'db',build:sha,contract:'schema-2:cutover-1'}},code) : original(u,i));
+    expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);
+    expect(h.logs.join()).not.toContain('activate-db | PASS');
+    expect(Object.values(h.state())[0]!.status).toBe('pending');
+  });
+  it.each(['activate-read','activate-db'])('build binding: pending %s retries keep the key and refuse a changed expected build',async action=>{
+    const h=harness(), original=h.fetcher.getMockImplementation()!;
+    let current=sha;
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(i.method==='POST') return response({ok:false,code:'CONFLICT',details:{reason:'cutover_build_mismatch'}},409);
+      if(u.endsWith('/health')) return response({...health(),commit:current});
+      if(u.endsWith('content-cutover')) return response({...status(),status:{...status().status,build:current}});
+      return original(u,i);
+    });
+    expect(await cutover([action,'--sha',sha],h)).toBe(1);
+    expect(await cutover([action,'--sha',sha],h)).toBe(1);
+    expect(mutations(h).map(([,i])=>(i.headers as Record<string,string>)['Idempotency-Key'])).toEqual([keys[0],keys[0]]);
+    current='b'.repeat(40);
+    expect(await cutover([action,'--sha',current],h)).toBe(1);
+    expect(mutations(h)).toHaveLength(2);
+    expect(h.logs.join()).toContain('Pending operation belongs to another expected SHA');
+  });
+  it.each([sha.toUpperCase(),sha.slice(0,39),sha+'a',' '+sha,sha+'\n'])('build binding: refuses malformed --sha %s before HTTP',async expected=>{
+    const h=harness(); expect(await cutover(['activate-db','--sha',expected],h)).toBe(1);
+    expect(h.fetcher).not.toHaveBeenCalled();
+  });
   it.each(['activate-read','activate-db'])('requires exact deployed SHA for %s',async action=>{
     const h=harness();expect(await cutover([action,'--sha','c'.repeat(40)],h)).toBe(1);expect(mutations(h)).toHaveLength(0);expect(h.confirm).not.toHaveBeenCalled();
   });

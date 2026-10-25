@@ -14,7 +14,7 @@ const hashPattern = /^[a-f0-9]{64}$/;
 const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const gateReasons = ['invalid_gate', 'full_parity_required', 'parity_not_green', 'backup_waiver_export_not_exact', 'write_proof_missing', 'write_proof_expired', 'phase_c_proof_missing', 'rollback_proof_missing', 'backup_proof_missing', 'gate_unavailable'];
 const deploymentPattern = /^dpl_[A-Za-z0-9]{1,128}$/;
-const reasons = new Set([...gateReasons, 'cron_auth', 'cutover_contract_mismatch', 'cutover_build_identity', 'cutover_parity_stale', 'stale_parity', 'import_lag', 'contract_mismatch', 'imports_disabled_in_db_mode', 'google_writes_disabled', 'private_backup_folder', 'rollback_store_mode', 'freeze_every_instance_first', 'export_store_mode', 'backup_store_mode', 'export_mismatch', 'markdown_missing', 'cutover_gate', 'parity', 'phase-c', 'backup', 'rehearsal']);
+const reasons = new Set([...gateReasons, 'cron_auth', 'cutover_build_mismatch', 'cutover_expected_build_invalid', 'cutover_contract_mismatch', 'cutover_build_identity', 'cutover_parity_stale', 'stale_parity', 'import_lag', 'contract_mismatch', 'imports_disabled_in_db_mode', 'google_writes_disabled', 'private_backup_folder', 'rollback_store_mode', 'freeze_every_instance_first', 'export_store_mode', 'backup_store_mode', 'export_mismatch', 'markdown_missing', 'cutover_gate', 'parity', 'phase-c', 'backup', 'rehearsal']);
 const errorCodes = new Set(['AUTH_REQUIRED', 'FORBIDDEN', 'CONFIG_MISSING', 'SCHEMA_DRIFT', 'NOT_FOUND', 'STALE_READ', 'CONFLICT', 'GATE_BLOCKED', 'AMBIGUOUS_MATCH', 'RATE_LIMITED', 'PROVIDER_UNAVAILABLE', 'PARTIAL_FAILURE', 'VALIDATION_FAILED', 'UNKNOWN']);
 class CutoverError extends Error {}
 const fail = message => { throw new CutoverError(message); };
@@ -274,7 +274,9 @@ export async function cutover(args = process.argv.slice(2), deps = {}) {
         ...(action === 'measure' ? { counts: Object.fromEntries(collections.map(k => [k, { fields: result.samples[k].fields, equal: result.samples[k].equal, blocking: result.samples[k].blocking }])) } : {}),
       });
     };
-    const operation = (action, validate) => mutate(action, '/api/ops/content-cutover', 'POST', { action }, validate);
+    const operation = (action, validate) => mutate(action, '/api/ops/content-cutover', 'POST', {
+      action, ...(action.startsWith('activate-') ? { expectedBuild: opts.sha } : {}),
+    }, validate);
     const backupValid = value => object(value) && (['verified', 'already_verified'].includes(value.status) && hashPattern.test(value.manifestHash) ||
       value.status === 'backup_waived' && value.waiver?.audited === true && value.waiver?.build === identity.sha && hashPattern.test(value.waiver?.auditHash));
     if (opts.action === 'status' || opts.action.startsWith('activate-')) {

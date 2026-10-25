@@ -127,12 +127,60 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
   }
   const activationRequest = (id = '33333333-3333-4333-8333-333333333333') => new Request('https://synthetic.example/api/ops/content-cutover', {
     method: 'POST', headers: { Authorization: `Bearer ${env.CRON_SECRET}`, 'Idempotency-Key': id },
-    body: JSON.stringify({ action: 'activate-db' }),
+    body: JSON.stringify({ action: 'activate-db', expectedBuild: build }),
   });
   const preparationExporter = () => new ContentExporter(new SupabaseContentDb(options),
     new GoogleSheetTransport(env.CS_SHEET_ID, {} as never, true), new ContentCutoverStore(options, build).exportJournal);
   const waiverGate = () => query('select content_studio_cutover_gate($1,$2,$3)', ['db', build, '2026-10-25']);
   const waiverActivate = () => query('select content_studio_cutover_activate($1,$2,$3,$4)', ['db', build, CUTOVER_CONTRACT, '2026-10-25']);
+  it.each(['activate-read', 'activate-db'] as const)('build binding: cached %s rejects another snapshot before SQL', async action => {
+    await admitWrite(false);
+    transport.mockClear();
+    for (const expectedBuild of [undefined, null, 1, '', build.toUpperCase(), build.slice(0, 39), ' '+build, build+'\n']) {
+      await expect(getServices().liveCutover!.execute(action, token, expectedBuild as string)).rejects.toMatchObject({ code: 'GATE_BLOCKED', details: { reason: 'cutover_expected_build_invalid' } });
+    }
+    await expect.soft(getServices().liveCutover!.execute(action, token, build.slice(0, 39) + 'b')).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect.soft(transport).not.toHaveBeenCalled();
+    expect.soft((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+    expect((await query('select * from content_studio_cutover_jobs')).rows).toHaveLength(0);
+  });
+  it.each(['activate-read', 'activate-db'] as const)('build binding: %s refuses a deployment switch before all durable effects', async action => {
+    await admitWrite(false); // Fully green executing build: only caller binding can stop this flip.
+    transport.mockClear();
+    const request = (expectedBuild: string) => new Request('https://synthetic.example/api/ops/content-cutover', {
+      method: 'POST', headers: { Authorization: `Bearer ${env.CRON_SECRET}`, 'Idempotency-Key': token },
+      body: JSON.stringify({ action, expectedBuild }),
+    });
+    const before = await query('select * from content_studio_audit_events');
+    expect((await POST(request(build.slice(0, 39) + 'b'))).status).toBe(409);
+    expect(transport).not.toHaveBeenCalled();
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+    expect((await query('select * from content_studio_cutover_jobs')).rows).toHaveLength(0);
+    expect((await query('select * from content_studio_audit_events')).rows).toEqual(before.rows);
+    // A cached composition must not claim or flip for another request snapshot.
+    await expect(getServices().liveCutover!.execute(action, token, build.slice(0, 39) + 'b')).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(transport).not.toHaveBeenCalled();
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+    const success = await POST(request(build)); expect(success.status).toBe(200);
+    const receipt = await success.json();
+    // The SQL path got the exact build admitted by the route.
+    const activation = transport.mock.calls.find(([url]) => String(url).endsWith('/content_studio_cutover_activate'))!;
+    expect(JSON.parse(String(activation[1]!.body)).p_build).toBe(build);
+    const durable = (await query('select * from content_studio_cutover_authority')).rows;
+    transport.mockClear();
+    expect((await POST(request(build.slice(0, 39) + 'b'))).status).toBe(409);
+    expect(transport).not.toHaveBeenCalled();
+    expect((await query('select * from content_studio_cutover_authority')).rows).toEqual(durable);
+    expect(await (await POST(request(build))).json()).toEqual(receipt);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toEqual(durable);
+    // Even after redeploying to a new matching expected build, the old UUID is
+    // a different SQL operation identity and cannot replay the prior success.
+    vi.stubEnv('CS_COMMIT_SHA', build.slice(0, 39) + 'b'); resetServices(); resetEnvCache();
+    const conflict = await POST(request(build.slice(0, 39) + 'b'));
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ ok: false, code: 'CONFLICT' });
+    expect((await query('select * from content_studio_cutover_authority')).rows).toEqual(durable);
+  });
   // Spell out each reported whitespace/format code point: ASCII-only and
   // locale-dependent POSIX guards must fail these same committed regressions.
   const invisibleReferences = [

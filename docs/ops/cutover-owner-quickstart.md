@@ -87,6 +87,10 @@ agent conversation or GitHub.
 
    Missing, malformed, contradictory, unknown or red target gate verdicts block
    activation before a POST. The app checks the gate atomically again on POST.
+   The runner also sends your `--sha` as `expectedBuild`. If the hostname reaches
+   a different build after the last status read, the server refuses before any
+   epoch or operation record is written. `cutover_build_mismatch` means stop and
+   have the coordinator verify the deployment; preserve the pending retry state.
 
 5. **Run backup, rehearsal and export only at their ordered runbook step.**
 
@@ -197,13 +201,24 @@ A valid status request cannot normally produce `invalid_gate`.
 
 The atomic activation operation remains the final authority, including epoch
 and contract checks beyond the measured gate. A green GET is an observation,
-not a reservation. The SHA/deployment checks and second status read cannot pin
-a mutable domain between requests: use the verified immutable deployment URL
-and avoid deployment changes during the run.
+not a reservation. Activation binds the caller's full SHA to the executing
+server before any claim, replay or activation. Use the verified immutable
+deployment URL and avoid deployment changes during the run; this SHA guard does
+not reserve a deployment ID or its configuration.
 
-POST retains `{action: measure|backup|rollback|activate-read|activate-db}`, the
-UUID `Idempotency-Key`, cron bearer and `{ok:true,result}`. A waived backup
-returns `{status:"backup_waived",waiver:{audited:true,build:"<exact SHA>",auditHash:"<SHA-256>"}}`
+POST uses `{action: "activate-read"|"activate-db", expectedBuild: "<40 lowercase hex SHA>"}`
+for activation, and `{action: "measure"|"backup"|"rollback"}` for preparation.
+Bodies are strict: extra keys, missing/malformed/uppercase/short/padded builds
+refuse activation with HTTP 422, `cutover_expected_build_invalid`. A different
+server build refuses with HTTP 409, `cutover_build_mismatch`. No normalization,
+prefix matching, operation claim, audit write or epoch change occurs on either
+refusal. The server reads `VERCEL_GIT_COMMIT_SHA` (or `CS_COMMIT_SHA` when absent)
+once per request and binds that exact value to the SQL store's gate/activation
+build before executing. The same UUID with a changed expected build cannot
+replay an earlier success, including after redeployment to that new build.
+The UUID `Idempotency-Key`, cron bearer and `{ok:true,result}` remain required.
+A waived backup returns
+`{status:"backup_waived",waiver:{audited:true,build:"<exact SHA>",auditHash:"<SHA-256>"}}`
 inside `result` (at top level beside `ok` for scheduled backup). The hash
 identifies the durable audit without returning its actor, operation/import IDs,
 private references or timestamps. Calendar waiver never creates this result.
