@@ -33,6 +33,12 @@ With a configured folder, archive verification is unchanged. A failed backup
 proof or other failed check is never converted to success. `/reconcile` displays
 **Backup gate waived by owner** and retained failures; backup cron/worker return
 `backup_waived` when no folder exists, without a manifest or verification time.
+Waived admission also requires a completed exact Sheet export report no older
+than 15 minutes, equal valid hashes, zero differences and zero retained issues.
+The activation action reads current Sheet parity again, including on retries;
+it never exports over a hand edit to make admission pass. SQL rechecks the
+retained journal at activation. The Phase C private evidence reference must be
+a JSON string of 1–2048 characters with non-whitespace content.
 
 Recovery is Supabase daily Pro plan backups plus the one-way exact Sheet export.
 There is **no independent archive of history/ledger outside the project**.

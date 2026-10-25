@@ -48,12 +48,30 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     markdownToken = token;
     try { await run(); } finally { markdownToken = undefined; }
   }), () => store.fence('markdown-export', markdownToken));
+  const verifyDbActivation = async () => {
+    if (!env.CS_CONTENT_BACKUP_FOLDER_ID && await store.backupWaiver()) {
+      // Admission observes the Sheet again, without exporting over an edit.
+      // Refresh also reloads retained issues from independent/crashed workers.
+      const parity = await exporter.parity();
+      if (!parity.exact || parity.dbHash !== parity.sheetHash || parity.differences.length || exporter.journal.issues.size) {
+        throw new AppError('FORBIDDEN', { reason: 'backup_waiver_export_not_exact' });
+      }
+    }
+  };
   // Preparation runs in shadow/read mode so backup and exact rollback evidence
   // exist BEFORE admitting DB authority. Neither changes the configured mode.
   services.liveCutover = {
-    execute: (action, operationId) => store.operation(action, operationId, () => services.liveCutover![action]()),
+    async execute(action, operationId) {
+      // Reverify even a completed operation, but preserve its original epoch
+      // and result on replay instead of performing activation a second time.
+      if (action === 'activate-db') await verifyDbActivation();
+      return store.operation(action, operationId, () => action === 'activate-db' ? store.activate('db') : services.liveCutover![action]());
+    },
     'activate-read': () => store.activate('db-read'),
-    'activate-db': () => store.activate('db'),
+    async 'activate-db'() {
+      await verifyDbActivation();
+      return store.activate('db');
+    },
     async status() {
       // Read waiver independently: a red admission check must not conceal the
       // recorded decision, and the decision must never conceal that failure.

@@ -60,6 +60,14 @@ platform does not provide `VERCEL_GIT_COMMIT_SHA`. Preview stays `fake`; never
 copy Production provider credentials into Preview. Flags admit construction;
 flip admission checks the latest typed import and exact deployed SHA. Parity
 evidence expires after 15 minutes; other flip proofs expire after 24 hours.
+Under the backup waiver, SQL admission also requires the latest completed Sheet
+export report within 15 minutes: exact, equal valid hashes, no differences and
+no retained issues. A newer failed report blocks even with an exact rehearsal.
+Every `activate-db` action (including a completed-operation retry) additionally
+reads fresh Sheet parity without writing Sheet cells. Unequal hashes, unexpected
+IDs, retained conflicts or unavailable provider reads refuse activation. SQL
+checks the durable journal again at the flip; do not replace this action with
+a direct SQL activation based only on a historical provider observation.
 Changing a flag alone cannot create DB authority. Explicit activation records
 a private epoch containing the admitted SHA, schema version and compiled
 `CUTOVER_CONTRACT` (`schema-2:cutover-1`). Compatible later deployments use this
@@ -281,7 +289,8 @@ the stated mode/write flag rather than reusing an old deployment environment.
    actual build/import identity and measured numbers. Do not use sample values
    as evidence. The record RPC checks latest import identity; the gate validates
    all fields, numeric limits and generated parity/backup/rehearsal records.
-   `dailyPlanBackup:true` and a nonempty `privateEvidence` reference must attest
+   `dailyPlanBackup:true` and a `privateEvidence` JSON string of 1–2048 characters
+   containing at least one non-whitespace character must attest
    actual daily Pro plan backup configuration and a restorable backup; a plan
    name alone is insufficient. `restoreExact:true` still needs a proven restore
    (use the plan backup restore evidence on the waiver path). The owner waiver

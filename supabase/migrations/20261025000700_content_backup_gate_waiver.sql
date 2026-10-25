@@ -59,7 +59,7 @@ drop function if exists public.content_studio_cutover_gate(text,text);
 drop function if exists public.content_studio_cutover_activate(text,text,text);
 create or replace function public.content_studio_cutover_gate(p_mode text,p_build text,p_backup_waiver text default null)
 returns jsonb language plpgsql stable security invoker set search_path=pg_catalog,public as $$
-declare e public.content_studio_cutover_evidence; s jsonb; c text; latest text; proof jsonb;
+declare e public.content_studio_cutover_evidence; s jsonb; c text; latest text; proof jsonb; export_proof jsonb;
 begin
   if p_mode not in ('db-read','db') or p_build is null or p_build !~ '^[a-f0-9]{40}$' then raise exception 'invalid gate' using errcode='42501'; end if;
   select operation_id into latest from public.content_studio_import_runs order by at desc,operation_id desc limit 1;
@@ -74,6 +74,25 @@ begin
       or (s->>'equal')::numeric > (s->>'fields')::numeric then raise exception 'parity not green' using errcode='42501'; end if;
   end loop;
   if p_mode='db' then
+    if public.content_studio_cutover_backup_waiver(p_backup_waiver,p_build) is not null then
+      -- A historical rehearsal cannot hide a retained conflict or a newer red
+      -- export. Runtime also reads fresh provider parity on each activation.
+      select state into s from public.content_studio_cutover_state where name='sheet-export';
+      export_proof:=s->'reports'->-1;
+      if s->'issues' is distinct from '[]'::jsonb
+        or jsonb_typeof(s->'reports') is distinct from 'array'
+        or export_proof->'exact' is distinct from 'true'::jsonb
+        or export_proof->'differences' is distinct from '[]'::jsonb
+        or export_proof->>'dbHash' is null or export_proof->>'dbHash' !~ '^[a-f0-9]{64}$'
+        or export_proof->>'dbHash' is distinct from export_proof->>'sheetHash'
+        or jsonb_typeof(export_proof->'at') is distinct from 'number' then
+        raise exception 'waived backup requires exact Sheet export' using errcode='42501';
+      end if;
+      if (export_proof->>'at')::numeric < extract(epoch from clock_timestamp()-interval '15 minutes')*1000
+        or (export_proof->>'at')::numeric > extract(epoch from clock_timestamp())*1000 then
+        raise exception 'waived backup requires exact Sheet export' using errcode='42501';
+      end if;
+    end if;
     foreach c in array array['phase-c','rehearsal','backup'] loop
       select payload into proof from public.content_studio_cutover_evidence where name=c and build=p_build and import_id=latest;
       if not found and c='backup'
@@ -88,7 +107,9 @@ begin
         or proof->>'importsStopped' is distinct from 'true' or proof->>'flagRoundTrip' is distinct from 'true'
         or proof->>'hostedSecurity' is distinct from 'true' or proof->>'independentConcurrency' is distinct from 'true'
         or proof->>'sheetRaceAccepted' is distinct from 'true'
-        or coalesce(length(proof->>'privateEvidence'),0)=0
+        or jsonb_typeof(proof->'privateEvidence') is distinct from 'string'
+        or coalesce(length(proof->>'privateEvidence'),0) not between 1 and 2048
+        or proof->>'privateEvidence' !~ '[^[:space:]]'
         or proof->>'sheetRead429' is distinct from '0' or proof->>'lagStale' is distinct from '0'
         or (proof->>'warmP95Ms')::numeric is null or (proof->>'warmP95Ms')::numeric not between 0 and 999.999
         or (proof->>'coldP95Ms')::numeric is null or (proof->>'coldP95Ms')::numeric not between 0 and 2499.999)

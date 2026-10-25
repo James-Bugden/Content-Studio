@@ -125,6 +125,14 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     await waiveBackup();
     return mode('db-read');
   }
+  const activationRequest = (id = '33333333-3333-4333-8333-333333333333') => new Request('https://synthetic.example/api/ops/content-cutover', {
+    method: 'POST', headers: { Authorization: `Bearer ${env.CRON_SECRET}`, 'Idempotency-Key': id },
+    body: JSON.stringify({ action: 'activate-db' }),
+  });
+  const preparationExporter = () => new ContentExporter(new SupabaseContentDb(options),
+    new GoogleSheetTransport(env.CS_SHEET_ID, {} as never, true), new ContentCutoverStore(options, build).exportJournal);
+  const waiverGate = () => query('select content_studio_cutover_gate($1,$2,$3)', ['db', build, '2026-10-25']);
+  const waiverActivate = () => query('select content_studio_cutover_activate($1,$2,$3,$4)', ['db', build, CUTOVER_CONTRACT, '2026-10-25']);
   it('CS-066: reapplying the additive migration is safe', async () => {
     await waivedPreparation();
     const before = (await query('select * from content_studio_backup_waivers')).rows;
@@ -224,6 +232,128 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     expect(await services.liveCutover!['activate-db']()).toMatchObject({ mode: 'db' });
     vi.spyOn(services.contentBackup!.folder, 'assertPrivate').mockRejectedValue(new AppError('FORBIDDEN'));
     await expect(services.liveCutover!.backup()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it.each(['hand-edit', 'unexpected-id'])('CS-066 R1: refuses activation AFTER real export detects %s', async fault => {
+    await waivedPreparation();
+    await expect(waiverGate()).resolves.toBeDefined();
+    const grid = sheet.rawTab(SHEET_TABS.library.name);
+    if (fault === 'hand-edit') sheet.externalEdit(SHEET_TABS.library.name, 2, grid[0]!.findIndex(c => c.value === 'Current Hook'), 'Synthetic later hand edit');
+    else {
+      const extra = structuredClone(grid[1]!);
+      extra[grid[0]!.findIndex(c => c.value === 'Library ID')] = { value: 'SYN-UNEXPECTED' };
+      grid.push(extra);
+    }
+    const before = JSON.stringify(grid), exporter = preparationExporter();
+    const result = await exporter.run();
+    expect(result.exact).toBe(false); expect(result.dbHash).not.toBe(result.sheetHash);
+    expect(result.differences).toContainEqual(expect.objectContaining({ fields: expect.arrayContaining([fault === 'hand-edit' ? 'Current Hook' : '@unexpected']) }));
+    if (fault === 'hand-edit') expect([...exporter.journal.issues.values()]).toContainEqual(expect.objectContaining({ reason: 'export_mismatch' }));
+    const response = await POST(activationRequest());
+    expect(response.status).toBe(403);
+    await expect(waiverGate()).rejects.toMatchObject({ code: '42501', message: 'waived backup requires exact Sheet export' });
+    await expect(waiverActivate()).rejects.toMatchObject({ code: '42501', message: 'waived backup requires exact Sheet export' });
+    expect(JSON.stringify(grid)).toBe(before);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it.each(['first', 'replay'])('CS-066 R1: %s activation rechecks Sheet without a new exporter run', async attempt => {
+    const services = await waivedPreparation();
+    if (attempt === 'replay') {
+      await services.liveCutover!['activate-db']();
+      mode('db');
+      expect((await POST(activationRequest())).status).toBe(200);
+      const beforeReplay = (await query('select * from content_studio_cutover_authority')).rows;
+      const reads = vi.mocked(GoogleSheetTransport.prototype.readTab); reads.mockClear();
+      expect((await POST(activationRequest())).status).toBe(200);
+      expect(reads).toHaveBeenCalled();
+      expect((await query('select * from content_studio_cutover_authority')).rows).toEqual(beforeReplay);
+    }
+    const authority = (await query('select * from content_studio_cutover_authority')).rows;
+    const grid = sheet.rawTab(SHEET_TABS.library.name);
+    sheet.externalEdit(SHEET_TABS.library.name, 2, grid[0]!.findIndex(c => c.value === 'Current Hook'), 'Synthetic unexported edit');
+    // Durable export remains green: only a fresh provider read can refuse this.
+    await expect(waiverGate()).resolves.toBeDefined();
+    const before = JSON.stringify(grid), writes = vi.mocked(GoogleSheetTransport.prototype.writeCells); writes.mockClear();
+    if (attempt === 'first') await expect(services.liveCutover!['activate-db']()).rejects.toMatchObject({ code: 'FORBIDDEN', details: { reason: 'backup_waiver_export_not_exact' } });
+    const response = await POST(activationRequest());
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ details: { reason: 'backup_waiver_export_not_exact' } });
+    expect(writes).not.toHaveBeenCalled(); expect(JSON.stringify(grid)).toBe(before);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toEqual(authority);
+  });
+  it('CS-066 R1: provider failure cannot reuse a green export at activation', async () => {
+    await waivedPreparation();
+    vi.mocked(GoogleSheetTransport.prototype.readTab).mockRejectedValue(new AppError('PROVIDER_UNAVAILABLE'));
+    expect((await POST(activationRequest())).status).toBe(503);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it('CS-066 R1: fresh equality cannot clear a retained exporter conflict', async () => {
+    await waivedPreparation();
+    const grid = sheet.rawTab(SHEET_TABS.library.name), col = grid[0]!.findIndex(c => c.value === 'Current Hook');
+    const original = structuredClone(grid[1]![col]!);
+    sheet.externalEdit(SHEET_TABS.library.name, 2, col, 'Synthetic conflicting edit');
+    expect((await preparationExporter().run()).exact).toBe(false);
+    grid[1]![col] = original;
+    expect((await preparationExporter().parity()).exact).toBe(true);
+    const response = await POST(activationRequest());
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ details: { reason: 'backup_waiver_export_not_exact' } });
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it('CS-066 R1: a newer worker conflict between fresh inspection and SQL activation refuses', async () => {
+    await waivedPreparation();
+    const original = transport.getMockImplementation()!;
+    let injected = false;
+    transport.mockImplementation(async (url, init) => {
+      if (String(url).endsWith('content_studio_cutover_activate')) {
+        injected = true;
+        await query("update content_studio_cutover_state set state=jsonb_set(state,'{issues}',$1) where name='sheet-export'", [JSON.stringify([[JSON.stringify(['library', 'SYN-L001']), { kind: 'library', id: 'SYN-L001', fields: ['Current Hook'], since: Date.now(), reason: 'export_mismatch' }]])]);
+      }
+      return original(url, init);
+    });
+    expect((await POST(activationRequest())).status).toBe(403); expect(injected).toBe(true);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it.each(['missing-state', 'issues', 'missing-reports', 'inexact', 'hash', 'missing-hash', 'invalid-hash', 'differences', 'stale', 'future', 'missing-time'])('CS-066 R1: SQL waiver refuses %s with all other proofs green', async fault => {
+    await waivedPreparation();
+    await expect(waiverGate()).resolves.toBeDefined();
+    if (fault === 'missing-state') await query("delete from content_studio_cutover_state where name='sheet-export'");
+    else {
+      const state = structuredClone((await query("select state from content_studio_cutover_state where name='sheet-export'")).rows[0]!.state) as { issues: unknown[]; reports: Record<string, unknown>[] };
+      const report = state.reports.at(-1)!;
+      if (fault === 'issues') state.issues = [[JSON.stringify(['library', 'SYN-L001']), { kind: 'library', id: 'SYN-L001', fields: ['Current Hook'], since: Date.now(), reason: 'export_mismatch' }]];
+      if (fault === 'missing-reports') state.reports = [];
+      if (fault === 'inexact') report.exact = false;
+      if (fault === 'hash') report.sheetHash = 'c'.repeat(64);
+      if (fault === 'missing-hash') { delete report.dbHash; delete report.sheetHash; }
+      if (fault === 'invalid-hash') { report.dbHash = 'bad'; report.sheetHash = 'bad'; }
+      if (fault === 'differences') report.differences = [{ fields: ['@unexpected'] }];
+      if (fault === 'stale') report.at = Date.now() - 16 * 60_000;
+      if (fault === 'future') report.at = Date.now() + 60_000;
+      if (fault === 'missing-time') delete report.at;
+      await query("update content_studio_cutover_state set state=$1 where name='sheet-export'", [state]);
+    }
+    await expect(waiverGate()).rejects.toMatchObject({ code: '42501', message: 'waived backup requires exact Sheet export' });
+    await expect(waiverActivate()).rejects.toMatchObject({ code: '42501', message: 'waived backup requires exact Sheet export' });
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it.each([
+    ['whitespace', ' \t\r\n '], ['false', false], ['number', 123], ['object', { reference: 'synthetic' }],
+    ['empty-array', []], ['null', null], ['missing', undefined], ['empty', ''], ['oversized', 'x'.repeat(2049)],
+  ])('CS-066 R1: phase-c rejects privateEvidence %s through the supported record RPC', async (_label, reference) => {
+    const services = await waivedPreparation();
+    const evidence = (await query("select import_id,payload from content_studio_cutover_evidence where name='phase-c'")).rows[0]!;
+    const payload = { ...(evidence.payload as Record<string, unknown>), privateEvidence: reference };
+    // JSON transport omits undefined, preserving the missing-key case.
+    await query('select content_studio_cutover_record($1,$2,$3,$4)', ['phase-c', build, evidence.import_id, JSON.parse(JSON.stringify(payload))]);
+    await expect(waiverGate()).rejects.toMatchObject({ code: '42501', message: 'phase C proof missing' });
+    await expect(services.liveCutover!['activate-db']()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect((await POST(activationRequest())).status).toBe(403);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+  });
+  it.each(['x', 'x'.repeat(2048), ' \t synthetic-private-reference \n '])('CS-066 R1: accepts a bounded nonblank evidence string (%#)', async reference => {
+    const services = await waivedPreparation();
+    await query("update content_studio_cutover_evidence set payload=jsonb_set(payload,'{privateEvidence}',$1) where name='phase-c'", [JSON.stringify(reference)]);
+    await expect(services.liveCutover!['activate-db']()).resolves.toMatchObject({ mode: 'db' });
   });
   it.each(['db', 'db-read'].flatMap(storeMode => ['draft', 'typefully'].map(action => [storeMode, action])))('R2 route: refreshes an initially green %s status and blocks %s before any provider call', async (storeMode, action) => {
     if (storeMode === 'db') await admitWrite();
