@@ -138,6 +138,8 @@ export const STATE_LOOK: Record<StateKind, KindLook> = {
 
 export type StateViewProps = {
   kind: StateKind;
+  /** False when a shared live region already announces this result. */
+  announce?: boolean;
   title?: string;
   detail?: React.ReactNode;
   /** Overrides the default recovery step; pass null to hide it. */
@@ -145,12 +147,12 @@ export type StateViewProps = {
   action?: React.ReactNode;
 };
 
-export function StateView({ kind, title, detail, nextStep, action }: StateViewProps) {
+export function StateView({ kind, title, detail, nextStep, action, announce = true }: StateViewProps) {
   const look = STATE_LOOK[kind];
   const step = nextStep === null ? null : (nextStep ?? look.nextStep ?? null);
   return (
     <div
-      role={look.role}
+      role={announce ? look.role : undefined}
       aria-busy={kind === 'loading' ? true : undefined}
       data-state={kind}
       className={`flex items-start gap-4 rounded-lg p-5 ${look.frame}`}

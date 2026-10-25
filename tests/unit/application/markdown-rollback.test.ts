@@ -85,3 +85,11 @@ it('attempts Sheet repair even if reading the Markdown queue throws, and reports
   await expect(repairContentExport()).rejects.toThrow('Synthetic queue failure');
   expect(sheet).toHaveBeenCalledOnce(); expect((await s.contentCutover!.exporter.parity()).exact).toBe(true);
 });
+
+it('CS-059j: unreadable untouched legacy masters refuse rollback', async () => {
+  const s = getServices(); await s.contentCutover!.exporter.run();
+  s.fakes!.drive.failNext({ op: 'read', code: 'PROVIDER_UNAVAILABLE', times: 100 });
+  const flip = vi.fn();
+  await expect(s.contentCutover!.rollbackToSheet(flip)).rejects.toMatchObject({ code: 'CONFLICT', details: { reason: 'rollback_markdown_not_exact' } });
+  expect(flip).not.toHaveBeenCalled(); expect(s.repo.capability().state).toBe('ready');
+});

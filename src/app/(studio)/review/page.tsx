@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { FilterDef } from '@/components/filter-bar';
 import { getServices } from '@/application/container';
 import { capabilities } from '@/application/capabilities';
 import { LEGACY_LANES, loadReviewQueue, parseReviewFilters, type ReviewQueue } from '@/application/review';
@@ -65,8 +66,26 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     return q ? `/review?${q}` : '/review';
   };
 
-  const clearHref = hrefWith({ lane: null, target: null, review: null, src: null, from: null, copyright: null, duplicate: null, queue: null, page: null });
-  const resultCount = queue.total === 0
+  const filterDefs: FilterDef[] = [
+    { key: 'target', label: 'Target platform', control: 'chips', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
+    { key: 'review', label: 'Review status', control: 'chips', options: REVIEW_STATUSES.map((s) => ({ value: s, label: s === 'Pending' ? 'Not reviewed' : s })) },
+    { key: 'src', label: 'Source', options: queue.sources.map((s) => ({ value: s.key, label: s.label })) },
+    { key: 'from', label: 'Source platform', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
+    { key: 'copyright', label: 'Copyright QA', options: COPYRIGHT_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
+    { key: 'duplicate', label: 'Duplicate QA', options: DUPLICATE_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
+    {
+      key: 'queue',
+      label: 'Queue',
+      options: [
+        { value: 'queued', label: 'Queued' },
+        { value: 'not_queued', label: 'Not queued' },
+      ],
+    },
+  ];
+  const clearHref = hrefWith(Object.fromEntries(['lane', 'page', ...filterDefs.map(f => f.key)].map(key => [key, null])));
+  const resultCount = queue.totalUnfiltered === 0
+    ? 'The Content Library is empty'
+    : queue.total === 0
     ? `None of the ${queue.totalUnfiltered} Library rows match these filters.`
     : `Showing ${(queue.page - 1) * 25 + 1} to ${Math.min(queue.page * 25, queue.total)} of ${queue.total}${queue.total !== queue.totalUnfiltered ? ` (filtered from ${queue.totalUnfiltered})` : ''}`;
 
@@ -147,22 +166,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           ) : null}
         </nav>
 
-        <FilterBar announcement={resultCount} clearKeys={['lane']} hideClear={queue.total === 0} variant="toolbar" disclosureKeys={['src', 'from', 'copyright', 'duplicate', 'queue']} filters={[
-          { key: 'target', label: 'Target platform', control: 'chips', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
-          { key: 'review', label: 'Review status', control: 'chips', options: REVIEW_STATUSES.map((s) => ({ value: s, label: s === 'Pending' ? 'Not reviewed' : s })) },
-          { key: 'src', label: 'Source', options: queue.sources.map((s) => ({ value: s.key, label: s.label })) },
-          { key: 'from', label: 'Source platform', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
-          { key: 'copyright', label: 'Copyright QA', options: COPYRIGHT_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
-          { key: 'duplicate', label: 'Duplicate QA', options: DUPLICATE_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
-          {
-            key: 'queue',
-            label: 'Queue',
-            options: [
-              { value: 'queued', label: 'Queued' },
-              { value: 'not_queued', label: 'Not queued' },
-            ],
-          },
-        ]} />
+        <FilterBar announcement={resultCount} clearKeys={['lane']} hideClear={queue.total === 0 && queue.totalUnfiltered > 0} variant="toolbar" disclosureKeys={['src', 'from', 'copyright', 'duplicate', 'queue']} filters={filterDefs} />
 
         {queue.scheduleUnavailable ? (
           <StateView
@@ -174,10 +178,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         ) : null}
 
         {queue.totalUnfiltered === 0 ? (
-          <StateView kind="empty" title="The Content Library is empty" detail="There are no rows to review. New drafts appear here after they are added to the Sheet." nextStep={null} />
+          <StateView announce={false} kind="empty" title="The Content Library is empty" detail="There are no rows to review. New drafts appear here after they are added to the Sheet." nextStep={null} />
         ) : queue.total === 0 ? (
           <StateView
             kind="no_match"
+            announce={false}
             detail={resultCount}
             action={<GuardedLink href={clearHref} className="underline">Clear all filters</GuardedLink>}
           />

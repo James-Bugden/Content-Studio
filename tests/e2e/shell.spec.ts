@@ -1,4 +1,4 @@
-import AxeBuilder from '@axe-core/playwright';
+import { scanAxe } from './support/axe';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -19,7 +19,7 @@ async function expectNoPageOverflow(page: Page) {
 }
 
 async function seriousAxeViolations(page: Page) {
-  const results = await new AxeBuilder({ page }).analyze();
+  const results = await scanAxe(page);
   return results.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5) }));

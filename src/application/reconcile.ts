@@ -119,8 +119,12 @@ export async function buildReconcileReport(
         [`${error.details.kind}: duplicate stable IDs prevent export and rollback. Fix the duplicate in the Sheet.`], [], { label: 'Review' }));
     }
     for (const [key, issue] of exporter.journal.issues) if (issue.reason === 'export_mismatch' && !mismatches.has(key)) mismatches.set(key, issue);
-    for (const issue of mismatches.values()) items.push(item('export_mismatch', 'blocking', 'Sheet export differs; row preserved',
-      [`${issue.kind}: ${issue.fields.join(', ')}. ${issue.recovery === 'change_authoritative_value' ? 'Change authoritative value: use the normal audited DB patch to choose text without a leading equals sign, then retry export. See the cutover runbook. ' : ''}Review the direction in the cutover runbook; no automatic overwrite.`], [issue.id], { label: 'Review' }));
+    for (const issue of mismatches.values()) {
+      const valueFields = exporter.journal.issues.get(exportKey(issue.kind, issue.id))?.fields ?? [];
+      const needsDirection = issue.recovery !== 'change_authoritative_value' || issue.fields.some(field => !valueFields.includes(field));
+      items.push(item('export_mismatch', 'blocking', 'Sheet export differs; row preserved',
+      [`${issue.kind}: ${issue.fields.join(', ')}. ${issue.recovery === 'change_authoritative_value' ? 'Change authoritative value: use the normal audited DB patch to choose text without a leading equals sign, then retry export. See the cutover runbook. ' : ''}${needsDirection ? 'Review the direction in the cutover runbook; no automatic overwrite.' : ''}`.trim()], [issue.id], { label: 'Review' }));
+    }
     for (const issue of exporter.journal.issues.values()) {
       const since = issue.reason === 'export_lag' ? issue.since : issue.lagSince;
       if (since === undefined) continue;

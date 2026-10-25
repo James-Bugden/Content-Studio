@@ -311,3 +311,18 @@ it('CS-059g: non-ready post has no initial preview even with a valid slot plan',
   expect(ctx.options.some(o => o.ok)).toBe(true);
   expect(ctx.initialPreview).toBeNull();
 });
+
+it.each(['library', 'schedule'])('CS-059j: stale %s wins over elapsed-slot validation', async changed => {
+  const p = await previewPromotion(repo, 'SYN-L005', '2026-10-01-MAIN-LI');
+  if (!p.ok) throw new Error('preview');
+  if (changed === 'library') {
+    const rows = await repo.listLibrary(); rows.find(r => r.value.libraryId === 'SYN-L005')!.revision = 'new-library-revision';
+    vi.spyOn(repo, 'listLibrary').mockResolvedValue(rows);
+  } else {
+    const rows = await repo.listSchedule(); rows.find(r => r.value.contentId === p.contentId)!.revision = 'new-slot-revision';
+    vi.spyOn(repo, 'listSchedule').mockResolvedValue(rows);
+  }
+  process.env.CS_FAKE_TODAY = '2026-10-02'; process.env.CS_FAKE_TIME = '21:01';
+  expect(await promote(repo, owner, { operationId: 'synthetic_stale_elapsed', libraryId: 'SYN-L005', contentId: p.contentId, expectedLibraryRevision: p.libraryRevision, expectedScheduleRevision: p.scheduleRevision })).toMatchObject({ ok: false, code: 'STALE_READ' });
+  expect(sheet.writes).toHaveLength(0);
+});

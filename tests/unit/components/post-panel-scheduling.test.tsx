@@ -99,7 +99,7 @@ it('tries the next default after a failed preview and keeps every selector avail
   });
   render(<PostPanel libraryId="SYN-L005" />);
   await screen.findByRole('button', { name: 'Confirm and write to Fri 2 Oct \u00b7 21:00' });
-  expect(screen.getByText('This slot cannot be used.')).toBeTruthy();
+  expect(screen.getByText('Thu 1 Oct \u00b7 21:00: This slot cannot be used.')).toBeTruthy();
   vi.mocked(fetch).mockResolvedValue(response({ ok: false }));
   fireEvent.click(screen.getByRole('button', { name: 'Thu 1 Oct \u00b7 21:00' }));
   await waitFor(() => expect(screen.queryByRole('button', { name: /Confirm and write/ })).toBeNull());
@@ -113,4 +113,61 @@ it('CS-059g: a warning preview uses natural height', async () => {
   render(<PostPanel libraryId="SYN-L005" />);
   const warning = await screen.findByText('This slot cannot be used.');
   expect(warning.closest('.h-80')).toBeNull();
+});
+
+it('CS-059j: fallback names failed slot and clears after a new pick settles', async () => {
+  let refreshed = false;
+  vi.mocked(fetch).mockImplementation(async url => {
+    if (String(url).includes('/api/panel/')) return response({ ok: true, data });
+    if (!refreshed && String(url).includes(slots[0]!.contentId)) return response({ ok: false, problems: ['This slot cannot be used.'] });
+    return response(preview(slots[1]!.contentId));
+  });
+  render(<PostPanel libraryId="SYN-L005" />);
+  await screen.findByRole('button', { name: 'Confirm and write to Fri 2 Oct · 21:00' });
+  expect(screen.getByText('Thu 1 Oct · 21:00: This slot cannot be used.')).toBeTruthy();
+  refreshed = true;
+  fireEvent.click(screen.getByRole('button', { name: 'Fri 2 Oct · 21:00' }));
+  await screen.findByRole('button', { name: 'Confirm and write to Fri 2 Oct · 21:00' });
+  expect(screen.queryByText('Thu 1 Oct · 21:00: This slot cannot be used.')).toBeNull();
+});
+it('CS-059j: snapshot refresh clears fallback warning without a new pick', async () => {
+  let refreshed = false;
+  vi.mocked(fetch).mockImplementation(async url => {
+    if (String(url).includes('/api/review/transition')) { refreshed = true; return response({ ok: true }); }
+    // A stale card can still offer Reopen while the summary offers scheduling.
+    if (String(url).includes('/api/panel/')) return response({ ok: true, data: { ...data, card: { ...data.card, reviewStatus: 'Changes Requested' }, ...(refreshed ? { initialPreview: preview(slots[0]!.contentId) } : {}) } });
+    if (String(url).includes(slots[0]!.contentId)) return response({ ok: false, problems: ['This slot cannot be used.'] });
+    return response(preview(slots[1]!.contentId));
+  });
+  render(<PostPanel libraryId="SYN-L005" />);
+  await screen.findByRole('button', { name: 'Confirm and write to Fri 2 Oct · 21:00' });
+  expect(screen.getByText('Thu 1 Oct · 21:00: This slot cannot be used.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Reopen for review' }));
+  await screen.findByRole('button', { name: 'Confirm and write to Thu 1 Oct · 21:00' });
+  expect(screen.queryByText('Thu 1 Oct · 21:00: This slot cannot be used.')).toBeNull();
+});
+
+it('CS-059j: elapsed confirm keeps catalogue safety message and existing recovery step', async () => {
+  vi.mocked(fetch).mockImplementation(async (_url, init) => init?.method === 'POST'
+    ? response({ ok: false, code: 'VALIDATION_FAILED', problems: ['This slot cannot be used.'], message: 'Some input was not valid. Nothing was changed.' })
+    : response({ ok: true, data: { ...data, initialPreview: preview(slots[0]!.contentId) } }));
+  render(<PostPanel libraryId="SYN-L005" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Confirm and write to Thu 1 Oct \u00b7 21:00' }));
+  const error = await screen.findByText(/Some input was not valid. Nothing was changed./);
+  expect(error.textContent).toContain('This slot cannot be used.');
+  expect(error.textContent).toContain('Choose another slot.');
+});
+
+it('CS-059j: two failing fallback slots name the last failed slot rather than the first pick', async () => {
+  const third = { contentId: '2026-10-03-MAIN-LI', isoDate: '2026-10-03', time: '21:00', slot: 'Main' };
+  const options = [...slots, third];
+  const fetcher = vi.mocked(fetch).mockImplementation(async url => {
+    if (String(url).includes('/api/panel/')) return response({ ok: true, data: { ...data, slotOptions: options } });
+    return response(String(url).includes(third.contentId) ? preview(third.contentId) : { ok: false, problems: ['This slot cannot be used.'] });
+  });
+  render(<PostPanel libraryId="SYN-L005" />);
+  await screen.findByRole('button', { name: 'Confirm and write to Sat 3 Oct \u00b7 21:00' });
+  expect(screen.getByText('Fri 2 Oct \u00b7 21:00: This slot cannot be used.')).toBeTruthy();
+  expect(fetcher.mock.calls.filter(([url]) => String(url).includes('/preview?')).map(([url]) => new URL(String(url), 'http://localhost').searchParams.get('contentId'))).toEqual(options.map(slot => slot.contentId));
+  expect(screen.queryByText('Thu 1 Oct \u00b7 21:00: This slot cannot be used.')).toBeNull();
 });

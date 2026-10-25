@@ -293,3 +293,24 @@ describe('previewed Markdown import', () => {
     await expect(previewMarkdownImport(new SupabaseContentRepository(db), drive, owner, SYNTH_MASTER_FILE_ID)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });
+
+it('CS-059j: level-4 draft refuses a level-3 heading on export and retains the exact master and pending job', async () => {
+  const baseline = (await repo.getLibrary('SYN-L008')).value.draftContent;
+  const master = `# Synthetic master\n\n## Post\n\n<!-- POST_START library_id="SYN-L008" -->\n\n#### Draft\n\n${baseline}\n\n<!-- POST_END -->\n\n## Neighbour\n\nUntouched`;
+  drive.externalEdit(SYNTH_MASTER_FILE_ID, master);
+  const found = findSection(master, 'SYN-L008');
+  expect(found.ok && found.section.level).toBe(4);
+  expect((await save('intro\n### Deeper heading\nmore')).ok).toBe(true);
+  await exporter.run();
+  expect(exporter.failures.get('SYN-L008')?.code).toBe('VALIDATION_FAILED');
+  expect(await db.pendingMarkdownExports()).toHaveLength(1);
+  expect(drive.writes).toHaveLength(0);
+  expect(drive.textOf(SYNTH_MASTER_FILE_ID)).toBe(master);
+});
+it('CS-059j: unqueued Drive/DB body difference is blocking', async () => {
+  const text = drive.textOf(SYNTH_MASTER_FILE_ID), found = findSection(text, 'SYN-L008');
+  if (!found.ok) throw new Error('fixture');
+  drive.externalEdit(SYNTH_MASTER_FILE_ID, safeReplaceSectionBody(text, found.section, 'Synthetic drift')!);
+  const report = await buildReconcileReport(repo, drive, undefined, { markdownExport: exporter });
+  expect(report.items.find(i => i.kind === 'markdown_export_lag' && i.stableIds.includes('SYN-L008'))?.severity).toBe('blocking');
+});

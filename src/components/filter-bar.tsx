@@ -154,8 +154,11 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
           Clear filters
         </button>
       )}
-      <p className="sr-only" aria-live="polite">
-        {announcement ?? (active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`)}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {/* A page-supplied announcement remounts only with committed results; the default text follows the optimistic filters and must not be announced again on commit. */}
+        <span key={announcement === undefined ? undefined : searchParams?.toString()}>
+          {announcement ?? (active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`)}
+        </span>
       </p>
       {dialog}
     </div>

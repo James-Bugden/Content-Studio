@@ -49,6 +49,8 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [previewWarning, setPreviewWarning] = useState<string | null>(null);
   const previewRequest = useRef(0);
+  const slotOptionsRef = useRef<PostPanelData['slotOptions']>([]);
+  useEffect(() => { slotOptionsRef.current = load.state === 'ok' ? load.data.slotOptions : []; }, [load]);
   const pickSlot = useCallback(async (contentId: string, fallback: string[] = []) => {
     const request = ++previewRequest.current;
     setPreview(null);
@@ -58,7 +60,9 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
       const body = await res?.json().catch(() => null);
       if (request !== previewRequest.current) return;
       if (res?.ok && body?.ok) { setPreview(body); return; }
-      setPreviewWarning(body?.problems?.join(' ') || body?.message || 'This slot cannot be used.');
+      const failedSlot = slotOptionsRef.current?.find(option => option.contentId === id);
+      const label = failedSlot ? slotLabel(failedSlot.isoDate, failedSlot.time) : id;
+      setPreviewWarning(`${label}: ${body?.problems?.join(' ') || body?.message || 'This slot cannot be used.'}`);
       setPreview(body?.ok === false ? body : { ok: false });
     }
   }, [libraryId]);

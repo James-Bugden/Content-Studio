@@ -45,11 +45,15 @@ export function PromoteConfirm(props: { libraryId: string; contentId: string; sl
       </InlineResult>
     );
   }
+  const elapsedSlot = result && !result.ok && result.code === 'VALIDATION_FAILED'
+    && result.problems?.length === 1 && result.problems[0] === 'This slot cannot be used.';
   return (
     <div className="flex flex-col gap-3">
       {result && !result.ok ? (
         <InlineResult tone={result.code === 'STALE_READ' ? 'warning' : 'error'}>
           {result.problems?.join(' ') || result.message || 'Not scheduled. Nothing was written.'}
+          {elapsedSlot && result.message ? ` ${result.message}` : ''}
+          {elapsedSlot ? ' Choose another slot.' : ''}
           {result.code === 'STALE_READ' ? ' Reload this page to see the new preview.' : ''}
         </InlineResult>
       ) : null}

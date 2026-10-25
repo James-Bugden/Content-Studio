@@ -1,11 +1,10 @@
-import AxeBuilder from '@axe-core/playwright';
+import { scanAxe } from './support/axe';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
 async function checkAndCapture(page: Page, info: TestInfo, name: string) {
-  // Next streams the document title with the page: scan only the settled document.
-  await expect.poll(() => page.title(), { message: 'document title is set before the axe scan' }).not.toBe('');
+  await expect.poll(() => page.title(), { message: 'document title is set before layout checks' }).not.toBe('');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await scanAxe(page)).violations).toEqual([]);
   await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
 }
 
@@ -53,7 +52,7 @@ test('CS-059c: at 21:30 Taipei a blank-time elapsed slot is absent, and exhauste
 
 test('CS-059c: a full-page slot outside the options falls back with an explanation', async ({ page }, info) => {
   await page.goto('/ready/SYN-L005/promote?slot=2026-12-01-MAIN-LI');
-  await expect(page.getByText('This slot cannot be used. Choose another slot.')).toBeVisible();
+  await expect(page.getByText('Tue 1 Dec \u00b7 LinkedIn \u00b7 Main: This slot cannot be used. Choose another slot.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Confirm and write to Thu 1 Oct · 21:00', exact: true })).toBeVisible();
   await checkAndCapture(page, info, 'promote-fallback');
 });
@@ -85,6 +84,7 @@ test('CS-059c: failed automatic preview falls back without moving the tabs', asy
     const after = await tabs.boundingBox();
     expect(after?.y).toBe(before?.y);
     await expect(panel.getByRole('button', { name: 'Thu 1 Oct · 21:00', exact: true })).toBeEnabled();
+    await expect(panel.getByRole('status')).toContainText('Thu 1 Oct \u00b7 21:00: This slot cannot be used.');
     await checkAndCapture(page, info, 'preview-fallback');
   } finally { release(); }
 });
@@ -179,4 +179,65 @@ test('CS-059g: Posts announces results once and clears lane with every filter', 
   await page.goto('/review?lane=review&target=LinkedIn');
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
   await expect(page).toHaveURL(/\/review$/);
+});
+
+test('CS-059j: equal no-match counts still announce a changed filter once', async ({ page }) => {
+  await page.goto('/review?review=Skipped&target=Threads');
+  const regions = page.getByRole('main').locator('[aria-live="polite"], [role="status"]:not([aria-live="off"])');
+  await expect(regions).toHaveCount(1);
+  const live = page.getByRole('main').locator('[aria-live="polite"]');
+  await expect(live).toHaveCount(1);
+  await expect(live).toContainText('None of the');
+  const previous = await live.locator('span').elementHandle();
+  if (!previous) throw new Error('announcement missing');
+  await page.getByRole('group', { name: 'Target platform', exact: true }).getByRole('button', { name: 'X', exact: true }).click();
+  await expect(page).toHaveURL(/target=X/);
+  await expect(live).toHaveCount(1);
+  await expect(live).toContainText('None of the');
+  await expect.poll(() => previous.evaluate(node => node.isConnected)).toBe(false);
+  await expect(regions).toHaveCount(1);
+});
+
+test('CS-059j: Posts announces only the committed result after a pending chip navigation', async ({ page }, info) => {
+  await page.goto('/review');
+  const live = page.getByRole('main').locator('[aria-live="polite"]');
+  await expect(live).toContainText('Showing 1 to');
+  await expect(live).toHaveAttribute('aria-atomic', 'true');
+  const before = await live.textContent();
+  await live.evaluate(region => {
+    const events: string[] = [];
+    (window as Window & { filterAnnouncements?: string[] }).filterAnnouncements = events;
+    new MutationObserver(records => {
+      for (const record of records) {
+        if (record.type === 'childList') for (const node of record.addedNodes) events.push(`insert: ${node.textContent}`);
+        if (record.type === 'characterData') events.push(`text: ${record.target.textContent}`);
+      }
+    }).observe(region, { childList: true, subtree: true, characterData: true });
+  });
+  const events = () => page.evaluate(() => (window as Window & { filterAnnouncements?: string[] }).filterAnnouncements);
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/review?**', async route => {
+    if (route.request().headers().rsc === '1' && new URL(route.request().url()).searchParams.get('target') === 'LinkedIn') await pending;
+    await route.continue();
+  });
+  const platform = page.getByRole('group', { name: 'Target platform', exact: true });
+  try {
+    const request = page.waitForRequest(request => request.headers().rsc === '1' && new URL(request.url()).searchParams.get('target') === 'LinkedIn');
+    await platform.getByRole('button', { name: 'LinkedIn', exact: true }).click();
+    await request;
+    await expect(platform.getByRole('button', { name: 'LinkedIn', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(await events()).toEqual([]);
+    await expect(live).toHaveText(before!);
+  } finally { release(); }
+  await expect(page).toHaveURL(/target=LinkedIn/);
+  await expect(live).not.toHaveText(before!);
+  const committed = await live.textContent();
+  await expect.poll(events).toEqual([`insert: ${committed}`]);
+  for (const label of ['Target platform', 'Review status']) {
+    const group = page.getByRole('group', { name: label, exact: true });
+    await expect(group.locator('button.bg-primary')).toHaveCount(1);
+    await expect(group.locator('button.bg-primary')).toHaveAttribute('aria-pressed', 'true');
+  }
+  await checkAndCapture(page, info, 'posts-committed-announcement');
 });
