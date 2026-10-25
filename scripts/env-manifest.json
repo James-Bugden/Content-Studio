@@ -45,6 +45,39 @@
       ]
     },
     {
+      "name": "CS_CONTENT_READ_ENABLED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
+      "name": "CS_CONTENT_DB_ENABLED",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
+      "name": "CS_CONTENT_BACKUP_FOLDER_ID",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "db-store"
+      ]
+    },
+    {
       "name": "APP_BASE_URL",
       "required": true,
       "schemaRequired": false,
