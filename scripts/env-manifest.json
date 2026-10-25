@@ -478,6 +478,16 @@
       "managed": true
     },
     {
+      "name": "VERCEL_DEPLOYMENT_ID",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [],
+      "managed": true
+    },
+    {
       "name": "VERCEL_ENV",
       "required": false,
       "schemaRequired": false,

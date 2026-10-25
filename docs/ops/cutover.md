@@ -13,13 +13,13 @@ at the corresponding ordered step below. The runner never changes deployment
 flags or directly accesses providers. App repair/rollback routes can write
 derived Sheet/Drive copies and require the ordered freeze/recovery procedure.
 
-**Integration blocker:** the merged cutover route is POST-only. It exposes no
-read-only gate verdict, deployment ID or audited backup waiver. The CLI refuses
-status/activation on HTTP 405; health/capabilities cannot replace measured gate
-proofs. The quickstart specifies the proposed status contract for a separately
-reviewed server follow-up. Do not advertise production cutover as ready until
-that contract and all live gates are evidenced. Calendar-wait waivers never
-waive backups. Mocked CLI tests are not production evidence.
+The cutover GET reports the deployed build/deployment ID, local freeze state,
+DB epoch, current-build SQL gate verdicts, evidence ages and audited waiver
+booleans. See the [server contract](cutover-owner-quickstart.md#server-integration-contract).
+Deploy the reviewed endpoint and apply the separately reviewed, UNAPPLIED
+`20261025000800_content_cutover_status.sql` read migration before owner use.
+Do not advertise production cutover as ready until every live gate is evidenced.
+Calendar-wait waivers never waive backups. Mocked tests are not production evidence.
 
 Implementation preparation only. No migration, live provider request, deployment,
 or authority flip was performed by the builder. Issue [#198](https://github.com/James-Bugden/Content-Studio/issues/198)
@@ -151,7 +151,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    **Rollback:** retain `CS_CONTENT_STORE=sheet`, redeploy the same SHA, smoke;
    no SQL drops, Sheet clearing or reverse imports.
 
-2. **Apply only the eight reviewed, still-unapplied migrations via Supabase
+2. **Apply only the nine reviewed, still-unapplied migrations via Supabase
    MCP `apply_migration`, one call per file, exact file contents in `query` and
    the timestamp/name as `name`, using the privately verified project ID.**
    Inspect migration history and definitions first. If a file was applied in
@@ -166,12 +166,13 @@ the stated mode/write flag rather than reusing an old deployment environment.
    20261025000500_content_shadow_live.sql
    20261025000600_content_cutover_live.sql
    20261025000700_content_backup_gate_waiver.sql
+   20261025000800_content_cutover_status.sql
    ```
 
    Run every denial/catalog query from [DB-9](database-shadow-live.md), including
    the four `content_studio_cutover_*` tables, append-only
    `content_studio_backup_waivers` and every cutover RPC (including
-   `waive_backup` / `backup_waiver`). Verify service_role cannot UPDATE/DELETE
+   `waive_backup` / `backup_waiver` / `status` / `backup_receipt`). Verify service_role cannot UPDATE/DELETE
    waiver records. Check gate/activate have only their new defaulted signatures. All tables
    force zero-policy RLS; every function is invoker with pinned search_path.
    Prove anon/authenticated denial through hosted REST, and run security/database

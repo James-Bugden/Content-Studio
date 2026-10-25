@@ -22,7 +22,7 @@ it('npm run cutover -- status prints a correct table with mocked fetch and TTY, 
       globalThis.fetch = async (url, init) => {
         if(init.headers.Authorization !== 'Bearer '+bearer || init.redirect !== 'error') throw new Error('Mock request refused');
         if(url === 'https://mock.example.com/api/health') return Response.json({ok:true,mode:'live',commit:'a'.repeat(40),capabilities:[]});
-        if(url === 'https://mock.example.com/api/ops/content-cutover' && init.method === 'GET') return Response.json({ok:true,status:{build:'a'.repeat(40),contract:'schema-2:cutover-1',gates:{'db-read':{ok:true,reasons:[]},db:{ok:false,reasons:['import_lag']}}}});
+        if(url === 'https://mock.example.com/api/ops/content-cutover' && init.method === 'GET') return Response.json({ok:true,status:{build:'a'.repeat(40),contract:'schema-2:cutover-1',deploymentId:null,store:'db-shadow',epoch:'none',writesDisabled:true,evidenceAgesMs:{parity:0,'phase-c':null,rehearsal:null,backup:null},waivers:{calendar:{audited:false},backup:{audited:false}},gates:{'db-read':{ok:true,reasons:[]},db:{ok:false,reasons:['parity_not_green']}}}});
         throw new Error('No network is allowed');
       };
     `);
@@ -37,7 +37,7 @@ it('npm run cutover -- status prints a correct table with mocked fetch and TTY, 
     catch(error) { const result=error as {status:number;stdout:Buffer|string};expect(result.status).toBe(1);output=String(result.stdout); }
     expect(output).toContain('step | result | reason');
     expect(output).toContain('gate db-read | PASS | server green');
-    expect(output).toContain('gate db | FAIL | import_lag');
+    expect(output).toContain('gate db | FAIL | parity_not_green');
     expect(output).not.toContain(bearer);
     const scan=(path:string):void=>{for(const entry of readdirSync(path,{withFileTypes:true})){const file=join(path,entry.name);if(entry.isDirectory())scan(file);else expect(readFileSync(file,'utf8')).not.toContain(bearer);}};
     scan(root);

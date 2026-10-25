@@ -204,7 +204,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     await store.operation('activate-db', '33333333-3333-4333-8333-333333333333', () => store.activate('db'));
     const services = mode('db');
     const backupId = '44444444-4444-4444-8444-444444444444';
-    expect(await services.liveCutover!.execute('backup', backupId)).toEqual({ status: 'backup_waived' });
+    expect(await services.liveCutover!.execute('backup', backupId)).toEqual({ status: 'backup_waived', waiver: { audited: true, build, auditHash: expect.stringMatching(/^[a-f0-9]{64}$/) } });
     await db.raw.exec('delete from content_studio_backup_waivers');
     await expect(store.operation('activate-db', '33333333-3333-4333-8333-333333333333', () => store.activate('db'))).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(services.liveCutover!.execute('backup', backupId)).rejects.toMatchObject({ code: 'CONFIG_MISSING' });
@@ -218,6 +218,15 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     const services = mode('db-read');
     const report = await buildReconcileReport(services.repo, services.drive, Date.now(), { liveCutover: services.liveCutover });
     expect(report.items.map(i => i.kind)).toEqual(expect.arrayContaining(['backup_waived', 'cutover_blocked', 'backup_fresh']));
+  });
+  it('CS-067: an audited receipt never bypasses the existing backup recovery gate', async () => {
+    const services=await waivedPreparation();
+    await query("delete from content_studio_cutover_evidence where name='parity'");
+    await expect(services.liveCutover!.backup()).rejects.toMatchObject({code:'FORBIDDEN'});
+    const response=await POST(new Request('https://synthetic.example/api/ops/content-cutover',{
+      method:'POST',headers:{authorization:`Bearer ${env.CRON_SECRET}`,'Idempotency-Key':'44444444-4444-4444-8444-444444444444'},body:JSON.stringify({action:'backup'}),
+    }));
+    expect(response.status).toBe(403);
   });
   it('CS-066: requires env AND an audited owner decision; env removal revokes waiver', async () => {
     const services = await waivedPreparation();
@@ -257,11 +266,11 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
   });
   it('CS-066: waiver reports honestly through worker/cron/reconcile, preserves export mismatch and emergency rollback', async () => {
     const preparation = await waivedPreparation();
-    expect(await preparation.liveCutover!.backup()).toEqual({ status: 'backup_waived' });
+    expect(await preparation.liveCutover!.backup()).toEqual({ status: 'backup_waived', waiver: { audited: true, build, auditHash: expect.stringMatching(/^[a-f0-9]{64}$/) } });
     await preparation.liveCutover!['activate-db']();
     const services = mode('db'); // env admission permits missing folder, but never creates an archive
     const response = await backupGET(new Request('https://synthetic.example/api/ops/content-backup/reconcile', { headers: { authorization: `Bearer ${env.CRON_SECRET}` } }));
-    expect(response.status).toBe(200); expect(await response.json()).toEqual({ ok: true, status: 'backup_waived' });
+    expect(response.status).toBe(200); expect(await response.json()).toEqual({ ok: true, status: 'backup_waived', waiver: { audited: true, build, auditHash: expect.stringMatching(/^[a-f0-9]{64}$/) } });
     const col = sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === 'Current Hook');
     await services.contentCutover!.exporter.run();
     sheet.externalEdit(SHEET_TABS.library.name, 2, col, 'Synthetic hand edit');

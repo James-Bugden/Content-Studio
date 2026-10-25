@@ -35,6 +35,19 @@ async function health() {
 }
 
 describe('OBS-01 health output', () => {
+  it('preserves the default Sheet health response byte for byte without build metadata', async () => {
+    process.env.CS_DATA_MODE='fake';
+    for(const name of ['CS_CONTENT_STORE','CS_COMMIT_SHA','VERCEL_GIT_COMMIT_SHA','VERCEL_DEPLOYMENT_ID','VERCEL_ENV']) delete process.env[name];
+    resetEnvCache();
+    expect((await health()).text).toBe('{"ok":true,"commit":"dev","mode":"fake","capabilities":[{"provider":"auth","state":"ready","mode":"fake"},{"provider":"sheet","state":"ready","mode":"fake"},{"provider":"drive","state":"ready","mode":"fake"},{"provider":"typefully","state":"ready","mode":"fake"},{"provider":"ai","state":"ready","mode":"fake"}]}');
+  });
+  it('reports exact build and optional deployment identity, preferring the platform SHA', async () => {
+    Object.assign(process.env, { CS_DATA_MODE: 'fake', CS_CONTENT_STORE: 'sheet', CS_COMMIT_SHA: 'b'.repeat(40),
+      VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40), VERCEL_DEPLOYMENT_ID: 'dpl_synthetic123' }); resetEnvCache();
+    let body = JSON.parse((await health()).text); expect(body.commit).toBe('a'.repeat(40)); expect(body.deploymentId).toBe('dpl_synthetic123');
+    delete process.env.VERCEL_GIT_COMMIT_SHA; delete process.env.VERCEL_DEPLOYMENT_ID; resetEnvCache();
+    body = JSON.parse((await health()).text); expect(body.commit).toBe('b'.repeat(40)); expect(body).not.toHaveProperty('deploymentId');
+  });
   it('OBS-01 / SEC-08: reports read-only capabilities without leaking any configured value', async () => {
     const env = process.env as Record<string, string | undefined>;
     delete env.AI_API_KEY;

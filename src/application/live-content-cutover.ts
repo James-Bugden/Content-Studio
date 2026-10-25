@@ -20,7 +20,7 @@ export type LiveCutoverOps = {
   'activate-db'(): Promise<unknown>;
   status(): Promise<{ blocking?: string; backupFailure?: boolean; backupWaiver?: { by: 'owner'; on: '2026-10-25'; recordedAt: string } | null }>;
   measure(): Promise<unknown>;
-  backup(): Promise<{ status: 'backup_waived' } | { status: 'verified'; manifestHash: string; verifiedAt: number }>;
+  backup(): Promise<{ status: 'backup_waived'; waiver: { audited: true; build: string; auditHash: string } } | { status: 'verified'; manifestHash: string; verifiedAt: number }>;
   rollback(): Promise<unknown>;
 };
 
@@ -104,7 +104,10 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
     },
     async backup() {
       await store.assertRecovery();
-      if (!env.CS_CONTENT_BACKUP_FOLDER_ID && await store.backupWaiver()) return { status: 'backup_waived' };
+      if (!env.CS_CONTENT_BACKUP_FOLDER_ID) {
+        const receipt = await store.backupReceipt();
+        if (receipt) return receipt;
+      }
       if (env.GOOGLE_WRITE_ENABLED !== 'true') throw new AppError('FORBIDDEN', { reason: 'google_writes_disabled' });
       if (!services.contentBackup) throw new AppError('CONFIG_MISSING', { reason: 'private_backup_folder' });
       return store.exclusive('backup', async (state, token) => {

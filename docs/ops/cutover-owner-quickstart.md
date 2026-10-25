@@ -1,7 +1,8 @@
 ﻿# Owner cutover quickstart
 
-Status: local runner prepared; production activation is blocked by a missing
-server status contract. This page does not record a production cutover.
+Status: owner runner and server status contract implemented and tested offline.
+Production still requires reviewed deployment, the new status migration and all
+ordered live gates. This page does not record a production cutover.
 
 The owner runs secret-bearing commands in their own terminal. The coordinator
 prepares migrations, SQL proofs, reviews, deployments and recovery. Never paste
@@ -12,9 +13,9 @@ agent conversation or GitHub.
    full 40-character Git SHA and verify the production origin. They also check
    all-instance freeze/drain, imports, backup/restore, rehearsal and CI as required
    by [the coordinator runbook](cutover.md). Do not invent or shorten the SHA.
-   The current server has no read-only cutover status endpoint: the coordinator
-   must resolve that separately before they can call activation ready. Health
-   capabilities alone never prove the cutover gates.
+   The coordinator verifies the deployed status endpoint and its read migration
+   before calling activation ready. Health capabilities alone never prove the
+   cutover gates.
 
 2. **Open PowerShell in this checkout.** Keep this terminal private. Set the
    verified production origin (replace the example with the coordinator's URL):
@@ -32,7 +33,11 @@ agent conversation or GitHub.
    It asks for `CRON_SECRET`. Enter the existing secret privately: typing and
    paste are hidden. Press Enter. Expect rows in the form `step | PASS/FAIL |
    reason`, including the deployed SHA. Do not send this secret to the coordinator.
-   Default input is always a hidden prompt. To read the password field of your
+   Status also shows deployment ID (or `unreported`), store, epoch, whether
+   this instance is frozen, calendar/backup audit booleans, evidence ages in
+   milliseconds and both gate verdicts. Missing evidence says `unavailable for
+   this build/import`. A PASS on a state/age/waiver row means the value was read;
+   admission is shown by the gate rows. Default input is always a hidden prompt. To read the password field of your
    existing, unlocked LastPass CLI entry instead, append `--from lastpass`:
 
    ```text
@@ -54,10 +59,9 @@ agent conversation or GitHub.
 
    This checks status, measures every collection, then checks the gate verdict
    again. Every request goes through the app's authenticated operation routes.
-   A red/missing status remains a failure even if measurement passes. Today,
-   expect `HTTP 405: deployed read-only cutover status route is unavailable`.
-   Stop activation and ask the coordinator to resolve that API prerequisite.
-   Do not try to bypass it. To run only the measurement when instructed:
+   A red/missing status remains a failure even if measurement passes. If an older
+   deployment returns HTTP 405, stop and have the coordinator deploy the reviewed
+   endpoint and verify its migration. Do not bypass the status check. To run only the measurement when instructed:
 
    ```text
    npm run cutover -- measure
@@ -81,8 +85,8 @@ agent conversation or GitHub.
    npm run cutover -- activate-db --sha REVIEWED_FULL_SHA
    ```
 
-   The current POST-only server blocks both activation commands before any
-   activation request. This protection must not be removed to finish a cutover.
+   Missing, malformed, contradictory, unknown or red target gate verdicts block
+   activation before a POST. The app checks the gate atomically again on POST.
 
 5. **Run backup, rehearsal and export only at their ordered runbook step.**
 
@@ -93,8 +97,10 @@ agent conversation or GitHub.
    ```
 
    Backup requires a verified manifest hash. `backup_waived` is accepted only
-   with an explicit server-audited, build-bound waiver hash; the merged server
-   currently implements no such waiver. The calendar-wait waiver is not a
+   with `waiver.audited: true`, the exact current build and a SHA-256 audit hash
+   derived from the durable owner decision for this build and latest import.
+   Removing the environment switch or audit revokes the result; a configured
+   backup folder retains the normal verified-archive path. The calendar-wait waiver is not a
    backup waiver. To exercise the daily backup reconcile route in DB mode:
 
    ```text
@@ -139,42 +145,68 @@ agent conversation or GitHub.
    owner-controlled folder. Another process or an
    interrupted run holds `run.lock`: ask the coordinator to prove the old
    process has stopped before removing only that lock. Preserve state/logs.
-   Local file failure also exits non-zero. Deployment ID is explicitly
-   `unreported` because the current health route does not expose it; the
-   coordinator retains verified Vercel identity separately in private evidence.
+   Local file failure also exits non-zero. Health reports the exact build and
+   Vercel deployment ID when provided. The runner binds status to both, records
+   the ID in private logs, and shows `unreported` when the platform supplies none.
 
-## Coordinator integration prerequisite
+## Server integration contract
 
-The merged `src/app/api/ops/content-cutover/route.ts` exports only POST with
-`{action: measure|backup|rollback|activate-read|activate-db}`, UUID
-`Idempotency-Key`, cron bearer, and `{ok:true,result}`. Neither health nor the
-reconcile routes expose activation gate verdicts. No server routes or gates
-are changed by this CLI issue.
-
-For an independently reviewed follow-up, the CLI reserves GET on the same
-cutover path for a read-only, bearer-authenticated, private/no-store response:
+GET `/api/ops/content-cutover` uses the existing constant-time CRON_SECRET
+bearer check and private/no-store headers on success and failure. It takes no
+query/body content and needs no idempotency key. The server supplies this shape:
 
 ```json
 {
   "ok": true,
   "status": {
-    "build": "<full deployed SHA>",
+    "build": "<40-character deployed SHA>",
+    "deploymentId": "dpl_example123",
+    "store": "db-shadow",
     "contract": "schema-2:cutover-1",
+    "epoch": "none",
+    "writesDisabled": true,
     "gates": {
-      "db-read": { "ok": false, "reasons": ["stale_parity"] },
-      "db": { "ok": false, "reasons": ["import_lag"] }
-    }
+      "db-read": { "ok": true, "reasons": [] },
+      "db": { "ok": false, "reasons": ["write_proof_missing"] }
+    },
+    "evidenceAgesMs": { "parity": 1200, "phase-c": null, "rehearsal": null, "backup": null },
+    "waivers": { "calendar": { "audited": false }, "backup": { "audited": false } }
   }
 }
 ```
 
-This is a **proposed integration contract**, exercised by mocks, not an endpoint
-that exists in the merged build. Reasons must come from the server gate and
-remain content-free; missing/unknown/contradictory verdicts block activation.
-The server's atomic activation gate remains the final authority. The SHA check
-and a second status read cannot pin a mutable domain between requests: the
-coordinator must use the verified immutable deployment URL for activation and
-avoid deployment changes during the run.
+`deploymentId` is null when unavailable (health omits the optional field).
+`store` is the configured store; epoch is `none`, `read`, `db` or `retired`.
+Freeze is the effective local app write boundary; it cannot prove all other
+instances or external writers are frozen/drained. Evidence ages refer only to
+the current build and latest import; missing or mismatched evidence is null.
+Waiver booleans require both the appropriate environment switch and durable
+audit. Calendar audit also matches the latest import snapshot; backup audit
+matches the build/import. Neither waiver invents a measurement or backup.
+
+The new **UNAPPLIED** migration `20261025000800_content_cutover_status.sql`
+contains read-only, service-role-only invoker functions. The status function
+calls the existing SQL gate once per target, returning its first named blocker
+for each. Resolve it and rerun to see the next blocker. It never changes gate
+thresholds, leases, evidence or authority. Named reasons are:
+`full_parity_required`, `parity_not_green`, `backup_waiver_export_not_exact`,
+`write_proof_missing`, `write_proof_expired`, `phase_c_proof_missing`,
+`rollback_proof_missing`, `backup_proof_missing`, `invalid_gate`, and
+`gate_unavailable` (unexpected SQL error, with text suppressed).
+A valid status request cannot normally produce `invalid_gate`.
+
+The atomic activation operation remains the final authority, including epoch
+and contract checks beyond the measured gate. A green GET is an observation,
+not a reservation. The SHA/deployment checks and second status read cannot pin
+a mutable domain between requests: use the verified immutable deployment URL
+and avoid deployment changes during the run.
+
+POST retains `{action: measure|backup|rollback|activate-read|activate-db}`, the
+UUID `Idempotency-Key`, cron bearer and `{ok:true,result}`. A waived backup
+returns `{status:"backup_waived",waiver:{audited:true,build:"<exact SHA>",auditHash:"<SHA-256>"}}`
+inside `result` (at top level beside `ok` for scheduled backup). The hash
+identifies the durable audit without returning its actor, operation/import IDs,
+private references or timestamps. Calendar waiver never creates this result.
 
 The scheduled backup and export reconcile routes are GETs. They receive a
 persisted client UUID header, but do not implement client-key replay: export

@@ -103,6 +103,11 @@ export class ContentCutoverStore implements ContentBackupSource {
     return z.object({ by: z.literal('owner'), on: z.literal('2026-10-25'), recordedAt: z.string().datetime({ offset: true }) }).nullable().parse(
       await this.rest.cutoverRpc('backup_waiver', { p_backup_waiver: this.waiverSwitch(), p_build: null }));
   }
+  async backupReceipt() {
+    return z.object({ status: z.literal('backup_waived'), waiver: z.object({ audited: z.literal(true),
+      build: z.literal(this.build), auditHash: z.string().regex(/^[a-f0-9]{64}$/) }) }).nullable().parse(
+      await this.rest.cutoverRpc('backup_receipt', { p_build: this.build, p_backup_waiver: this.waiverSwitch() }));
+  }
   async activate(mode: 'db-read' | 'db') {
     ok.parse(await this.rest.cutoverRpc('activate', { p_mode: mode, p_build: this.build, p_contract: this.contract, p_backup_waiver: this.waiverSwitch() }));
     return { mode, build: this.build, contract: this.contract };

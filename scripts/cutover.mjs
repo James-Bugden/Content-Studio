@@ -12,7 +12,9 @@ const exportCollections = ['library', 'queue', 'schedule', 'workflow_settings'];
 const shaPattern = /^[a-f0-9]{40}$/;
 const hashPattern = /^[a-f0-9]{64}$/;
 const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
-const reasons = new Set(['cron_auth', 'cutover_contract_mismatch', 'cutover_build_identity', 'cutover_parity_stale', 'stale_parity', 'import_lag', 'contract_mismatch', 'imports_disabled_in_db_mode', 'google_writes_disabled', 'private_backup_folder', 'rollback_store_mode', 'freeze_every_instance_first', 'export_store_mode', 'backup_store_mode', 'export_mismatch', 'markdown_missing', 'cutover_gate', 'parity', 'phase-c', 'backup', 'rehearsal']);
+const gateReasons = ['invalid_gate', 'full_parity_required', 'parity_not_green', 'backup_waiver_export_not_exact', 'write_proof_missing', 'write_proof_expired', 'phase_c_proof_missing', 'rollback_proof_missing', 'backup_proof_missing', 'gate_unavailable'];
+const deploymentPattern = /^dpl_[A-Za-z0-9]{1,128}$/;
+const reasons = new Set([...gateReasons, 'cron_auth', 'cutover_contract_mismatch', 'cutover_build_identity', 'cutover_parity_stale', 'stale_parity', 'import_lag', 'contract_mismatch', 'imports_disabled_in_db_mode', 'google_writes_disabled', 'private_backup_folder', 'rollback_store_mode', 'freeze_every_instance_first', 'export_store_mode', 'backup_store_mode', 'export_mismatch', 'markdown_missing', 'cutover_gate', 'parity', 'phase-c', 'backup', 'rehearsal']);
 const errorCodes = new Set(['AUTH_REQUIRED', 'FORBIDDEN', 'CONFIG_MISSING', 'SCHEMA_DRIFT', 'NOT_FOUND', 'STALE_READ', 'CONFLICT', 'GATE_BLOCKED', 'AMBIGUOUS_MATCH', 'RATE_LIMITED', 'PROVIDER_UNAVAILABLE', 'PARTIAL_FAILURE', 'VALIDATION_FAILED', 'UNKNOWN']);
 class CutoverError extends Error {}
 const fail = message => { throw new CutoverError(message); };
@@ -224,22 +226,29 @@ export async function cutover(args = process.argv.slice(2), deps = {}) {
       step = 'health';
       const value = await request('/api/health');
       if (value.mode !== 'live' || !shaPattern.test(value.commit) || !Array.isArray(value.capabilities)) fail('Health requires live mode, full deployed SHA and capability list.');
-      identity = { sha: value.commit, deploymentId: null };
+      if (value.deploymentId !== undefined && !deploymentPattern.test(value.deploymentId)) fail('Health deployment identity is invalid.');
+      identity = { sha: value.commit, deploymentId: value.deploymentId ?? null };
       if (opts.sha && value.commit !== opts.sha) fail('Deployed SHA differs from --sha. Stop; ask the coordinator to verify the deployment.');
-      row('health', true, `live; SHA ${value.commit}; deployment id unreported`);
+      row('health', true, `live; SHA ${value.commit}; deployment id ${identity.deploymentId ?? 'unreported'}`);
       records.push({ timestamp: now(), step: 'health', ...identity });
       return value;
     };
     const status = async () => {
       await health(); step = 'status';
-      // Deliberately fail closed on today's POST-only route (405). Never infer
-      // admission from capability presence or a successful historical measure.
+      // Admission comes from the current server SQL gate, never capabilities.
       const value = await request('/api/ops/content-cutover');
       if (!object(value.status) || value.status.build !== identity.sha || value.status.contract !== 'schema-2:cutover-1' || !object(value.status.gates)) fail('Cutover status contract missing or mismatched; activation is blocked.');
       const result = value.status;
+      if (result.deploymentId !== identity.deploymentId || !['sheet','db-shadow','db-read','db'].includes(result.store) ||
+        !['none','read','db','retired'].includes(result.epoch) || typeof result.writesDisabled !== 'boolean' ||
+        !object(result.evidenceAgesMs) || !['parity','phase-c','rehearsal','backup'].every(k => result.evidenceAgesMs[k] === null || count(result.evidenceAgesMs[k])) ||
+        !['calendar','backup'].every(k => typeof result.waivers?.[k]?.audited === 'boolean')) fail('Cutover status state missing or mismatched; activation is blocked.');
+      row('state', true, `store ${result.store}; epoch ${result.epoch}; writes ${result.writesDisabled ? 'frozen locally' : 'not frozen locally'}`);
+      for (const name of ['calendar','backup']) row(`waiver ${name}`, true, result.waivers[name].audited ? 'audited' : 'not audited');
+      for (const name of ['parity','phase-c','rehearsal','backup']) row(`age ${name}`, true, result.evidenceAgesMs[name] === null ? 'unavailable for this build/import' : `${result.evidenceAgesMs[name]} ms`);
       for (const mode of ['db-read', 'db']) {
         const gate = result.gates[mode];
-        if (!object(gate) || typeof gate.ok !== 'boolean' || !Array.isArray(gate.reasons)) fail('Gate verdict is unmeasured; activation is blocked.');
+        if (!object(gate) || typeof gate.ok !== 'boolean' || !Array.isArray(gate.reasons) || gate.reasons.some(r => !gateReasons.includes(r)) || (gate.ok ? gate.reasons.length !== 0 : gate.reasons.length === 0)) fail('Gate verdict is unmeasured; activation is blocked.');
         const target = opts.action === 'activate-read' ? 'db-read' : opts.action === 'activate-db' ? 'db' : null;
         if (!target || mode === target) row(`gate ${mode}`, gate.ok && gate.reasons.length === 0, gate.ok && gate.reasons.length === 0 ? 'server green' : namedReasons({ details: { reasons: gate.reasons } }));
       }

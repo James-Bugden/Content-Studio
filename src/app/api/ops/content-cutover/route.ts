@@ -5,9 +5,27 @@ import { requireCronSecret } from '@/lib/cron-auth';
 import { serverEnv } from '@/lib/env';
 import { errorResponse, json } from '@/lib/http';
 import { AppError } from '@/domain/errors';
+import { readCutoverStatus } from '@/application/cutover-status';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+/** Read-only, build-bound admission; no caller payload or operation identity. */
+export async function GET(request: Request) {
+  try {
+    const env = serverEnv();
+    requireCronSecret(request, env.CRON_SECRET);
+    if (new URL(request.url).search || request.headers.has('Content-Type') || request.body !== null) throw new AppError('VALIDATION_FAILED');
+    return json({ ok: true, status: await readCutoverStatus(env) });
+  } catch (error) { return errorResponse(error); }
+}
+
+// Explicit handlers keep private cache headers on method refusals too.
+const methodNotAllowed = () => json({ ok: false, code: 'METHOD_NOT_ALLOWED' }, { status: 405 });
+export const PUT = methodNotAllowed;
+export const PATCH = methodNotAllowed;
+export const DELETE = methodNotAllowed;
+export const HEAD = methodNotAllowed;
+export const OPTIONS = methodNotAllowed;
 /** Private coordinator operations; no caller-supplied credentials or payloads. */
 export async function POST(request: Request) {
   try {

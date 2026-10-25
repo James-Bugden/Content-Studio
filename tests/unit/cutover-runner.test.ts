@@ -21,7 +21,7 @@ const base = 'https://deployment.example.com';
 const keys = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'];
 const collections = ['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'];
 const health = () => ({ ok: true, mode: 'live', commit: sha, capabilities: ['auth','sheet','drive'].map(provider => ({provider, mode:'live',state:'ready'})) });
-const status = () => ({ok:true,status:{build:sha,contract:'schema-2:cutover-1',gates:{'db-read':{ok:true,reasons:[]},db:{ok:true,reasons:[]}}}});
+const status = () => ({ok:true,status:{build:sha,contract:'schema-2:cutover-1',deploymentId:null,store:'db-shadow',epoch:'none',writesDisabled:true,evidenceAgesMs:{parity:0,'phase-c':null,rehearsal:null,backup:null},waivers:{calendar:{audited:false},backup:{audited:false}},gates:{'db-read':{ok:true,reasons:[]},db:{ok:true,reasons:[]}}}});
 const measured = () => ({coverage:'all-rows',build:sha,samples:Object.fromEntries(collections.map(collection => [collection,{collection,idsEqual:true,fields:1,equal:1,blocking:0,lagMs:10,facts:[{privateCopy:'synthetic private copy'}]}]))});
 const parity = () => ({ exact:true,counts:{library:1,queue:0,schedule:1,workflow_settings:1},dbHash:hash,sheetHash:hash,differences:[] });
 const response = (body: unknown, code = 200) => new Response(JSON.stringify(body),{status:code});
@@ -46,6 +46,10 @@ afterEach(()=> { for (const root of roots.splice(0)) rmSync(root,{recursive:true
 beforeEach(()=>vi.clearAllMocks());
 
 describe('owner CLI boundaries',()=>{
+  it.each(['auth','sheet','drive'])('smoke refuses a missing required %s provider',async missing=>{
+    const h=harness();h.fetcher.mockResolvedValueOnce(response({...health(),capabilities:health().capabilities.filter(c=>c.provider!==missing)}));
+    expect(await cutover(['smoke'],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
+  });
   it.each(['status','measure','activate-read','activate-db','backup','rollback','export','all-prepare','smoke'])('prints PASS tables for mocked %s',async action=>{
     const h=harness();
     expect(await cutover([action,...(action.startsWith('activate-')?['--sha',sha]:[])],h)).toBe(0);
@@ -115,8 +119,8 @@ describe('activation admission',()=>{
   });
   it.each(['activate-read','activate-db'])('requires green target gate for %s',async action=>{
     const h=harness();const fetcher=h.fetcher.getMockImplementation()!;
-    h.fetcher.mockImplementation(async (u,i)=> {const s=status();s.status.gates[action === 'activate-read'?'db-read':'db']={ok:false,reasons:['stale_parity','import_lag','contract_mismatch'] as never[]};return u.endsWith('content-cutover')?response(s):fetcher(u,i);});
-    expect(await cutover([action,'--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);expect(h.confirm).not.toHaveBeenCalled();expect(h.logs.join()).toContain('stale_parity, import_lag, contract_mismatch');
+    h.fetcher.mockImplementation(async (u,i)=> {const s=status();s.status.gates[action === 'activate-read'?'db-read':'db']={ok:false,reasons:['full_parity_required','parity_not_green','phase_c_proof_missing'] as never[]};return u.endsWith('content-cutover')?response(s):fetcher(u,i);});
+    expect(await cutover([action,'--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);expect(h.confirm).not.toHaveBeenCalled();expect(h.logs.join()).toContain('full_parity_required, parity_not_green, phase_c_proof_missing');
   });
   it.each(['ACTIVATE ','activate','','YES'])('refuses inexact confirmation %s',async answer=>{
     const h=harness();h.confirm.mockResolvedValue(answer);expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);expect(h.logs.join()).toContain('Rollback command:');
@@ -133,27 +137,80 @@ describe('activation admission',()=>{
       if(kind==='contract')s.status.contract='other';
       if(kind==='gates')s.status.gates={} as never;
       if(kind==='unknown')s.status.gates.db.ok=undefined as never;
-      if(kind==='contradiction')s.status.gates.db.reasons=['stale_parity'] as never;
+      if(kind==='contradiction')s.status.gates.db.reasons=['full_parity_required'] as never;
       return response(s);
     });
     expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
   });
   it('rechecks gates after confirmation before mutation',async()=>{
-    const h=harness();h.confirm.mockImplementation(async()=>{h.fetcher.mockResolvedValueOnce(response(health())).mockResolvedValueOnce(response({...status(),status:{...status().status,gates:{...status().status.gates,db:{ok:false,reasons:['stale_parity']}}}}));return 'ACTIVATE';});
+    const h=harness();h.confirm.mockImplementation(async()=>{h.fetcher.mockResolvedValueOnce(response(health())).mockResolvedValueOnce(response({...status(),status:{...status().status,gates:{...status().status.gates,db:{ok:false,reasons:['full_parity_required']}}}}));return 'ACTIVATE';});
     expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
   });
   it('read activation succeeds with its green gate while write admission remains red',async()=>{
     const h=harness(),f=h.fetcher.getMockImplementation()!;
     h.fetcher.mockImplementation(async(u,i)=>{
-      if(u.endsWith('content-cutover')&&i.method==='GET'){const s=status();s.status.gates.db={ok:false,reasons:['stale_parity'] as never};return response(s);}
+      if(u.endsWith('content-cutover')&&i.method==='GET'){const s=status();s.status.gates.db={ok:false,reasons:['full_parity_required'] as never};return response(s);}
       return f(u,i);
     });
     expect(await cutover(['activate-read','--sha',sha],h)).toBe(0);expect(mutations(h)).toHaveLength(1);
   });
-  it('real merged POST-only route returns 405: status is a blocker, never fabricated green',async()=>{
+  it('older POST-only deployment returns 405: status is a blocker, never fabricated green',async()=>{
     const h=harness(),fetcher=h.fetcher.getMockImplementation()!;
     h.fetcher.mockImplementation(async(u,i)=>u.endsWith('content-cutover')&&i.method==='GET'?response({ok:false},405):fetcher(u,i));
     expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);expect(h.logs.join()).toContain('HTTP 405');expect(mutations(h)).toHaveLength(0);
+  });
+  it.each(['deployment','store','epoch','freeze','ages','negative-age','unsafe-age','waivers','unknown-reason','empty-red'])('rejects malformed real state %s before activation',async fault=>{
+    const h=harness(),f=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(!u.endsWith('content-cutover'))return f(u,i);
+      const s=status();
+      if(fault==='deployment')s.status.deploymentId='dpl_other' as never;
+      if(fault==='store')s.status.store='other';
+      if(fault==='epoch')s.status.epoch='other';
+      if(fault==='freeze')s.status.writesDisabled=undefined as never;
+      if(fault==='ages')s.status.evidenceAgesMs=null as never;
+      if(fault==='negative-age')s.status.evidenceAgesMs.parity=-1;
+      if(fault==='unsafe-age')s.status.evidenceAgesMs.parity=Number.MAX_SAFE_INTEGER+1;
+      if(fault==='waivers')s.status.waivers.backup.audited=undefined as never;
+      if(fault==='unknown-reason')s.status.gates.db={ok:false,reasons:['SYNTHETIC_PRIVATE_REASON'] as never};
+      if(fault==='empty-red')s.status.gates.db={ok:false,reasons:[]};
+      return response(s);
+    });
+    expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);expect(h.logs.join()).not.toContain('SYNTHETIC_PRIVATE_REASON');
+    if(fault==='ages')expect(h.logs.join()).toContain('Cutover status state missing or mismatched');
+  });
+  it.each(['bad',null,'dpl_with spaces'])('rejects invalid health deployment id %s',async deploymentId=>{
+    const h=harness();h.fetcher.mockResolvedValueOnce(response({...health(),deploymentId}));
+    expect(await cutover(['activate-db','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
+  });
+  it('shows and journals a valid deployment id when health and status match',async()=>{
+    const h=harness(),f=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>u.endsWith('/health')?response({...health(),deploymentId:'dpl_synthetic123'}):u.endsWith('content-cutover')&&i.method==='GET'?response({ok:true,status:{...status().status,deploymentId:'dpl_synthetic123'}}):f(u,i));
+    expect(await cutover(['status'],h)).toBe(0);expect(h.logs.join()).toContain('deployment id dpl_synthetic123');expect(h.files.join()).toContain('dpl_synthetic123');
+  });
+  it('requires a boolean verdict on the other gate during read activation',async()=>{
+    const h=harness(),f=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(!u.endsWith('content-cutover')||i.method!=='GET')return f(u,i);
+      const s=status();s.status.gates.db.ok='true' as never;return response(s);
+    });
+    expect(await cutover(['activate-read','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
+  });
+  it('refuses unknown reason codes on the other gate during read activation',async()=>{
+    const h=harness(),f=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(!u.endsWith('content-cutover')||i.method!=='GET')return f(u,i);
+      const s=status();s.status.gates.db={ok:false,reasons:['unknown'] as never};return response(s);
+    });
+    expect(await cutover(['activate-read','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
+  });
+  it.each([{ok:true,reasons:['full_parity_required']},{ok:false,reasons:[]}])('refuses contradictory other-gate verdict %s during read activation',async gate=>{
+    const h=harness(),f=h.fetcher.getMockImplementation()!;
+    h.fetcher.mockImplementation(async(u,i)=>{
+      if(!u.endsWith('content-cutover')||i.method!=='GET')return f(u,i);
+      const s=status();s.status.gates.db=gate as never;return response(s);
+    });
+    expect(await cutover(['activate-read','--sha',sha],h)).toBe(1);expect(mutations(h)).toHaveLength(0);
   });
 });
 
