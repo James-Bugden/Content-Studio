@@ -157,3 +157,17 @@ it('CS-059j: elapsed confirm keeps catalogue safety message and existing recover
   expect(error.textContent).toContain('This slot cannot be used.');
   expect(error.textContent).toContain('Choose another slot.');
 });
+
+it('CS-059j: two failing fallback slots name the last failed slot rather than the first pick', async () => {
+  const third = { contentId: '2026-10-03-MAIN-LI', isoDate: '2026-10-03', time: '21:00', slot: 'Main' };
+  const options = [...slots, third];
+  const fetcher = vi.mocked(fetch).mockImplementation(async url => {
+    if (String(url).includes('/api/panel/')) return response({ ok: true, data: { ...data, slotOptions: options } });
+    return response(String(url).includes(third.contentId) ? preview(third.contentId) : { ok: false, problems: ['This slot cannot be used.'] });
+  });
+  render(<PostPanel libraryId="SYN-L005" />);
+  await screen.findByRole('button', { name: 'Confirm and write to Sat 3 Oct \u00b7 21:00' });
+  expect(screen.getByText('Fri 2 Oct \u00b7 21:00: This slot cannot be used.')).toBeTruthy();
+  expect(fetcher.mock.calls.filter(([url]) => String(url).includes('/preview?')).map(([url]) => new URL(String(url), 'http://localhost').searchParams.get('contentId'))).toEqual(options.map(slot => slot.contentId));
+  expect(screen.queryByText('Thu 1 Oct \u00b7 21:00: This slot cannot be used.')).toBeNull();
+});

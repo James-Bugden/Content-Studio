@@ -83,7 +83,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     },
   ];
   const clearHref = hrefWith(Object.fromEntries(['lane', 'page', ...filterDefs.map(f => f.key)].map(key => [key, null])));
-  const resultCount = queue.total === 0
+  const resultCount = queue.totalUnfiltered === 0
+    ? 'The Content Library is empty'
+    : queue.total === 0
     ? `None of the ${queue.totalUnfiltered} Library rows match these filters.`
     : `Showing ${(queue.page - 1) * 25 + 1} to ${Math.min(queue.page * 25, queue.total)} of ${queue.total}${queue.total !== queue.totalUnfiltered ? ` (filtered from ${queue.totalUnfiltered})` : ''}`;
 

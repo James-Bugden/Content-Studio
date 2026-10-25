@@ -32,6 +32,7 @@ it('CS-059j: an empty Library retains a clear action', async () => {
   mocks.load.mockResolvedValue({ total: 0, totalUnfiltered: 0, page: 1, pages: 1, cards: [], sources: [], laneCounts: {} });
   render(await ReviewPage({ searchParams: Promise.resolve({ lane: 'review', target: 'Threads' }) }));
   expect(screen.getByRole('button', { name: 'Clear filters' })).toBeTruthy();
+  expect(document.querySelector('[aria-live="polite"]')?.textContent).toBe('The Content Library is empty');
 });
 it('CS-059j: no-match clear removes every defined filter including queue', async () => {
   mocks.load.mockResolvedValue({ total: 0, totalUnfiltered: 5, page: 1, pages: 1, cards: [], sources: [], laneCounts: {} });

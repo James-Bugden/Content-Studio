@@ -177,12 +177,47 @@ it('CS-059j: equal result text is reinserted on each committed filter change, in
   expect(document.querySelector('[aria-live="polite"]')).toBe(region);
   expect(region.firstChild).not.toBe(before);
   expect(region.textContent).toBe('None match.');
+  expect(region.getAttribute('aria-atomic')).toBe('true');
 });
-it('CS-059j: every chip group has exactly one black selected chip', () => {
+it.each(['', 'platform=X&status=ready'])('CS-059j: every chip group has exactly one black selected chip (%s)', query => {
+  nav.params = new URLSearchParams(query);
   render(<FilterBar filters={filters.map(f => ({ ...f, control: 'chips' }))} />);
   for (const label of ['Target platform', 'Gate status']) {
     const group = screen.getByRole('group', { name: label });
     expect(group.querySelectorAll('button.bg-primary')).toHaveLength(1);
     expect(group.querySelector('button.bg-primary')?.getAttribute('aria-pressed')).toBe('true');
+  }
+});
+
+it('CS-059j: pending navigation inserts nothing, then commits exactly one new result announcement', async () => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  nav.push.mockImplementation(() => startTransition(async () => { await pending; }));
+  const chips = filters.map(f => ({ ...f, control: 'chips' as const }));
+  const { rerender } = render(<FilterBar filters={chips} announcement="Showing 1 to 25 of 40" />);
+  const region = document.querySelector('[aria-live="polite"]')!;
+  const events: string[] = [];
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      if (record.type === 'childList') for (const node of record.addedNodes) events.push(`insert: ${node.textContent}`);
+      if (record.type === 'characterData') events.push(`text: ${record.target.textContent}`);
+    }
+  });
+  observer.observe(region, { childList: true, subtree: true, characterData: true });
+  try {
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^X$/ })); });
+    expect(nav.push).toHaveBeenCalledWith('/review?platform=X', { scroll: false });
+    expect(screen.getByRole('button', { name: /^X$/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(events).toEqual([]);
+    await act(async () => {
+      nav.params = new URLSearchParams('platform=X');
+      rerender(<FilterBar filters={chips} announcement="Showing 1 to 3 of 3" />);
+      release();
+    });
+    expect(document.querySelector('[aria-live="polite"]')).toBe(region);
+    expect(events).toEqual(['insert: Showing 1 to 3 of 3']);
+  } finally {
+    observer.disconnect();
+    await act(async () => release());
   }
 });

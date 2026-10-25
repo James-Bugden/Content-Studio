@@ -155,7 +155,8 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
         </button>
       )}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
-        <span key={query}>
+        {/* Remount only with committed results, never the optimistic pending query. */}
+        <span key={searchParams?.toString()}>
           {announcement ?? (active.length === 0 ? 'No filters applied' : `${active.length} ${active.length === 1 ? 'filter' : 'filters'} applied`)}
         </span>
       </p>

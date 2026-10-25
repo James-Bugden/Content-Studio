@@ -32,8 +32,9 @@ The existing authenticated 15-minute Content export repair also drains Markdown
 jobs, including hook updates and retries. No cron is installed by this change.
 A Drive failure never vetoes the DB save. Save rejects section-level headings
 and open code fences with the existing Sheet validation/copy, using the standard
-level-2 boundary without a Drive read. This does not detect level-3 headings
-in a level-4 Draft section; fresh export validates the actual section level and
+**level-2 boundary without a Drive read**. The proposed save-time check against
+the master's actual section level (#193 item 1) is **deferred**, not implemented.
+This does not detect level-3 headings in a level-4 Draft section; fresh export validates the actual section level and
 refuses unsafe structure without changing the master or acknowledging the job.
 Reading Drive during save to discover its level would break the Drive-independent
 save contract; that extension is deferred until section metadata can be trusted
