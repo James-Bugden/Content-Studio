@@ -290,7 +290,8 @@ the stated mode/write flag rather than reusing an old deployment environment.
    as evidence. The record RPC checks latest import identity; the gate validates
    all fields, numeric limits and generated parity/backup/rehearsal records.
    `dailyPlanBackup:true` and a `privateEvidence` JSON string of 1–2048 characters
-   containing at least one non-whitespace character must attest
+   containing a visible printable character after removing Unicode whitespace,
+   invisible characters and format controls must attest
    actual daily Pro plan backup configuration and a restorable backup; a plan
    name alone is insufficient. `restoreExact:true` still needs a proven restore
    (use the plan backup restore evidence on the waiver path). The owner waiver

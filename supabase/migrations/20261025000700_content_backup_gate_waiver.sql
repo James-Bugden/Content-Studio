@@ -53,6 +53,19 @@ returns jsonb language sql stable security invoker set search_path=pg_catalog,pu
   order by recorded_at desc,operation_id desc limit 1;
 $$;
 
+-- Shared free-form evidence-reference validator. POSIX space/graph coverage is
+-- locale-dependent, so strip explicit Unicode whitespace, format controls and
+-- default-ignorable/invisible characters before requiring a printable glyph.
+-- Validation never trims or rewrites the stored reference; padded refs survive.
+create or replace function public.content_studio_cutover_evidence_reference(p_reference jsonb)
+returns boolean language sql immutable security invoker set search_path=pg_catalog,public as $$
+  select coalesce(jsonb_typeof(p_reference)='string'
+    and length(p_reference #>> '{}') between 1 and 2048
+    and regexp_replace(p_reference #>> '{}',
+      U&'[[:space:][:cntrl:]\0085\00a0\00ad\034f\0600-\0605\061c\06dd\070f\0890-\0891\08e2\115f-\1160\1680\17b4-\17b5\180b-\180f\2000-\200f\2028-\202f\205f\2060-\206f\2800\3000\3164\fe00-\fe0f\feff\ffa0\fff0-\fffb\+0110bd\+0110cd\+013430-\+013440\+01bca0-\+01bca3\+01d173-\+01d17a\+0e0000-\+0e0fff]',
+      '', 'g') ~ '[[:graph:]]', false);
+$$;
+
 -- Remove old signatures to prevent PostgREST overload ambiguity. Reapplication
 -- is safe: the new signatures use CREATE OR REPLACE, originals no longer exist.
 drop function if exists public.content_studio_cutover_gate(text,text);
@@ -107,9 +120,7 @@ begin
         or proof->>'importsStopped' is distinct from 'true' or proof->>'flagRoundTrip' is distinct from 'true'
         or proof->>'hostedSecurity' is distinct from 'true' or proof->>'independentConcurrency' is distinct from 'true'
         or proof->>'sheetRaceAccepted' is distinct from 'true'
-        or jsonb_typeof(proof->'privateEvidence') is distinct from 'string'
-        or coalesce(length(proof->>'privateEvidence'),0) not between 1 and 2048
-        or proof->>'privateEvidence' !~ '[^[:space:]]'
+        or not public.content_studio_cutover_evidence_reference(proof->'privateEvidence')
         or proof->>'sheetRead429' is distinct from '0' or proof->>'lagStale' is distinct from '0'
         or (proof->>'warmP95Ms')::numeric is null or (proof->>'warmP95Ms')::numeric not between 0 and 999.999
         or (proof->>'coldP95Ms')::numeric is null or (proof->>'coldP95Ms')::numeric not between 0 and 2499.999)
@@ -145,10 +156,12 @@ end $$;
 
 
 revoke all on function public.content_studio_cutover_waive_backup(uuid,text,text,text,text),
+  public.content_studio_cutover_evidence_reference(jsonb),
   public.content_studio_cutover_backup_waiver(text,text),
   public.content_studio_cutover_gate(text,text,text),
   public.content_studio_cutover_activate(text,text,text,text) from public,anon,authenticated;
 grant execute on function public.content_studio_cutover_waive_backup(uuid,text,text,text,text),
+  public.content_studio_cutover_evidence_reference(jsonb),
   public.content_studio_cutover_backup_waiver(text,text),
   public.content_studio_cutover_gate(text,text,text),
   public.content_studio_cutover_activate(text,text,text,text) to service_role;

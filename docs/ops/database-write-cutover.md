@@ -38,7 +38,9 @@ than 15 minutes, equal valid hashes, zero differences and zero retained issues.
 The activation action reads current Sheet parity again, including on retries;
 it never exports over a hand edit to make admission pass. SQL rechecks the
 retained journal at activation. The Phase C private evidence reference must be
-a JSON string of 1–2048 characters with non-whitespace content.
+a JSON string of 1–2048 characters containing a visible printable character
+after removing Unicode whitespace, invisible characters and format controls.
+The shared SQL reference validator preserves the original padded reference.
 
 Recovery is Supabase daily Pro plan backups plus the one-way exact Sheet export.
 There is **no independent archive of history/ledger outside the project**.

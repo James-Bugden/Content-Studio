@@ -133,6 +133,57 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     new GoogleSheetTransport(env.CS_SHEET_ID, {} as never, true), new ContentCutoverStore(options, build).exportJournal);
   const waiverGate = () => query('select content_studio_cutover_gate($1,$2,$3)', ['db', build, '2026-10-25']);
   const waiverActivate = () => query('select content_studio_cutover_activate($1,$2,$3,$4)', ['db', build, CUTOVER_CONTRACT, '2026-10-25']);
+  // Spell out each reported whitespace/format code point: ASCII-only and
+  // locale-dependent POSIX guards must fail these same committed regressions.
+  const invisibleReferences = [
+    0x0001, 0x0009, 0x000a, 0x000b, 0x000c, 0x000d, 0x001f, 0x0020, 0x007f, 0x0085,
+    0x00a0, 0x00ad, 0x034f, 0x061c, 0x115f, 0x1160, 0x1680, 0x17b4, 0x17b5, 0x180e,
+    ...Array.from({ length: 16 }, (_, i) => 0x2000 + i),
+    ...Array.from({ length: 8 }, (_, i) => 0x2028 + i),
+    0x205f, ...Array.from({ length: 16 }, (_, i) => 0x2060 + i),
+    0x2800, 0x3000, 0x3164, 0xfe00, 0xfe0f, 0xfeff, 0xffa0, 0xfff9,
+    0x110bd, 0x13430, 0x1bca0, 0x1d173, 0xe0001, 0xe0020, 0xe007f, 0xe0100, 0xe01ef,
+  ].map(code => [`U+${code.toString(16).toUpperCase().padStart(4, '0')}`, String.fromCodePoint(code)] as const);
+  it.each([...invisibleReferences, ['mixed invisibles', invisibleReferences.map(([, value]) => value).join('')] as const])(
+    'CS-066 R2: invisible privateEvidence %s refuses SQL gate, RPC activation and authenticated HTTP', async (_label, reference) => {
+      const services = await waivedPreparation();
+      await expect(waiverGate()).resolves.toBeDefined(); // all other proofs are green
+      const evidence = (await query("select import_id,payload from content_studio_cutover_evidence where name='phase-c'")).rows[0]!;
+      const payload = { ...(evidence.payload as Record<string, unknown>), privateEvidence: reference };
+      await query('select content_studio_cutover_record($1,$2,$3,$4)', ['phase-c', build, evidence.import_id, payload]);
+      // Soft assertions expose every admission layer even when a mutant admits
+      // the gate. Direct SQL activation cannot be masked by a runtime precheck.
+      await expect.soft(waiverGate()).rejects.toMatchObject({ code: '42501', message: 'phase C proof missing' });
+      await expect.soft(waiverActivate()).rejects.toMatchObject({ code: '42501', message: 'phase C proof missing' });
+      expect.soft((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+      // Isolate later probes if a mutant wrongly created an epoch: that epoch
+      // must not make the runtime/HTTP assertions refuse for an unrelated reason.
+      await db.raw.exec('truncate content_studio_cutover_authority');
+      await expect.soft(services.liveCutover!['activate-db']()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect.soft((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+      await db.raw.exec('truncate content_studio_cutover_authority');
+      expect.soft((await POST(activationRequest())).status).toBe(403);
+      expect((await query('select * from content_studio_cutover_authority')).rows).toHaveLength(0);
+    },
+  );
+  it.each([' \t synthetic-private-reference \n ', '\u00a0\u2003\u2060synthetic-private-reference\u202f\ufeff', '證據'])(
+    'CS-066 R2: preserves padded or Unicode visible references at every admission layer (%#)', async reference => {
+      const services = await waivedPreparation();
+      const evidence = (await query("select import_id,payload from content_studio_cutover_evidence where name='phase-c'")).rows[0]!;
+      await query('select content_studio_cutover_record($1,$2,$3,$4)', ['phase-c', build, evidence.import_id,
+        { ...(evidence.payload as Record<string, unknown>), privateEvidence: reference }]);
+      await expect(waiverGate()).resolves.toBeDefined();
+      await expect(waiverActivate()).resolves.toBeDefined();
+      expect((await query("select * from content_studio_cutover_authority where mode='db'")).rows).toHaveLength(1);
+      await db.raw.exec('truncate content_studio_cutover_authority');
+      await expect(services.liveCutover!['activate-db']()).resolves.toMatchObject({ mode: 'db' });
+      expect((await query("select * from content_studio_cutover_authority where mode='db'")).rows).toHaveLength(1);
+      await db.raw.exec('truncate content_studio_cutover_authority');
+      expect((await POST(activationRequest())).status).toBe(200);
+      expect((await query("select payload->>'privateEvidence' as reference from content_studio_cutover_evidence where name='phase-c'")).rows[0]!.reference).toBe(reference);
+      expect((await query("select * from content_studio_cutover_authority where mode='db'")).rows).toHaveLength(1);
+    },
+  );
   it('CS-066: reapplying the additive migration is safe', async () => {
     await waivedPreparation();
     const before = (await query('select * from content_studio_backup_waivers')).rows;
