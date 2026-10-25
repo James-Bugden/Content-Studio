@@ -15,6 +15,13 @@ Preview must never receive production credentials. Production variables are set 
 
 Names only; values live in Vercel. See `.env.example`.
 
+For repeatable Production provisioning, use the [LastPass environment bootstrap](env-setup.md):
+store private settings once in LastPass, then run `npm run env:setup`. The complete
+schema-checked inventory is `scripts/env-manifest.json`; its production defaults
+keep Google writes and database cutover disabled. Existing values are preserved.
+After redeploying, set the public `APP_BASE_URL` locally and run
+`npm run env:verify` against `/api/health`. No CI job is required or added.
+
 | Name | Preview | Production | Notes |
 | --- | --- | --- | --- |
 | `CS_DATA_MODE` | `fake` | `live` | |
@@ -42,10 +49,10 @@ These need the owner's own accounts and cannot be done by an agent: credential v
 1. **Google Cloud** (one project for Content Studio):
    - Enable the Google Sheets API and the Google Drive API.
    - OAuth consent screen: internal or testing, owner account only.
-   - Create an OAuth client (Web). Authorised redirect URI: `<production URL>/api/auth/callback/google`. Paste the client id and secret into Vercel Production as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
-   - Create a service account and a JSON key. Paste `client_email` into `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `private_key` into `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`. Delete the downloaded key file afterwards.
+   - Create an OAuth client (Web). Authorised redirect URI: `<production URL>/api/auth/callback/google`. Store the client id and secret in the LastPass entries for `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`, then run the bootstrap.
+   - Create a service account and a JSON key. Store `client_email` and `private_key` in the LastPass entries for `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`. Delete the downloaded key file afterwards.
 2. **Share** a *copy* of the workbook and a *copy* of the `Content / Editing` folder with the service account email (Editor), for T3. Set `CS_SHEET_ID` to the copy's id.
-3. **Sign in once** at the production URL with Google. The login page shows your account ID; paste it into `CS_OWNER_GOOGLE_SUB` and redeploy.
+3. **Sign in once** at the production URL with Google. The login page shows your account ID; store it in the LastPass entry for `CS_OWNER_GOOGLE_SUB`, rerun the bootstrap and redeploy.
 4. **Optional:** Typefully API key and a test social set; Anthropic API key.
 5. **Optional Supabase read model:** use the approved shared future combined-product project, apply only the committed Content Studio migration, and configure the four `SUPABASE_READ_MODEL_*` variables against a copied Sheet first. Never run a remote reset, whole-project schema pull or repo-wide migration push from Content Studio. Keep mode `off` in production until MIG-02 through MIG-05 evidence is accepted.
 

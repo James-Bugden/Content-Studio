@@ -19,7 +19,9 @@
     "check:secrets": "node scripts/scan-secrets.mjs",
     "check:env": "node scripts/check-env.mjs",
     "verify:supabase": "node scripts/verify-supabase-read-model.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run check:private && npm run check:secrets && npm run test"
+    "verify": "npm run typecheck && npm run lint && npm run check:private && npm run check:secrets && npm run test",
+    "env:setup": "node scripts/env-setup.mjs",
+    "env:verify": "node scripts/env-verify.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.128.0",
