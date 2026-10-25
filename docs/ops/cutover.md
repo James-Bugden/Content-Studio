@@ -129,7 +129,7 @@ the stated mode/write flag rather than reusing an old deployment environment.
    ```
 
    Run every denial/catalog query from [DB-9](database-shadow-live.md), including
-   the four `content_studio_cutover_*` tables and eleven cutover RPCs. All tables
+   the four `content_studio_cutover_*` tables and twelve cutover RPCs. All tables
    force zero-policy RLS; every function is invoker with pinned search_path.
    Prove anon/authenticated denial through hosted REST, and run security/database
    advisors. Replies inventory must be identical. **Rollback:** keep `sheet`
@@ -302,6 +302,24 @@ on that deployed build. A changed contract/schema version blocks writes, reports
 `cutover_contract_mismatch` in Fix issues and leaves owner backup/rollback
 available. Deploy the compatible code again or follow the verified rollback
 sequence. A contract migration needs its own reviewed migration/cutover plan.
+
+For a **permanent** return to Sheet authority, first complete the verified
+rollback operation and deploy/smoke `sheet` with writes still frozen. Before
+enabling Sheet writes, retire the old DB epoch via Supabase MCP `execute_sql`:
+
+```sql
+select public.content_studio_cutover_retire(
+  '<new-operation-uuid>'::uuid, '<actual-rollback-build-sha>',
+  '<dbHash-from-the-successful-rollback-response>');
+```
+
+Use the generated exact rehearsal hash within 15 minutes. This idempotent,
+audited operation marks the epoch `sheet`; stale DB deployments then refuse
+instead of serving a database that has missed new Sheet writes. Only after
+retirement may Sheet writes resume. A later DB cutover requires a **new import
+after retirement**, new full measurement and explicit activation; old proofs
+cannot reactivate the retired epoch. Frozen Sheet-to-DB flag rehearsals with
+zero intervening authority writes deliberately keep their DB epoch.
 
 The emergency backup/rollback paths check that DB authority exists, not fresh
 parity/Phase C/SHA evidence. Backup still verifies private ACLs and every archive

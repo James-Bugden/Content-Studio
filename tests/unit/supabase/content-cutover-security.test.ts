@@ -29,7 +29,7 @@ describe('DB-10 actual SQL measured gates / security / consistent snapshots', ()
       for (const run of [db.asAnon, db.asOwner]) await expect(run(q => q.query(`select * from ${table}`))).rejects.toBeDefined();
     }
     const functions = (await db.raw.query<{ oid: string; prosecdef: boolean; proconfig: string[] }>("select oid::text,prosecdef,proconfig from pg_proc where proname like 'content_studio_cutover_%'")).rows;
-    expect(functions).toHaveLength(11);
+    expect(functions).toHaveLength(12);
     for (const fn of functions) {
       expect(fn.prosecdef).toBe(false); expect(fn.proconfig.join()).toContain('search_path=pg_catalog, public');
       for (const role of ['anon', 'authenticated']) expect((await db.raw.query<{ok: boolean}>('select has_function_privilege($1,$2::oid,$3) as ok', [role, fn.oid, 'EXECUTE'])).rows[0]!.ok).toBe(false);

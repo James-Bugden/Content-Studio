@@ -24,7 +24,7 @@ create table public.content_studio_cutover_jobs (
 -- An epoch survives compatible deployments. Only activate checks a build SHA.
 create table public.content_studio_cutover_authority (
   singleton boolean primary key default true check(singleton),
-  mode text not null check(mode in ('db-read','db')),
+  mode text not null check(mode in ('sheet','db-read','db')),
   build text not null,
   contract text not null,
   schema_version integer not null,
@@ -187,11 +187,40 @@ begin
   return jsonb_build_object('ok',true);
 end $$;
 
+create function public.content_studio_cutover_retire(p_operation_id uuid,p_build text,p_rehearsal_hash text)
+returns jsonb language plpgsql security invoker set search_path=pg_catalog,public as $$
+declare e public.content_studio_cutover_evidence; a public.content_studio_cutover_authority; t uuid:=gen_random_uuid(); h text; claim jsonb; result jsonb;
+begin
+  h:=encode(sha256(convert_to('retire:'||p_build||':'||p_rehearsal_hash,'UTF8')),'hex');
+  claim:=public.content_studio_cutover_operation(p_operation_id,h,t,null);
+  if claim->>'status'='replayed' then return claim->'result'; end if;
+  perform pg_advisory_xact_lock(198,2);
+  select * into a from public.content_studio_cutover_authority where singleton for update;
+  select * into e from public.content_studio_cutover_evidence where name='rehearsal';
+  if a.mode is null or e.build is distinct from p_build or e.payload->>'exact' is distinct from 'true'
+    or e.import_id is distinct from (select operation_id from public.content_studio_import_runs order by at desc,operation_id desc limit 1)
+    or exists(select 1 from public.content_studio_posts where updated_at>e.at)
+    or exists(select 1 from public.content_studio_schedule where updated_at>e.at)
+    or p_rehearsal_hash is null or p_rehearsal_hash !~ '^[a-f0-9]{64}$'
+    or e.payload->>'dbHash' is distinct from p_rehearsal_hash or e.payload->>'sheetHash' is distinct from p_rehearsal_hash
+    or e.at<clock_timestamp()-interval '15 minutes' then raise exception 'verified rollback required' using errcode='42501'; end if;
+  -- Coordinator calls only AFTER verifying the frozen Sheet deployment, BEFORE
+  -- resuming Sheet writes. Frozen flag round-trip rehearsals need not retire.
+  if a.mode<>'sheet' then update public.content_studio_cutover_authority set mode='sheet',activated_at=clock_timestamp() where singleton; end if;
+  result:=jsonb_build_object('ok',true,'mode','sheet','build',p_build);
+  perform public.content_studio_cutover_operation(p_operation_id,h,t,result);
+  return result;
+end $$;
+
 create function public.content_studio_cutover_activate(p_mode text,p_build text,p_contract text)
 returns jsonb language plpgsql security invoker set search_path=pg_catalog,public as $$
-declare v integer;
+declare v integer; a public.content_studio_cutover_authority;
 begin
   perform pg_advisory_xact_lock(198,2);
+  select * into a from public.content_studio_cutover_authority where singleton;
+  if a.mode='sheet' and not exists(select 1 from public.content_studio_import_runs where at>a.activated_at) then
+    raise exception 'new import required after Sheet rollback' using errcode='42501';
+  end if;
   select version into v from public.content_studio_schema_version;
   if p_contract is distinct from 'schema-'||v||':cutover-1' then raise exception 'contract mismatch' using errcode='42501'; end if;
   perform public.content_studio_cutover_gate(p_mode,p_build);
@@ -213,6 +242,7 @@ begin
     perform public.content_studio_cutover_gate('db-read',p_build);
     return jsonb_build_object('ok',true,'readOnly',false);
   end if;
+  if a.mode='sheet' then raise exception 'DB epoch retired; activate with a new import' using errcode='42501'; end if;
   if a.mode='db' then
     if p_mode<>'db' then raise exception 'DB authority exists' using errcode='42501'; end if;
     -- Owner emergency exit never depends on measured admission or contract.

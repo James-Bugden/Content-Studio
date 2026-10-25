@@ -107,6 +107,27 @@ async function admitWrite(activate = true) {
 }
 
 describe('DB-10 live composition / real SQL over mocked REST and Google boundaries', () => {
+  it('retires DB authority before Sheet writes resume; a stale epoch cannot be reused without a new import and activation', async () => {
+    await admitWrite();
+    const services = mode('db');
+    const ready = await services.liveCutover!.rollback() as { parity: { dbHash: string } };
+    await expect(query('select content_studio_cutover_retire($1,$2,$3)', [token, build, 'e'.repeat(64)])).rejects.toMatchObject({ code: '42501', message: 'verified rollback required' });
+    const retire = () => query('select content_studio_cutover_retire($1,$2,$3) as result', [token, build, ready.parity.dbHash]);
+    expect((await retire()).rows[0]!.result).toMatchObject({ ok: true, mode: 'sheet' });
+    expect((await retire()).rows[0]!.result).toMatchObject({ ok: true, mode: 'sheet' });
+    await expect(services.repo.listLibrary()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
+    const authority = mode('sheet').repo, row = await authority.getLibrary('SYN-L001');
+    expect(await authority.updateLibrary({ operationId: 'synthetic-post-rollback-sheet', actor: { role: 'owner', sub: 'synthetic-owner' }, target: { libraryId: 'SYN-L001' }, expectedRevision: row.revision, patch: { currentHook: 'Synthetic Sheet authority after rollback' } })).toMatchObject({ ok: true });
+    await expect(mode('db').repo.listQueue()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(new ContentCutoverStore(options, build).activate('db')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    mode('db-shadow');
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(new SheetsContentRepository(sheet), { sourceKey: 'synthetic_source' }), await importVersions(new SupabaseContentDb(options)), hash);
+    await query('select content_studio_import_run($1,$2,$3,$4,$5,$6,$7)', ['synthetic-post-retirement-import', e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows]);
+    await admitRead();
+    await expect(new ContentCutoverStore(options, build).activate('db-read')).resolves.toMatchObject({ mode: 'db-read' });
+    expect((await mode('db-read').repo.getLibrary('SYN-L001')).cells.currentHook).toBe('Synthetic Sheet authority after rollback');
+  });
   it('recovers a single injected 429 at every awaited IO boundary in parity and a changed-row export', async () => {
     await admitWrite();
     await mode('db').contentCutover!.exporter.run();
