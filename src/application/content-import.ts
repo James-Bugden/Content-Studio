@@ -4,6 +4,7 @@ import type { ContentRepository } from './ports';
 import { buildSheetMirrorSnapshot, mirrorHash, evidenceHash, type SheetMirrorSnapshot } from './sheet-mirror';
 import { AppError, isAppError } from '@/domain/errors';
 import { parseBoolean } from '@/domain/enums';
+import { CONTENT_ANGLE_RAW_KEY, numberedContentAngle } from '@/domain/content-angle';
 import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import { assertContentSchemaVersion } from '@/integrations/supabase/content-schema';
 
@@ -151,13 +152,19 @@ export function typedContentRow(collection: Exclude<ImportCollection, 'workflow_
     let value: unknown = text;
     let rendered = text;
     if (numeric.has(field)) {
-      if (text.trim() === '') value = null;
+      const angle = field === 'contentAngle' ? numberedContentAngle(text) : null;
+      if (angle !== null) {
+        value = angle;
+        // Keep the exact Sheet cell, not a formatting exception. Do not mutate
+        // the source record or mix metadata into exported unknown columns.
+        row.passthrough = { ...record.passthrough, [CONTENT_ANGLE_RAW_KEY]: text };
+      } else if (text.trim() === '') value = null;
       else {
         if (!/^-?(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text.trim())) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });
         value = Number(text.trim().replace(/,/g, ''));
         if (!Number.isSafeInteger(value) || Number(value) < -2147483648 || Number(value) > 2147483647) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });
       }
-      rendered = value === null ? '' : String(value);
+      rendered = angle !== null ? text : value === null ? '' : String(value);
     } else if (field === 'posted' || field === 'queueForSchedule') {
       value = parseBoolean(text);
       if (value === null) throw blocked();
