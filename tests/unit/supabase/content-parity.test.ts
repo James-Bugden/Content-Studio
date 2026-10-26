@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compareContent, ContentParityJournal, PARITY_COLLECTIONS, shadowContentRepository } from '@/application/content-parity';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
@@ -10,8 +10,25 @@ import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 import { contentLists, sheetWithIdlessRecords } from '../../support/idless-sheet';
 
 const fullEvidence = { snapshotHash: 'a'.repeat(64), counts: { library: 0, queue: 0, schedule: 0, workflow_settings: 0 }, hashes: { library: 'a'.repeat(64), queue: 'a'.repeat(64), schedule: 'a'.repeat(64), workflow_settings: 'a'.repeat(64) }, exceptions: [], fullParity: { rows: 0, fields: 0, equal: 0, idsEqual: true, unclassified: 0 } };
+afterEach(() => vi.unstubAllEnvs());
 
 describe('MIG-10 shadow comparisons', () => {
+  it.each(['refused_numeric', 'refused_size'] as const)('CS-071: %s keeps otherwise green parity red, including a waived window', kind => {
+    const journal = new ContentParityJournal(), day = 86400_000, now = Date.UTC(2026, 9, 25);
+    for (let d = 1; d <= 7; d++) for (const collection of PARITY_COLLECTIONS) for (let n = 0; n < 5; n++) {
+      journal.samples.push({ at: now - d * day + n, collection, idsEqual: true, fields: 1000, equal: 1000, blocking: 0, lagMs: 100, facts: [] });
+    }
+    journal.imported(now);
+    for (const waived of [false, true]) {
+      vi.stubEnv('CS_PARITY_WINDOW_WAIVED', waived ? '2026-10-25' : '');
+      journal.lastRun = structuredClone(fullEvidence);
+      if (waived) journal.lastRun.windowWaiver = { by: 'owner', on: '2026-10-25', recordedAt: new Date(now).toISOString() };
+      expect(journal.summary(now).ready).toBe(true);
+      journal.lastRun.exceptions.push({ class: kind, collection: 'library', field: kind === 'refused_numeric' ? 'content_angle' : '@row', hash: 'b'.repeat(64) });
+      expect(journal.summary(now).ready).toBe(false);
+    }
+  });
+
   it.each(contentLists)('CS-070: filters only Sheet-side idless records for %s without hiding duplicates', async (collection, method) => {
     const repo = await sheetWithIdlessRecords();
     const source = await repo[method]();

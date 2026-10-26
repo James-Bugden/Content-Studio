@@ -110,13 +110,13 @@ export function buildTypedImport(snapshot: SheetMirrorSnapshot, versions: Map<st
     const collection = source.collection as Exclude<ImportCollection, 'workflow_settings'>;
     const record = source.payload as LibraryRecord | ScheduleRecord;
     // A refused derived row must remain unequal/pending, without stopping other
-    // rows. Only named refusals in Phase C qualify; unknown differences still fail closed.
+    // rows in shadow/read modes. Only named refusals qualify; unknown differences still fail closed.
     const rowExceptions: Parameters<typeof exception>[] = [];
     let row: Record<string, unknown>;
     try { row = typedContentRow(collection, source.stableId, record, (...args) => rowExceptions.push(args)); }
     catch (error) {
       const refusal = copyRefusal(error);
-      if (process.env.CS_CONTENT_STORE !== 'db-read' || !refusal) throw error;
+      if (!['db-shadow', 'db-read'].includes(process.env.CS_CONTENT_STORE ?? '') || !refusal) throw error;
       exception(collection, refusal.field, source.stableId, refusal.class, record.revision);
       continue;
     }

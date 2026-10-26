@@ -824,6 +824,22 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
       for (let point = 1; point <= boundaryCount; point++) await exercise(point);
     }
   }, 60_000);
+  it.each(['numeric', 'size'])('CS-071: a shadow %s refusal completes import but keeps measure and SQL activation red', async kind => {
+    await admitRead(); // Prove the same fixture can pass before adding the refusal.
+    const header = kind === 'numeric' ? 'Content Angle (1-14)' : 'Image Brief';
+    const col = sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === header);
+    expect(col).toBeGreaterThanOrEqual(0);
+    sheet.externalEdit(SHEET_TABS.library.name, 2, col, kind === 'numeric' ? 'synthetic-not-a-number' : 'x'.repeat(262_144));
+    const result = await runConfiguredSheetMirror({ kind: 'owner', idempotencyKey: '33333333-3333-4333-8333-333333333333' });
+    expect(result.status).toBe('completed');
+    expect(result.exceptions).toContainEqual(expect.objectContaining({ class: kind === 'numeric' ? 'refused_numeric' : 'refused_size' }));
+    await expect(getServices().liveCutover!.measure()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const sample = (await query("select payload->'samples'->'library' as sample from content_studio_cutover_evidence where name='parity'")).rows[0]!.sample;
+    expect(sample).toMatchObject({ idsEqual: true, blocking: expect.any(Number) });
+    expect((sample as { blocking: number }).blocking).toBeGreaterThan(0);
+    await expect(query('select content_studio_cutover_gate($1,$2)', ['db-read', build])).rejects.toMatchObject({ code: '42501' });
+    await expect(new ContentCutoverStore(options, build).activate('db-read')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
   it('rejects a red actual measurement rather than returning successful full coverage', async () => {
     await admitRead();
     const col = sheet.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === 'Current Hook');

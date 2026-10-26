@@ -191,13 +191,14 @@ hook/mismatch controls use the selected write authority. `db-read` correctly
 continues to say Sheet; `db` says database. Existing JSON `sheet` revision/draft
 field names are retained for client compatibility, without implying authority.
 DB-3's integer, timestamp and aggregate-size differences remain explicit copy
-failures, never reasons to veto or coerce a Sheet write. In db-read, a refused
-integer or oversized row is omitted from the import's accepted rows/counts and
+failures, never reasons to veto or coerce a Sheet write. In db-shadow and db-read,
+a refused integer or oversized row is omitted from the import's accepted rows/counts and
 recorded once as `refused_numeric` (column field) or `refused_size` (`@row`) in
 the private exception ledger. Other rows still import atomically. Reconcile
 shows a blocking row-specific refusal requiring source/limit correction; another
 import alone is not promised to repair it. Unknown differences, integrity and
-CAS failures still abort the batch; db-shadow retains its fail-closed behavior.
+CAS failures still abort the batch in both modes. Named refusals remain blocking
+for parity measurement and cutover admission (CS-071 / #222).
 Both unapplied RPC definitions accept these named classes; no live SQL was run.
 JSONB separator overhead is included in the preflight byte cap. The
 fake Schedule seed now fingerprints formula-aware raw rows exactly as the Sheet
