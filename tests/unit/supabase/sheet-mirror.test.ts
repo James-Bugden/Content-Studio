@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { setTelemetrySink, type TelemetrySink } from '@/observability/events';
+import { contentLists, sheetWithIdlessRecords, skippedCounts } from '../../support/idless-sheet';
 import { AppError } from '@/domain/errors';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
@@ -48,6 +50,53 @@ class MemoryStore implements SheetMirrorStore {
 }
 
 describe('MIG-02: exact Sheet snapshot and replay', () => {
+  it('CS-070: skips and counts idless rows in all four collections, preserving payloads and source positions', async () => {
+    const repo = await sheetWithIdlessRecords();
+    const sink = vi.fn<TelemetrySink>();
+    setTelemetrySink(sink);
+    try {
+      const snapshot = await buildSheetMirrorSnapshot(repo, { sourceKey, runId: runOne });
+      for (const [collection, method] of contentLists) {
+        const source = await repo[method]();
+        const rows = snapshot.rows.filter(r => r.collection === collection);
+        expect(rows).toHaveLength(source.length - skippedCounts[collection]);
+        expect(snapshot.counts[collection]).toBe(rows.length);
+        expect(rows.length).toBeGreaterThan(0);
+        for (const row of rows) {
+          expect(row.stableId.trim()).not.toBe('');
+          expect(row.position).toBe(source.findIndex(record => record === row.payload));
+          expect(row.payload).toEqual(source[row.position]);
+          expect(row.rowHash).toBe(mirrorHash(row.payload));
+        }
+        expect(rows.some(r => r.position === 1)).toBe(true);
+      }
+      const events = sink.mock.calls.map(([event]) => event).filter(event => event.name === 'sheet.mirror.skipped_idless');
+      expect(events).toHaveLength(1);
+      expect(events[0]).toEqual({
+        name: 'sheet.mirror.skipped_idless', adapter: 'sheet', outcome: 'ok', facts: skippedCounts, at: expect.any(String),
+      });
+    } finally { setTelemetrySink(null); }
+  });
+
+  it.each(contentLists)('CS-070: duplicate IDs still conflict in %s alongside skipped rows', async (collection, method) => {
+    const repo = await sheetWithIdlessRecords();
+    const records = await repo[method]();
+    records.push(records[1]! as never);
+    await expect(buildSheetMirrorSnapshot(repo, { sourceKey })).rejects.toMatchObject({
+      code: 'CONFLICT', details: { reason: 'mirror_duplicate_stable_id', collection },
+    });
+  });
+
+  it('CS-070: a blank queue-summary source still fails validation', async () => {
+    const repo = new SheetsContentRepository(new FakeSheetTransport());
+    const summary = await repo.queueSummary();
+    summary[0]!.source = ' \t ';
+    vi.spyOn(repo, 'queueSummary').mockResolvedValue(summary);
+    await expect(buildSheetMirrorSnapshot(repo, { sourceKey })).rejects.toMatchObject({
+      code: 'VALIDATION_FAILED', details: { reason: 'mirror_missing_stable_id', collection: 'queue_summary' },
+    });
+  });
+
   it('uses a content-sensitive SHA-256 hash rather than a constant or short change fingerprint', () => {
     expect(mirrorHash({ value: 'A' })).toMatch(/^[0-9a-f]{64}$/);
     expect(mirrorHash({ value: 'A' })).not.toBe(mirrorHash({ value: 'B' }));

@@ -7,10 +7,33 @@ import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
 import { recentEvents } from '@/observability/events';
 import { buildReconcileReport } from '@/application/reconcile';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
+import { contentLists, sheetWithIdlessRecords } from '../../support/idless-sheet';
 
 const fullEvidence = { snapshotHash: 'a'.repeat(64), counts: { library: 0, queue: 0, schedule: 0, workflow_settings: 0 }, hashes: { library: 'a'.repeat(64), queue: 'a'.repeat(64), schedule: 'a'.repeat(64), workflow_settings: 'a'.repeat(64) }, exceptions: [], fullParity: { rows: 0, fields: 0, equal: 0, idsEqual: true, unclassified: 0 } };
 
 describe('MIG-10 shadow comparisons', () => {
+  it.each(contentLists)('CS-070: filters only Sheet-side idless records for %s without hiding duplicates', async (collection, method) => {
+    const repo = await sheetWithIdlessRecords();
+    const source = await repo[method]();
+    const valid = source.filter(record => ('libraryId' in record.value ? record.value.libraryId : record.value.contentId).trim() !== '');
+    const equal = compareContent(collection, source, valid, 1, 0);
+    expect(equal).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
+    expect(equal.fields).toBeGreaterThan(0);
+    expect(equal.equal).toBe(equal.fields);
+    expect(compareContent(collection, source.filter(r => !valid.some(record => record === r)), [], 1, 0)).toMatchObject({ idsEqual: true, blocking: 0 });
+    for (const [left, right] of [[source, [...valid, valid[0]!]], [[...source, valid[0]!], valid]]) {
+      expect(compareContent(collection, left, right, 1, 0)).toMatchObject({ idsEqual: false, blocking: 1 });
+    }
+    // A bad DB row must still fail the ID-set gate.
+    expect(compareContent(collection, valid, source, 1, 0).idsEqual).toBe(false);
+  });
+
+  it('CS-070: leaves blank queue-summary sources and workflow-setting keys comparable', () => {
+    expect(compareContent('queue_summary', [{ source: '', counts: { Total: 1 } }], [], 1, 0)).toMatchObject({ idsEqual: false, blocking: 1 });
+    const settings = { raw: { '': 'Synthetic value' }, rawNotes: {}, timezone: 'Asia/Taipei', slots: [], problems: [] };
+    expect(compareContent('workflow_settings', settings, { ...settings, raw: {} }, 1, 0)).toMatchObject({ idsEqual: false, blocking: 1 });
+  });
+
   it('names blank checkbox equivalence without masking any other field or true checkbox', () => {
     const record = (posted: string, content: string) => [{ value: { contentId: 'SYN-1', posted: false }, cells: { posted, content } }];
     const equal = compareContent('schedule', record('', 'Synthetic copy'), record('FALSE', 'Synthetic copy'), 1, 0);
