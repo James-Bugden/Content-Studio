@@ -1,146 +1,77 @@
-# CS-068 build report: issue #210, round 1
+# CS-070 / issue #219 build report
 
-Issue: https://github.com/James-Bugden/Content-Studio/issues/210
+- Assignment: Standard; build; PR label 219; round 1.
+- Issue: https://github.com/James-Bugden/Content-Studio/issues/219
+- Branch: `fix/219-idless-rows`.
+- Base: `e611740` (main at task start); worktree initially clean.
+- Implementation commit: `3db6f5ab0b1a7a2636177964621f6f31a8b9edb3`.
+- Commit subject: `CS-070: skip Sheet rows without a stable ID in import and parity (#219)`.
+- Environment: Windows local worktree; synthetic fake repositories only; 2026-10-26.
 
-Branch: `fix/210-missing-queue-summary-tab`, based on `1970368`.
-Classification: Standard; verification tier T0. This report is committed with
-the implementation; the containing commit identifies the reviewed build.
+## Result and acceptance evidence
 
-## Change and acceptance evidence
+The mirror now omits library, queue, ready and schedule records whose stable
+ID is empty after trimming. `hasStableSheetId` is shared with Sheet-side content
+parity. Retained records keep their original positions, payloads and hashes.
+Typed import inherits the mirror filter without changing conversion rules.
 
-- `readAll` returns an empty collection only for `queueSummary` when its first
-  page throws the transport's typed `VALIDATION_FAILED` error (Sheet HTTP 400).
-- Emits `sheet.tab_absent` with `{ tab: 'queueSummary', tabAbsent: true,
-  startRow: 1 }`. No provider payload, workbook identifier or content is logged.
-- All other tabs retain first-page error propagation; all other typed codes
-  and untyped errors still propagate for the summary.
-- Present-tab parsing and the existing later-page grid-boundary handling remain
-  unchanged. Tests cover both existing counts/master links and summary pagination.
-- A fake-transport missing-tab fixture builds a complete mirror snapshot with
-  zero summary rows. Sampled shadow parity compares empty summaries successfully
-  with equal IDs, no blocking facts and 100% field equality (fields not applicable).
+When any rows are skipped, one `sheet.mirror.skipped_idless` telemetry event
+contains the four numeric collection counts in `facts`. Its only other fields
+are the fixed name, adapter, outcome and generated timestamp. It includes no
+content, stable IDs, source row numbers or operation identity.
 
-Read AGENTS.md, the implementation skill, MASTER-SPEC, issue #210, the Sheet
-repository, mirror and parity services, and the Sheets read/cache contract.
-The worktree was initially clean; no existing PR was listed for this branch.
-Self-reviewed the complete source/test diff against the issue's narrow scope.
+| Issue acceptance | Evidence | Result |
+| --- | --- | --- |
+| Skip/count idless records in all four collections | Fake repository mixes empty, whitespace-only and valid IDs; different skip counts per collection | Pass |
+| Mirror snapshot builds and preserves valid records | Counts, nonempty retained IDs, payloads, hashes and original positions asserted | Pass |
+| Duplicate IDs still conflict | Duplicate stable ID injected separately into each collection alongside idless records | Pass |
+| Parity has equal Sheet/DB ID sets | Direct four-collection comparisons plus typed fake-store import/adapter round trip | Pass |
+| Counts-only logging | Exact event shape and exactly one skip event asserted through telemetry sink | Pass |
+| Mutation-check skip guard | Guard disabled; mirror, import and parity regressions fail; original bytes restored | Pass |
 
-## Commands and results
+Parity filters only the expected Sheet lists; invalid DB rows and duplicates on
+either side remain blocking. Queue-summary and workflow-settings rules remain
+unchanged, with explicit regression coverage. UI gates remain unchanged.
 
-All resource-heavy commands used the shared queue. No full test suite was run.
+## Verification
 
-```sh
-bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts tests/unit/google/sheets-repository.test.ts tests/unit/google/sheets-read-cache.test.ts tests/unit/google/sheets-stale-read.test.ts tests/unit/supabase/sheet-mirror.test.ts tests/unit/supabase/sheet-mirror-parity.test.ts tests/unit/supabase/content-parity.test.ts tests/unit/security --maxWorkers=1
+All Vitest, typecheck and lint commands ran through `bash ~/bin/heavy`.
+The final test command ran after restoring the mutation:
+
+```powershell
+$env:CS_TEST_MODE='unit'
+bash ~/bin/heavy npx vitest run tests/unit/supabase/sheet-mirror.test.ts tests/unit/supabase/content-import.test.ts tests/unit/supabase/content-import-operation.test.ts tests/unit/supabase/content-parity.test.ts tests/unit/supabase/sheet-mirror-parity.test.ts tests/unit/security --maxWorkers=1
 ```
 
-PASS: 18 test files, 226 tests; exit 0. Secret-scanner security tests intentionally
-print findings for planted synthetic sentinels; those tests passed.
+Result: **16 files passed, 195 tests passed**, exit 0. No skipped tests in this
+final run. Secret-scanner negative fixtures intentionally print synthetic
+findings; their tests pass.
 
-```sh
-bash ~/bin/heavy npm run typecheck
-```
+Mutation command: the three edited test files above, with
+`--maxWorkers=1 -t CS-070`, after temporarily replacing
+`return id.trim() !== '';` with `return id.length >= 0;` in the shared helper.
+Result: **10 failed, 2 passed, 44 unselected/skipped**, exit 1; mutant killed.
+The unselected tests are not claimed as verification passes.
 
-FAILED: exit 1. Shared dependencies `@supabase/supabase-js` and
-`@electric-sql/pglite` are absent (confirmed with `Test-Path`); TypeScript reports
-missing modules and associated implicit-any/untyped-call errors in existing
-Replies/database code and tests. No diagnostics name the changed source or test.
-`node_modules` is a junction to the main checkout and was left untouched;
-no package installation was attempted. Global typecheck is not a pass.
+- `bash ~/bin/heavy npm run lint`: **Pass**, exit 0.
+- `bash ~/bin/heavy npm run typecheck`: **Blocked / failed**, exit 1.
+  The shared local `node_modules` lacks `@supabase/supabase-js` and
+  `@electric-sql/pglite` (including its contrib declarations). TypeScript reports
+  unresolved imports and consequent typing errors in unchanged Replies and
+  database tests. No diagnostics name the changed files. This is not a green
+  typecheck; dependencies were not installed or modified.
+- `git diff --check`: **Pass**.
+- Self-review: reviewed actual implementation/test diff; no blocking code findings.
 
-```sh
-bash ~/bin/heavy npm run lint
-```
+## Scope and remaining limitations
 
-PASS: exit 0, no lint diagnostics.
+T0 is the issue's required tier. Its targeted tests and lint pass, but full T0
+is not green because of the typecheck environment blocker. Broader application
+and Supabase directory suites were not run: the assignment explicitly limits
+this memory-constrained PC to targeted tests. No UI/browser behavior changed;
+T1-T4 were not required or run for this build assignment.
 
-```sh
-git diff --check
-```
-
-PASS: no whitespace errors.
-
-## Risks and limits
-
-The transport's first-page validation code is the specified signal for an absent
-summary; this intentionally does not inspect private provider error messages.
-The optional summary remains empty rather than deriving replacement counts from
-Content Queue. No schema, authority, write, cache-policy or dependency changes.
-
-No live provider calls, PGlite suites, browser checks, push, GitHub writes,
-merge or deployment were performed. GitHub access was read-only issue/PR-state
-inspection. Production behavior is unverified by design for this build handoff.
-The requested targeted T0 scope supersedes the skill's broader database-suite
-recommendation; unrelated application/database suites were not run.
-
-## PR #211 review fix: round 1
-
-PR: https://github.com/James-Bugden/Content-Studio/pull/211
-
-Review-fix base: `d3d8d116ff6a2bbb7316ff0b280772e39b6976d8`.
-Classification remains Standard, T0. The commit containing this report identifies
-the fixed build. The earlier sections retain the original implementation evidence.
-
-Read-only GitHub inspection confirmed issue #210 and PR #211 are open, with the
-PR head matching the local review-fix base. Vercel reported a successful preview
-for that prior head; this local fix has not been pushed or deployed.
-
-Addressed P2 by adding two first-page `queueSummary()` transport failures:
-
-- A plain object `{ code: 'VALIDATION_FAILED', details: { status: 400 } }`.
-- An ordinary `Error` with `code = 'VALIDATION_FAILED'`.
-
-Both cases assert rejection with the exact thrown value using `rejects.toBe`,
-and assert one transport read of the summary tab at `startRow: 1`. The original
-untyped Error regression and branded AppError success case remain covered.
-
-```sh
-bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1
-```
-
-PASS on the real source: 1 test file, 25 tests; exit 0.
-
-Mutation proof: temporarily replaced only the first-summary-page
-`isAppError(error)` check with
-`typeof error === 'object' && error !== null && 'code' in error`, leaving the
-`error.code === 'VALIDATION_FAILED'` comparison in place. The full file failed
-with exit 1. A focused repeat captured both new failures explicitly:
-
-```sh
-bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts -t 'carrying VALIDATION_FAILED' --maxWorkers=1
-```
-
-EXPECTED FAILURE on the widened guard: 2 failed, 23 deselected; exit 1. Both
-reported `promise resolved "[]" instead of rejecting` at the identity assertion.
-Restored the original bytes in `finally` after each mutation run. Before/after
-SHA-256 matched:
-`3C432A76FA0F0736DBE9EC0077613E4A1A18F2AEFCDA7B94E2AEEE1B12560B57`.
-`git diff --exit-code -- src/integrations/google/sheets-repository.ts` passed
-with no output. The same focused command then passed on the restored source:
-2 passed, 23 deselected; exit 0. Deselection is only for this mutation probe;
-all 25 cases passed in the complete-file and related-test runs.
-
-```sh
-bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts tests/unit/google/sheets-repository.test.ts tests/unit/google/sheets-read-cache.test.ts tests/unit/google/sheets-stale-read.test.ts --maxWorkers=1
-bash ~/bin/heavy npm run typecheck
-bash ~/bin/heavy npm run lint
-```
-
-Restored-source Sheets tests: PASS, 4 files / 76 tests; exit 0.
-Typecheck: FAILED, exit 2, because the shared `node_modules` junction still lacks
-`@supabase/supabase-js` and `@electric-sql/pglite`, with missing-module and related
-implicit-any/untyped-call diagnostics in existing Replies/database files.
-No diagnostic names the changed test. No dependency installation or workaround
-was attempted; global typecheck remains a failed check.
-Lint: PASS, exit 0, no diagnostics. `git diff --check`: PASS.
-
-All heavy commands used the shared queue. Mutation, restored-source tests,
-typecheck and lint ran sequentially within one queue reservation, with nested
-`bash ~/bin/heavy` calls retaining that reservation. The initial script-file
-launcher was refused by local PowerShell policy before any check or source
-mutation; invoking the same commands inline completed the verification.
-
-The final change contains only this report and the regression test. Production
-implementation is byte-for-byte unchanged. T1-T4 do not apply to this test-only
-review fix. No full suite, package install, push, GitHub write, merge, deployment
-or live-provider operation was performed. The remaining limitation is the
-pre-existing dependency-blocked typecheck.
+No live provider calls, deployments, new dependencies, installs, pushes or
+GitHub writes were performed. Issue and branch PR state were inspected using
+read-only GitHub commands; no PR existed for this branch at inspection. The
+issue remains open. Production import behavior is not claimed as verified.

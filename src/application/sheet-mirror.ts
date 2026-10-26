@@ -3,6 +3,8 @@ import { createHash, createHmac, randomUUID, randomBytes } from 'node:crypto';
 import { AppError } from '@/domain/errors';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import type { ContentRepository } from './ports';
+import { hasStableSheetId } from './sheet-records';
+import { emit } from '@/observability/events';
 
 export const MIRROR_SCHEMA_VERSION = 1 as const;
 
@@ -90,11 +92,11 @@ function row(collection: MirrorCollection, stableId: string, payload: unknown, p
 }
 
 function recordRows(collection: 'library' | 'queue' | 'ready', records: LibraryRecord[]): MirrorRow[] {
-  return records.map((record, position) => row(collection, record.value.libraryId, record, position, record));
+  return records.flatMap((record, position) => hasStableSheetId(record) ? [row(collection, record.value.libraryId, record, position, record)] : []);
 }
 
 function scheduleRows(records: ScheduleRecord[]): MirrorRow[] {
-  return records.map((record, position) => row('schedule', record.value.contentId, record, position, record));
+  return records.flatMap((record, position) => hasStableSheetId(record) ? [row('schedule', record.value.contentId, record, position, record)] : []);
 }
 
 function summaryRows(records: QueueSummaryRow[]): MirrorRow[] {
@@ -135,12 +137,24 @@ export async function buildSheetMirrorSnapshot(
     repo.workflowSettings(),
   ]);
 
+  const contentRows = {
+    library: recordRows('library', library),
+    queue: recordRows('queue', queue),
+    ready: recordRows('ready', ready),
+    schedule: scheduleRows(schedule),
+  };
+  const skipped = {
+    library: library.length - contentRows.library.length,
+    queue: queue.length - contentRows.queue.length,
+    ready: ready.length - contentRows.ready.length,
+    schedule: schedule.length - contentRows.schedule.length,
+  };
+  if (Object.values(skipped).some(count => count > 0)) {
+    emit({ name: 'sheet.mirror.skipped_idless', adapter: 'sheet', outcome: 'ok', facts: skipped });
+  }
   const rows = [
     row('schema', 'sheet', schema, 0),
-    ...recordRows('library', library),
-    ...recordRows('queue', queue),
-    ...recordRows('ready', ready),
-    ...scheduleRows(schedule),
+    ...Object.values(contentRows).flat(),
     ...summaryRows(summary),
     ...settingsRows(settings),
   ].sort((a, b) => a.collection.localeCompare(b.collection) || a.stableId.localeCompare(b.stableId));

@@ -4,6 +4,8 @@ import { canonicalJson, evidenceHash } from './sheet-mirror';
 import { classifyDifference } from './content-import';
 import type { ImportEnvelope } from './content-import';
 import { emit } from '@/observability/events';
+import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
+import { hasStableSheetId } from './sheet-records';
 
 export const PARITY_COLLECTIONS = ['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] as const;
 export type ParityCollection = typeof PARITY_COLLECTIONS[number];
@@ -31,6 +33,9 @@ function indexed(collection: ParityCollection, input: unknown): Map<string, unkn
 
 /** Adapter-level comparison: revisions/positions/formula machinery are not content. */
 export function compareContent(collection: ParityCollection, expected: unknown, actual: unknown, at: number, lastImport: number | null): ParitySample {
+  if (collection === 'library' || collection === 'queue' || collection === 'ready' || collection === 'schedule') {
+    expected = (expected as (LibraryRecord | ScheduleRecord)[]).filter(hasStableSheetId);
+  }
   const left = indexed(collection, expected), right = indexed(collection, actual);
   const facts: ParityFact[] = [];
   let idsEqual = true, fields = 0, equal = 0, blocking = 0;

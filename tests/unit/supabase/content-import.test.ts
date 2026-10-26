@@ -8,6 +8,7 @@ import { FakeContentImportStore } from '@/integrations/supabase/fake-content-imp
 import { SupabaseContentImportStore } from '@/integrations/supabase/content-import-store';
 import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 import { compareContent } from '@/application/content-parity';
+import { contentLists, sheetWithIdlessRecords, skippedCounts } from '../../support/idless-sheet';
 
 beforeEach(() => vi.stubEnv('CS_CONTENT_STORE', 'db-shadow'));
 afterEach(() => vi.unstubAllEnvs());
@@ -16,6 +17,19 @@ const actor = mirrorHash('synthetic-import-actor');
 const sheet = () => new SheetsContentRepository(new FakeSheetTransport());
 const snapshot = () => buildSheetMirrorSnapshot(sheet(), { sourceKey: 'synthetic_workbook' });
 describe('MIG-09 typed complete imports', () => {
+  it('CS-070: imports valid records with idless Sheet rows and retains adapter parity', async () => {
+    const repo = await sheetWithIdlessRecords();
+    const store = new FakeContentImportStore({ posts: [], schedule: [], settings: [] });
+    const result = await runTypedImport(repo, store, 'synthetic_workbook', actor);
+    const db = new SupabaseContentRepository(store.db, 'db-read');
+    for (const [collection, method] of contentLists) {
+      const expected = await repo[method](), actual = await db[method]();
+      expect(actual).toHaveLength(expected.length - skippedCounts[collection]);
+      expect(compareContent(collection, expected, actual, 1, 0)).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
+      if (collection !== 'ready') expect(result.counts[collection]).toBe(actual.length);
+    }
+  });
+
   it('CS-059b / R05: db-read aborts the entire import on an unclassified conversion failure', async () => {
     vi.stubEnv('CS_CONTENT_STORE', 'db-read');
     const repo = sheet(), store = new FakeContentImportStore();
