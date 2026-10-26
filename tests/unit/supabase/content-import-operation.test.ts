@@ -5,8 +5,40 @@ import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
 import { requireCronSecret } from '@/lib/cron-auth';
 import { evidenceHash } from '@/application/sheet-mirror';
 
-afterEach(() => { vi.unstubAllEnvs(); resetServices(); resetEnvCache(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); resetServices(); resetEnvCache(); });
 describe('typed import scheduling seam', () => {
+  it('CS-075: lag follows fresh capture, never unchanged replay, in-progress, failed or read-only work', async () => {
+    vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', 'db-shadow'); resetEnvCache(); resetServices();
+    let now = Date.UTC(2026, 9, 26);
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now);
+    const services = getServices(), journal = services.contentParity!, store = services.contentImport!;
+    const first = { kind: 'owner', idempotencyKey: '11111111-1111-4111-8111-111111111111' } as const;
+    await runConfiguredSheetMirror(first);
+    const captured = journal.lastImport!;
+    now = captured + 900_001;
+    vi.setSystemTime(now);
+    expect(await runConfiguredSheetMirror(first)).toMatchObject({ status: 'replayed' });
+    expect(journal.lastImport).toBe(captured);
+    expect(journal.summary(now).lagMs).toBe(900_001);
+    await services.repo.listLibrary();
+    expect(journal.lastImport).toBe(captured);
+    let finish!: () => void;
+    const apply = store.applyImport.bind(store);
+    vi.spyOn(store, 'applyImport').mockImplementationOnce(async envelope => { await new Promise<void>(resolve => { finish = resolve; }); await apply(envelope); });
+    const pending = runConfiguredSheetMirror({ kind: 'scheduled' });
+    // Wait until the complete source has been captured, but not yet committed.
+    while (!finish) await new Promise(resolve => setTimeout(resolve, 0));
+    expect(await runConfiguredSheetMirror({ kind: 'scheduled' })).toMatchObject({ status: 'in_progress' });
+    expect(journal.lastImport).toBe(captured);
+    vi.setSystemTime(now + 300_000);
+    finish(); await pending;
+    const refreshed = journal.lastImport!;
+    expect(refreshed).toBe(now);
+    expect(journal.summary().lagMs).toBe(300_000);
+    vi.spyOn(store, 'applyImport').mockRejectedValueOnce(new Error('Synthetic import failure'));
+    await expect(runConfiguredSheetMirror({ kind: 'scheduled' })).rejects.toThrow('Synthetic import failure');
+    expect(journal.lastImport).toBe(refreshed);
+  });
   it('uses the configured source key in the durable audit identity', async () => {
     vi.stubEnv('CS_DATA_MODE', 'fake'); vi.stubEnv('CS_CONTENT_STORE', 'db-shadow');
     vi.stubEnv('SUPABASE_READ_MODEL_SOURCE_KEY', 'synthetic_configured_source'); resetEnvCache(); resetServices();

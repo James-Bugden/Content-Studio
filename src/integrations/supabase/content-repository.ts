@@ -14,6 +14,7 @@ import { LIBRARY_HEADERS, SCHEDULE_HEADERS, LIBRARY_WRITABLE, SCHEDULE_WRITABLE 
 import { parseWorkflowSettings } from '@/domain/settings';
 import { assertContentSchemaVersion } from './content-schema';
 import { validateContentRow } from './content-row-schema';
+import { CONTENT_TIMESTAMP_FIELDS, taipeiContentTimestamp } from '@/application/content-timestamps';
 
 export const contentColumn = (field: string): string => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
 const summarySchema = z.array(z.object({ content_source: z.string(), master_link: z.string(), counts: z.record(z.string(), z.number().finite().nullable()) }));
@@ -26,17 +27,16 @@ function validated<T>(schema: z.ZodType<T>, input: unknown): T {
 
 // PostgREST emits timestamptz in UTC. Sheet's operational display is Taipei.
 function taipeiStamp(value: string): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) throw new AppError('SCHEMA_DRIFT', { kind: 'timestamp' });
-  return new Date(date.getTime() + 8 * 60 * 60_000).toISOString().replace(/\.000Z$/, '+08:00').replace(/Z$/, '+08:00');
+  const stamp = taipeiContentTimestamp(value);
+  if (stamp === null) throw new AppError('SCHEMA_DRIFT', { kind: 'timestamp' });
+  return stamp;
 }
 
 function cells<F extends string>(headers: Record<F, string>, row: object): Record<F, string> {
   const raw = row as Record<string, unknown>;
   return Object.fromEntries(Object.keys(headers).map(field => {
     let value = cellText(raw[contentColumn(field)]);
-    if (['finalSyncedAt', 'publishedAt', 'analyticsSyncedAt'].includes(field)) value = taipeiStamp(value);
+    if (CONTENT_TIMESTAMP_FIELDS.has(field)) value = taipeiStamp(value);
     if (field === 'finalSyncedAt' && value && raw.final_synced_hash) value += ` #${raw.final_synced_hash}`;
     return [field, value];
   })) as Record<F, string>;
