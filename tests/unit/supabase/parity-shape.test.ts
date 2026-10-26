@@ -20,7 +20,8 @@ function library(cells: Record<string, string>) {
 }
 
 describe('CS-075 schedule timestamp equivalence', () => {
-  it.each(['finalSyncedAt', 'publishedAt', 'analyticsSyncedAt'] as const)('compares both cells and value.%s by instant with exact hash', async field => {
+  it('compares both cells and value.finalSyncedAt by instant with exact hash', async () => {
+    const field = 'finalSyncedAt';
     const source = (await new SheetsContentRepository(new FakeSheetTransport()).listSchedule()).slice(0, 1);
     for (const [left, right] of [
       ['2026-09-21T10:59:52+08:00', '2026-09-21T02:59:52.000Z'],

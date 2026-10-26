@@ -8,7 +8,7 @@ import { CONTENT_ANGLE_RAW_KEY, numberedContentAngle } from '@/domain/content-an
 import { HOOK_SCORE_RAW_KEY, decimalHookScore } from '@/domain/hook-score';
 import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import { assertContentSchemaVersion } from '@/integrations/supabase/content-schema';
-import { CONTENT_TIMESTAMP_FIELDS, contentTimestampParts, sameContentTimestamp, taipeiContentTimestamp } from './content-timestamps';
+import { CONTENT_TIMESTAMP_FIELDS, FINAL_SYNCED_AT_RAW_KEY, contentTimestampParts, sameContentTimestamp, taipeiContentTimestamp } from './content-timestamps';
 
 export const IMPORT_COLLECTIONS = ['library', 'queue', 'schedule', 'workflow_settings'] as const;
 export type ImportCollection = typeof IMPORT_COLLECTIONS[number];
@@ -177,8 +177,11 @@ export function typedContentRow(collection: Exclude<ImportCollection, 'workflow_
       const { stamp, hash } = parts;
       value = stamp || null;
       rendered = taipeiContentTimestamp(stamp)!;
-      if (field === 'finalSyncedAt' && hash) rendered += ` #${hash}`;
-      if (field === 'finalSyncedAt') row.final_synced_hash = hash;
+      if (field === 'finalSyncedAt') {
+        row.final_synced_hash = hash;
+        row.passthrough = { ...(row.passthrough as Record<string, unknown>), [FINAL_SYNCED_AT_RAW_KEY]: text };
+        rendered = text;
+      }
     } else if (field === 'parentContentId') value = text || null;
     if (rendered !== text) {
       const kind = classifyDifference(text, rendered, field);

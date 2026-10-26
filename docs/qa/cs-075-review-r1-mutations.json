@@ -1,0 +1,805 @@
+{
+  "baseCommit": "68148a5bc1e372853f444e33b1b9f47cdf85cb84",
+  "baselinePassed": true,
+  "mutants": 35,
+  "detected": 35,
+  "results": [
+    {
+      "guard": "Calendar syntax refusal",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (!match) return false;",
+      "after": "if (!match) return true;",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "23451adb233da80909d192e226cdac5210f33899660d8099e34e3f83a410f287",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  3 failed | 34 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:59:52 without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T02:59:52', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21 02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21 02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T2:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T2:59:52Z', …(1) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Year zero refused",
+      "file": "src/application/content-timestamps.ts",
+      "before": "year < 1 || ",
+      "after": "",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "24719945bcf9ffb15dd9f81595f7acd4a98c8cf85e3e60cb6742e9d7d369d877",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 36 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 0000-01-01T00:00:00Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '0000-01-01T00:00:00Z', …(1) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Calendar day ranges",
+      "file": "src/application/content-timestamps.ts",
+      "before": "day > days[month - 1]!",
+      "after": "day > 31",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "ac50bd0f3b0e7500339e828531643bc9dec1fb93ca8811c4ea65230001a8fb06",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  7 failed | 30 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-30T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-02-30T02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-29T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-02-29T02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 1900-02-29T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '1900-02-29T02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-04-31T02:59:52Z without normalizing its calendar"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Leap year multiple of four",
+      "file": "src/application/content-timestamps.ts",
+      "before": "year % 4 === 0 && ",
+      "after": "false && ",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "03f1f4662481d7c6bc9a461181cdf275a44b3043665c9b3ba6cf3cd985e31fed",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 35 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2000-02-29T02:59:52Z",
+        "AssertionError: expected undefined to be '2000-02-29T02:59:52Z' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2024-02-29T23:59:59Z",
+        "AssertionError: expected undefined to be '2024-02-29T23:59:59Z' // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Leap year century rule",
+      "file": "src/application/content-timestamps.ts",
+      "before": "year % 100 !== 0 || year % 400 === 0",
+      "after": "true",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "d24de562cf9285c6f8f53962fb0f47bcf6a05cb18e88afcc8e0539e295dda535",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 36 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 1900-02-29T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '1900-02-29T02:59:52Z', …(1) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Leap year four-century exception",
+      "file": "src/application/content-timestamps.ts",
+      "before": "year % 400 === 0",
+      "after": "false",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "2127af05ca424993449224ecf61f9e52e1269a21673ff5ab9874b9071de364e5",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 36 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2000-02-29T02:59:52Z",
+        "AssertionError: expected undefined to be '2000-02-29T02:59:52Z' // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Month refusal direction",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (year < 1 || month < 1",
+      "after": "if (month > 12) return true;\n  if (year < 1 || month < 1",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "58bc8d54f969a6cecea314d5a7066d357d1a378ae309a4fa06d5d63786d9b3ee",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 36 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-13-21T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-13-21T02:59:52Z', …(1) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Minute refusal direction",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (minute > 59 ||",
+      "after": "if (minute > 59) return true;\n  if (minute > 59 ||",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "fa4b4f6c6621ceda242478fce2ed4fdb78bfd798cc67fd0e98899ae0e3185c89",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 36 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:60:00Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T02:60:00Z', …(1) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Second refusal direction",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (minute > 59 ||",
+      "after": "if (second > 59) return true;\n  if (minute > 59 ||",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "79eecb311a4e1e184eed7ad0c54791860326132230d65a551fb57360d845797b",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 36 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:59:60Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T02:59:60Z', …(1) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Offset hour refusal direction",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (minute > 59 ||",
+      "after": "if (Number(offsetHour) > 23) return true;\n  if (minute > 59 ||",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "3c1310f1d7a37031a7a4003449a18e111595ada7a24c19fa2cb9f72517eacb02",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 35 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:59:52+24:00 without normalizing its calendar",
+        "AssertionError: expected { …(2) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:59:52-24:00 without normalizing its calendar",
+        "AssertionError: expected { …(2) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Offset minute refusal direction",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (minute > 59 ||",
+      "after": "if (Number(offsetMinute) > 59) return true;\n  if (minute > 59 ||",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "34d730e958b5f785a2212ac703d8f087b3ea1b5074bd099ed0621ad8cc5ff8e0",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 35 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:59:52+08:60 without normalizing its calendar",
+        "AssertionError: expected { …(2) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T02:59:52-08:60 without normalizing its calendar",
+        "AssertionError: expected { …(2) } to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Hour and exact end-of-day refusal direction",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (hour > 24 ||",
+      "after": "if (hour >= 24) return true;\n  if (hour > 24 ||",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "f2a0e919cf96076c8232778f8815faceb37f480d5217fdbf2f0762cdeadbf675",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  4 failed | 33 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T25:00:00Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T25:00:00Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T24:01:00Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T24:01:00Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T24:00:01Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-09-21T24:00:01Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-21T24:00:00.000001Z without normalizing its calendar"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Minute-only compatibility",
+      "file": "src/application/content-timestamps.ts",
+      "before": "(?::(\\d{2})(?:\\.(\\d+))?)?",
+      "after": ":(\\d{2})(?:\\.(\\d+))?",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "8e820fc043350dd0eb68f11e48d6bbce904d71d6cba9ce5855421a12c83ee989",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 35 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00Z",
+        "AssertionError: expected undefined to be '2026-09-21T24:00Z' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T10:59+08:00",
+        "AssertionError: expected undefined to be '2026-09-21T10:59+08:00' // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Exact 24:00 compatibility",
+      "file": "src/application/content-timestamps.ts",
+      "before": "hour > 24 ||",
+      "after": "hour >= 24 ||",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "2eb1e54f80c45918924306ee91265b417de9a4849c3db5ac8c11ceeee3f53703",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 35 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00Z",
+        "AssertionError: expected undefined to be '2026-09-21T24:00Z' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00:00.0000+08:00",
+        "AssertionError: expected undefined to be '2026-09-21T24:00:00.0000+08:00' // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Timestamp calendar validation is mandatory",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (stamp && !validCalendarStamp(stamp)) return null;",
+      "after": "if (false) return null;",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "1deb01c63428d1912e81e5dd18d43f09537e2c860a0871b3690eef5a61cbb422",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  25 failed | 12 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-30T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-02-30T02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-29T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '2026-02-29T02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 1900-02-29T02:59:52Z without normalizing its calendar",
+        "AssertionError: expected { stamp: '1900-02-29T02:59:52Z', …(1) } to be null",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-04-31T02:59:52Z without normalizing its calendar"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Import conversion refuses invalid parsed input",
+      "file": "src/application/content-import.ts",
+      "before": "if (!parts) throw blocked();",
+      "after": "if (!parts) return {};",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "e3987220a49ce1f1a8d90f9a018e8897ce28bd773d81598689d5ddde824cf944",
+      "mutantSha256": "fac1e50854dda0ccff084298a459e2ccdbb96cfb86071f7b666041833a44af8b",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  25 failed | 12 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-30T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-29T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 1900-02-29T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-04-31T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-06-31T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-31T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-11-31T02:59:52Z without normalizing its calendar"
+      ],
+      "restoredSha256": "e3987220a49ce1f1a8d90f9a018e8897ce28bd773d81598689d5ddde824cf944"
+    },
+    {
+      "guard": "Patch conversion refuses invalid parsed input",
+      "file": "src/integrations/supabase/content-repository.ts",
+      "before": "if (!parts) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });",
+      "after": "if (!parts) return {};",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb",
+      "mutantSha256": "a7327729b2f33a2abd3db3b0055765691a7ab781a7dd208834ba2f12e0d457f8",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  25 failed | 12 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-30T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-02-29T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 1900-02-29T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-04-31T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-06-31T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-09-31T02:59:52Z without normalizing its calendar",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > refuses 2026-11-31T02:59:52Z without normalizing its calendar"
+      ],
+      "restoredSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb"
+    },
+    {
+      "guard": "Timestamp field allowlist",
+      "file": "src/application/content-timestamps.ts",
+      "before": "if (!CONTENT_TIMESTAMP_FIELDS.has(field)) return null;",
+      "after": "if (false) return null;",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "8a71d79aaef82ca0fdb3bccc1b3e335e859d4fbf117ce94ba3b34d640ec4da85",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 59 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z / 2026-09-21T10:59:52+08:00",
+        "AssertionError: expected 'timestamp_formatting' to be null",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > keeps timestamp-looking content bytes exact",
+        "AssertionError: expected 1 to be 2 // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Hash suffix only on finalSyncedAt",
+      "file": "src/application/content-timestamps.ts",
+      "before": "field === 'finalSyncedAt' ? text.split(' #') : [text]",
+      "after": "text.split(' #')",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "318ed264e8e36d848f6c30e97ad739b353b15041cbefc9c4ebc9506bbd422156",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 60 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a / 2026-09-21T10:59:52+08:00 #a",
+        "AssertionError: expected 'timestamp_formatting' to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Multiple hash delimiters refused",
+      "file": "src/application/content-timestamps.ts",
+      "before": "parts.length > 2 || ",
+      "after": "false || ",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "daecf3feb0d58fbccfc116a8abfd3900d3f79ccb1ee4adf4c67d2d6ccb38c109",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 59 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a #b / 2026-09-21T10:59:52+08:00 #a #b",
+        "AssertionError: expected 'timestamp_formatting' to be null",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses invalid timestamp imports: 2026-09-21T02:59:52Z #a #b",
+        "AssertionError: expected function to throw an error, but it didn't"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Empty hash or stamp refused",
+      "file": "src/application/content-timestamps.ts",
+      "before": "parts.length === 2 && (!stamp || !hash)",
+      "after": "false",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "8aafbdd6f70bae16c0f63ad3c90749969d4e343a675f2b628168ede177a87ab7",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  3 failed | 58 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z # / 2026-09-21T10:59:52+08:00",
+        "AssertionError: expected 'timestamp_formatting' to be null",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses invalid timestamp imports:  #hash",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses invalid timestamp imports: 2026-09-21T02:59:52Z #",
+        "AssertionError: expected function to throw an error, but it didn't"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Exact hash bytes required",
+      "file": "src/application/content-timestamps.ts",
+      "before": "a.hash !== b.hash",
+      "after": "false",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "ebe780570b9381661bc5a00a4eb84a64176cf6967dcff1dfb7e3080bf27db637",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  5 failed | 56 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a / 2026-09-21T10:59:52+08:00 #b",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #Ａ / 2026-09-21T10:59:52+08:00 #A",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #Café / 2026-09-21T10:59:52+08:00 #Café",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a\t / 2026-09-21T10:59:52+08:00 #a",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a / 2026-09-21T10:59:52+08:00",
+        "AssertionError: expected 'timestamp_formatting' to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Instant seconds must match",
+      "file": "src/application/content-timestamps.ts",
+      "before": "x[0] === y[0] && x[1] === y[1]",
+      "after": "x[1] === y[1]",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "1ef9bddbdd77fc073bd2fdef656fcc45cc195ffddf7088d59dd086827254c9b5",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 60 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > compares both cells and value.finalSyncedAt by instant with exact hash",
+        "AssertionError: expected +0 to be 2 // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Submillisecond fraction must match",
+      "file": "src/application/content-timestamps.ts",
+      "before": "x[0] === y[0] && x[1] === y[1]",
+      "after": "x[0] === y[0]",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "ad75a336e5a74b18d41ce6ebdd19e8aea58c61eca72cf5cad37eeb1b32c47876",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 60 passed (61)",
+        " FAIL  tests/unit/supabase/parity-shape.test.ts > CS-075 schedule timestamp equivalence > refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52.123001Z / 2026-09-21T02:59:52.123002Z",
+        "AssertionError: expected 'timestamp_formatting' to be null"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Raw final timestamp retained during import",
+      "file": "src/application/content-import.ts",
+      "before": "[FINAL_SYNCED_AT_RAW_KEY]: text",
+      "after": "[FINAL_SYNCED_AT_RAW_KEY]: rendered",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "e3987220a49ce1f1a8d90f9a018e8897ce28bd773d81598689d5ddde824cf944",
+      "mutantSha256": "5f108024b6bb46ef12b9126dd419bcdd503ce78bceef8a5828c05d175925a8d6",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  13 failed | 4 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-20T22:59:52.1200-04:00 #synthetic-final after actual SQL normalization",
+        "AssertionError: expected '2026-09-21T10:59:52.12+08:00' to be '2026-09-20T22:59:52.1200-04:00 #synth…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T10:59:52.1200+08:00 after actual SQL normalization",
+        "AssertionError: expected '2026-09-21T10:59:52.12+08:00' to be '2026-09-21T10:59:52.1200+08:00' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T02:59:52.0000Z #synthetic-final after actual SQL normalization",
+        "AssertionError: expected '2026-09-21T10:59:52+08:00' to be '2026-09-21T02:59:52.0000Z #synthetic-…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T02:59:52Z after actual SQL normalization"
+      ],
+      "restoredSha256": "e3987220a49ce1f1a8d90f9a018e8897ce28bd773d81598689d5ddde824cf944"
+    },
+    {
+      "guard": "Raw timestamp preserved rather than normalized on render",
+      "file": "src/integrations/supabase/content-repository.ts",
+      "before": "sameContentTimestamp(originalStamp, value, field)) value = originalStamp;",
+      "after": "false) value = originalStamp;",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb",
+      "mutantSha256": "0549ea8a3ce68ddfc764daf76a15f8e41f51454049255bfb6372ddb161365434",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  8 failed | 9 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-20T22:59:52.1200-04:00 #synthetic-final after actual SQL normalization",
+        "AssertionError: expected '2026-09-21T10:59:52.12+08:00 #synthet…' to be '2026-09-20T22:59:52.1200-04:00 #synth…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T10:59:52.1200+08:00 after actual SQL normalization",
+        "AssertionError: expected '2026-09-21T10:59:52.12+08:00' to be '2026-09-21T10:59:52.1200+08:00' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T02:59:52.0000Z #synthetic-final after actual SQL normalization",
+        "AssertionError: expected '2026-09-21T10:59:52+08:00 #synthetic-…' to be '2026-09-21T02:59:52.0000Z #synthetic-…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T02:59:52Z after actual SQL normalization"
+      ],
+      "restoredSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb"
+    },
+    {
+      "guard": "Stale timestamp metadata must match the DB instant and hash",
+      "file": "src/integrations/supabase/content-repository.ts",
+      "before": "sameContentTimestamp(originalStamp, value, field)) value = originalStamp;",
+      "after": "true) value = originalStamp;",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb",
+      "mutantSha256": "1274bb8bc622ff792737e56184a25382775aec48cf7992ead364f9ae3739f1c2",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  7 failed | 10 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:53.123456+08:00 #synth…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:53.123456+08:00 #syn…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.120001+08:00 #synth…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:52.120001+08:00 #syn…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.12+08:00 #synthetic…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:52.12+08:00 #synthet…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.12+08:00"
+      ],
+      "restoredSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb"
+    },
+    {
+      "guard": "Stale timestamp guard compares every fractional digit",
+      "file": "src/application/content-timestamps.ts",
+      "before": "fraction.replace(/0+$/, '')",
+      "after": "fraction.slice(0, 3).replace(/0+$/, '')",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918",
+      "mutantSha256": "543e849b3dd5c63acddd6b190e596279792b94caf2b6e0c9812a50b9a0ad6686",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 16 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.120001+08:00 #synth…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:52.120001+08:00 #syn…' // Object.is equality"
+      ],
+      "restoredSha256": "297023653c66d7be9a8d8296574b2ee366312c22440878dc4349f5ee80bb9918"
+    },
+    {
+      "guard": "Malformed original metadata refused",
+      "file": "src/integrations/supabase/content-repository.ts",
+      "before": "typeof originalStamp === 'string'\n      && sameContentTimestamp(originalStamp, value, field)",
+      "after": "typeof originalStamp === 'string'",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb",
+      "mutantSha256": "823b7d449aab959d814546791ce7b20dbddee9ba4027c3487d6a6b462af37c7f",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  7 failed | 10 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:53.123456+08:00 #synth…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:53.123456+08:00 #syn…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.120001+08:00 #synth…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:52.120001+08:00 #syn…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.12+08:00 #synthetic…",
+        "AssertionError: expected '2026-09-20T22:59:52.1200-04:00 #synth…' to be '2026-09-21T10:59:52.12+08:00 #synthet…' // Object.is equality",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > discards stale preserved text after a SQL edit: 2026-09-21T10:59:52.12+08:00"
+      ],
+      "restoredSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb"
+    },
+    {
+      "guard": "Schedule timestamp metadata hidden from exported unknown columns",
+      "file": "src/integrations/supabase/content-repository.ts",
+      "before": "const { [HOOK_SCORE_RAW_KEY]: originalScore, [FINAL_SYNCED_AT_RAW_KEY]: _originalStamp, ...passthrough }",
+      "after": "const { [HOOK_SCORE_RAW_KEY]: originalScore, ...passthrough }",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb",
+      "mutantSha256": "95fca4290c49569901738891f76d8dd0e74192f4307ad310ff6ce3de11ef07ab",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  13 failed | 4 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-20T22:59:52.1200-04:00 #synthetic-final after actual SQL normalization",
+        "AssertionError: expected { Object (@final_synced_at) } to not have property \"@final_synced_at\"",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T10:59:52.1200+08:00 after actual SQL normalization",
+        "AssertionError: expected { Object (@final_synced_at) } to not have property \"@final_synced_at\"",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T02:59:52.0000Z #synthetic-final after actual SQL normalization",
+        "AssertionError: expected { Object (@final_synced_at) } to not have property \"@final_synced_at\"",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > retains original bytes for 2026-09-21T02:59:52Z after actual SQL normalization"
+      ],
+      "restoredSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb"
+    },
+    {
+      "guard": "Library and Queue timestamp metadata hidden from export",
+      "file": "src/integrations/supabase/content-repository.ts",
+      "before": "const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, [HOOK_SCORE_RAW_KEY]: originalScore, [FINAL_SYNCED_AT_RAW_KEY]: _originalStamp, ...passthrough }",
+      "after": "const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, [HOOK_SCORE_RAW_KEY]: originalScore, ...passthrough }",
+      "tests": [
+        "tests/unit/supabase/content-timestamps-pglite.test.ts"
+      ],
+      "beforeSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb",
+      "mutantSha256": "179d83490d183f9255138fff1a772966448620a0163719f730c4a3bb550e9256",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps-pglite.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  1 failed | 16 passed (17)",
+        " FAIL  tests/unit/supabase/content-timestamps-pglite.test.ts > CS-075 complete SQL timestamp export and rollback > strips internal timestamp metadata from Library and Queue without adding a timestamp field",
+        "AssertionError: expected { '33': { …(2) }, …(1) } to deeply equal { '33': { …(2) } }"
+      ],
+      "restoredSha256": "aea8f03e32de9393cf3b879003bf2ea714f52fa6c370ce45c231e1360fa075bb"
+    },
+    {
+      "guard": "value parity allowance applies only to finalSyncedAt",
+      "file": "src/application/content-parity.ts",
+      "before": "field === 'value.finalSyncedAt';",
+      "after": "['value.finalSyncedAt', 'value.publishedAt', 'value.analyticsSyncedAt'].includes(field);",
+      "tests": [
+        "tests/unit/supabase/independent-parity-review.test.ts"
+      ],
+      "beforeSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc",
+      "mutantSha256": "2b0f2d0efab79fe9f657931aa4bdfeb3f881a727d0003ad3178f74c2e6ebf78c",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/independent-parity-review.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 25 passed (27)",
+        " FAIL  tests/unit/supabase/independent-parity-review.test.ts > Independent timestamp attacks > keeps publishedAt outside the requested finalSyncedAt equality exception",
+        " FAIL  tests/unit/supabase/independent-parity-review.test.ts > Independent timestamp attacks > keeps analyticsSyncedAt outside the requested finalSyncedAt equality exception",
+        "AssertionError: expected 0 to be greater than 0"
+      ],
+      "restoredSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc"
+    },
+    {
+      "guard": "Other timestamp fields keep previous unequal cell accounting",
+      "file": "src/application/content-parity.ts",
+      "before": "(field === 'cells.finalSyncedAt' || field === 'value.finalSyncedAt')",
+      "after": "true",
+      "tests": [
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc",
+      "mutantSha256": "c98b2f8b746ddffd7a42ff6c023231d355b911dddbd0bc9bca0d8d5b27eec813",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  2 failed | 35 passed (37)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 parity equality is bounded to finalSyncedAt > retains prior strict value comparison and unequal cell accounting for publishedAt",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 parity equality is bounded to finalSyncedAt > retains prior strict value comparison and unequal cell accounting for analyticsSyncedAt",
+        "AssertionError: expected 4 to be 3 // Object.is equality"
+      ],
+      "restoredSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc"
+    },
+    {
+      "guard": "Equivalent final timestamp value compares equal",
+      "file": "src/application/content-parity.ts",
+      "before": "const timestampValue = collection === 'schedule'",
+      "after": "const timestampValue = false && collection === 'schedule'",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc",
+      "mutantSha256": "a50cd87e301b9554fb69e3e759d210bc423d802c466373947acdf8badef8d19c",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  11 failed | 50 passed (61)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 0001-01-01T02:59:52Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 9999-12-31T02:59:52Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2000-02-29T02:59:52Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2024-02-29T23:59:59Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-04-30T23:59:59Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00:00.0000+08:00"
+      ],
+      "restoredSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc"
+    },
+    {
+      "guard": "Equivalent final timestamp contributes to field equality",
+      "file": "src/application/content-parity.ts",
+      "before": "kind === 'blank_boolean' || kind === 'timestamp_formatting'",
+      "after": "kind === 'blank_boolean' || false && kind === 'timestamp_formatting'",
+      "tests": [
+        "tests/unit/supabase/parity-shape.test.ts",
+        "tests/unit/supabase/content-timestamps.test.ts"
+      ],
+      "beforeSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc",
+      "mutantSha256": "915df9151c625e226e4d98dba17c8fe565d96850eb65685567aa5a355d3988c9",
+      "command": "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts tests/unit/supabase/content-timestamps.test.ts --maxWorkers=1",
+      "exitCode": 1,
+      "detected": true,
+      "assertions": [
+        "      Tests  11 failed | 50 passed (61)",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 0001-01-01T02:59:52Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 9999-12-31T02:59:52Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2000-02-29T02:59:52Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2024-02-29T23:59:59Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-04-30T23:59:59Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00Z",
+        " FAIL  tests/unit/supabase/content-timestamps.test.ts > CS-075 calendar validation before timestamp equivalence and conversion > accepts valid boundary 2026-09-21T24:00:00.0000+08:00"
+      ],
+      "restoredSha256": "c288a66d33381230ce595fe23b8dff1cba40b40178a0f81ccb34fd66e406cadc"
+    }
+  ],
+  "restoredPassed": true
+}

@@ -91,7 +91,7 @@ describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
     const expectedSchedule = await sheet.listSchedule(), actualSchedule = await repo.listSchedule();
     const equal = compareContent('schedule', expectedSchedule, actualSchedule, 100, 0);
     expect(equal.blocking).toBe(0); expect(equal.equal).toBe(equal.fields);
-    expect(equal.facts).toContainEqual(expect.objectContaining({ field: 'value.finalSyncedAt', kind: 'timestamp_formatting' }));
+    expect(equal.facts).toEqual([]); // The original timestamp text now survives SQL normalization.
     actualSchedule[0]!.cells.finalSyncedAt = actualSchedule[0]!.value.finalSyncedAt = '2026-09-21T02:59:53Z #synthetic-hash';
     expect(compareContent('schedule', expectedSchedule, actualSchedule, 100, 0).blocking).toBe(2);
     actualSummary[0]!.counts.Total!++;
