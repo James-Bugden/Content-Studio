@@ -134,6 +134,12 @@ export class SheetsContentRepository implements ContentRepository {
           () => this.transport.readTab(tab.name, tabKey === 'settings' ? 'C' : tab.lastColumn, { startRow: start, maxRows: PAGE_ROWS, formulas: withExtras, links: withExtras }),
         );
       } catch (error) {
+        // This optional, rebuildable summary tab is absent from some workbooks.
+        // Only its first-page validation failure means an empty collection.
+        if (tabKey === 'queueSummary' && start === 1 && isAppError(error) && error.code === 'VALIDATION_FAILED') {
+          emit({ name: 'sheet.tab_absent', adapter: 'sheet', outcome: 'ok', facts: { tab: tabKey, tabAbsent: true, startRow: start } });
+          return [];
+        }
         // A prior page already returned exactly PAGE_ROWS rows, so this request is shaped
         // exactly like every earlier one. Sheets answers a range that starts past the tab's
         // actual grid size with 400 "Unable to parse range", which the transport reports as
