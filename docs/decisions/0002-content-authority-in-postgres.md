@@ -107,8 +107,10 @@ successful operation with a different hash/target/actor/mode return before
 the row-attempt audit insert; these refusals do not create audit rows.
 
 Typed DB writes intentionally have stricter validation than Sheet string cells:
-`hookScore: '7.5'` and `'8/10'` are rejected (`value_invalid`) because the DB
-column is an integer, whereas Sheet accepts both strings. Each string remains
+after CS-074's unapplied migration, `hookScore: '7.5'` is accepted; `'8/10'`
+is still rejected (`value_invalid`). Scores accept ASCII signed decimals with
+at most two fractional digits and absolute value below 1000. Other numeric
+columns keep their integer rule. Each string remains
 capped at 50,000 characters; the entire DB patch also has a 262,144-byte cap
 (SQL measures jsonb text, including nested passthrough). Two 45,000-character
 zh-TW fields can therefore pass Sheet validation but fail DB validation

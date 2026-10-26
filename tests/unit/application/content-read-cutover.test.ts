@@ -22,13 +22,15 @@ import { createDraft } from '@/application/typefully';
 import { FakeTypefullyGateway } from '@/integrations/typefully/fake-gateway';
 import { sha256 } from '@/integrations/supabase/content-repository';
 import { contentSheetCacheOptions, DB_READ_CACHE_TTL_MS } from '@/application/content-cache';
+import { contentExportRows } from '@/application/content-export';
+import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 
 const owner = { sub: 'synthetic-owner', role: 'owner' as const };
 let pg: PGlite;
 class SqlDb extends FakeContentDb {
   async rows<T>(sql: string, args: unknown[] = []) {
     return pg.transaction(async tx => { await tx.exec('set local role service_role');
-      // Match the production JSON transport (PGlite returns native Date values).
+      // Serialize native Date values, retaining numeric strings from SQL drivers.
       return JSON.parse(JSON.stringify((await tx.query<T>(sql, args)).rows)) as T[];
     });
   }
@@ -85,6 +87,49 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
       [e.operationId, e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows]))[0]!.r.ok).toBe(true);
     return e;
   };
+  it.each(['library', 'queue', 'schedule'] as const)('CS-074: %s driver numeric strings preserve exact text and unchanged imports create no version/history', async kind => {
+    const current = await (kind === 'schedule' ? sheet.getSchedule(ids[kind]) : kind === 'library' ? sheet.getLibrary(ids[kind]) : sheet.getQueue(ids[kind]));
+    const grid = transport.rawTab(SHEET_TABS[kind].name), header = kind === 'schedule' ? 1 : 0;
+    const column = grid[header]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore);
+    transport.externalEdit(SHEET_TABS[kind].name, current.row, column, '007.50\t');
+    await importSheet();
+    // Inject node-postgres style numeric strings into the fake without a content
+    // mutation; PGlite naturally returns these strings from its numeric column.
+    if (mode === 'fake') {
+      const seed = db.snapshot();
+      const row = kind === 'schedule' ? seed.schedule.find(r => r.content_id === ids[kind])! : seed.posts.find(r => r.collection === kind && r.library_id === ids[kind])!;
+      Object.assign(row, { hook_score: '7.50' }); db.replaceSnapshot(seed);
+    }
+    const stored = kind === 'schedule' ? await db.getSchedule(ids[kind]) : await db.getPost(kind, ids[kind]);
+    expect(stored!.hook_score).toBe('7.50');
+    const record = await read(kind);
+    expect(record.cells.hookScore).toBe('007.50\t'); expect(record.value.hookScore).toBe(7.5);
+    expect((await contentExportRows(db)).find(r => r.kind === kind && r.id === ids[kind])!.cells[LIBRARY_HEADERS.hookScore]!.value).toBe('007.50\t');
+    const version = String(stored!.row_version), revision = record.revision;
+    const history = mode === 'fake' ? db.history.length : (await (db as SqlDb).rows('select * from content_studio_row_history')).length;
+    await importSheet();
+    const after = kind === 'schedule' ? await db.getSchedule(ids[kind]) : await db.getPost(kind, ids[kind]);
+    expect(String(after!.row_version)).toBe(version); expect((await read(kind)).revision).toBe(revision);
+    expect(mode === 'fake' ? db.history.length : (await (db as SqlDb).rows('select * from content_studio_row_history')).length).toBe(history);
+    const repaired = await db.writeThrough({ operationId: `synthetic_score_metadata_${kind}`, patchHash: sha256('synthetic metadata'), actorHash: sha256(owner.sub), kind, id: ids[kind], expectedVersion: version,
+      data: { hook_score: 7.5, sheet_revision: 'b'.repeat(16), source_sheet_row: current.row + 1 } });
+    expect(repaired.ok).toBe(true); expect(String(repaired.revision)).toBe(version);
+    const metadata = kind === 'schedule' ? await db.getSchedule(ids[kind]) : await db.getPost(kind, ids[kind]);
+    expect(metadata!.sheet_revision).toBe('b'.repeat(16)); expect(metadata!.source_sheet_row).toBe(current.row + 1);
+    expect(mode === 'fake' ? db.history.length : (await (db as SqlDb).rows('select * from content_studio_row_history')).length).toBe(history);
+    // A later edit/clear must discard the preserved string even for SQL drivers.
+    for (const score of ['6.00', null]) {
+      if (mode === 'fake') {
+        const seed = db.snapshot();
+        const row = kind === 'schedule' ? seed.schedule.find(r => r.content_id === ids[kind])! : seed.posts.find(r => r.collection === kind && r.library_id === ids[kind])!;
+        Object.assign(row, { hook_score: score }); db.replaceSnapshot(seed);
+      } else await (db as SqlDb).rows(`update content_studio_${kind === 'schedule' ? 'schedule' : 'posts'} set hook_score=$1 where ${kind === 'schedule' ? 'content_id=$2' : 'collection=$3 and library_id=$2'} returning *`, kind === 'schedule' ? [score, ids[kind]] : [score, ids[kind], kind]);
+      const actual = new SupabaseContentRepository(db);
+      const changed = kind === 'schedule' ? await actual.getSchedule(ids[kind]) : kind === 'library' ? await actual.getLibrary(ids[kind]) : await actual.getQueue(ids[kind]);
+      expect(changed.cells.hookScore).toBe(score === null ? '' : '6');
+      expect(changed.value.hookScore).toBe(score === null ? null : 6);
+    }
+  });
   it('B1: a failed R1 copy followed by a hand-edited R2 import retires the overlay on get/list, without reconcile', async () => {
     const before = await repo.getLibrary(ids.library);
     vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
@@ -98,22 +143,40 @@ describe.each(['fake', 'pglite'] as const)('MIG-11 db-read / %s', mode => {
     expect((await write('library', (await repo.getLibrary(ids.library)).revision, 'App save R3', 'synthetic_after_repair')).ok).toBe(true);
   });
   it('B1: metadata-only repair can retire a superseded overlay without a row_version bump', async () => {
-    const before = await repo.getLibrary(ids.library), original = await db.getPost('library', ids.library);
-    const score = String(original!.hook_score ?? 8);
-    // Establish a known typed baseline before testing representation-only changes.
-    transport.externalEdit(SHEET_TABS.library.name, before.row, transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore), score);
+    const before = await repo.getLibrary(ids.library);
+    // Boolean spelling remains representation-only. Hook Score spelling is
+    // exact preserved content after CS-074, so changing it must bump the version.
+    const column = transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.queueForSchedule);
+    transport.externalEdit(SHEET_TABS.library.name, before.row, column, 'no');
     await importSheet();
     const version = String((await db.getPost('library', ids.library))!.row_version);
+    const history = mode === 'fake' ? db.history.length : (await (db as SqlDb).rows('select * from content_studio_row_history')).length;
     vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
-    await repo.updateLibrary({ operationId: 'synthetic_metadata_overlay', actor: owner, target: { libraryId: ids.library }, expectedRevision: (await repo.getLibrary(ids.library)).revision, patch: { hookScore: `0${score}` } });
+    expect((await repo.updateLibrary({ operationId: 'synthetic_metadata_overlay', actor: owner, target: { libraryId: ids.library }, expectedRevision: (await repo.getLibrary(ids.library)).revision, patch: { queueForSchedule: 'FALSE' } })).ok).toBe(true);
     // Warm the mismatched pair before a revision-only import repairs it.
     await repo.listLibrary();
     expect(repo.pendingRefresh('library', ids.library)).toBe(true);
-    transport.externalEdit(SHEET_TABS.library.name, before.row, transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore), `00${score}`);
+    transport.externalEdit(SHEET_TABS.library.name, before.row, column, 'No');
     await importSheet();
     expect(String((await db.getPost('library', ids.library))!.row_version)).toBe(version);
+    expect(mode === 'fake' ? db.history.length : (await (db as SqlDb).rows('select * from content_studio_row_history')).length).toBe(history);
     // List is the first read here; it must clear the overlay independently of get.
     expect((await repo.listLibrary()).find(r => r.value.libraryId === ids.library)!.revision).toBe((await sheet.getLibrary(ids.library)).revision);
+    expect(repo.pendingRefresh('library', ids.library)).toBe(false);
+  });
+  it('CS-074: changed Hook Score spelling advances the version and retires a superseded overlay exactly', async () => {
+    const before = await repo.getLibrary(ids.library);
+    const column = transport.rawTab(SHEET_TABS.library.name)[0]!.findIndex(c => c.value === LIBRARY_HEADERS.hookScore);
+    transport.externalEdit(SHEET_TABS.library.name, before.row, column, '6.0');
+    await importSheet();
+    const version = Number((await db.getPost('library', ids.library))!.row_version);
+    vi.spyOn(db, 'writeThrough').mockRejectedValueOnce(new Error('synthetic outage'));
+    expect((await repo.updateLibrary({ operationId: 'synthetic_score_overlay', actor: owner, target: { libraryId: ids.library }, expectedRevision: (await repo.getLibrary(ids.library)).revision, patch: { hookScore: '06' } })).ok).toBe(true);
+    await repo.listLibrary(); expect(repo.pendingRefresh('library', ids.library)).toBe(true);
+    transport.externalEdit(SHEET_TABS.library.name, before.row, column, '006.0');
+    await importSheet();
+    expect(Number((await db.getPost('library', ids.library))!.row_version)).toBe(version + 1);
+    expect((await repo.getLibrary(ids.library)).cells.hookScore).toBe('006.0');
     expect(repo.pendingRefresh('library', ids.library)).toBe(false);
   });
   const read = (kind: keyof typeof ids) => kind === 'schedule' ? repo.getSchedule(ids[kind]) : kind === 'library' ? repo.getLibrary(ids[kind]) : repo.getQueue(ids[kind]);

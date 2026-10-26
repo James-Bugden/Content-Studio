@@ -6,8 +6,10 @@ type Snake<S extends string> = S extends `${infer A}${infer B}`
   ? `${A extends Lowercase<A> ? A : `_${Lowercase<A>}`}${Snake<B>}` : S;
 type NumericField = 'hookScore' | 'contentAngle' | 'views' | 'likes' | 'reposts' | 'replies' | 'bookmarks' | 'newFollowers';
 type NullableTextField = 'parentContentId' | 'finalSyncedAt' | 'publishedAt' | 'analyticsSyncedAt';
+// SQL numeric drivers may return text; validateContentRow normalizes Hook Score.
 type Columns<F extends string> = { [K in F as Snake<K>]: K extends 'posted' | 'queueForSchedule' ? boolean
-  : K extends NumericField ? number | null : K extends NullableTextField ? string | null : string };
+  : K extends 'hookScore' ? number | string | null
+    : K extends NumericField ? number | null : K extends NullableTextField ? string | null : string };
 export type ContentRowMeta = {
   row_version: number | string;
   source_sheet_row: number | null;

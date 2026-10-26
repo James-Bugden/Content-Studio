@@ -8,6 +8,7 @@ import { toLibraryRecord, toScheduleRecord } from '@/domain/mapping';
 import { contentColumn, sha256 } from './content-repository';
 import { CONTENT_STUDIO_SCHEMA_VERSION } from './content-schema';
 import type { ContentBackupSnapshot } from '@/application/content-backup';
+import { validateContentRow } from './content-row-schema';
 
 export type ContentDbSeed = { posts: ContentPostRow[]; schedule: ContentScheduleRow[]; settings: ContentSettingRow[] };
 const numeric = new Set(['hookScore', 'contentAngle', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers']);
@@ -126,7 +127,8 @@ export class FakeContentDb implements ContentDb {
     if (mode === 'patch' && kind === 'library' && row && 'draft_content' in data && (row as ContentPostRow).draft_content !== data.draft_content && (row as ContentPostRow).review_status === 'Approved') {
       data.review_status = 'Not Reviewed';
     }
-    const fields = Object.keys(data).filter(f => !row || JSON.stringify((row as unknown as Record<string, unknown>)[f]) !== JSON.stringify(data[f])).sort();
+    const comparable = row && validateContentRow(row);
+    const fields = Object.keys(data).filter(f => !comparable || JSON.stringify((comparable as unknown as Record<string, unknown>)[f]) !== JSON.stringify(data[f])).sort();
     let state: ContentWriteResult['steps'][number]['state'];
     let code: ContentWriteResult['code'] = null;
     if (!row && mode === 'patch') { state = 'not_found'; code = 'NOT_FOUND'; }
@@ -152,7 +154,9 @@ export class FakeContentDb implements ContentDb {
           body: post.draft_content, since: prior?.since ?? Date.now() });
       }
       state = 'applied';
-      this.history.push({ operation_id: operationId, target_kind: kind, target_id: id, before_image: before, row_version_before: before ? String(before.row_version) : null, changed_fields: fields });
+      if (!before || fields.some(f => !['source_sheet_row', 'sheet_revision'].includes(f))) {
+        this.history.push({ operation_id: operationId, target_kind: kind, target_id: id, before_image: before, row_version_before: before ? String(before.row_version) : null, changed_fields: fields });
+      }
     }
     const result: ContentWriteResult = { ok: code === null, code, steps: [{ state }], revision: row?.row_version ?? null };
     this.audit.push({ operation_id: operationId, actor_hash: write.actorHash, target_kind: kind, target_id: id,
