@@ -10,6 +10,7 @@ import { mirrorHash } from '@/application/sheet-mirror';
 import { ContentShadowStore } from './content-shadow-store';
 import type { SupabaseContentDbOptions } from './content-db';
 import { CUTOVER_CONTRACT } from '@/application/cutover-contract';
+import type { CutoverActor } from '@/lib/cutover-auth';
 
 const ok = z.object({ ok: z.literal(true) });
 const stateSchema = z.object({ checkpoints: z.array(z.tuple([z.string(), z.object({ fingerprint: z.string().regex(/^[a-f0-9]{16}$/),
@@ -73,19 +74,24 @@ export class ContentCutoverStore implements ContentBackupSource {
   async record(name: 'parity' | 'rehearsal' | 'backup', importId: string, payload: unknown) {
     ok.parse(await this.rest.cutoverRpc('record', { p_name: name, p_build: this.build, p_import_id: importId, p_payload: payload }));
   }
-  async operation(action: string, id: string, run: () => Promise<unknown>) {
+  async operation(action: string, id: string, run: () => Promise<unknown>, actor: CutoverActor = 'cron_bearer') {
     const token = randomUUID(), hash = mirrorHash([this.contract, this.mode, action, ...(action.startsWith('activate-') ? [this.build] : [])]);
     const params = { p_id: id, p_hash: hash, p_token: token, p_result: null as unknown };
     const claim = z.object({ status: z.enum(['acquired', 'replayed']), result: z.unknown().optional() }).parse(await this.rest.cutoverRpc('operation', params));
     // Readiness to flip is never replayed from a historical Sheet observation.
     // Repeat verification even for a lost-response retry of rollback.
     if (claim.status === 'replayed') {
+      // Backward compatible with jobs completed before actor auditing. The
+      // envelope lives in the existing private job row, never in HTTP results.
+      const audited = z.object({ cutoverAudit: z.object({ actor: z.enum(['owner_session', 'cron_bearer']) }), value: z.unknown() }).safeParse(claim.result);
+      const result = audited.success ? audited.data.value : claim.result;
       if (action === 'activate-db') await this.assertFlip('db');
-      return action === 'rollback' || (claim.result as { status?: string } | null)?.status === 'backup_waived' ? run() : claim.result;
+      return action === 'rollback' || action === 'export' || (result as { status?: string } | null)?.status === 'backup_waived' ? run() : result;
     }
     try {
       const result = await run();
-      z.object({ status: z.literal('completed') }).parse(await this.rest.cutoverRpc('operation', { ...params, p_result: result }));
+      z.object({ status: z.literal('completed') }).parse(await this.rest.cutoverRpc('operation', { ...params,
+        p_result: { cutoverAudit: { actor }, value: result } }));
       return result;
     } catch (error) {
       await this.rest.cutoverRpc('operation', { ...params, p_result: { retry: true } }).catch(() => {});

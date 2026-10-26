@@ -8,6 +8,7 @@ vi.mock('@/application/container', () => ({ getServices: () => ({ contentParity:
 vi.mock('@/application/reconcile', () => ({ buildReconcileReport: async () => ({ checkedAt: new Date(0).toISOString(), capabilities: [], alerts: [], unreadable: [], items: [], events: [] }) }));
 vi.mock('@/lib/auth', () => ({ requireActor: async () => ({ role: 'owner' }) }));
 vi.mock('@/components/reconcile/content-import-button', () => ({ ContentImportButton: () => <button>Run content import</button> }));
+vi.mock('@/components/reconcile/database-switch-panel', () => ({ DatabaseSwitchPanel: () => <section aria-label="Database switch">Database switch</section> }));
 import Page from '@/app/(studio)/reconcile/page';
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); resetEnvCache(); });
 it.each([true,false])('renders durable scope and honest insufficient/unavailable gates: %s', async available => {

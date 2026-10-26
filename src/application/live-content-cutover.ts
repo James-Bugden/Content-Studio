@@ -14,9 +14,10 @@ import { compareContent, PARITY_COLLECTIONS } from './content-parity';
 import { createContentBackup } from './content-backup';
 import { AppError } from '@/domain/errors';
 import { assertExpectedCutoverBuild } from './cutover-build';
+import type { CutoverActor } from '@/lib/cutover-auth';
 
 export type LiveCutoverOps = {
-  execute(action: 'measure' | 'backup' | 'rollback' | 'activate-read' | 'activate-db', operationId: string, expectedBuild?: string): Promise<unknown>;
+  execute(action: 'measure' | 'backup' | 'rollback' | 'export' | 'activate-read' | 'activate-db', operationId: string, expectedBuild?: string, actor?: CutoverActor): Promise<unknown>;
   'activate-read'(): Promise<unknown>;
   'activate-db'(): Promise<unknown>;
   status(): Promise<{ blocking?: string; backupFailure?: boolean; backupWaiver?: { by: 'owner'; on: '2026-10-25'; recordedAt: string } | null }>;
@@ -62,7 +63,7 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
   // Preparation runs in shadow/read mode so backup and exact rollback evidence
   // exist BEFORE admitting DB authority. Neither changes the configured mode.
   services.liveCutover = {
-    async execute(action, operationId, expectedBuild) {
+    async execute(action, operationId, expectedBuild, actor = 'cron_bearer') {
       // Refuse before any provider work or idempotency claim/replay. The store
       // retains this exact build for both the SQL gate and activation calls.
       if (action === 'activate-read' || action === 'activate-db') {
@@ -71,7 +72,14 @@ export function composeLiveCutover(services: Services, env: ServerEnv, tokens: S
       // Reverify even a completed operation, but preserve its original epoch
       // and result on replay instead of performing activation a second time.
       if (action === 'activate-db') await verifyDbActivation();
-      return store.operation(action, operationId, () => action === 'activate-db' ? store.activate('db') : services.liveCutover![action]());
+      return store.operation(action, operationId, async () => {
+        if (action === 'activate-db') return store.activate('db');
+        if (action === 'export') {
+          const { repairContentExport } = await import('@/lib/content-maintenance');
+          return repairContentExport();
+        }
+        return services.liveCutover![action]();
+      }, actor);
     },
     'activate-read': () => store.activate('db-read'),
     async 'activate-db'() {

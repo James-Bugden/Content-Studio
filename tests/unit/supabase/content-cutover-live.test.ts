@@ -7,7 +7,7 @@ import { GoogleSheetTransport } from '@/integrations/google/google-sheet';
 import { GoogleDriveGateway } from '@/integrations/google/google-drive';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 import { buildTypedImport, importVersions } from '@/application/content-import';
-import { buildSheetMirrorSnapshot } from '@/application/sheet-mirror';
+import { buildSheetMirrorSnapshot, mirrorHash } from '@/application/sheet-mirror';
 import { ContentCutoverStore } from '@/integrations/supabase/content-cutover-store';
 import { getServices, resetServices } from '@/application/container';
 import { resetEnvCache, serverEnv } from '@/lib/env';
@@ -21,7 +21,7 @@ import { CUTOVER_CONTRACT } from '@/application/cutover-contract';
 import { buildReconcileReport } from '@/application/reconcile';
 import { ContentExporter } from '@/application/content-export';
 import { SupabaseContentDb } from '@/integrations/supabase/content-db';
-import { POST } from '@/app/api/ops/content-cutover/route';
+import { GET, POST } from '@/app/api/ops/content-cutover/route';
 import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
 import { POST as draftRoute } from '@/app/api/library/[libraryId]/draft/route';
 import { POST as typefullyRoute } from '@/app/api/schedule/[contentId]/typefully/create/route';
@@ -113,6 +113,52 @@ async function admitWrite(activate = true) {
 }
 
 describe('DB-10 live composition / real SQL over mocked REST and Google boundaries', () => {
+  it('replays a legacy completed operation without an audit envelope byte-for-byte and without running it again', async () => {
+    const result={status:'verified',manifestHash:hash,verifiedAt:123};
+    await query('insert into content_studio_cutover_jobs(operation_id,request_hash,result) values($1,$2,$3)',
+      [token,mirrorHash([CUTOVER_CONTRACT,'db-read','backup']),result]);
+    const run=vi.fn();
+    expect(await new ContentCutoverStore(options,build).operation('backup',token,run,'owner_session')).toEqual(result);
+    expect(run).not.toHaveBeenCalled();
+    expect((await query('select result from content_studio_cutover_jobs where operation_id=$1',[token])).rows[0]!.result).toEqual(result);
+  });
+  function ownerRequest(action: string, id = token, expectedBuild = build) {
+    for (const [k,v] of Object.entries({ AUTH_GOOGLE_ID:'synthetic-client', AUTH_GOOGLE_SECRET:'synthetic-google-secret',
+      CS_OWNER_GOOGLE_SUB:'100000000000000000001', APP_BASE_URL:'https://synthetic.example' })) vi.stubEnv(k,v);
+    resetEnvCache();
+    return new Request('https://synthetic.example/api/ops/content-cutover', { method:'POST',
+      headers:{ origin:'https://synthetic.example', 'Idempotency-Key':id },
+      body:JSON.stringify({action,...(action.startsWith('activate-') ? {expectedBuild} : {})}) });
+  }
+  it.each(['activate-read','activate-db'])('owner-session %s keeps atomic gates, audited SQL claims, bearer replay and changed-build refusal', async action => {
+    await admitWrite(false);
+    const owner = await POST(ownerRequest(action)); expect(owner.status).toBe(200);
+    const receipt = await owner.json();
+    expect(receipt).toEqual({ok:true,result:{mode:action === 'activate-read' ? 'db-read' : 'db',build,contract:CUTOVER_CONTRACT}});
+    const row = (await query('select result from content_studio_cutover_jobs where operation_id=$1',[token])).rows[0]!;
+    expect(row.result).toEqual({cutoverAudit:{actor:'owner_session'},value:receipt.result});
+    const epoch = (await query('select * from content_studio_cutover_authority')).rows;
+    const request = ownerRequest(action); request.headers.set('authorization',`Bearer ${env.CRON_SECRET}`);
+    expect(await (await POST(request)).json()).toEqual(receipt);
+    expect((await query('select * from content_studio_cutover_authority')).rows).toEqual(epoch);
+    expect((await POST(ownerRequest(action,token,'b'.repeat(40)))).status).toBe(409);
+    expect((await query('select result from content_studio_cutover_jobs where operation_id=$1',[token])).rows).toEqual([row]);
+    const status = await GET(new Request('https://synthetic.example/api/ops/content-cutover',{headers:{'sec-fetch-site':'same-origin'}}));
+    expect(status.status).toBe(200); const body=await status.json(); expect(body.status.lastImportAgeMs).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(body)).not.toContain('operation_id'); expect(JSON.stringify(body)).not.toContain('owner_session');
+  });
+  it('owner export uses the same repair guards, claims and fresh verification on replay', async () => {
+    await admitWrite(); mode('db');
+    const first = await POST(ownerRequest('export')); expect(first.status).toBe(200);
+    const result=await first.json(); expect(result.result.exact).toBe(true);
+    expect(result.result.differences).toEqual([]);
+    expect((await query('select result from content_studio_cutover_jobs where operation_id=$1',[token])).rows[0]!.result)
+      .toMatchObject({cutoverAudit:{actor:'owner_session'}});
+    const reads=vi.mocked(GoogleSheetTransport.prototype.readTab); reads.mockClear();
+    expect((await POST(ownerRequest('export'))).status).toBe(200); expect(reads).toHaveBeenCalled();
+    mode('db-read'); expect((await POST(ownerRequest('export'))).status).toBe(409);
+    expect((await POST(ownerRequest('export','44444444-4444-4444-8444-444444444444'))).status).toBe(403);
+  });
   async function waiveBackup() {
     const importId = await new SupabaseContentDb(options).latestImportId();
     return query('select content_studio_cutover_waive_backup($1,$2,$3,$4,$5) as result', [token, build, importId, '2026-10-25', hash]);

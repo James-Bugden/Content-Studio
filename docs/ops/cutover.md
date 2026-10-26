@@ -2,6 +2,14 @@
 
 ## Owner terminal and coordinator responsibilities (CS-067)
 
+The owner can now use **Fix issues → Database switch** with the existing owner
+session at the same ordered steps below. See the in-app section of
+[the owner quickstart](cutover-owner-quickstart.md). It needs no cron secret.
+It records the same build-bound decisions and never changes deployment flags;
+all coordinator responsibilities and live gates below still apply. The terminal
+runner remains an alternative. Fake previews show explicitly red synthetic
+status and cannot activate live authority.
+
 The owner runs secret-bearing HTTP operations in their own terminal using
 [the numbered owner quickstart](cutover-owner-quickstart.md). The coordinator
 must never enter, receive or hold CRON_SECRET. The coordinator handles migration
