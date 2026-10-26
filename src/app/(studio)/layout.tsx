@@ -6,6 +6,8 @@ import { StudioPanelHost } from '@/components/panel/panel-host';
 import { BacklogNavigationProvider } from '@/components/backlog/backlog-navigation';
 import { Suspense } from 'react';
 import { getActor } from '@/lib/auth';
+import { capabilities } from '@/application/capabilities';
+import { CapabilityBanner } from '@/components/capability-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +21,7 @@ export default async function StudioLayout({ children }: { children: React.React
   if (!actor) redirect('/login');
   return (
     <AppShell
+      statusSlot={<CapabilityBanner capabilities={capabilities()} />}
       accountSlot={
         <div className="flex items-center gap-3 text-sm">
           {actor.role === 'owner' ? null : <span className="text-ink-soft">Read only</span>}

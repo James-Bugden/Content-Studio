@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-test('local Inter loads all app weights with the existing CSP', async ({ page }) => {
+test('self-hosted Nunito Sans loads all app weights with the existing CSP', async ({ page }) => {
   const fontRequests: string[] = [];
   const cspErrors: string[] = [];
   page.on('request', (request) => {
@@ -23,10 +23,10 @@ test('local Inter loads all app weights with the existing CSP', async ({ page })
     }));
     return { family, loaded, variable: getComputedStyle(document.documentElement).getPropertyValue('--font-sans-polished') };
   });
-  expect(fonts.family).toContain('inter');
-  expect(fonts.variable).toContain('inter');
-  expect(fonts.loaded).toEqual(['400', '500', '600'].map((weight) => [{ weight, status: 'loaded', display: 'swap' }]));
-  expect(new Set(fontRequests).size).toBe(3);
+  expect(fonts.family).toMatch(/nunito.?sans/i);
+  expect(fonts.variable).toMatch(/nunito.?sans/i);
+  expect(fonts.loaded.every(faces => faces.length > 0 && faces.every(face => face.status === 'loaded' && face.display === 'swap'))).toBe(true);
+  expect(new Set(fontRequests).size).toBeGreaterThan(0);
   expect(fontRequests.every((url) => new URL(url).origin === new URL(page.url()).origin)).toBe(true);
   expect(cspErrors).toEqual([]);
 

@@ -1,3 +1,4 @@
+import { StatusBanner } from '@/components/shell-status';
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { loadBoard, type Board } from '@/application/board';
@@ -23,10 +24,10 @@ export default async function NextUpPage() {
     return (
       <>
         <PageHeader title="Next up" description="Here is what needs you" />
-        <CapabilityBanner capabilities={capabilities()} />
+        <StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
   }
-  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} integrationStatus={<CapabilityBanner capabilities={capabilities()} />} />;
+  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
 }

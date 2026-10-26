@@ -1,3 +1,4 @@
+import { StatusBanner } from '@/components/shell-status';
 import type { Metadata } from 'next';
 import type { FilterDef } from '@/components/filter-bar';
 import { getServices } from '@/application/container';
@@ -110,7 +111,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         }
       />
       <div className="mt-4 flex flex-col gap-4">
-        <CapabilityBanner capabilities={capabilities()} />
+        <StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>
 
         {summary && summary.length > 0 ? (
           <details className="group rounded-lg border border-line bg-card px-4">

@@ -20,3 +20,5 @@ export { GuardedLink, type GuardedLinkProps } from './guarded-link';
 export { useLeaveConfirmation } from './leave-confirm';
 export { ModalDialog, type ModalDialogProps } from './modal-dialog';
 export { buttonClass, type ButtonVariant } from './button-styles';
+
+export { XLogo, LinkedInLogo, ThreadsLogo } from './platform-logos';

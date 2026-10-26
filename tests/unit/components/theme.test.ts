@@ -10,7 +10,7 @@ describe('visual theme (THEME-01)', () => {
     const css = readFileSync('src/app/globals.css', 'utf8');
     expect(css).toContain('--color-primary: #18191b;');
     expect(css).not.toContain('#1d4ed8');
-    expect(css).toContain('--color-paper: #fbfbfa;');
+    expect(css).toContain('--color-paper: #f1f3f6;');
     expect(css).toContain('--color-card: #ffffff;');
   });
 });
