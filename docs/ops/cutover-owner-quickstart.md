@@ -1,8 +1,57 @@
 ﻿# Owner cutover quickstart
 
-Status: owner runner and server status contract implemented and tested offline.
+Status: owner panel, terminal runner and server status contract implemented and tested offline.
 Production still requires reviewed deployment, the new status migration and all
 ordered live gates. This page does not record a production cutover.
+
+## In the app: Database switch (recommended)
+
+Sign in with the existing owner account, open **Fix issues** (`/reconcile`),
+then find **Database switch**. No terminal or secret is needed. Viewers cannot
+see the panel or call its operations. Wait for the coordinator to verify the
+reviewed build, deployment, migration and ordered live checks in
+[the coordinator runbook](cutover.md). This panel does not waive those checks.
+
+1. Select **Refresh status**. Compare the complete 40-character deployed build
+   with the coordinator's reviewed SHA. The table explains the current authority,
+   switch record, readiness blockers, evidence ages and applicable recorded
+   waivers. The last-import countdown shows the remaining 15-minute freshness
+   window; unavailable or expired evidence blocks switching. Local write freeze
+   does not prove that other instances or external writers are frozen.
+2. At the coordinator's ordered step, select **Import now**, then **Measure**.
+   Resolve the plain-language blockers before continuing. **Backup check**
+   verifies an archive or the existing audited backup waiver. A waiver result
+   does not mean an archive was created.
+3. Run **Rehearse rollback** and **Export check** only when instructed. These
+   operations may repair derived Sheet/Drive copies. Rehearsal requires the
+   correct store mode and frozen/drained writers; export is available in database
+   authority mode. They retain the same server guards as the terminal runner.
+4. When the coordinator confirms this exact build is ready, select **Switch
+   reads to database** or, at the later write-cutover step, **Switch to database**.
+   The dialog explains the change and rollback procedure and displays the exact
+   build. Type exactly `ACTIVATE` (uppercase, no spaces). Status is checked when
+   opening and again after confirmation. A changed build, deployment, authority,
+   waiver or gate refuses the switch: close the dialog, review the refreshed
+   status and start again. The server still checks the build before claiming a
+   request and checks the atomic SQL gate at activation.
+5. A verified switch records an epoch. The coordinator must still change the
+   ordered deployment settings and verify the deployed app. To return to Sheet
+   reads, the coordinator redeploys Sheet mode. After database write authority,
+   first freeze/drain all writers, rehearse exact Sheet/Drive rollback, then
+   redeploy Sheet mode and verify it before resuming writes.
+
+Operations show an in-progress message. If a request is interrupted or completion
+is unconfirmed, keep this tab and ask the coordinator to inspect before retrying
+the same action. Its UUID is saved **before** sending in this origin's tab-local
+`sessionStorage`, survives reload, and is reused with server idempotency. Only a
+verified result clears it. New completed operations get new UUIDs. An activation
+pending against another SHA, invalid retry state or unavailable browser storage
+refuses another POST; preserve it for coordinator inspection. Do not clear browser
+storage or open another tab to force a new request. Closing the tab can lose this
+local retry identity; the coordinator must inspect durable operations before
+recovery. The app never automatically retries or changes deployment settings.
+
+## Terminal runner (alternative)
 
 The owner runs secret-bearing commands in their own terminal. The coordinator
 prepares migrations, SQL proofs, reviews, deployments and recovery. Never paste
@@ -155,8 +204,15 @@ agent conversation or GitHub.
 
 ## Server integration contract
 
-GET `/api/ops/content-cutover` uses the existing constant-time CRON_SECRET
-bearer check and private/no-store headers on success and failure. It takes no
+GET `/api/ops/content-cutover` accepts the existing constant-time CRON_SECRET
+bearer check or the same owner identity and same-origin/CSRF guard as other owner
+mutations. Both GET and POST require that guard for cookie sessions, including
+`Sec-Fetch-Site: same-origin` when Origin is absent. A supplied Authorization
+header always takes the bearer path; an invalid bearer never falls back to a
+cookie. Owner maintenance is available during a Content freeze, while all
+operation-specific mode, freeze, admission and provider gates still apply. The
+cron backup/export routes remain bearer-only. Responses retain private/no-store
+headers on success and failure. GET takes no
 query/body content and needs no idempotency key. The server supplies this shape:
 
 ```json
@@ -178,6 +234,11 @@ query/body content and needs no idempotency key. The server supplies this shape:
   }
 }
 ```
+
+For owner sessions only, status also includes `lastImportAgeMs` (a nonnegative
+integer or null). It reads only the latest completed import timestamp; read
+failure is shown as unavailable. This age is explanatory and never substitutes
+for SQL admission. Bearer status bytes and provider reads are unchanged.
 
 `deploymentId` is null when unavailable (health omits the optional field).
 `store` is the configured store; epoch is `none`, `read`, `db` or `retired`.
@@ -207,7 +268,7 @@ deployment URL and avoid deployment changes during the run; this SHA guard does
 not reserve a deployment ID or its configuration.
 
 POST uses `{action: "activate-read"|"activate-db", expectedBuild: "<40 lowercase hex SHA>"}`
-for activation, and `{action: "measure"|"backup"|"rollback"}` for preparation.
+for activation, and `{action: "measure"|"backup"|"rollback"|"export"}` for preparation.
 Bodies are strict: extra keys, missing/malformed/uppercase/short/padded builds
 refuse activation with HTTP 422, `cutover_expected_build_invalid`. A different
 server build refuses with HTTP 409, `cutover_build_mismatch`. No normalization,
@@ -216,7 +277,16 @@ refusal. The server reads `VERCEL_GIT_COMMIT_SHA` (or `CS_COMMIT_SHA` when absen
 once per request and binds that exact value to the SQL store's gate/activation
 build before executing. The same UUID with a changed expected build cannot
 replay an earlier success, including after redeployment to that new build.
-The UUID `Idempotency-Key`, cron bearer and `{ok:true,result}` remain required.
+The UUID `Idempotency-Key`, either authentication method and `{ok:true,result}`
+remain required. The new export POST wraps the existing repair in the same
+operation claims; completed export retries still reverify current providers,
+like rollback. The existing private job result now contains an audit envelope
+whose actor is `owner_session` or `cron_bearer`; legacy job results remain
+replayable. HTTP receipts unwrap it. Operation telemetry also records only the
+actor class, action and UUID, including failures, never the owner subject or
+cookie. Owner receipts project fixed aggregate fields only; export differences
+keep a fixed blocker marker without private row IDs, field names or content.
+The terminal runner and its bearer result shapes are unchanged.
 A waived backup returns
 `{status:"backup_waived",waiver:{audited:true,build:"<exact SHA>",auditHash:"<SHA-256>"}}`
 inside `result` (at top level beside `ok` for scheduled backup). The hash

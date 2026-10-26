@@ -9,6 +9,7 @@ import { requireActor } from '@/lib/auth';
 import { summariseBacklogTimings } from '@/observability/alerts';
 import { recentEvents } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
+import { DatabaseSwitchPanel } from '@/components/reconcile/database-switch-panel';
 import { ContentImportButton } from '@/components/reconcile/content-import-button';
 
 export const metadata: Metadata = { title: 'Reconcile | Content Studio' };
@@ -30,6 +31,7 @@ export default async function ReconcilePage() {
       <>
         <PageHeader title="Fix issues" description="Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step." />
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
+        {actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked /> : null}
       </>
     );
   }
@@ -41,6 +43,7 @@ export default async function ReconcilePage() {
       <PageHeader title="Fix issues" description={`Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <CapabilityBanner capabilities={report.capabilities} />
+        {actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
         <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
           <p>Store mode: {serverEnv().CS_CONTENT_STORE}. {serverEnv().CS_CONTENT_STORE === 'db' ? 'Database is authoritative; Sheet is a one-way comparison export.' : 'Sheet remains authoritative.'}</p>

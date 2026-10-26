@@ -54,7 +54,7 @@ it.each(['activate-read', 'activate-db'])('build binding: %s forwards the single
   try {
     expect((await POST(request({ action, expectedBuild: build }))).status).toBe(200);
     expect(reads).toBe(1);
-    expect(mocks.execute).toHaveBeenCalledExactlyOnceWith(action, '11111111-1111-4111-8111-111111111111', build);
+    expect(mocks.execute).toHaveBeenCalledExactlyOnceWith(action, '11111111-1111-4111-8111-111111111111', build, 'cron_bearer');
     // Same key, different expectation cannot reach a successful replay.
     expect((await POST(request({ action, expectedBuild: 'c'.repeat(40) }))).status).toBe(409);
     expect(mocks.execute).toHaveBeenCalledTimes(1);
@@ -66,6 +66,6 @@ it.each(['activate-read', 'activate-db'])('build binding: %s accepts fallback id
   mocks.env.VERCEL_GIT_COMMIT_SHA = build;
   mocks.env.CS_COMMIT_SHA = 'b'.repeat(40);
   expect((await POST(request({ action, expectedBuild: build }))).status).toBe(200);
-  expect(mocks.execute).toHaveBeenNthCalledWith(1, action, '11111111-1111-4111-8111-111111111111', build);
-  expect(mocks.execute).toHaveBeenNthCalledWith(2, action, '11111111-1111-4111-8111-111111111111', build);
+  expect(mocks.execute).toHaveBeenNthCalledWith(1, action, '11111111-1111-4111-8111-111111111111', build, 'cron_bearer');
+  expect(mocks.execute).toHaveBeenNthCalledWith(2, action, '11111111-1111-4111-8111-111111111111', build, 'cron_bearer');
 });

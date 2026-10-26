@@ -13,6 +13,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Run the real Auth.js wrapper through Vite so its Next extensionless
+    // imports resolve and next/headers can use a synthetic request context.
+    server: { deps: { inline: ['next-auth'] } },
     environment: 'node',
     include: [
       'tests/unit/**/*.test.ts',

@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); resetEnvCache(); });
 
-it.each([null, 'Bearer wrong', 'bearer synthetic-cutover-status-bearer', 'Bearer '+secret+'extra'])('authenticates before any read using fixed-size constant-time compare (%s)', async header => {
+it.each(['Bearer wrong', 'bearer synthetic-cutover-status-bearer', 'Bearer '+secret+'extra'])('authenticates before any read using fixed-size constant-time compare (%s)', async header => {
   const res = await GET(request(header)); expect(res.status).toBe(403); expect(fetcher).not.toHaveBeenCalled();
   expect(timingSafeEqual).toHaveBeenCalledOnce();
   const [a,b] = vi.mocked(timingSafeEqual).mock.calls[0]!; expect(a.byteLength).toBe(32); expect(b.byteLength).toBe(32);

@@ -1,47 +1,128 @@
-# CS-075 — PR #231, fix round 1
+# CS-076 fix handoff - PR #232, round 1
 
-Fixed the three blocking P1 findings from the read-only [PR #231 review](https://github.com/James-Bugden/Content-Studio/pull/231) for [issue #229](https://github.com/James-Bugden/Content-Studio/issues/229), in the existing isolated `fix/229-parity-shape` worktree. Classification: **Heavy**; scoped bug fixes, no PRD required.
+Issue: https://github.com/James-Bugden/Content-Studio/issues/230
+PR: https://github.com/James-Bugden/Content-Studio/pull/232
+Classification: Standard; role: fix. Branch: `feat/230-owner-cutover-panel`.
+Parent: `d1f99bfa9c6322262cd1cc2bd3ddc3425e11304a` (already merges main).
+Commit subject: `CS-076: keep the existing import button on /reconcile and fix sweep findings (#230)`.
+This report supersedes the earlier build report, including its incomplete auth-log
+claim. The independent review found a real Auth.js expiry-logger privacy leak.
 
-Reviewed head/base for this fix: `68148a5bc1e372853f444e33b1b9f47cdf85cb84`. Implementation/test/runner tree before replacing this report and adding the new mutation evidence: `3064bdcfb3019bd34022c7d5be4ed987535b6644`. The containing commit identifies the final build. Previous build-round evidence remains historical at that parent commit; it does not establish these fixes.
+## Implementation and regression coverage
 
-## Fixes and acceptance evidence
+- Restored the existing `ContentImportButton` in the Content import and parity
+  section, outside the collapsed import-details disclosure. Its default accessible
+  name is exactly `Run content import`; its existing request, idempotency/retry,
+  refresh and `Content import completed.` text in `role=status` remain unchanged.
+  As before, that control is owner-only and appears when typed parity is active
+  (`db-shadow`/`db-read`), not in inactive Sheet or database-authority mode.
+- The panel's `Import now` continues to render that same component with its label
+  prop and status-refresh callbacks. It is disabled with a recovery explanation
+  when report construction fails or any reconciliation source is unreadable.
+  This covers the sweep's `noWrites` contract for Sheet/Drive/Typefully faults
+  while preserving the existing recovery control's behavior.
+- Kept the supplied partial page/panel/component-test work and verified it.
+  New component regressions exercise the real import component for both entry
+  points: exact label/status, POST endpoint/UUID, router refresh, readiness
+  refresh, owner visibility and fault/recovery disabling.
+- Added all three Auth.js `logger` handlers to the shared lazy auth config.
+  They ignore every argument and emit only `AUTH_ERROR`, `AUTH_WARNING` or
+  `AUTH_DEBUG`. No exception, library code, cause, stack, metadata or decrypted
+  claims are forwarded to the console. The debug handler uses `console.warn`
+  to comply with the repository's console policy.
+- Added `cutover-expired-cookie.test.ts`: real Auth.js `encode`/`decode`, shared
+  auth config, session parsing, `requireMutation`, and cutover GET/POST run
+  without an auth mock. Both HTTP and `__Secure-` cookie names are covered.
+  A real encrypted owner JWE authenticates successfully on both methods first;
+  advancing only Date beyond expiry and Auth.js's clock tolerance causes both
+  to return 401 with private/no-store headers and no provider execution.
+  Captured console methods plus stdout/stderr and responses exclude the owner
+  subject, actual generated jti, email, entire encrypted token, secret, and
+  literal payload/sub/jti/email/token text. Exactly two fixed error codes are
+  required, preventing a missing-cookie/unreached-auth false green.
+- Vitest inlines `next-auth` through Vite so the real wrapper's extensionless
+  Next imports resolve and only Next's request context can be faked.
+- No authorization, same-origin, bearer precedence, SQL gate, expected-build,
+  replay, audit or typed-ACTIVATE guard was weakened or changed.
 
-| Finding | Result and committed regression |
+## CI diagnosis and browser selector audit
+
+Read-only inspection: run `40319491678`, PR status/comments and issue #230.
+The four DB-read failures at 375/1280 were missing `Run content import` at
+`content-read-cutover.spec.ts:38,72`; the component is restored, so these
+unchanged selectors and role/status assertions are reachable again.
+
+The exploratory job `121562682565` was CANCELLED during `Install Chromium` at
+12:20:21 UTC after slow package downloads. It never extracted the server or
+started the sweep; no sweep artifact existed. This was an infrastructure/setup
+timeout, not evidence of a new panel accessibility or console failure. No CI
+workflow change is bundled. The unreadable-source guard above addresses a
+separate implementation risk found by reading its fault assertions.
+
+No e2e tests were modified in this fix. Reviewed all matches for `/reconcile`,
+import labels/status and panel names/IDs, including:
+
+| Specs | Selector/behavior review |
 | --- | --- |
-| P1-1: invalid calendar dates compare equal and import | The shared parser checks the written year/month/day, Gregorian leap-year rules, hours, minutes, seconds and offset components before calling `Date.parse`. Years are 0001–9999; minute/second and offset-minute ranges are 00–59, offset hours 00–23. Existing minute-only timestamps and exactly `24:00` (zero seconds/fraction) remain accepted. Impossible days, invalid times, ambiguous offsets and malformed hash suffixes cannot qualify for equivalence. Import and patch conversion refuse them. Parity still compares invalid text exactly, without normalizing it. `content-timestamps.test.ts` covers February 30, non-leap/century February 29, month ends, zero/out-of-range components, offset signs and boundaries, 24-hour policy, and valid leap/year/date boundaries. |
-| P1-2: exact rollback changes the original timestamp bytes | Import retains the entire `finalSyncedAt` cell in reserved `passthrough.@final_synced_at` metadata, using the existing angle/score pattern. The adapter renders it only if the preserved text still parses to the current DB instant **and** exact hash. Changed seconds, microseconds, hash or cleared timestamps discard the stale rendering; malformed metadata is ignored. Metadata never becomes an unknown exported column. Library/Queue currently have no such field: no field/schema was added, and their renderers strip the reserved metadata too. |
-| P1-2: complete SQL/export/rollback proof (MIG-09/MIG-12) | `content-timestamps-pglite.test.ts` applies the complete sorted existing Content migration chain and executes the actual import and patch RPCs. Repository/export reads query the actual PGlite tables, with PostgreSQL JSON timestamp serialization retaining microseconds. Tests prove byte-identical original cells and whole Schedule grids through import, export and rollback for positive/negative offsets, `.1200`, `Z`, microseconds, exact Unicode/tab hash text, minute-only and 24:00 forms. A same-instant SQL patch retains the original; edited instants/fractions/hashes and clearing export the current value. Exact parity and matching hashes are asserted after rollback. |
-| P1-3: equality allowance extends to other timestamps | The new schedule `value.*` comparison and field-equality accounting apply only to `finalSyncedAt`. `publishedAt` and `analyticsSyncedAt` retain their previous behavior: a timestamp-formatting cell fact remains unequal, while a changed typed value blocks. Dedicated regressions assert both the blocking count and field-equality accounting, including cell-only comparisons. |
-| Reviewer's independent probes | Committed the saved reviewer probes as `tests/unit/supabase/independent-parity-review.test.ts`, changing only the support import path for its directory. Before fixes: **22 passed, 5 failed**, reproducing the two calendar failures, two overbroad parity failures and SQL/export/rollback failure. After fixes: **27 passed**. |
+| `content-read-cutover` | Exact legacy button and completed status restored; row-specific pending recovery selectors unchanged. |
+| `content-parity` | Panel Import now still uses the same component; UUID replay and completed status retained. |
+| `content-parity-sheet`, `content-write-cutover` | Legacy button remains absent when typed parity is inactive or database is authoritative. |
+| `database-switch` | Panel name, status labels, native dialog, exact ACTIVATE label, switch/cancel/refresh names and focus hooks unchanged. |
+| `sweep`, `sweep-faults`, `sweep-checks` | Readiness, noWrites, keyboard, axe, console/network, overflow contracts retained; panel import disabled on unreadable-source faults. |
+| `a11y`, `states`, `ux-polish`, `zz-screens` | Page heading, provider state, folded Diagnostics and existing fix actions retained. |
+| `markdown-authority`, `navigation-counts`, `schedule` (and editor reconcile-text match) | Markdown controls, data-reconcile-kind sections, nav badges, stale headings and dismiss/review controls retained. |
 
-The Ready Queue, derived summary, lag behavior, thresholds, gate SQL and existing migrations retain the prior implementation. No migration is needed.
+Markup review found one panel heading and unique reason/confirmation IDs, a
+proper confirmation label, native controls with no interactive nesting, shared
+44px button/input classes, existing color tokens, a fixed-width table and
+wrapping build/text. This is static review only: browser/a11y/overflow/console
+results at both widths still require CI. Browser suites were not run locally,
+as requested; neither cancellation nor static review is recorded as a pass.
 
-Existing database copies need a fresh Sheet-authoritative import to acquire the raw timestamp metadata. A timestamp normalized by an older import cannot recover its original cell bytes from `timestamptz` alone; the coordinator should re-import on this build before live exact rollback verification.
+## Verification
 
-## Local verification
+Windows, synthetic fixtures and fake/PGlite providers only. Every Vitest,
+TypeScript and lint invocation used `bash ~/bin/heavy`; one Vitest worker.
+No full repository test suite, dependency installation or new dependency.
 
-All work used synthetic fixtures and local PGlite in a scratch **copy** at `D:/wt/cs-231-fix-r1`, with a junction to the existing `C:/Users/jbbug/projects/cs-wt/163/node_modules`. Scratch-only Git metadata was initialized for the security scanner checks. No dependency was installed. Every Vitest and typecheck invocation used `bash ~/bin/heavy`; lint used the queue too.
+- `bash ~/bin/heavy npx vitest run tests/unit/components tests/unit/application tests/unit/security tests/unit/supabase --maxWorkers=1`: PASS, 85 files / 1649 tests.
+- `bash ~/bin/heavy npm run typecheck`: PASS.
+- `bash ~/bin/heavy npm run lint`: PASS after using an allowed console method.
+- Final restored-source retest of both UI regressions, real expired-cookie
+  regression and all four existing auth test files: PASS, 7 files / 88 tests.
+  After aligning the synthetic email with the scanner's reserved example.com
+  domain convention, the real-cookie regression was rerun: PASS, 2/2 tests.
+- `node scripts/check-private-paths.mjs`, `node scripts/scan-secrets.mjs` and `git diff --check`: PASS (rechecked before commit).
 
-Final commands:
+The original node_modules junction lacked the already-declared PGlite/Supabase
+packages: initial run had 71 passing files / 1023 tests and 14 import failures.
+Validation temporarily used the complete existing dependency tree at
+`C:/Users/jbbug/projects/cs-wt/163/node_modules` (including declared versions
+Vitest 5.0.3, Next 16.4.1, Auth.js beta.32, PGlite 0.5.8). No install occurred.
+An initial typecheck was stopped after a temporary backup-junction name entered
+its wildcard scan; that junction was removed and the clean typecheck passed.
+The original worktree junction is restored before handoff. Synthetic logs and
+mutation hashes are retained locally under `tmp/cs076/` (ignored).
 
-```text
-bash ~/bin/heavy npx vitest run tests/unit/application tests/unit/supabase tests/unit/security tests/unit/google tests/unit/env-bootstrap.test.ts --maxWorkers=1
-bash ~/bin/heavy npm run typecheck
-bash ~/bin/heavy npm run lint
-node scripts/check-env.mjs
-node scripts/check-private-paths.mjs
-node scripts/scan-secrets.mjs
-git diff --cached --check
-```
+Adversarial lenses: import reachability/recovery, privacy/auth integration, and
+false-green test integrity. Three implementation mutations were applied one at
+a time, killed by behavioral assertions (not compile/import failures), and
+restored with matching SHA-256 hashes before the final 88-test retest:
 
-Final result: **61 files / 1,578 tests passed**, no skipped tests, **239.77 seconds**, exit **0**. Typecheck and lint each exited **0**. Env validation, env-manifest/schema drift, private-path policy, secret scanning and staged whitespace checks passed. The entire required application/Supabase/security directories and **all** Google unit regressions are included; this is not the full repository suite. `env-bootstrap.test.ts` verifies env-manifest/schema drift. The initial directory run passed 61 files / 1,575 tests; the final run adds three boundary/same-instant tests. The first targeted run exposed hard-coded test field counts that omitted the comparator's existing empty projections; those assertions now compare equality relative to the reported field count. Final process exit codes were captured directly by the external Node validation runner, avoiding PowerShell's treatment of expected test stderr as a shell error.
+| Mutation | Observed failure |
+| --- | --- |
+| Remove the shared Auth.js logger override | Both real expired-cookie tests fail; captured default-logger diagnostics contain the synthetic subject, jti field and email. |
+| Remove the restored legacy import component from the page | Both db-shadow/db-read visibility journeys fail on the missing exact button. |
+| Remove importsBlocked from the panel import disabled condition | Fault/recovery test fails because Import now is enabled during the fault. |
 
-Adversarial verification used calendar/precision correctness, SQL/export/stale-state integration, metadata privacy, and false-green test integrity lenses. The committed runner, `scripts/verify-cs-075-round1.mjs`, requires a disposable `D:/wt/cs-231-fix-*` directory, runs a green baseline, applies **35** distinct implementation mutations, requires failing test assertions, checks changed SHA-256 hashes, restores original bytes in `finally`, and retests the restored implementation. **35/35 detected**; the baseline and restored runs both passed **105 tests**. All recorded source/restored hashes match this worktree. The new evidence is [cs-075-review-r1-mutations.json](docs/qa/cs-075-review-r1-mutations.json); the earlier `cs-075-mutations.json` belongs to the previous build. Full logs, baseline failure reproduction, final exit codes and mutation logs remain outside the repository at `D:/wt/cs-231-fix-r1-evidence`.
+No mutation was retained. The owner/CSRF, bearer/replay/build-binding and
+typed-confirmation assertions in the existing security/component suites pass.
 
-T0 applies. No UI/interaction, mobile or native behavior changed, so T1/T2/T3/T4 execution is outside this local fix scope. A new independent review and remote CI remain for the coordinator's next review round; the previous head's green CI is not evidence for the new local commit.
+## Remaining evidence and boundaries
 
-## Handoff and constraints
-
-No live provider data call, GitHub write, push, merge, deployment or issue closure occurred. GitHub inspection was read-only. Dependencies, thresholds, gate SQL and migrations are unchanged. The final commit uses the requested message: `CS-075: validate calendar dates, preserve raw timestamp text, limit leniency to finalSyncedAt (#229)`.
-
-All 11 implementation/test/runner files matched the verified scratch copy byte-for-byte by SHA-256. The scratch dependency junction was removed using `cmd //c rmdir`; the dependency source remains intact. The unlinked scratch copy and external evidence directory are retained. No recursive deletion occurred under `cs-wt` or elsewhere. No unresolved implementation blocker remains; the local commit is ready for the coordinator's independent review.
+CI T1/T2 at 375/1280, including the previously unstarted sweep, must be rerun on
+the fix commit. Local unit/static results do not establish deployed behavior.
+No push, gh write, merge, deployment, live provider call, production-data change,
+cutover, new dependency or auth/ACTIVATE relaxation was performed. The only
+commit in this fix includes this report and mentions the redacted logger in
+its body. The exact resulting commit identity is supplied in the handoff.

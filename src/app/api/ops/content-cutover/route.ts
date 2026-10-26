@@ -1,12 +1,14 @@
 import 'server-only';
 import { z } from 'zod';
 import { getServices } from '@/application/container';
-import { requireCronSecret } from '@/lib/cron-auth';
+import { requireCutoverActor } from '@/lib/cutover-auth';
 import { serverEnv } from '@/lib/env';
 import { errorResponse, json } from '@/lib/http';
 import { AppError } from '@/domain/errors';
-import { readCutoverStatus } from '@/application/cutover-status';
+import { readCutoverStatus, readOwnerCutoverStatus } from '@/application/cutover-status';
 import { assertExpectedCutoverBuild, expectedBuildSchema } from '@/application/cutover-build';
+import { timed } from '@/observability/events';
+import { ownerCutoverResult } from '@/application/cutover-result';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -14,9 +16,11 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   try {
     const env = serverEnv();
-    requireCronSecret(request, env.CRON_SECRET);
+    const actor = await requireCutoverActor(request, env.CRON_SECRET);
     if (new URL(request.url).search || request.headers.has('Content-Type') || request.body !== null) throw new AppError('VALIDATION_FAILED');
-    return json({ ok: true, status: await readCutoverStatus(env) });
+    // Keep the runner's response and provider reads identical. Only the owner
+    // panel needs an import countdown; failure is unknown, never a green age.
+    return json({ ok: true, status: actor === 'cron_bearer' ? await readCutoverStatus(env) : await readOwnerCutoverStatus(env) });
   } catch (error) { return errorResponse(error); }
 }
 
@@ -31,12 +35,12 @@ const activation = z.object({
   action: z.enum(['activate-read', 'activate-db']),
   expectedBuild: expectedBuildSchema,
 }).strict();
-const operation = z.union([activation, z.object({ action: z.enum(['measure', 'backup', 'rollback']) }).strict()]);
+const operation = z.union([activation, z.object({ action: z.enum(['measure', 'backup', 'rollback', 'export']) }).strict()]);
 /** Private coordinator operations; activation is bound to the reviewed build. */
 export async function POST(request: Request) {
   try {
     const env = serverEnv();
-    requireCronSecret(request, env.CRON_SECRET);
+    const actor = await requireCutoverActor(request, env.CRON_SECRET);
     const body: unknown = await request.json();
     const parsed = operation.safeParse(body);
     if (!parsed.success) {
@@ -52,6 +56,8 @@ export async function POST(request: Request) {
     if ('expectedBuild' in parsed.data) assertExpectedCutoverBuild(parsed.data.expectedBuild, build);
     const ops = getServices().liveCutover;
     if (!ops) throw new AppError('FORBIDDEN');
-    return json({ ok: true, result: await ops.execute(parsed.data.action, operationId.data, build) });
+    const result = await timed({ name: 'cutover.operation', adapter: 'app', operationId: operationId.data,
+      facts: { action: parsed.data.action, actor } }, () => ops.execute(parsed.data.action, operationId.data, build, actor));
+    return json({ ok: true, result: actor === 'cron_bearer' ? result : ownerCutoverResult(parsed.data.action, result, build) });
   } catch (error) { return errorResponse(error); }
 }
