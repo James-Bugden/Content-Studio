@@ -15,6 +15,11 @@ const telemetry = vi.fn();
 beforeEach(() => { vi.stubEnv('CS_CONTENT_STORE', 'db-shadow'); telemetry.mockClear(); setTelemetrySink(telemetry); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); setTelemetrySink(null); });
 const actor = mirrorHash('synthetic-angle-actor');
+const exactCells = (['library', 'queue'] as const).flatMap(kind => [
+  { kind, text: ' \t3. Example angle \u81fa  ', angle: 3, changed: ['3. Example angle', '3. Different example angle  ', '3'] },
+  { kind, text: '7. Cafe\u0301', angle: 7, changed: ['7. Caf\u00e9'] },
+  { kind, text: '7. exact\t', angle: 7, changed: ['7. exact'] },
+]);
 function fixture(text: string, kind: 'library' | 'queue' = 'library') {
   const sheet = new FakeSheetTransport(), tab = SHEET_TABS[kind].name;
   const grid = sheet.rawTab(tab), column = grid[0]!.findIndex(c => c.value === LIBRARY_HEADERS.contentAngle);
@@ -53,7 +58,7 @@ describe('CS-072 numbered Content Angle cells', () => {
     expect(numberedContentAngle(text)).not.toBeNull();
   });
 
-  it.each(['0. Example angle', '15. Example angle', 'x. y', '7 Example angle', '7.', '7.   ', '-3. Example angle', '003. Example angle', '3. Example\nangle', 'Example 3. angle', '3e0. Example angle'])('refuses invalid label %j with content-free diagnostics', async text => {
+  it.each(['0. Example angle', '15. Example angle', 'x. y', '7 Example angle', '7.', '7.   ', '-3. Example angle', '003. Example angle', '3. Example\nangle', 'Example 3. angle', '3e0. Example angle', '\uFF17. x', '\u0667. x'])('refuses invalid label %j with content-free diagnostics', async text => {
     const { repo, store } = fixture(text);
     const records = await repo.listLibrary(), source = records[0]!;
     let error: unknown;
@@ -91,9 +96,13 @@ describe('CS-072 numbered Content Angle cells', () => {
     }
   });
 
-  it.each(['library', 'queue'] as const)('exports and rehearses rollback byte-for-byte for %s; a DB edit cannot resurrect another angle label', async kind => {
-    const text = ' \t3. Example angle \u81fa  ', { sheet, repo, store, tab, column } = fixture(text, kind);
+  it.each(exactCells)('exports and rehearses rollback byte-for-byte for $kind/$text; a DB edit cannot resurrect another angle label', async ({ kind, text, angle }) => {
+    const { sheet, repo, store, tab, column } = fixture(text, kind);
     await runTypedImport(repo, store, 'synthetic_workbook', actor);
+    const source = (await (kind === 'library' ? repo.listLibrary() : repo.listQueue()))[0]!;
+    expect(await store.db.getPost(kind, source.value.libraryId)).toMatchObject({ content_angle: angle, passthrough: { [CONTENT_ANGLE_RAW_KEY]: text } });
+    const exported = (await contentExportRows(store.db)).find(r => r.kind === kind && r.id === source.value.libraryId)!;
+    expect(Buffer.from(exported.cells[LIBRARY_HEADERS.contentAngle]!.value)).toEqual(Buffer.from(text));
     const dbRepo = new SupabaseContentRepository(store.db), exporter = new ContentExporter(store.db, sheet, { checkpoints: new Map(), issues: new Map(), reports: [] });
     const cutover = new ContentWriteCutover(dbRepo, exporter);
     const before = sheet.rawTab(tab).map(row => row[column]?.value ?? '');
@@ -103,7 +112,6 @@ describe('CS-072 numbered Content Angle cells', () => {
     expect(flip).toHaveBeenCalledWith('sheet');
     expect(Buffer.from(JSON.stringify(sheet.rawTab(tab).map(row => row[column]?.value ?? '')))).toEqual(Buffer.from(JSON.stringify(before)));
     expect(sheet.writes.flatMap(w => w.writes.filter(c => w.tab === tab && c.column === column))).toEqual([]);
-    const source = (await (kind === 'library' ? repo.listLibrary() : repo.listQueue()))[0]!;
     for (const angle of [4, null]) {
       store.db.externalEdit(kind, source.value.libraryId, { content_angle: angle });
       expect((await exporter.run()).exact).toBe(true);
@@ -112,14 +120,16 @@ describe('CS-072 numbered Content Angle cells', () => {
     }
   });
 
-  it('parity requires exact label bytes and excludes internal metadata while retaining unknown columns', async () => {
-    const { repo, store } = fixture('3. Example angle  ');
+  it.each(exactCells)('parity requires exact label bytes for $kind/$text and retains unknown columns', async ({ kind, text, changed: differences }) => {
+    const { repo, store } = fixture(text, kind);
     await runTypedImport(repo, store, 'synthetic_workbook', actor);
-    const expected = await repo.listLibrary(), actual = await new SupabaseContentRepository(store.db).listLibrary();
-    expect(compareContent('library', expected, actual, 1, 0)).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
-    for (const text of ['3. Example angle', '3. Different example angle  ', '3']) {
+    const method = kind === 'library' ? 'listLibrary' : 'listQueue';
+    const expected = await repo[method](), actual = await new SupabaseContentRepository(store.db)[method]();
+    expect(Buffer.from(actual[0]!.cells.contentAngle!)).toEqual(Buffer.from(text));
+    expect(compareContent(kind, expected, actual, 1, 0)).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
+    for (const text of differences) {
       const changed = structuredClone(actual); changed[0]!.cells.contentAngle = text;
-      const report = compareContent('library', expected, changed, 1, 0);
+      const report = compareContent(kind, expected, changed, 1, 0);
       expect(report.blocking).toBeGreaterThan(0);
       expect(report.facts).toContainEqual(expect.objectContaining({ field: 'cells.contentAngle', kind: 'changed' }));
       expect(JSON.stringify(report)).not.toContain('Example angle');

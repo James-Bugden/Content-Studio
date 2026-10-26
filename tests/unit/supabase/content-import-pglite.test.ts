@@ -34,11 +34,14 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
-  it.each(['library', 'queue'] as const)('CS-072: %s label/plain cells survive SQL measurement, export and exact rollback', async kind => {
+  it.each((['library', 'queue'] as const).flatMap(kind => [
+    { kind, text: ' \t3. Example angle \u81fa  ', angle: 3, changed: '3. Example angle \u81fa' },
+    { kind, text: '7. Cafe\u0301', angle: 7, changed: '7. Caf\u00e9' },
+    { kind, text: '7. exact\t', angle: 7, changed: '7. exact' },
+  ]))('CS-072: $kind/$text label/plain cells survive SQL measurement, export and exact rollback', async ({ kind, text, angle, changed }) => {
     const transport = new FakeSheetTransport(), sheet = new SheetsContentRepository(transport);
     const tab = SHEET_TABS[kind].name, grid = transport.rawTab(tab);
     const column = grid[0]!.findIndex(c => c.value === LIBRARY_HEADERS.contentAngle);
-    const text = ' \t3. Example angle \u81fa  ';
     transport.externalEdit(tab, 2, column, text);
     transport.externalEdit(tab, 3, column, '14');
     grid[0]!.push({ value: 'Synthetic extra' }); grid[1]!.push({ value: 'Synthetic extra value  ' });
@@ -60,13 +63,21 @@ describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
     const sources = await (kind === 'library' ? sheet.listLibrary() : sheet.listQueue());
     const source = sources[0]!;
     const stored = posts.find(r => r.collection === kind && r.library_id === source.value.libraryId)!;
-    expect(stored).toMatchObject({ content_angle: 3, passthrough: { [CONTENT_ANGLE_RAW_KEY]: text } });
+    expect(stored).toMatchObject({ content_angle: angle, passthrough: { [CONTENT_ANGLE_RAW_KEY]: text } });
+    expect(Buffer.from(stored.passthrough[CONTENT_ANGLE_RAW_KEY] as string)).toEqual(Buffer.from(text));
     expect(posts.find(r => r.collection === kind && r.library_id === sources[1]!.value.libraryId)?.content_angle).toBe(14);
     const reader = new FakeContentDb({ posts, schedule, settings });
     const repo = new SupabaseContentRepository(reader), exporter = new ContentExporter(reader, transport, { checkpoints: new Map(), issues: new Map(), reports: [] });
     for (const [collection, method] of [['library', 'listLibrary'], ['queue', 'listQueue'], ['ready', 'listReadyQueue'], ['schedule', 'listSchedule'], ['queue_summary', 'queueSummary'], ['workflow_settings', 'workflowSettings']] as const) {
       expect(compareContent(collection, await sheet[method](), await repo[method](), 1, 0)).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
     }
+    const method = kind === 'library' ? 'listLibrary' : 'listQueue';
+    const actual = await repo[method]();
+    expect(Buffer.from(actual[0]!.cells.contentAngle!)).toEqual(Buffer.from(text));
+    actual[0]!.cells.contentAngle = changed;
+    const mismatch = compareContent(kind, sources, actual, 1, 0);
+    expect(mismatch.blocking).toBeGreaterThan(0);
+    expect(mismatch.facts).toContainEqual(expect.objectContaining({ field: 'cells.contentAngle', kind: 'changed' }));
     const exported = (await contentExportRows(reader)).find(r => r.kind === kind && r.id === source.value.libraryId)!;
     expect(Buffer.from(exported.cells[LIBRARY_HEADERS.contentAngle]!.value)).toEqual(Buffer.from(text));
     expect(exported.cells['Synthetic extra']).toEqual({ value: 'Synthetic extra value  ' });
@@ -99,6 +110,23 @@ describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
     const ledger = await db.asService(q => q.query<{ exceptions: unknown }>('select exceptions from content_studio_import_runs where operation_id=$1', [e.operationId]));
     expect(ledger.rows[0]!.exceptions).toEqual(e.exceptions);
     for (const text of invalid) expect(JSON.stringify(ledger.rows[0])).not.toContain(text);
+  });
+  it.each((['library', 'queue'] as const).flatMap(kind => ['\uFF17. x', '\u0667. x'].map(text => ({ kind, text }))))('CS-072: $kind/$text non-ASCII digits are refused with a SQL ledger entry', async ({ kind, text }) => {
+    const transport = new FakeSheetTransport(), sheet = new SheetsContentRepository(transport);
+    const tab = SHEET_TABS[kind].name, grid = transport.rawTab(tab);
+    const column = grid[0]!.findIndex(c => c.value === LIBRARY_HEADERS.contentAngle);
+    transport.externalEdit(tab, 2, column, text);
+    const sources = await (kind === 'library' ? sheet.listLibrary() : sheet.listQueue());
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(sheet, { sourceKey: 'synthetic_workbook' }), new Map(), actor);
+    expect(e.counts[kind]).toBe(sources.length - 1);
+    const refusal = { class: 'refused_numeric', collection: kind, field: 'content_angle', hash: expect.stringMatching(/^[a-f0-9]{64}$/) };
+    expect(e.exceptions.filter(e => e.class.startsWith('refused_'))).toEqual([refusal]);
+    expect((await rpc(e)).rows[0]!.result.ok).toBe(true);
+    const rows = await db.asService(q => q.query('select library_id from content_studio_posts where collection=$1 and library_id=$2', [kind, sources[0]!.value.libraryId]));
+    expect(rows.rows).toEqual([]);
+    const ledger = await db.asService(q => q.query<{ exceptions: ImportEnvelope['exceptions'] }>('select exceptions from content_studio_import_runs where operation_id=$1', [e.operationId]));
+    expect(ledger.rows[0]!.exceptions.filter(e => e.class.startsWith('refused_'))).toEqual([refusal]);
+    expect(JSON.stringify(ledger.rows[0])).not.toContain(text);
   });
   it.each(['formula_display', 'number_formatting', 'trailing_whitespace', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting'])('the complete migration chain still accepts %s', async kind => {
     const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey: 'synthetic_workbook' });
