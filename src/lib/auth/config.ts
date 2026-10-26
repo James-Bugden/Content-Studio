@@ -18,6 +18,13 @@ function buildConfig(): NextAuthConfig {
   return {
     secret: env.AUTH_SECRET,
     trustHost: true,
+    // Auth.js errors can contain decrypted session claims in their causes.
+    // Override every level: never pass errors, codes or metadata to a logger.
+    logger: {
+      error: () => { console.error('AUTH_ERROR'); },
+      warn: () => { console.warn('AUTH_WARNING'); },
+      debug: () => { console.warn('AUTH_DEBUG'); },
+    },
     providers: env.AUTH_GOOGLE_ID && env.AUTH_GOOGLE_SECRET ? [Google({ clientId: env.AUTH_GOOGLE_ID, clientSecret: env.AUTH_GOOGLE_SECRET })] : [],
     session: { strategy: 'jwt', maxAge: SESSION_MAX_AGE_SECONDS },
     jwt: { maxAge: SESSION_MAX_AGE_SECONDS },

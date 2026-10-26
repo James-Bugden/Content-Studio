@@ -22,9 +22,13 @@ export type ModalDialogProps = {
   wide?: boolean;
   /** Visually distinguishes a warning from a plain decision. */
   tone?: 'neutral' | 'warning';
+  /** Phone confirmation sheet; desktop keeps the shared centred dialog. */
+  phoneSheet?: boolean;
+  /** Use when opening also disables the trigger before the dialog effect runs. */
+  returnFocusTo?: React.RefObject<HTMLElement | null>;
 };
 
-export function ModalDialog({ open, onClose, title, description, children, footer, wide = false, tone = 'neutral' }: ModalDialogProps) {
+export function ModalDialog({ open, onClose, title, description, children, footer, wide = false, tone = 'neutral', phoneSheet = false, returnFocusTo }: ModalDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -34,16 +38,20 @@ export function ModalDialog({ open, onClose, title, description, children, foote
     const dialog = ref.current;
     if (!dialog) return;
     if (open && !dialog.open) {
-      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      returnFocus.current = returnFocusTo?.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       if (typeof dialog.showModal === 'function') dialog.showModal();
       else dialog.setAttribute('open', '');
     } else if (!open && dialog.open) {
       if (typeof dialog.close === 'function') dialog.close();
       else dialog.removeAttribute('open');
-      returnFocus.current?.focus();
+      const opener = returnFocus.current;
+      // Readiness can disable the original switch while its dialog is open.
+      // Return to a useful control in the same panel when that happens.
+      if (opener?.matches(':disabled')) opener.closest('section')?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+      else opener?.focus();
       returnFocus.current = null;
     }
-  }, [open]);
+  }, [open, returnFocusTo]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -67,7 +75,8 @@ export function ModalDialog({ open, onClose, title, description, children, foote
         if (event.key === 'Escape' && typeof ref.current?.showModal !== 'function') onClose();
       }}
       className={[
-        'm-auto w-[calc(100%-2rem)] rounded-lg border bg-card p-0 text-ink shadow-xl backdrop:bg-ink/40',
+        'border bg-card p-0 text-ink shadow-xl backdrop:bg-ink/40',
+        phoneSheet ? 'mt-auto mr-0 mb-0 ml-0 w-full rounded-t-xl sm:m-auto sm:w-[calc(100%-2rem)] sm:rounded-lg' : 'm-auto w-[calc(100%-2rem)] rounded-lg',
         wide ? 'max-w-6xl' : 'max-w-lg',
         tone === 'warning' ? 'border-block border-t-4' : 'border-line',
       ].join(' ')}

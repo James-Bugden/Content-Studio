@@ -15,6 +15,11 @@ export class ContentShadowStore {
   async cutoverRpc(name: string, body: Record<string, unknown>): Promise<unknown> {
     return this.request(`rpc/content_studio_cutover_${name}`, { method: 'POST', body: JSON.stringify(body) });
   }
+  async latestImportAt(): Promise<string | null> {
+    const rows = z.array(z.object({ at: z.string().datetime({ offset: true }) })).max(1).parse(
+      await this.request('content_studio_import_runs?select=at&order=at.desc,operation_id.desc&limit=1', { method: 'GET' }));
+    return rows[0]?.at ?? null;
+  }
   async rows(params: Record<string, string>): Promise<unknown[]> {
     const rows: unknown[] = [];
     for (;;) {
