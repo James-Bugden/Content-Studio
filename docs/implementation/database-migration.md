@@ -354,8 +354,9 @@ skipped or inconclusive measurement is not green.
   the row is marked `refresh_pending`, the UI shows the returned record, and
   the next scheduled import repairs representable values. A refused integer or
   oversized row remains a blocking pending item until its value or copy limit is
-  corrected; db-read imports count/classify it in the exception ledger and keep
-  importing other rows. Unknown differences and CAS conflicts still fail closed.
+  corrected; db-shadow and db-read imports count/classify it in the exception
+  ledger and keep importing other rows. Unknown differences and CAS conflicts
+  still fail closed.
   An overlay retires when its fingerprint is copied or the DB matches the
   current Sheet fingerprint, even after a newer edit. Pending reads avoid
   repeated full-tab authority checks for unchanged DB/import tokens:

@@ -30,8 +30,47 @@ describe('MIG-09 typed complete imports', () => {
     }
   });
 
-  it('CS-059b / R05: db-read aborts the entire import on an unclassified conversion failure', async () => {
-    vi.stubEnv('CS_CONTENT_STORE', 'db-read');
+  describe.each(['db-shadow', 'db-read'])('CS-071: %s refusals', mode => {
+    it.each(['numeric', 'size'])('classifies a %s refusal, imports other rows and keeps evidence private', async kind => {
+      vi.stubEnv('CS_CONTENT_STORE', mode);
+      const repo = sheet(), store = new FakeContentImportStore({ posts: [], schedule: [], settings: [] });
+      const rows = await repo.listLibrary(), refused = rows[0]!, valid = rows[1]!;
+      const privateCopy = 'Synthetic refused copy must stay private';
+      refused.cells.hookScore = '007'; // Discard representation exceptions for the refused row too.
+      refused.cells.draftContent = privateCopy;
+      if (kind === 'numeric') refused.cells.contentAngle = 'synthetic-not-a-number';
+      else refused.cells.imageBrief = 'x'.repeat(262_144);
+      valid.cells.draftContent = 'Synthetic other row still imports';
+      valid.value.draftContent = valid.cells.draftContent;
+      vi.spyOn(repo, 'listLibrary').mockResolvedValue(rows);
+
+      const result = await runTypedImport(repo, store, 'synthetic_workbook', actor);
+      const imported = await store.db.listPosts('library');
+      expect(result.counts.library).toBe(rows.length - 1);
+      expect(imported).toHaveLength(rows.length - 1);
+      expect(imported.some(r => r.library_id === refused.value.libraryId)).toBe(false);
+      expect(imported.find(r => r.library_id === valid.value.libraryId)?.draft_content).toBe(valid.cells.draftContent);
+      const field = kind === 'numeric' ? 'content_angle' : '@row';
+      expect(result.exceptions.filter(e => e.class.startsWith('refused_'))).toEqual([{
+        class: kind === 'numeric' ? 'refused_numeric' : 'refused_size', collection: 'library', field,
+        hash: evidenceHash({ collection: 'library', field, id: refused.value.libraryId, value: refused.revision }),
+      }]);
+      expect(result.exceptions).not.toContainEqual(expect.objectContaining({ class: 'number_formatting', field: 'hook_score' }));
+      for (const entry of result.exceptions) {
+        expect(Object.keys(entry).sort()).toEqual(['class', 'collection', 'field', 'hash']);
+        expect(entry.hash).toMatch(/^[a-f0-9]{64}$/);
+      }
+      const ledger = JSON.stringify(result.exceptions);
+      for (const privateValue of [privateCopy, refused.value.libraryId, refused.revision, 'synthetic-not-a-number', 'x'.repeat(100)]) {
+        expect(ledger).not.toContain(privateValue);
+      }
+      const actual = await new SupabaseContentRepository(store.db, 'db-read').listLibrary();
+      expect(compareContent('library', rows, actual, 1, 0)).toMatchObject({ idsEqual: false, blocking: 1 });
+    });
+  });
+
+  it.each(['db-shadow', 'db-read'])('CS-071 / R05: %s aborts the entire import on an unclassified conversion failure', async mode => {
+    vi.stubEnv('CS_CONTENT_STORE', mode);
     const repo = sheet(), store = new FakeContentImportStore();
     const rows = await repo.listLibrary();
     // A malformed boolean is neither a numeric nor size refusal. Keep the
@@ -41,7 +80,7 @@ describe('MIG-09 typed complete imports', () => {
     vi.spyOn(repo, 'listLibrary').mockResolvedValue(rows);
     const apply = vi.spyOn(store, 'applyImport');
     const before = await store.db.listPosts('library');
-    await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    await expect(runTypedImport(repo, store, 'synthetic_workbook', actor)).rejects.toMatchObject({ code: 'VALIDATION_FAILED', details: { reason: 'unclassified_import_difference' } });
     expect(apply).not.toHaveBeenCalled();
     expect(await store.db.listPosts('library')).toEqual(before);
   });
@@ -125,7 +164,9 @@ describe('MIG-09 typed complete imports', () => {
     expect(classifyDifference('text  ', 'text', 'nextAction')).toBe('trailing_whitespace');
     expect(classifyDifference('expected', 'lost', 'hasImage')).toBe(null);
     record.cells.views = 'not a number'; row.rowHash = mirrorHash(row.payload);
-    expect(() => buildTypedImport(source, new Map(), actor)).toThrowError(expect.objectContaining({ code: 'VALIDATION_FAILED' }));
+    const refused = buildTypedImport(source, new Map(), actor);
+    expect(refused.rows.some(r => r.target_kind === 'schedule' && r.target_id === row.stableId)).toBe(false);
+    expect(refused.exceptions).toContainEqual(expect.objectContaining({ class: 'refused_numeric', field: 'views' }));
   });
   it('binds counts, collection hashes, rows and exceptions into the canonical snapshot hash', async () => {
     const source = await snapshot();
