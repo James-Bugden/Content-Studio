@@ -5,7 +5,7 @@ import { classifyDifference } from './content-import';
 import type { ImportEnvelope } from './content-import';
 import { emit } from '@/observability/events';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
-import { hasStableSheetId } from './sheet-records';
+import { hasStableSheetId, isReadyQueuePlaceholder } from './sheet-records';
 
 export const PARITY_COLLECTIONS = ['library', 'queue', 'ready', 'schedule', 'queue_summary', 'workflow_settings'] as const;
 export type ParityCollection = typeof PARITY_COLLECTIONS[number];
@@ -36,6 +36,7 @@ export function compareContent(collection: ParityCollection, expected: unknown, 
   if (collection === 'library' || collection === 'queue' || collection === 'ready' || collection === 'schedule') {
     expected = (expected as (LibraryRecord | ScheduleRecord)[]).filter(hasStableSheetId);
   }
+  if (collection === 'ready') expected = (expected as LibraryRecord[]).filter(record => !isReadyQueuePlaceholder(record));
   const left = indexed(collection, expected), right = indexed(collection, actual);
   const facts: ParityFact[] = [];
   let idsEqual = true, fields = 0, equal = 0, blocking = 0;
@@ -61,12 +62,14 @@ export function compareContent(collection: ParityCollection, expected: unknown, 
     for (const field of new Set([...Object.keys(af), ...Object.keys(bf)])) {
       fields++;
       if (canonicalJson([af[field]]) === canonicalJson([bf[field]])) { equal++; continue; }
-      const kind = field.startsWith('cells.') ? classifyDifference(af[field], bf[field], field.slice(6)) : null;
+      const timestampValue = collection === 'schedule' && field === 'value.finalSyncedAt';
+      const kind = field.startsWith('cells.') || timestampValue ? classifyDifference(af[field], bf[field], field.slice(6)) : null;
       fact(id, collection === 'queue_summary' && field.startsWith('counts.') ? 'counts' : field, kind ?? 'changed');
       // Sheet's blank checkbox is false. Name this single semantic equivalence
-      // explicitly so real unposted rows can pass Phase B; all other classified
-      // text changes (especially whitespace) remain unequal fields.
-      if (kind === 'blank_boolean') equal++;
+      // explicitly so real unposted rows can pass Phase B. Only final-sync
+      // timestamp formatting also contributes to field equality.
+      if (kind === 'blank_boolean' || kind === 'timestamp_formatting' && collection === 'schedule'
+        && (field === 'cells.finalSyncedAt' || field === 'value.finalSyncedAt')) equal++;
       if (!kind) blocking++;
     }
   }

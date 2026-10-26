@@ -14,6 +14,7 @@ import { LIBRARY_HEADERS, SCHEDULE_HEADERS, LIBRARY_WRITABLE, SCHEDULE_WRITABLE 
 import { parseWorkflowSettings } from '@/domain/settings';
 import { assertContentSchemaVersion } from './content-schema';
 import { validateContentRow } from './content-row-schema';
+import { CONTENT_TIMESTAMP_FIELDS, FINAL_SYNCED_AT_RAW_KEY, contentTimestampParts, sameContentTimestamp, taipeiContentTimestamp } from '@/application/content-timestamps';
 
 export const contentColumn = (field: string): string => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
 const summarySchema = z.array(z.object({ content_source: z.string(), master_link: z.string(), counts: z.record(z.string(), z.number().finite().nullable()) }));
@@ -26,18 +27,20 @@ function validated<T>(schema: z.ZodType<T>, input: unknown): T {
 
 // PostgREST emits timestamptz in UTC. Sheet's operational display is Taipei.
 function taipeiStamp(value: string): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) throw new AppError('SCHEMA_DRIFT', { kind: 'timestamp' });
-  return new Date(date.getTime() + 8 * 60 * 60_000).toISOString().replace(/\.000Z$/, '+08:00').replace(/Z$/, '+08:00');
+  const stamp = taipeiContentTimestamp(value);
+  if (stamp === null) throw new AppError('SCHEMA_DRIFT', { kind: 'timestamp' });
+  return stamp;
 }
 
 function cells<F extends string>(headers: Record<F, string>, row: object): Record<F, string> {
   const raw = row as Record<string, unknown>;
   return Object.fromEntries(Object.keys(headers).map(field => {
     let value = cellText(raw[contentColumn(field)]);
-    if (['finalSyncedAt', 'publishedAt', 'analyticsSyncedAt'].includes(field)) value = taipeiStamp(value);
+    if (CONTENT_TIMESTAMP_FIELDS.has(field)) value = taipeiStamp(value);
     if (field === 'finalSyncedAt' && value && raw.final_synced_hash) value += ` #${raw.final_synced_hash}`;
+    const originalStamp = (raw.passthrough as Record<string, unknown>)[FINAL_SYNCED_AT_RAW_KEY];
+    if (field === 'finalSyncedAt' && typeof originalStamp === 'string'
+      && sameContentTimestamp(originalStamp, value, field)) value = originalStamp;
     return [field, value];
   })) as Record<F, string>;
 }
@@ -61,7 +64,7 @@ export class SupabaseContentRepository implements ContentRepository {
   private post(row: ContentPostRow): LibraryRecord {
     row = validateContentRow(row);
     const c = cells(LIBRARY_HEADERS, row);
-    const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, [HOOK_SCORE_RAW_KEY]: originalScore, ...passthrough } = row.passthrough;
+    const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, [HOOK_SCORE_RAW_KEY]: originalScore, [FINAL_SYNCED_AT_RAW_KEY]: _originalStamp, ...passthrough } = row.passthrough;
     if (typeof originalScore === 'string' && decimalHookScore(originalScore) !== null
       && decimalHookScore(originalScore) === row.hook_score) c.hookScore = originalScore;
     // A later DB edit must never export a label for a different angle. The
@@ -77,7 +80,7 @@ export class SupabaseContentRepository implements ContentRepository {
   private schedule(row: ContentScheduleRow): ScheduleRecord {
     row = validateContentRow(row);
     const c = cells(SCHEDULE_HEADERS, row);
-    const { [HOOK_SCORE_RAW_KEY]: originalScore, ...passthrough } = row.passthrough;
+    const { [HOOK_SCORE_RAW_KEY]: originalScore, [FINAL_SYNCED_AT_RAW_KEY]: _originalStamp, ...passthrough } = row.passthrough;
     if (typeof originalScore === 'string' && decimalHookScore(originalScore) !== null
       && decimalHookScore(originalScore) === row.hook_score) c.hookScore = originalScore;
     return { value: toScheduledPost(c), cells: c, row: row.source_sheet_row ?? 0,
@@ -177,11 +180,12 @@ export function contentPatch(patch: Record<string, string | undefined>, currentC
       typed = value === '' ? null : Number(value.replace(/,/g, ''));
       if (typed !== null && (!Number.isInteger(typed) || Number(typed) < -2147483648 || Number(typed) > 2147483647 || (['views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers'].includes(field) && Number(typed) < 0))) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
     }
-    if (['finalSyncedAt', 'publishedAt', 'analyticsSyncedAt'].includes(field)) {
-      const [stamp, hash = ''] = field === 'finalSyncedAt' ? value.split(' #') : [value];
+    if (CONTENT_TIMESTAMP_FIELDS.has(field)) {
+      const parts = contentTimestampParts(value, field);
       // SQL timestamps represent instants. Never interpret an offset-free value
       // in the server's local time zone (which differs between dev and hosting).
-      if (stamp && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(stamp) || !Number.isFinite(new Date(stamp).getTime()))) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
+      if (!parts) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
+      const { stamp, hash } = parts;
       typed = stamp ? new Date(stamp).toISOString() : null;
       if (field === 'finalSyncedAt') result.final_synced_hash = hash;
     }

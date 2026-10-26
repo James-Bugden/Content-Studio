@@ -1,0 +1,885 @@
+{
+    "issue":  "https://github.com/James-Bugden/Content-Studio/issues/229",
+    "baseCommit":  "4f82166e44a66fced4d3db75e5060093b4cee0c1",
+    "environment":  "Synthetic fixtures and local PGlite in a scratch copy; every Vitest invocation uses the shared heavy queue",
+    "mutants":  53,
+    "detected":  53,
+    "byteForByteRestoration":  true,
+    "mutatedSourceFiles":  [
+                               {
+                                   "path":  "src/application/content-import.ts",
+                                   "sha256":  "3267fc8e184943b9cac0397cd72fdc5c5a961cd5aab6b40ad5a62e8016c658c1"
+                               },
+                               {
+                                   "path":  "src/application/content-parity.ts",
+                                   "sha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f"
+                               },
+                               {
+                                   "path":  "src/application/content-timestamps.ts",
+                                   "sha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                               },
+                               {
+                                   "path":  "src/application/queue-summary.ts",
+                                   "sha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                               },
+                               {
+                                   "path":  "src/application/sheet-mirror.ts",
+                                   "sha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb"
+                               },
+                               {
+                                   "path":  "src/application/sheet-records.ts",
+                                   "sha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf"
+                               },
+                               {
+                                   "path":  "src/integrations/google/sheets-repository.ts",
+                                   "sha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                               },
+                               {
+                                   "path":  "src/integrations/supabase/content-repository.ts",
+                                   "sha256":  "32073e2fe356abfae6a56f0ce7eda4d8ed38f2412e430a5c180ed2de08c0929b"
+                               },
+                               {
+                                   "path":  "src/integrations/supabase/snapshot-content-repository.ts",
+                                   "sha256":  "6b82f5f6b2ea5934d55134ebc17469095e8e98b1eea771d8cdc2062bd48fb1e7"
+                               }
+                           ],
+    "results":  [
+                    {
+                        "guard":  "timestamp field allowlist",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "6f172c9e15149b45d90f1ec68d922ef7b5d3662f35433e951dd46309464ba5ca",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  2 failed | 24 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z / 2026-09-21T10:59:52+08:00",
+                                           "AssertionError: expected \u0027timestamp_formatting\u0027 to be null",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e keeps timestamp-looking content bytes exact",
+                                           "AssertionError: expected 1 to be 2 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "hash suffix only on final sync",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "622ff55495581a5a2ce3be656121a2eed01c3aaca34fa1f3b9107be7f77a5090",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a / 2026-09-21T10:59:52+08:00 #a",
+                                           "AssertionError: expected \u0027timestamp_formatting\u0027 to be null"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "multiple hash delimiters refused",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "549cc6c21dab6d85977484721d70aff8918f425021a3d152566f0f14380f86f8",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  2 failed | 24 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a #b / 2026-09-21T10:59:52+08:00 #a #b",
+                                           "AssertionError: expected \u0027timestamp_formatting\u0027 to be null",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-09-21T02:59:52Z #a #b",
+                                           "AssertionError: expected function to throw an error, but it didn\u0027t"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "empty hash or stamp refused",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "bc6c8709272a90cbf761e8ba12aa6d402139cb9c721845df20164c82a930f5de",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  3 failed | 23 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z # / 2026-09-21T10:59:52+08:00",
+                                           "AssertionError: expected \u0027timestamp_formatting\u0027 to be null",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports:  #hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-09-21T02:59:52Z #",
+                                           "AssertionError: expected function to throw an error, but it didn\u0027t"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "explicit offset ISO format required",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "3baa383edd8dbac2bc010d8c0995acde1c888dda637fbd329f159fe484541ab2",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-09-21T02:59:52",
+                                           "AssertionError: expected function to throw an error, but it didn\u0027t"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "finite timestamp required",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "e7d1f62af4a70537557bb58d889519ba92853f4e43508225674c999932143928",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-99-21T02:59:52Z",
+                                           "AssertionError: expected error to match asymmetric matcher"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "exact hash bytes required",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "f1f593c079845bffe2ad38ba7aeb2221302d6195d80f1179d982c708d74fa455",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  5 failed | 21 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a / 2026-09-21T10:59:52+08:00 #b",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #ï¼¡ / 2026-09-21T10:59:52+08:00 #A",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #CafeÌ / 2026-09-21T10:59:52+08:00 #CafÃ©",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a\t / 2026-09-21T10:59:52+08:00 #a",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52Z #a / 2026-09-21T10:59:52+08:00",
+                                           "AssertionError: expected \u0027timestamp_formatting\u0027 to be null"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "instant seconds must match",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "bb63e0c8220843024afb438e5da7b3390bfc6669efc286f26b03935e9baa67c8",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  3 failed | 23 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.finalSyncedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.publishedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.analyticsSyncedAt by instant with exact hash",
+                                           "AssertionError: expected +0 to be 2 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "fractional seconds must match",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "9321ff9dbda5f32aa540a7181499513fff88fe517aaeb16585208063093f6f56",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses non-equivalent or non-timestamp text 2026-09-21T02:59:52.123001Z / 2026-09-21T02:59:52.123002Z",
+                                           "AssertionError: expected \u0027timestamp_formatting\u0027 to be null"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "timestamp classification retained",
+                        "file":  "src/application/content-import.ts",
+                        "beforeSha256":  "3267fc8e184943b9cac0397cd72fdc5c5a961cd5aab6b40ad5a62e8016c658c1",
+                        "mutantSha256":  "bb8136923b4dad2d995be852d52950af5fc9b10971fa762ab23d9a72e11a6ffa",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  3 failed | 23 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.finalSyncedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.publishedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.analyticsSyncedAt by instant with exact hash",
+                                           "AssertionError: expected null to be \u0027timestamp_formatting\u0027 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "3267fc8e184943b9cac0397cd72fdc5c5a961cd5aab6b40ad5a62e8016c658c1"
+                    },
+                    {
+                        "guard":  "timestamp import validates shared parser",
+                        "file":  "src/application/content-import.ts",
+                        "beforeSha256":  "3267fc8e184943b9cac0397cd72fdc5c5a961cd5aab6b40ad5a62e8016c658c1",
+                        "mutantSha256":  "c794aead3dbc30862c92b3915c246a30a1ce46d7acae9f3e8316ba23a66bc952",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  6 failed | 20 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: invalid",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-09-21T02:59:52",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-99-21T02:59:52Z",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports:  #hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-09-21T02:59:52Z #",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e refuses invalid timestamp imports: 2026-09-21T02:59:52Z #a #b",
+                                           "AssertionError: expected function to throw an error, but it didn\u0027t"
+                                       ],
+                        "restoredSha256":  "3267fc8e184943b9cac0397cd72fdc5c5a961cd5aab6b40ad5a62e8016c658c1"
+                    },
+                    {
+                        "guard":  "import preserves microseconds",
+                        "file":  "src/application/content-timestamps.ts",
+                        "beforeSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3",
+                        "mutantSha256":  "64b742184b28bf7f01317bb63a46fa0423a1bf40dc83f0bb078ce10d7eec2e30",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  3 failed | 23 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.finalSyncedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.publishedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.analyticsSyncedAt by instant with exact hash"
+                                       ],
+                        "restoredSha256":  "54d3598188756989a110a0e0f222216c59bc63293d75a3ab02056ec3348d99e3"
+                    },
+                    {
+                        "guard":  "DB read preserves microseconds",
+                        "file":  "src/integrations/supabase/content-repository.ts",
+                        "beforeSha256":  "32073e2fe356abfae6a56f0ce7eda4d8ed38f2412e430a5c180ed2de08c0929b",
+                        "mutantSha256":  "17db2e8914611bd6ca645b22fb737126387e06b774d57f4f400f4b909f7e6125",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected 2 to be +0 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "32073e2fe356abfae6a56f0ce7eda4d8ed38f2412e430a5c180ed2de08c0929b"
+                    },
+                    {
+                        "guard":  "value timestamp comparison enabled",
+                        "file":  "src/application/content-parity.ts",
+                        "beforeSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f",
+                        "mutantSha256":  "a082f68366422b32640f74b725d5db07fd4bc6e0965e05d3acc0897fd7a4f5c9",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  3 failed | 23 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.finalSyncedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.publishedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.analyticsSyncedAt by instant with exact hash",
+                                           "AssertionError: expected { at: 100, â€¦(7) } to match object { idsEqual: true, blocking: +0 }"
+                                       ],
+                        "restoredSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f"
+                    },
+                    {
+                        "guard":  "equivalent timestamps count equal",
+                        "file":  "src/application/content-parity.ts",
+                        "beforeSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f",
+                        "mutantSha256":  "1776cff0a06d6be76468d9be3f5dac3e8f43c2cb29371485cec869d3a5497587",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  3 failed | 23 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.finalSyncedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.publishedAt by instant with exact hash",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 schedule timestamp equivalence \u003e compares both cells and value.analyticsSyncedAt by instant with exact hash",
+                                           "AssertionError: expected 92 to be 94 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f"
+                    },
+                    {
+                        "guard":  "exact Ready sentinel ID required",
+                        "file":  "src/application/sheet-records.ts",
+                        "beforeSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf",
+                        "mutantSha256":  "92dc15656882eb7ee55e0aa895f3efee116b1457899a3803acede26ec152c05a",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected true to be false // Object.is equality"
+                                       ],
+                        "restoredSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf"
+                    },
+                    {
+                        "guard":  "all other Ready cells must be blank",
+                        "file":  "src/application/sheet-records.ts",
+                        "beforeSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf",
+                        "mutantSha256":  "67fdebd6d1fcdae2e15407ed425d64e24bd1d4b0de2c62d1b2cf98add28093db",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected true to be false // Object.is equality"
+                                       ],
+                        "restoredSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf"
+                    },
+                    {
+                        "guard":  "Ready links must be blank",
+                        "file":  "src/application/sheet-records.ts",
+                        "beforeSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf",
+                        "mutantSha256":  "fa2f0ef0812a4f29729e938170d87b9ee2b5336bb5da4674c487a78eb74c4bd9",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected true to be false // Object.is equality"
+                                       ],
+                        "restoredSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf"
+                    },
+                    {
+                        "guard":  "Ready extra cells must be blank",
+                        "file":  "src/application/sheet-records.ts",
+                        "beforeSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf",
+                        "mutantSha256":  "8e0295027fdaebc506963da0bc00b9c017e865ee109b793547cd83d5ef14bde0",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected true to be false // Object.is equality"
+                                       ],
+                        "restoredSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf"
+                    },
+                    {
+                        "guard":  "Ready scalar extra cells must be blank",
+                        "file":  "src/application/sheet-records.ts",
+                        "beforeSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf",
+                        "mutantSha256":  "cc262b247de6d6fd97613d4a2fe4e74ca765f99ca2a0dd1520d6a91b60cd1f74",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected true to be false // Object.is equality"
+                                       ],
+                        "restoredSha256":  "369e0cb69ee4322d14afb30f7117638cdbc194e607d48982296b70cbfb813bdf"
+                    },
+                    {
+                        "guard":  "adapter skips Ready sentinel",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "a215a8c97846c542ed8e3b2fa7ae61059a70d908bf0f54d2dc5d7bff6c5322dd",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e skips the exact sentinel in the adapter, mirror/import snapshot, parity and counts",
+                                           "AssertionError: expected [ { value: { â€¦(26) }, row: 2, â€¦(5) } ] to deeply equal []"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "mirror skips Ready sentinel",
+                        "file":  "src/application/sheet-mirror.ts",
+                        "beforeSha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb",
+                        "mutantSha256":  "89fc5bc9072e8b30b0134fc1da93943a4cef1b5206d33cdaebf8390c46509039",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  2 failed | 24 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e skips the exact sentinel in the adapter, mirror/import snapshot, parity and counts",
+                                           "AssertionError: expected 1 to be +0 // Object.is equality",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected 2 to be 1 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb"
+                    },
+                    {
+                        "guard":  "mirror filters sentinel only in Ready",
+                        "file":  "src/application/sheet-mirror.ts",
+                        "beforeSha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb",
+                        "mutantSha256":  "65411ea3679f588cecac2c8d2413170decbded55eea769b1d9dab8838ad9d800",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e preserves similar IDs, any nonblank field/link/extra cell and real rows",
+                                           "AssertionError: expected +0 to be 1 // Object.is equality"
+                                       ],
+                        "restoredSha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb"
+                    },
+                    {
+                        "guard":  "parity skips expected Ready sentinel",
+                        "file":  "src/application/content-parity.ts",
+                        "beforeSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f",
+                        "mutantSha256":  "74e16c62d5fec67e8b5cb069fde9a8277ccf74890b079db91814ff6439679df1",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e skips the exact sentinel in the adapter, mirror/import snapshot, parity and counts",
+                                           "AssertionError: expected { at: 1, collection: \u0027ready\u0027, â€¦(6) } to match object { idsEqual: true, fields: +0, â€¦(1) }"
+                                       ],
+                        "restoredSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f"
+                    },
+                    {
+                        "guard":  "parity keeps DB sentinel visible",
+                        "file":  "src/application/content-parity.ts",
+                        "beforeSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f",
+                        "mutantSha256":  "b1d5128e8a7a18c79c082a934b0ccad930c097476677137ef3e035bb840807aa",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 Ready Queue placeholder \u003e skips the exact sentinel in the adapter, mirror/import snapshot, parity and counts",
+                                           "AssertionError: expected { at: 1, collection: \u0027ready\u0027, â€¦(6) } to match object { idsEqual: false, blocking: 1 }"
+                                       ],
+                        "restoredSha256":  "86f9b00b3a6e9eb1da0de2f5e6954b58fa34f6f592a8b34ad5a32051a791792f"
+                    },
+                    {
+                        "guard":  "summary IDs preserve exact source keys",
+                        "file":  "src/application/sheet-mirror.ts",
+                        "beforeSha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb",
+                        "mutantSha256":  "40e7a2eb296825f6f762304267ea10ae020f2230d9b0c21c5868d884b4c05fec",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views"
+                                       ],
+                        "restoredSha256":  "416bfd052314d1ad294f5c68baf785ebde2fd71438b7621034e0c30830ad80cb"
+                    },
+                    {
+                        "guard":  "fallback only on actual absence",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "7873faebef08a88b2fbcaa5b79843267ef48eb5318461aeedcd7ae662f30da80",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  2 failed | 25 passed (27)",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e keeps a present empty/malformed tab empty and propagates queue read failures only for absence",
+                                           "AssertionError: promise rejected \"Error: Synthetic unavailable\" instead of resolving",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e tracks absence with its cached snapshot and rechecks presence after expiry",
+                                           "AssertionError: expected [ { â€¦(3) }, { â€¦(3) } ] to deeply equal []"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "absence tolerance scoped to summary tab",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "1daef5123454cb795bba1264190a2ab000a817e6d4a81b220783e7ae288db943",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  5 failed | 22 passed (27)",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e still rejects a first-page 400 for listLibrary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e still rejects a first-page 400 for listQueue",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e still rejects a first-page 400 for listReadyQueue",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e still rejects a first-page 400 for listSchedule",
+                                           "AssertionError: expected AppError: The Sheet columns no longer matâ€¦ { â€¦(2) } to match object { code: \u0027VALIDATION_FAILED\u0027 }",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e still rejects a first-page 400 for workflowSettings",
+                                           "AssertionError: promise resolved \"{ timezone: \u0027Asia/Taipei\u0027, â€¦(4) }\" instead of rejecting"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "absence tolerance only on first page",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "c3d28d8d696375f64e34b4d845902137dbcb10d98587c498457543f28d2fb8f9",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 26 passed (27)",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e preserves present summary rows when a later page reaches the grid boundary"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "absence tolerance requires typed error",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "9fb6e1367822ae938142c2f36d140e6bc20999474c81edcf920de76442474c91",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  2 failed | 25 passed (27)",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow a plain object carrying VALIDATION_FAILED on the first summary page",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow an ordinary Error carrying VALIDATION_FAILED on the first summary page",
+                                           "AssertionError: promise resolved \"[ { â€¦(3) }, { â€¦(3) } ]\" instead of rejecting"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "absence tolerance requires validation code",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "e9652cc269225b22c84a927c93b97505c13cb4a0efe37108f2d3ffdbea79649c",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  13 failed | 14 passed (27)",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow AUTH_REQUIRED for the summary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow FORBIDDEN for the summary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow CONFIG_MISSING for the summary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow SCHEMA_DRIFT for the summary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow NOT_FOUND for the summary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow STALE_READ for the summary",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e does not swallow CONFLICT for the summary"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "absent snapshot marker retained",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "e6f6f334c4c170deb8732fc47a8fdcd3338c269858282acb86633ad880054869",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/google/sheets-missing-summary.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  5 failed | 22 passed (27)",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e derives counts on first-page 400 and records a structured absence fact",
+                                           "AssertionError: expected [] to deeply equal [ { â€¦(3) }, { â€¦(3) } ]",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e builds a complete mirror snapshot with the derived summary",
+                                           "AssertionError: expected +0 to be 2 // Object.is equality",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e samples derived summary parity through the DB reader",
+                                           "AssertionError: expected [] to deeply equal [ { â€¦(3) }, { â€¦(3) } ]",
+                                           " FAIL  tests/unit/google/sheets-missing-summary.test.ts \u003e CS-068: optional Content Queue Summary tab \u003e keeps a present empty/malformed tab empty and propagates queue read failures only for absence"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "mirror summary accepts blank source string",
+                        "file":  "src/integrations/supabase/snapshot-content-repository.ts",
+                        "beforeSha256":  "6b82f5f6b2ea5934d55134ebc17469095e8e98b1eea771d8cdc2062bd48fb1e7",
+                        "mutantSha256":  "5c980c50471c874a7fb77f7f2be83639c181993f97048497189561cd1a3bef05",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 derived queue summary exact text \u003e round-trips blank, whitespace and trim-colliding source groups through the mirror reader"
+                                       ],
+                        "restoredSha256":  "6b82f5f6b2ea5934d55134ebc17469095e8e98b1eea771d8cdc2062bd48fb1e7"
+                    },
+                    {
+                        "guard":  "mirror summary still refuses nonstring source",
+                        "file":  "src/integrations/supabase/snapshot-content-repository.ts",
+                        "beforeSha256":  "6b82f5f6b2ea5934d55134ebc17469095e8e98b1eea771d8cdc2062bd48fb1e7",
+                        "mutantSha256":  "24f105b6b2dd8dee3a8b04296cbf95835bc25539a9e3e3bd64d42253b6233b6f",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/parity-shape.test.ts --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 25 passed (26)",
+                                           " FAIL  tests/unit/supabase/parity-shape.test.ts \u003e CS-075 derived queue summary exact text \u003e round-trips blank, whitespace and trim-colliding source groups through the mirror reader",
+                                           "AssertionError: promise resolved \"[ { source: \u0027\u0027, â€¦(2) }, â€¦(3) ]\" instead of rejecting"
+                                       ],
+                        "restoredSha256":  "6b82f5f6b2ea5934d55134ebc17469095e8e98b1eea771d8cdc2062bd48fb1e7"
+                    },
+                    {
+                        "guard":  "absence fallback uses queue rows only",
+                        "file":  "src/integrations/google/sheets-repository.ts",
+                        "beforeSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7",
+                        "mutantSha256":  "debae5a6bc4c42e8d295137dadebaa43c0dbb5ff7c3911f243e6220951a1d64d",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { â€¦(3) } ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "b6dcf01b16c8ca5685f48caf7af2b0039ab5f194cd25952940d9b212ed28d2d7"
+                    },
+                    {
+                        "guard":  "summary non-record IDs excluded",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "840172daf5e529a744baf70df359016c905f86464935b89dd549edfb82b6a7ab",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(11) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary source bytes are exact",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "e6bdd80728df84905683f1d80a49940085de9582ab1d4e47462e11a1d5176527",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(5) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary source grouping retained",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "c2daae886d8f4f2eae723f1a9258527028761189890eb465e1adf89b553797cf",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary UTF-8 C ordering",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "624e9850fa917a2f570e12fe3458a0b92a798d86bd1baeda57738ae7d5bd59bf",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary nonblank links only",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "0f94836f3cb76587f69187b0b511694934678928333ad8d4ad92029a7ab3e8ff",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary master link takes precedence",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "a5096a81c926a0d9e26e31c377cacd89965ec0cecff7ac40b58f133aa3b97ee6",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Markdown fallback retained",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "4aa3a38957df65fd95f175c64b15cfe1ba662cac526215dd0d75d5f00b3708e3",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Total counts all source rows",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "f57ba23facb9f354cd9ca28aa13d16848927d2107a4d5de546db1cd15a3d8cd4",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Not Reviewed includes blank",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "755cf52b978f7494fccec57759c5470383b36d83abcb40fa8c62223631e59135",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Not Reviewed includes Not Reviewed",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "f71ed8997af767c7cbfaa8047162e9d27d30e80e6ebb521c93110f7cb766b7e8",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Not Reviewed includes Pending",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "3ca30e17dea81030d4916ad18056aa7f52750afbbc5bafd6126da4ff93b6fc9b",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Approved uses exact raw status",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "a8ce5a6045289bce0f2795196173704a571943e672f06caccc6a907c438301bd",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Queued uses imported boolean",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "1f9b19ebcb24c120fa3e5ad55d79b34ae31f521172efd23d67e1548857898b59",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Needs Fix includes changes requested",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "d24a1df21a4fbb593b060cabb9992a7de8d936bff4ec34cdbfb3e70b260bec57",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Needs Fix includes copyright rework",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "9801e195612dc9e0e989012b142453bdb1958825282f04c40ccfc91a50d77cf5",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Needs Fix includes CHECK",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "0ee30bec8650e8a08280839da5c8825896281fa77c8232cf5fa8bab2e8e47a29",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Needs Fix includes DUPLICATE",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "5eb6e3cf3980a39365e7a874a4db6effd4642e0c7c41be4b2dc06e9293c536c4",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    },
+                    {
+                        "guard":  "summary Needs Fix counts once per row",
+                        "file":  "src/application/queue-summary.ts",
+                        "beforeSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95",
+                        "mutantSha256":  "1254b325c52a2689168033edd7eadf165a5d97c9cb8bb4b491b861e73e87f63a",
+                        "command":  "bash ~/bin/heavy npx vitest run tests/unit/supabase/content-import-pglite.test.ts -t CS-075 --maxWorkers=1",
+                        "exitCode":  1,
+                        "detected":  true,
+                        "assertions":  [
+                                           "      Tests  1 failed | 20 skipped (21)",
+                                           " FAIL  tests/unit/supabase/content-import-pglite.test.ts \u003e MIG-09 actual DB-1 import RPC with DB-4 envelopes \u003e CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views",
+                                           "AssertionError: expected [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ] to deeply equal [ { source: \u0027\u0027, â€¦(2) }, â€¦(10) ]"
+                                       ],
+                        "restoredSha256":  "51b786b7663ab80417301a193697ec13b045bd85f9d88df15d6658a2828a1c95"
+                    }
+                ]
+}

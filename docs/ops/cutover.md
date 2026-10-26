@@ -63,6 +63,16 @@ the cutover measurement. IDs must match 100%, field equality >=99.9% in each
 collection, zero unclassified differences, measured import lag <=15 minutes.
 Empty measured collections are allowed; an absent collection is not.
 
+Schedule timestamp representations count as equal only for the same instant
+and exact final-copy hash; fractional seconds are preserved. The exact empty
+Ready Queue sentinel (`No posts queued` with every other cell blank) is not a
+record. If the Content Queue Summary tab is absent, its Sheet comparison is
+derived from stable-ID Content Queue rows using the existing SQL view's exact
+source groups, statuses, counts and master-link ordering. A present tab,
+including an empty one, is compared as read. Real differences still block.
+Import lag starts at source capture: a new complete unchanged import refreshes
+it, while replay, unfinished work and failed imports cannot refresh it.
+
 Set these **Vercel Production target only** variables through project settings
 or `vercel env update NAME production` (interactive input; never shell history):
 
