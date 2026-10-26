@@ -1,174 +1,128 @@
-# CS-076 build handoff — issue #230, round 1
+# CS-076 fix handoff - PR #232, round 1
 
-Implemented [issue #230](https://github.com/James-Bugden/Content-Studio/issues/230)
-on `feat/230-owner-cutover-panel`. Classification: Heavy; role: build.
-Base commit: `4f82166e44a66fced4d3db75e5060093b4cee0c1`.
-Implementation commit: `deeee551a166bce541db340b85bd755ca59eaea0`.
-Implementation tree: `9f40396518da5dc7d52c2a7c708783535c33f8f4`.
-Commit subject: `CS-076: in-app Database switch panel (owner session) for the cutover (#230)`.
-This report is a separate documentation-only follow-up; application source is
-identical to that implementation commit.
+Issue: https://github.com/James-Bugden/Content-Studio/issues/230
+PR: https://github.com/James-Bugden/Content-Studio/pull/232
+Classification: Standard; role: fix. Branch: `feat/230-owner-cutover-panel`.
+Parent: `d1f99bfa9c6322262cd1cc2bd3ddc3425e11304a` (already merges main).
+Commit subject: `CS-076: keep the existing import button on /reconcile and fix sweep findings (#230)`.
+This report supersedes the earlier build report, including its incomplete auth-log
+claim. The independent review found a real Auth.js expiry-logger privacy leak.
 
-## Result and boundaries
+## Implementation and regression coverage
 
-- Owner sessions can read status and run the six cutover actions through the
-  existing mutation identity and same-origin checks. The exact cutover path has
-  the same maintenance exception as import/parity, allowing recovery during a
-  Content freeze. Operation-specific guards still apply.
-- A supplied Authorization header always uses the original constant-time bearer
-  checker. Failed bearer credentials never fall back to a cookie. The cron
-  export and backup routes remain bearer-only.
-- The Database switch panel includes plain status/reasons, evidence and waiver
-  state, the 15-minute import countdown, import/preparation actions and both
-  exact-build, typed-ACTIVATE confirmations. It re-fetches on opening and again
-  before activation, refusing changed decisions or expired import evidence.
-- Pending UUIDs are saved before POST in tab-local sessionStorage, reused after
-  unconfirmed results/reloads, and cleared only after a verified receipt.
-  Pending activations cannot be reassigned to a different build.
-- Existing private operation rows persist `owner_session` versus `cron_bearer`
-  in an audit envelope. HTTP results unwrap it; legacy raw jobs replay unchanged.
-  Redacted operation telemetry records actor class on success/failure. Owner
-  response schemas discard private IDs, field names, arbitrary facts and copy.
-- Phone dialogs use the shared native dialog as a bottom sheet, with 44px
-  controls, exact build text, rollback instructions and keyboard focus recovery.
-  The panel remains available when the surrounding reconciliation report fails.
-- Fake previews return explicitly synthetic, red status. All six cutover actions
-  disable; existing fake imports remain usable. Live failures never fall back
-  to fake data. The owner quickstart and coordinator runbook document this path.
+- Restored the existing `ContentImportButton` in the Content import and parity
+  section, outside the collapsed import-details disclosure. Its default accessible
+  name is exactly `Run content import`; its existing request, idempotency/retry,
+  refresh and `Content import completed.` text in `role=status` remain unchanged.
+  As before, that control is owner-only and appears when typed parity is active
+  (`db-shadow`/`db-read`), not in inactive Sheet or database-authority mode.
+- The panel's `Import now` continues to render that same component with its label
+  prop and status-refresh callbacks. It is disabled with a recovery explanation
+  when report construction fails or any reconciliation source is unreadable.
+  This covers the sweep's `noWrites` contract for Sheet/Drive/Typefully faults
+  while preserving the existing recovery control's behavior.
+- Kept the supplied partial page/panel/component-test work and verified it.
+  New component regressions exercise the real import component for both entry
+  points: exact label/status, POST endpoint/UUID, router refresh, readiness
+  refresh, owner visibility and fault/recovery disabling.
+- Added all three Auth.js `logger` handlers to the shared lazy auth config.
+  They ignore every argument and emit only `AUTH_ERROR`, `AUTH_WARNING` or
+  `AUTH_DEBUG`. No exception, library code, cause, stack, metadata or decrypted
+  claims are forwarded to the console. The debug handler uses `console.warn`
+  to comply with the repository's console policy.
+- Added `cutover-expired-cookie.test.ts`: real Auth.js `encode`/`decode`, shared
+  auth config, session parsing, `requireMutation`, and cutover GET/POST run
+  without an auth mock. Both HTTP and `__Secure-` cookie names are covered.
+  A real encrypted owner JWE authenticates successfully on both methods first;
+  advancing only Date beyond expiry and Auth.js's clock tolerance causes both
+  to return 401 with private/no-store headers and no provider execution.
+  Captured console methods plus stdout/stderr and responses exclude the owner
+  subject, actual generated jti, email, entire encrypted token, secret, and
+  literal payload/sub/jti/email/token text. Exactly two fixed error codes are
+  required, preventing a missing-cookie/unreached-auth false green.
+- Vitest inlines `next-auth` through Vite so the real wrapper's extensionless
+  Next imports resolve and only Next's request context can be faked.
+- No authorization, same-origin, bearer precedence, SQL gate, expected-build,
+  replay, audit or typed-ACTIVATE guard was weakened or changed.
 
-No runner, constant-time bearer checker, SQL, thresholds, waiver rules, authority
-defaults, dependency or lockfile changed. No live call, migration, deployment,
-authority switch, push, GitHub write or issue closure was performed.
+## CI diagnosis and browser selector audit
 
-## Verification commands and results
+Read-only inspection: run `40319491678`, PR status/comments and issue #230.
+The four DB-read failures at 375/1280 were missing `Run content import` at
+`content-read-cutover.spec.ts:38,72`; the component is restored, so these
+unchanged selectors and role/status assertions are reachable again.
 
-All Vitest, typecheck, build and Playwright commands used `bash ~/bin/heavy`.
-PGlite ran only in a scratch COPY at `D:/wt/cs230-owner-panel`, with the requested
-node_modules junction to the existing `163/node_modules`. No install ran. The
-original worktree junction was preserved. No scratch recursive deletion ran.
+The exploratory job `121562682565` was CANCELLED during `Install Chromium` at
+12:20:21 UTC after slow package downloads. It never extracted the server or
+started the sweep; no sweep artifact existed. This was an infrastructure/setup
+timeout, not evidence of a new panel accessibility or console failure. No CI
+workflow change is bundled. The unreadable-source guard above addresses a
+separate implementation risk found by reading its fault assertions.
 
-| Command / environment | Result |
+No e2e tests were modified in this fix. Reviewed all matches for `/reconcile`,
+import labels/status and panel names/IDs, including:
+
+| Specs | Selector/behavior review |
 | --- | --- |
-| `gh issue view 230 --repo James-Bugden/Content-Studio --json number,title,body,state,url` | Read issue contract; open. Read-only PR lookup found no PR at number 230. |
-| `bash ~/bin/heavy npx vitest run tests/unit/application tests/unit/supabase tests/unit/security tests/unit/components tests/unit/env-bootstrap.test.ts tests/unit/cutover-runner.test.ts tests/unit/cutover-cli.test.ts tests/unit/cutover-acl.test.ts --maxWorkers=1 --reporter=dot` (scratch, final directory run) | **84 files, 1,737 tests passed**, 291.57s. This is the required directory selection, not the full repository suite. |
-| Same directory selection before final additions | 82 files, 1,723 tests passed. |
-| Targeted owner SQL/legacy/export retest using `-t 'owner export\|legacy completed\|owner-session'` | 4 selected tests passed; the other 258 were deliberately outside that targeted selection. The subsequent complete directory run above covered them all. |
-| `bash ~/bin/heavy npx vitest run tests/unit/components --maxWorkers=1 --reporter=dot` after native-browser focus correction | **28 files, 232 tests passed**, 52.75s. Includes shared dialog and panel regressions. |
-| `bash ~/bin/heavy npx vitest run tests/unit/security/cutover-owner.test.ts --maxWorkers=1` after explicitly adding POST same-origin-metadata success assertion | **32/32 passed**. |
-| `bash ~/bin/heavy npm run typecheck` (scratch, final source) | Passed. |
-| `bash ~/bin/heavy npm run lint` (original worktree, final source) | Passed. |
-| `tests/unit/env-bootstrap.test.ts` in the required directory command | Manifest/schema drift coverage passed; no app env variable was added. |
-| `node scripts/check-private-paths.mjs`; `node scripts/scan-secrets.mjs`; `git diff --cached --check` | Passed after staging the implementation. Repeated with the report before commit. |
-| `bash ~/bin/heavy npm run build -- --webpack` (scratch) | **Blocked/failed** on unchanged Replies client import of `node:crypto` and cross-drive Next client module resolution. See limitations below. |
-| `bash ~/bin/heavy npx playwright test --config=panel-harness/playwright.config.ts` (scratch-only synthetic component harness) | **2/2 passed**, Chromium 375×812 and 1280×900, 8.1s. Actual panel/shared dialog/CSS; router and HTTP are test doubles. |
+| `content-read-cutover` | Exact legacy button and completed status restored; row-specific pending recovery selectors unchanged. |
+| `content-parity` | Panel Import now still uses the same component; UUID replay and completed status retained. |
+| `content-parity-sheet`, `content-write-cutover` | Legacy button remains absent when typed parity is inactive or database is authoritative. |
+| `database-switch` | Panel name, status labels, native dialog, exact ACTIVATE label, switch/cancel/refresh names and focus hooks unchanged. |
+| `sweep`, `sweep-faults`, `sweep-checks` | Readiness, noWrites, keyboard, axe, console/network, overflow contracts retained; panel import disabled on unreadable-source faults. |
+| `a11y`, `states`, `ux-polish`, `zz-screens` | Page heading, provider state, folded Diagnostics and existing fix actions retained. |
+| `markdown-authority`, `navigation-counts`, `schedule` (and editor reconcile-text match) | Markdown controls, data-reconcile-kind sections, nav badges, stale headings and dismiss/review controls retained. |
 
-T0 additionally proves real SQL operation claims, private actor envelopes,
-cross-auth replay, unchanged atomic activation, changed-build refusal, legacy
-raw-result replay, export mode/key conflicts and fresh verification on export
-retry. Unit tests cover malformed status/receipts, unknown/expired import ages,
-pending build mismatch, typed confirmation, disabled controls, stale decisions
-and raw-text suppression. Secret-scanner tests intentionally plant synthetic
-sentinels in temporary files; their expected diagnostics are not repo findings.
+Markup review found one panel heading and unique reason/confirmation IDs, a
+proper confirmation label, native controls with no interactive nesting, shared
+44px button/input classes, existing color tokens, a fixed-width table and
+wrapping build/text. This is static review only: browser/a11y/overflow/console
+results at both widths still require CI. Browser suites were not run locally,
+as requested; neither cancellation nor static review is recorded as a pass.
 
-The committed T1 spec `tests/e2e/database-switch.spec.ts` runs at the existing
-375 and 1280 projects on the fake-store app, with synthetic cutover HTTP fixtures.
-It covers owner/viewer visibility, typed confirmation, reload/retry identity,
-stale refusal, focus, overflow, phone sheet positioning, touch sizes and axe.
-The existing shadow reconciliation import spec now targets Import now in the
-new panel. The full Next app T1 journey was **not passed locally** because its
-prerequisite build failed; CI browser evidence is still required.
+## Verification
 
-The supplemental Chromium harness verified real rendered panel behavior at both
-widths: lowercase/padded ACTIVATE refusal, successful exact confirmation, pending
-UUID reuse after reload/timeout, stale gate refusal, native modal focus return,
-375px bottom sheet placement, 44px inputs/buttons, no page overflow and zero axe
-violations. Both phone panel and phone/desktop dialog screenshots were visually
-inspected. It caught a real disabled-trigger focus race, which was fixed before
-the final 2/2 run. This is component-level T2 evidence, not a deployed-app pass.
+Windows, synthetic fixtures and fake/PGlite providers only. Every Vitest,
+TypeScript and lint invocation used `bash ~/bin/heavy`; one Vitest worker.
+No full repository test suite, dependency installation or new dependency.
 
-## Exact authentication matrix tested
+- `bash ~/bin/heavy npx vitest run tests/unit/components tests/unit/application tests/unit/security tests/unit/supabase --maxWorkers=1`: PASS, 85 files / 1649 tests.
+- `bash ~/bin/heavy npm run typecheck`: PASS.
+- `bash ~/bin/heavy npm run lint`: PASS after using an allowed console method.
+- Final restored-source retest of both UI regressions, real expired-cookie
+  regression and all four existing auth test files: PASS, 7 files / 88 tests.
+  After aligning the synthetic email with the scanner's reserved example.com
+  domain convention, the real-cookie regression was rerun: PASS, 2/2 tests.
+- `node scripts/check-private-paths.mjs`, `node scripts/scan-secrets.mjs` and `git diff --check`: PASS (rechecked before commit).
 
-GET and POST are both exercised unless a row states otherwise. Valid actions use
-synthetic operation adapters/SQL, never production providers.
+The original node_modules junction lacked the already-declared PGlite/Supabase
+packages: initial run had 71 passing files / 1023 tests and 14 import failures.
+Validation temporarily used the complete existing dependency tree at
+`C:/Users/jbbug/projects/cs-wt/163/node_modules` (including declared versions
+Vitest 5.0.3, Next 16.4.1, Auth.js beta.32, PGlite 0.5.8). No install occurred.
+An initial typecheck was stopped after a temporary backup-junction name entered
+its wildcard scan; that junction was removed and the clean typecheck passed.
+The original worktree junction is restored before handoff. Synthetic logs and
+mutation hashes are retained locally under `tmp/cs076/` (ignored).
 
-| Credentials / request proof | Expected and observed |
+Adversarial lenses: import reachability/recovery, privacy/auth integration, and
+false-green test integrity. Three implementation mutations were applied one at
+a time, killed by behavioral assertions (not compile/import failures), and
+restored with matching SHA-256 hashes before the final 88-test retest:
+
+| Mutation | Observed failure |
 | --- | --- |
-| Configured immutable owner subject; matching Origin; no Authorization | 200 status / valid mutation, including while Content is frozen and admission is red. Audit actor `owner_session`. |
-| Same owner; no Origin; `Sec-Fetch-Site: same-origin` | GET and POST accepted through the shared fallback; metadata guard mutation was killed. |
-| Same owner; CRON_SECRET unset; matching Origin | GET and POST accepted; owner auth needs no cron secret. |
-| Viewer subject, unrelated subject or unbound subject; matching Origin | 403 before status/provider/service execution. |
-| Anonymous; matching Origin | 401 before execution. |
-| Unreadable session | 401; session exception text suppressed from responses and logs. |
-| Owner; Origin missing and fetch metadata missing | 403 before execution. |
-| Owner; literal `Origin: null` | 403. |
-| Owner; foreign Origin, including with `Sec-Fetch-Site: same-origin` | 403; metadata cannot override an explicit foreign Origin. |
-| Owner; no Origin; `Sec-Fetch-Site: cross-site` | 403. |
-| Foreign request hostname and foreign Origin while APP_BASE_URL is configured | 403; configured origin prevents host spoofing. |
-| Exact valid cron bearer; anonymous cookie and foreign Origin | 200; original bearer path ignores session/CSRF and returns original public bytes. Audit actor `cron_bearer`. |
-| Empty Authorization, wrong bearer, lowercase `bearer`, or suffixed bearer; otherwise-valid owner session | 403 `cron_auth`; no cookie downgrade. |
-| Missing CRON_SECRET with supplied bearer, including `Bearer undefined` | 403; no provider call. |
-| Invalid bearer lengths/content | Refused using the existing two 32-byte digests and `timingSafeEqual`. |
-| Exact `/api/ops/content-cutover` path during freeze | Owner maintenance allowed after CSRF/identity checks; SQL/action guards remain authoritative. |
-| Lookalike `/api/ops/content-cutover/other` and ordinary Content write path during freeze | 403 `rollback_read_only`. |
-| Owner session with matching Origin sent to scheduled export/backup GET | 403; cron routes remain bearer-only. |
-| Owner/bearer: all six actions with valid UUID/body | Same execution/claim path; activation has the same exact expectedBuild binding. |
-| Missing UUID or strict-body extra property | Refused before operation execution; activation-invalid bodies return 422, other invalid bodies 400. |
-| Missing, malformed, uppercase, shortened or padded expectedBuild | 422 before claim/audit/epoch effects. |
-| Different full expectedBuild, including common-prefix mismatch and changed-build replay | 409 before new durable effects. |
-| Same UUID crossing owner/bearer after a completed activation | Same unwrapped receipt and unchanged authority epoch; original job actor retained. |
-| Same UUID reused for another mode/action | Conflict; new export UUID in a non-DB mode also hits the original mode refusal. |
-| Success, auth failure, validation failure, build refusal and unsupported methods | Private/no-store headers preserved. |
-| Provider errors and unexpected private fields in status/results | Private copy, identity, cookie and credential text excluded from response/log assertions. |
+| Remove the shared Auth.js logger override | Both real expired-cookie tests fail; captured default-logger diagnostics contain the synthetic subject, jti field and email. |
+| Remove the restored legacy import component from the page | Both db-shadow/db-read visibility journeys fail on the missing exact button. |
+| Remove importsBlocked from the panel import disabled condition | Fault/recovery test fails because Import now is enabled during the fault. |
 
-## Independent review and adversarial checks
+No mutation was retained. The owner/CSRF, bearer/replay/build-binding and
+typed-confirmation assertions in the existing security/component suites pass.
 
-An independent Sol reviewer at xhigh reviewed auth/privacy, authority/state/replay,
-test integrity and UI confirmation. No remaining blocking findings. Initial
-export diagnostics were narrowed to aggregate receipts; fake action disabled
-states and native focus recovery were also corrected and independently reviewed.
+## Remaining evidence and boundaries
 
-Thirteen separate implementation mutations were applied in the reviewer's own
-scratch copy, their application/restoration checked by SHA-256, and each was
-killed by behavioral assertion failures rather than compilation failure:
-
-1. Remove owner-session boundary: 11 failed tests.
-2. Remove bearer verifier: 4 failed tests.
-3. Permit bad-bearer downgrade: 4 failed tests.
-4. Remove missing-secret refusal: 1 failed test.
-5. Remove constant-time comparison: 3 failed tests.
-6. Remove same-origin delegation: 6 failed tests.
-7. Weaken exact Origin match: 3 failed tests.
-8. Permit missing/cross-site fetch metadata: 2 failed tests.
-9. Admit viewer role: 1 failed test.
-10. Broaden exact maintenance exception: 1 failed test.
-11. Remove typed disabled-control guard: 2 failed tests.
-12. Remove typed handler guard alone: 1 failed test invoking the actual wired callback.
-13. Remove final decision comparison: 8 failed changed-decision tests.
-
-Restored review baseline: 111/111 passed. Subsequent independent follow-ups:
-86/86 auth/status, 27/27 helper/panel, and 23/23 latest focus-corrected panel tests.
-Authorization, decision and typed guards were unchanged by the later focus fix.
-
-Local evidence is retained under `D:/wt/cs230-owner-panel` (required-final.log,
-component-final.log, build.log and panel-harness browser log/PNGs) and
-`D:/wt/cs230-review/review-evidence` (mutation JSON and per-mutant assertion logs).
-These contain synthetic evidence only and are not committed.
-
-## Residual risks and next required evidence
-
-- Full app build/T1 and repository CI have not been demonstrated green here.
-  The local webpack attempt fails at unchanged
-  `src/replies/lib/contracts/text.ts` → Replies Workspace (`node:crypto`) and
-  cross-drive Next client entry resolution. Original-worktree typecheck attempts
-  also lacked Supabase/PGlite through its existing junction; the authorized
-  scratch environment passed complete typecheck without installation. No unrelated
-  dependency or Replies fix was bundled into this issue.
-- SessionStorage is tab-local. Closing/clearing it can lose the client retry UUID;
-  durable operations remain on the server. The docs require coordinator inspection
-  before recovery rather than forcing a new operation.
-- Separate status/import timestamp reads are observations, not reservations.
-  Server build binding and the existing atomic SQL admission remain final authority.
-- This build performs no production flip. The owner/coordinator must still satisfy
-  live gates, apply reviewed migrations/deployment settings and verify the actual
-  deployed build. Native-device/T4 and live provider behavior were not exercised.
-- No push, PR/CI write, merge, deployment or closure is authorized in this build turn.
+CI T1/T2 at 375/1280, including the previously unstarted sweep, must be rerun on
+the fix commit. Local unit/static results do not establish deployed behavior.
+No push, gh write, merge, deployment, live provider call, production-data change,
+cutover, new dependency or auth/ACTIVATE relaxation was performed. The only
+commit in this fix includes this report and mentions the redacted logger in
+its body. The exact resulting commit identity is supplied in the handoff.

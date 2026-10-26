@@ -27,7 +27,7 @@ async function fetchStatus(): Promise<CutoverStatus> {
   return cutoverStatusSchema.parse(body.status);
 }
 
-export function DatabaseSwitchPanel() {
+export function DatabaseSwitchPanel({ importsBlocked = false }: { importsBlocked?: boolean }) {
   const [snapshot, setSnapshot] = useState<{ status: CutoverStatus; at: number } | null>(null);
   const [now, setNow] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -155,7 +155,8 @@ export function DatabaseSwitchPanel() {
         </tbody>
       </table>
     </> : null}
-    <ContentImportButton label="Import now" disabled={busy || checking || status?.store === 'db'} onPending={pending => { running.current = pending; setBusy(pending); }} onComplete={() => void refresh()} />
+    <ContentImportButton label="Import now" disabled={importsBlocked || busy || checking || status?.store === 'db'} onPending={pending => { running.current = pending; setBusy(pending); }} onComplete={() => void refresh()} />
+    {importsBlocked ? <p className="text-sm text-ink-soft">Some content sources could not be checked. Reload Fix issues before importing from this panel.</p> : null}
     {status?.store === 'db' ? <p className="text-sm text-ink-soft">Imports stop after database authority.</p> : null}
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {(Object.keys(labels) as CutoverAction[]).map(action => {

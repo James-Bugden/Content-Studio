@@ -83,6 +83,33 @@ it('keeps every cutover action disabled in the synthetic preview while leaving t
   }
   expect(screen.getByRole('button',{name:'Import now'})).toHaveProperty('disabled',false);expect(posts).toHaveLength(0);
 });
+it('reuses the existing import request and completion status for Import now, then refreshes readiness', async () => {
+  await panel();
+  const original = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (url, init) => url === '/api/ops/sheet-mirror'
+    ? Response.json({ ok: true, status: 'completed' }) : original(url, init));
+  const readsBefore = fetcher.mock.calls.filter(([url]) => url === '/api/ops/content-cutover').length;
+  await userEvent.click(screen.getByRole('button', { name: 'Import now' }));
+  await waitFor(() => expect(screen.getAllByRole('status').some(status => status.textContent === 'Content import completed.')).toBe(true));
+  expect(fetcher).toHaveBeenCalledWith('/api/ops/sheet-mirror', { method: 'POST', headers: {
+    'Content-Type': 'application/json', 'Idempotency-Key': expect.stringMatching(/^[0-9a-f-]{36}$/),
+  } });
+  await waitFor(() => expect(fetcher.mock.calls.filter(([url]) => url === '/api/ops/content-cutover').length).toBeGreaterThan(readsBefore));
+  expect(sessionStorage.getItem(cutoverRetrySlot('import'))).toBeNull();
+  expect(posts).toHaveLength(0);
+});
+it('blocks Import now with a recovery reason when reconcile sources are unreadable, then enables it after recovery', async () => {
+  const view = render(<DatabaseSwitchPanel importsBlocked />);
+  await screen.findByText(cutoverBuild);
+  const button = screen.getByRole('button', { name: 'Import now' });
+  expect(button).toHaveProperty('disabled', true);
+  expect(screen.getByText(/Some content sources could not be checked/)).toBeTruthy();
+  await userEvent.click(button);
+  expect(fetcher.mock.calls.some(([url]) => url === '/api/ops/sheet-mirror')).toBe(false);
+  view.rerender(<DatabaseSwitchPanel importsBlocked={false} />);
+  expect(button).toHaveProperty('disabled', false);
+  expect(screen.queryByText(/Some content sources could not be checked/)).toBeNull();
+});
 it.each(['red','expired','unknown-age','malformed'] as const)('disables switches with a plain reason for %s readiness', async fault => {
   if (fault === 'red') current.gates.db = { ok: false, reasons: ['write_proof_missing'] };
   if (fault === 'expired') current.lastImportAgeMs = 900_000;
