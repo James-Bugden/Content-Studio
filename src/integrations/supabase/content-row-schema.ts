@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS } from '@/domain/sheet-schema';
 import { AppError } from '@/domain/errors';
+import { decimalHookScore } from '@/domain/hook-score';
 import type { ContentPostRow, ContentScheduleRow } from '@/application/content-db';
 
 const numeric = new Set(['hookScore', 'contentAngle', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers']);
@@ -10,7 +11,10 @@ const column = (field: string) => field.replace(/[A-Z]/g, c => `_${c.toLowerCase
 function shape(headers: Record<string, string>) {
   return Object.fromEntries(Object.keys(headers).map(field => [column(field),
     field === 'posted' || field === 'queueForSchedule' ? z.boolean()
-      : numeric.has(field) ? z.number().int().nullable()
+      // PostgREST emits JSON numbers; SQL drivers emit numeric(6,2) strings.
+      // Normalize before stale-text checks and rendering, preserving passthrough.
+      : field === 'hookScore' ? z.union([z.number(), z.string()]).refine(n => decimalHookScore(String(n)) !== null).transform(Number).nullable()
+        : numeric.has(field) ? z.number().int().nullable()
         : timestamp.has(field) || field === 'parentContentId' ? z.string().nullable() : z.string()]));
 }
 const meta = {
@@ -22,8 +26,9 @@ const post = z.object({ ...shape(LIBRARY_HEADERS), ...meta, collection: z.enum([
 const schedule = z.object({ ...shape(SCHEDULE_HEADERS), ...meta, final_synced_hash: z.string(), source_link_url: z.string() }).passthrough();
 
 /** Validate persisted rows, including fake rows, before constructing domain values. */
-export function validateContentRow(row: ContentPostRow): ContentPostRow;
-export function validateContentRow(row: ContentScheduleRow): ContentScheduleRow;
+export function validateContentRow(row: ContentPostRow): ContentPostRow & { hook_score: number | null };
+export function validateContentRow(row: ContentScheduleRow): ContentScheduleRow & { hook_score: number | null };
+export function validateContentRow(row: ContentPostRow | ContentScheduleRow): (ContentPostRow | ContentScheduleRow) & { hook_score: number | null };
 export function validateContentRow(row: ContentPostRow | ContentScheduleRow): ContentPostRow | ContentScheduleRow {
   const parsed = ('collection' in row ? post : schedule).safeParse(row);
   if (!parsed.success) throw new AppError('SCHEMA_DRIFT', { kind: 'row', fields: parsed.error.issues.map(i => String(i.path[0])) });

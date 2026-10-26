@@ -4,6 +4,7 @@ import type { ContentPostRow, ContentScheduleRow, ContentSettingRow } from '@/ap
 import { mirrorHash } from '@/application/sheet-mirror';
 import { AppError } from '@/domain/errors';
 import { FakeContentDb, syntheticContentDbSeed } from './fake-content-db';
+import { validateContentRow } from './content-row-schema';
 
 /** Separate import fake; DB-3 owns FakeContentDb's interactive mutation path. */
 export class FakeContentImportStore implements ContentImportStore {
@@ -26,7 +27,11 @@ export class FakeContentImportStore implements ContentImportStore {
       const key = r.target_kind === 'schedule' ? 'content_id' : r.target_kind === 'workflow_settings' ? 'setting' : 'library_id';
       const rows = group as unknown as Record<string, unknown>[];
       const at = rows.findIndex(row => row[key] === r.target_id && (key !== 'library_id' || row.collection === r.target_kind));
-      const before = rows[at];
+      const stored = rows[at];
+      // Match SQL's typed comparison: driver "6.00" and imported 6 are equal.
+      // Preserved Sheet text remains an exact comparison inside passthrough.
+      const before = stored && r.target_kind !== 'workflow_settings'
+        ? validateContentRow(stored as ContentPostRow | ContentScheduleRow) as unknown as Record<string, unknown> : stored;
       const same = before && Object.entries(r.row).every(([k, v]) => mirrorHash([before[k]]) === mirrorHash([v]));
       if (same) continue;
       if (String(before ? before.row_version ?? 1 : null) !== String(r.expected_version)) throw new AppError('STALE_READ');

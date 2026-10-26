@@ -21,6 +21,7 @@ import {
   parseEnum,
 } from './enums';
 import { fingerprintValues } from './hash';
+import { decimalHookScore } from './hook-score';
 import type { LibraryItem, LibraryRecord, ScheduledPost, ScheduleRecord, VisualFields } from './records';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS, type HeaderIndex, type LibraryField, type ScheduleField } from './sheet-schema';
 import { parseVisualSource } from './visual';
@@ -93,7 +94,7 @@ export function toLibraryItem(c: Record<LibraryField, string>): LibraryItem {
     currentHook: c.currentHook,
     hookTemplate: c.hookTemplate,
     hookAlternatives: c.hookAlternatives,
-    hookScore: num(c.hookScore),
+    hookScore: decimalHookScore(c.hookScore),
     hookType: c.hookType,
     draftContent: c.draftContent,
     visual: visualFrom(c),
@@ -124,7 +125,7 @@ export function toScheduledPost(c: Record<ScheduleField, string>): ScheduledPost
     hookAlternatives: c.hookAlternatives,
     finalContent: c.finalContent,
     aiAction: c.aiAction,
-    hookScore: num(c.hookScore),
+    hookScore: decimalHookScore(c.hookScore),
     hookType: c.hookType,
     typefullyDraftId: c.typefullyDraftId.trim(),
     typefullyStatus: parseEnum(TYPEFULLY_STATUSES, c.typefullyStatus, { blankAs: 'Not Sent' }),

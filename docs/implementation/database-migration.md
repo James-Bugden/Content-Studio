@@ -68,8 +68,9 @@ Derived Sheet tabs become SQL views, never tables:
 
 - Text fields are `text not null default ''` so the adapter can produce the same
   `cells: Record<Field, string>` the domain already consumes. Booleans
-  (`queue_for_schedule`, `posted`) are `boolean`, numbers (`hook_score`,
-  `content_angle`, the six metric columns) are `integer` nullable. Enum-valued
+  (`queue_for_schedule`, `posted`) are `boolean`. After the unapplied CS-074
+  migration, `hook_score` is nullable `numeric(6,2)`; `content_angle` and the six
+  metric columns remain nullable `integer`. Enum-valued
   columns stay `text`: the domain's `UNRECOGNISED_VALUE` blocker remains the
   single place that judges vocabulary, so a value the UI cannot handle is still
   visible rather than rejected at import.
@@ -88,6 +89,20 @@ Derived Sheet tabs become SQL views, never tables:
   cell. The DB adapter consumes this metadata (it is not an unknown column)
   and renders it only while its valid 1..14 prefix equals `content_angle`;
   otherwise it renders the current integer. Sheet mapping stays unchanged.
+- Posts and schedule reserve `@hook_score` for exact nonblank Sheet score text,
+  including decimal zeroes and surrounding whitespace. Accept ASCII signed
+  decimals with at most two fractional digits and absolute value below 1000.
+  SQL driver numeric strings and PostgREST JSON numbers normalize to the same
+  number before rendering or import/write-through comparisons. An unchanged
+  import or a repair of only Sheet revision/row metadata keeps `row_version`
+  stable and creates no content history; repairs remain audited. Exact changes
+  to the preserved Sheet score spelling are content changes. The additive
+  `20261026000200_content_metadata_history.sql` repair is UNAPPLIED and follows
+  `20261026000100_content_hook_score_decimal.sql`; both require review before
+  an explicit production apply.
+  The reader/exporter uses this text only while it still parses to the stored
+  value; a changed or null score renders the current number or blank. Metadata
+  is excluded from unknown-column export, and parity compares exact score text.
 - Every row carries `row_version bigint not null default 1`, `created_at`,
   `updated_at`, `created_by_op`, `updated_by_op` (operation ids),
   `source_sheet_row integer` (the last known Sheet row, used only by the import
