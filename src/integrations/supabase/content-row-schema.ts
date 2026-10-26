@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS } from '@/domain/sheet-schema';
 import { AppError } from '@/domain/errors';
+import { decimalHookScore } from '@/domain/hook-score';
 import type { ContentPostRow, ContentScheduleRow } from '@/application/content-db';
 
 const numeric = new Set(['hookScore', 'contentAngle', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers']);
@@ -10,7 +11,8 @@ const column = (field: string) => field.replace(/[A-Z]/g, c => `_${c.toLowerCase
 function shape(headers: Record<string, string>) {
   return Object.fromEntries(Object.keys(headers).map(field => [column(field),
     field === 'posted' || field === 'queueForSchedule' ? z.boolean()
-      : numeric.has(field) ? z.number().int().nullable()
+      : field === 'hookScore' ? z.number().refine(n => decimalHookScore(String(n)) !== null).nullable()
+        : numeric.has(field) ? z.number().int().nullable()
         : timestamp.has(field) || field === 'parentContentId' ? z.string().nullable() : z.string()]));
 }
 const meta = {

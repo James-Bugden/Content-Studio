@@ -5,6 +5,7 @@ import { buildSheetMirrorSnapshot, mirrorHash, evidenceHash, type SheetMirrorSna
 import { AppError, isAppError } from '@/domain/errors';
 import { parseBoolean } from '@/domain/enums';
 import { CONTENT_ANGLE_RAW_KEY, numberedContentAngle } from '@/domain/content-angle';
+import { HOOK_SCORE_RAW_KEY, decimalHookScore } from '@/domain/hook-score';
 import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import { assertContentSchemaVersion } from '@/integrations/supabase/content-schema';
 
@@ -47,7 +48,7 @@ export function copyRefusal(error: unknown): { class: CopyRefusal; field: string
 /** Only these representation differences are allowed; copy whitespace is exact. */
 export function classifyDifference(expected: unknown, actual: unknown, field = ''): Exclude<ExceptionClass, 'formula_display' | CopyRefusal> | null {
   if (typeof expected !== 'string' || typeof actual !== 'string' || expected === actual) return null;
-  if (numeric.has(field) && /^ *-?(?:\d+|\d{1,3}(?:,\d{3})+) *$/.test(expected)
+  if (numeric.has(field) && field !== 'hookScore' && /^ *-?(?:\d+|\d{1,3}(?:,\d{3})+) *$/.test(expected)
     && Number(expected.trim().replace(/,/g, '')) === Number(actual) && /^-?\d+$/.test(actual)) return 'number_formatting';
   if (['posted', 'queueForSchedule'].includes(field) && (actual === 'TRUE' || actual === 'FALSE')
     && parseBoolean(expected) === (actual === 'TRUE')) return expected === '' ? 'blank_boolean' : 'boolean_formatting';
@@ -157,14 +158,19 @@ export function typedContentRow(collection: Exclude<ImportCollection, 'workflow_
         value = angle;
         // Keep the exact Sheet cell, not a formatting exception. Do not mutate
         // the source record or mix metadata into exported unknown columns.
-        row.passthrough = { ...record.passthrough, [CONTENT_ANGLE_RAW_KEY]: text };
+        row.passthrough = { ...(row.passthrough as Record<string, unknown>), [CONTENT_ANGLE_RAW_KEY]: text };
       } else if (text.trim() === '') value = null;
+      else if (field === 'hookScore') {
+        value = decimalHookScore(text);
+        if (value === null) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });
+        row.passthrough = { ...(row.passthrough as Record<string, unknown>), [HOOK_SCORE_RAW_KEY]: text };
+      }
       else {
         if (!/^-?(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text.trim())) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });
         value = Number(text.trim().replace(/,/g, ''));
         if (!Number.isSafeInteger(value) || Number(value) < -2147483648 || Number(value) > 2147483647) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });
       }
-      rendered = angle !== null ? text : value === null ? '' : String(value);
+      rendered = angle !== null || field === 'hookScore' && value !== null ? text : value === null ? '' : String(value);
     } else if (field === 'posted' || field === 'queueForSchedule') {
       value = parseBoolean(text);
       if (value === null) throw blocked();

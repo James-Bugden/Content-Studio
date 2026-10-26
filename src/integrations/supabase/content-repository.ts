@@ -7,6 +7,7 @@ import { AppError, isAppError } from '@/domain/errors';
 import { fingerprintValues } from '@/domain/hash';
 import { cellText, toLibraryItem, toScheduledPost, type LibraryPatch, type SchedulePatch } from '@/domain/mapping';
 import { CONTENT_ANGLE_RAW_KEY, numberedContentAngle } from '@/domain/content-angle';
+import { HOOK_SCORE_RAW_KEY, decimalHookScore } from '@/domain/hook-score';
 import { libraryIdSchema, operationIdSchema, type MutationEnvelope, type MutationResult } from '@/domain/mutation';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS, LIBRARY_WRITABLE, SCHEDULE_WRITABLE } from '@/domain/sheet-schema';
@@ -60,7 +61,9 @@ export class SupabaseContentRepository implements ContentRepository {
   private post(row: ContentPostRow): LibraryRecord {
     row = validateContentRow(row);
     const c = cells(LIBRARY_HEADERS, row);
-    const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, ...passthrough } = row.passthrough;
+    const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, [HOOK_SCORE_RAW_KEY]: originalScore, ...passthrough } = row.passthrough;
+    if (typeof originalScore === 'string' && decimalHookScore(originalScore) !== null
+      && decimalHookScore(originalScore) === row.hook_score) c.hookScore = originalScore;
     // A later DB edit must never export a label for a different angle. The
     // ordinary Sheet mapper still sees the exact original text in both modes.
     if (typeof originalAngle === 'string' && numberedContentAngle(originalAngle) !== null
@@ -74,8 +77,11 @@ export class SupabaseContentRepository implements ContentRepository {
   private schedule(row: ContentScheduleRow): ScheduleRecord {
     row = validateContentRow(row);
     const c = cells(SCHEDULE_HEADERS, row);
+    const { [HOOK_SCORE_RAW_KEY]: originalScore, ...passthrough } = row.passthrough;
+    if (typeof originalScore === 'string' && decimalHookScore(originalScore) !== null
+      && decimalHookScore(originalScore) === row.hook_score) c.hookScore = originalScore;
     return { value: toScheduledPost(c), cells: c, row: row.source_sheet_row ?? 0,
-      revision: this.revision(row, 'content_studio_schedule', c.contentId), formulaFields: [], passthrough: row.passthrough,
+      revision: this.revision(row, 'content_studio_schedule', c.contentId), formulaFields: [], passthrough,
       links: { ...(row.source_link_url ? { sourceLink: row.source_link_url } : {}), ...(row.image_file_url ? { imageFile: row.image_file_url } : {}) } };
   }
   listLibrary() { return this.listPosts('library'); }
@@ -164,7 +170,10 @@ export function contentPatch(patch: Record<string, string | undefined>, currentC
     if (value === undefined) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
     let typed: unknown = value;
     if (field === 'queueForSchedule' || field === 'posted') typed = value === 'TRUE';
-    if (numericFields.has(field)) {
+    if (field === 'hookScore') {
+      typed = value === '' ? null : decimalHookScore(value);
+      if (typed === null && value !== '') throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
+    } else if (numericFields.has(field)) {
       typed = value === '' ? null : Number(value.replace(/,/g, ''));
       if (typed !== null && (!Number.isInteger(typed) || Number(typed) < -2147483648 || Number(typed) > 2147483647 || (['views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers'].includes(field) && Number(typed) < 0))) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
     }
