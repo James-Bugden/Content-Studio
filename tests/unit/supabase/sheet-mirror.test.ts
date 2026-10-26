@@ -87,13 +87,16 @@ describe('MIG-02: exact Sheet snapshot and replay', () => {
     });
   });
 
-  it('CS-070: a blank queue-summary source still fails validation', async () => {
+  it('CS-075: preserves blank summary grouping keys while exact duplicates still conflict', async () => {
     const repo = new SheetsContentRepository(new FakeSheetTransport());
     const summary = await repo.queueSummary();
     summary[0]!.source = ' \t ';
     vi.spyOn(repo, 'queueSummary').mockResolvedValue(summary);
+    const snapshot = await buildSheetMirrorSnapshot(repo, { sourceKey });
+    expect(snapshot.rows.find(row => row.collection === 'queue_summary' && (row.payload as { source: string }).source === ' \t ')?.payload).toEqual(summary[0]);
+    summary.push(summary[0]!);
     await expect(buildSheetMirrorSnapshot(repo, { sourceKey })).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED', details: { reason: 'mirror_missing_stable_id', collection: 'queue_summary' },
+      code: 'CONFLICT', details: { reason: 'mirror_duplicate_stable_id', collection: 'queue_summary' },
     });
   });
 

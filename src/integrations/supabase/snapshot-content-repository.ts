@@ -112,7 +112,7 @@ export class SnapshotContentRepository implements ContentRepository {
   async queueSummary(): Promise<QueueSummaryRow[]> {
     return this.rows('queue_summary', (value) => {
       const row = object(value, 'invalid_queue_summary_payload');
-      text(row.source, 'invalid_queue_summary_payload');
+      if (typeof row.source !== 'string') throw new AppError('PROVIDER_UNAVAILABLE', { provider: 'supabase', reason: 'invalid_queue_summary_payload' });
       object(row.counts, 'invalid_queue_summary_payload');
       return value as QueueSummaryRow;
     });

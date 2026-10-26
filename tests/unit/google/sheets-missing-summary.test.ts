@@ -7,6 +7,9 @@ import { PAGE_ROWS } from '@/integrations/google/sheet-transport';
 import { setTelemetrySink, type TelemetryEvent } from '@/observability/events';
 import { buildSheetMirrorSnapshot } from '@/application/sheet-mirror';
 import { ContentParityJournal, shadowContentRepository } from '@/application/content-parity';
+import { deriveQueueSummary } from '@/application/queue-summary';
+import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
+import { FakeContentDb } from '@/integrations/supabase/fake-content-db';
 
 afterEach(() => { setTelemetrySink(null); vi.restoreAllMocks(); });
 
@@ -21,12 +24,12 @@ function missingSummary() {
 }
 
 describe('CS-068: optional Content Queue Summary tab', () => {
-  it('returns empty on first-page 400 and records a structured absence fact', async () => {
+  it('derives counts on first-page 400 and records a structured absence fact', async () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => events.push(event));
     const { repo, spy } = missingSummary();
-    await expect(repo.queueSummary()).resolves.toEqual([]);
-    expect(spy).toHaveBeenCalledTimes(1);
+    await expect(repo.queueSummary()).resolves.toEqual(deriveQueueSummary(await repo.listQueue()));
+    expect(spy.mock.calls.filter(call => call[0] === SHEET_TABS.queueSummary.name)).toHaveLength(1);
     expect(spy.mock.calls[0]?.[2].startRow).toBe(1);
     expect(events).toContainEqual(expect.objectContaining({
       name: 'sheet.tab_absent', adapter: 'sheet', outcome: 'ok',
@@ -84,24 +87,60 @@ describe('CS-068: optional Content Queue Summary tab', () => {
     expect(events.some(event => event.name === 'sheet.tab_absent')).toBe(false);
   });
 
-  it('builds a complete mirror snapshot with an empty summary', async () => {
+  it('builds a complete mirror snapshot with the derived summary', async () => {
     const { repo } = missingSummary();
     const snapshot = await buildSheetMirrorSnapshot(repo, { sourceKey: 'synthetic_workbook' });
-    expect(snapshot.counts.queue_summary).toBe(0);
-    expect(snapshot.rows.filter(row => row.collection === 'queue_summary')).toEqual([]);
+    const summary = deriveQueueSummary(await repo.listQueue());
+    expect(snapshot.counts.queue_summary).toBe(summary.length);
+    expect(snapshot.rows.filter(row => row.collection === 'queue_summary').map(row => row.payload)).toEqual(summary);
     expect(snapshot.counts.library).toBeGreaterThan(0);
     expect(snapshot.counts.schedule).toBeGreaterThan(0);
     expect(snapshot.counts.workflow_settings).toBe(1);
     expect(snapshot.rows.find(row => row.collection === 'schema')?.payload).toMatchObject({ ok: true });
   });
 
-  it('samples parity as equal for empty summaries on both sides', async () => {
+  it('samples derived summary parity through the DB reader', async () => {
     const { repo } = missingSummary();
-    const db = new SheetsContentRepository(new FakeSheetTransport({ [SHEET_TABS.queueSummary.name]: [] }));
+    const db = new SupabaseContentRepository(new FakeContentDb());
     const journal = new ContentParityJournal();
     journal.imported(Date.now());
-    await expect(shadowContentRepository(repo, db, journal, () => true).queueSummary()).resolves.toEqual([]);
-    expect(journal.samples).toEqual([expect.objectContaining({ collection: 'queue_summary', idsEqual: true, fields: 0, equal: 0, blocking: 0, facts: [] })]);
-    expect(journal.summary().collections.find(row => row.collection === 'queue_summary')).toMatchObject({ idsEqual: true, fieldEquality: 100, fieldsNA: true, blocking: 0 });
+    await expect(shadowContentRepository(repo, db, journal, () => true).queueSummary()).resolves.toEqual(await db.queueSummary());
+    expect(journal.samples).toEqual([expect.objectContaining({ collection: 'queue_summary', idsEqual: true, blocking: 0, facts: [] })]);
+    expect(journal.summary().collections.find(row => row.collection === 'queue_summary')).toMatchObject({ idsEqual: true, fieldEquality: 100, fieldsNA: false, blocking: 0 });
+  });
+
+  it('keeps a present empty/malformed tab empty and propagates queue read failures only for absence', async () => {
+    for (const rows of [[], [{ values: ['Unrecognised synthetic header'] }]]) {
+      const transport = new FakeSheetTransport({ [SHEET_TABS.queueSummary.name]: rows });
+      const repo = new SheetsContentRepository(transport), readQueue = vi.spyOn(repo, 'listQueue').mockRejectedValue(new Error('Synthetic unavailable'));
+      await expect(repo.queueSummary()).resolves.toEqual([]);
+      expect(readQueue).not.toHaveBeenCalled();
+    }
+    const { repo } = missingSummary();
+    vi.spyOn(repo, 'listQueue').mockRejectedValue(new AppError('PROVIDER_UNAVAILABLE'));
+    await expect(repo.queueSummary()).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+  });
+
+  it('tracks absence with its cached snapshot and rechecks presence after expiry', async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = new FakeSheetTransport(), read = transport.readTab.bind(transport);
+      let absent = true;
+      vi.spyOn(transport, 'readTab').mockImplementation((tab, column, options) => {
+        if (tab === SHEET_TABS.queueSummary.name && absent) throw new AppError('VALIDATION_FAILED');
+        return read(tab, column, options);
+      });
+      const repo = new SheetsContentRepository(transport, { writable: false, readCacheMs: 100 });
+      const derived = await repo.queueSummary();
+      expect(derived.length).toBeGreaterThan(0);
+      absent = false;
+      transport.rawTab(SHEET_TABS.queueSummary.name).splice(0);
+      expect(await repo.queueSummary()).toEqual(derived);
+      vi.advanceTimersByTime(101);
+      expect(await repo.queueSummary()).toEqual([]);
+      absent = true;
+      vi.advanceTimersByTime(101);
+      expect(await repo.queueSummary()).toEqual(derived);
+    } finally { vi.useRealTimers(); }
   });
 });
