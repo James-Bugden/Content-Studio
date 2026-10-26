@@ -55,6 +55,18 @@ describe('CS-068: optional Content Queue Summary tab', () => {
     await expect(new SheetsContentRepository(transport).queueSummary()).rejects.toBe(error);
   });
 
+  it.each([
+    { kind: 'a plain object', error: { code: 'VALIDATION_FAILED', details: { status: 400 } } },
+    { kind: 'an ordinary Error', error: Object.assign(new Error('Synthetic failure'), { code: 'VALIDATION_FAILED' }) },
+  ])('does not swallow $kind carrying VALIDATION_FAILED on the first summary page', async ({ error }) => {
+    const transport = new FakeSheetTransport();
+    const spy = vi.spyOn(transport, 'readTab').mockRejectedValueOnce(error);
+    await expect(new SheetsContentRepository(transport).queueSummary()).rejects.toBe(error);
+    expect(spy).toHaveBeenCalledExactlyOnceWith(
+      SHEET_TABS.queueSummary.name, SHEET_TABS.queueSummary.lastColumn, expect.objectContaining({ startRow: 1 }),
+    );
+  });
+
   it('preserves present summary rows when a later page reaches the grid boundary', async () => {
     const events: TelemetryEvent[] = [];
     setTelemetrySink(event => events.push(event));
