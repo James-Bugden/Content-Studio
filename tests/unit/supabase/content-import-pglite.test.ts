@@ -10,10 +10,15 @@ import type { ContentPostRow, ContentScheduleRow, ContentSettingRow } from '@/ap
 import { getServices, resetServices } from '@/application/container';
 import { resetEnvCache } from '@/lib/env';
 import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
+import { CONTENT_ANGLE_RAW_KEY } from '@/domain/content-angle';
+import { LIBRARY_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
+import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
+import { ContentExporter, ContentWriteCutover, contentExportRows } from '@/application/content-export';
+import { compareContent } from '@/application/content-parity';
 
 beforeEach(async () => {
   vi.stubEnv('CS_CONTENT_STORE', 'db-shadow');
-  await db.raw.exec('truncate content_studio_posts, content_studio_schedule, content_studio_workflow_settings, content_studio_operations, content_studio_import_runs, content_studio_audit_events, content_studio_row_history restart identity cascade');
+  await db.raw.exec('truncate content_studio_shadow_jobs, content_studio_shadow_lease, content_studio_shadow_events, content_studio_posts, content_studio_schedule, content_studio_workflow_settings, content_studio_operations, content_studio_import_runs, content_studio_audit_events, content_studio_row_history restart identity cascade');
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); resetServices(); resetEnvCache(); });
 let db: TestDatabase;
@@ -29,6 +34,100 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
+  it.each((['library', 'queue'] as const).flatMap(kind => [
+    { kind, text: ' \t3. Example angle \u81fa  ', angle: 3, changed: '3. Example angle \u81fa' },
+    { kind, text: '7. Cafe\u0301', angle: 7, changed: '7. Caf\u00e9' },
+    { kind, text: '7. exact\t', angle: 7, changed: '7. exact' },
+  ]))('CS-072: $kind/$text label/plain cells survive SQL measurement, export and exact rollback', async ({ kind, text, angle, changed }) => {
+    const transport = new FakeSheetTransport(), sheet = new SheetsContentRepository(transport);
+    const tab = SHEET_TABS[kind].name, grid = transport.rawTab(tab);
+    const column = grid[0]!.findIndex(c => c.value === LIBRARY_HEADERS.contentAngle);
+    transport.externalEdit(tab, 2, column, text);
+    transport.externalEdit(tab, 3, column, '14');
+    grid[0]!.push({ value: 'Synthetic extra' }); grid[1]!.push({ value: 'Synthetic extra value  ' });
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(sheet, { sourceKey: 'synthetic_workbook' }), new Map(), actor);
+    const operation = 'owner:synthetic_source:11111111-1111-4111-8111-111111111111';
+    const token = '22222222-2222-4222-8222-222222222222';
+    e.operationId = operation;
+    // PostgREST returns JSON timestamps; PGlite's direct driver returns Dates.
+    const query = async <T>(sql: string, params: unknown[] = []): Promise<T[]> => JSON.parse(JSON.stringify((await db.asService(q => q.query<T>(sql, params))).rows));
+    await query('select content_studio_shadow_claim($1,$2,$3)', [operation, e.snapshotHash, token]);
+    await query('select content_studio_shadow_import($1,$2,$3,$4,$5,$6,$7,$8)', [operation, token, e.snapshotHash, e.actorHash, e.counts, e.hashes, e.exceptions, e.rows]);
+    const evidence = (await query<{ result: { fullParity: { idsEqual: boolean; rows: number; fields: number; equal: number; unclassified: number }; exceptions: { class: string }[] } }>('select result from content_studio_shadow_jobs where operation_id=$1', [operation]))[0]!.result;
+    expect(evidence.exceptions.filter(e => e.class.startsWith('refused_'))).toEqual([]);
+    expect(evidence.fullParity).toMatchObject({ rows: e.rows.length, idsEqual: true, unclassified: 0 });
+    expect(evidence.fullParity.equal).toBe(evidence.fullParity.fields);
+    const posts = await query<ContentPostRow>('select * from content_studio_posts');
+    const schedule = await query<ContentScheduleRow>('select * from content_studio_schedule');
+    const settings = await query<ContentSettingRow>('select * from content_studio_workflow_settings');
+    const sources = await (kind === 'library' ? sheet.listLibrary() : sheet.listQueue());
+    const source = sources[0]!;
+    const stored = posts.find(r => r.collection === kind && r.library_id === source.value.libraryId)!;
+    expect(stored).toMatchObject({ content_angle: angle, passthrough: { [CONTENT_ANGLE_RAW_KEY]: text } });
+    expect(Buffer.from(stored.passthrough[CONTENT_ANGLE_RAW_KEY] as string)).toEqual(Buffer.from(text));
+    expect(posts.find(r => r.collection === kind && r.library_id === sources[1]!.value.libraryId)?.content_angle).toBe(14);
+    const reader = new FakeContentDb({ posts, schedule, settings });
+    const repo = new SupabaseContentRepository(reader), exporter = new ContentExporter(reader, transport, { checkpoints: new Map(), issues: new Map(), reports: [] });
+    for (const [collection, method] of [['library', 'listLibrary'], ['queue', 'listQueue'], ['ready', 'listReadyQueue'], ['schedule', 'listSchedule'], ['queue_summary', 'queueSummary'], ['workflow_settings', 'workflowSettings']] as const) {
+      expect(compareContent(collection, await sheet[method](), await repo[method](), 1, 0)).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
+    }
+    const method = kind === 'library' ? 'listLibrary' : 'listQueue';
+    const actual = await repo[method]();
+    expect(Buffer.from(actual[0]!.cells.contentAngle!)).toEqual(Buffer.from(text));
+    actual[0]!.cells.contentAngle = changed;
+    const mismatch = compareContent(kind, sources, actual, 1, 0);
+    expect(mismatch.blocking).toBeGreaterThan(0);
+    expect(mismatch.facts).toContainEqual(expect.objectContaining({ field: 'cells.contentAngle', kind: 'changed' }));
+    const exported = (await contentExportRows(reader)).find(r => r.kind === kind && r.id === source.value.libraryId)!;
+    expect(Buffer.from(exported.cells[LIBRARY_HEADERS.contentAngle]!.value)).toEqual(Buffer.from(text));
+    expect(exported.cells['Synthetic extra']).toEqual({ value: 'Synthetic extra value  ' });
+    const before = grid.map(row => row[column]?.value ?? '');
+    const rollback = await new ContentWriteCutover(repo, exporter).rollbackToSheet(vi.fn());
+    expect(rollback.parity).toMatchObject({ exact: true, dbHash: rollback.parity.sheetHash });
+    expect(Buffer.from(JSON.stringify(grid.map(row => row[column]?.value ?? '')))).toEqual(Buffer.from(JSON.stringify(before)));
+    // Exercise a changed integer through the real SQL copy/CAS boundary.
+    const original = e.rows.find(r => r.target_kind === kind && r.target_id === source.value.libraryId)!;
+    const result = await query<{ r: { ok: boolean } }>('select content_studio_write_through($1,$2,$3,$4,$5,$6,$7) as r', ['synthetic-angle-edit', mirrorHash('synthetic-angle-edit'), actor, kind, source.value.libraryId, stored.row_version, { ...original.row, content_angle: 4 }]);
+    expect(result[0]!.r.ok).toBe(true);
+    const edited = (await query<ContentPostRow>('select * from content_studio_posts where collection=$1 and library_id=$2', [kind, source.value.libraryId]))[0]!;
+    reader.externalEdit(kind, source.value.libraryId, edited);
+    expect((await exporter.run()).exact).toBe(true);
+    expect(grid[1]![column]!.value).toBe('4');
+  });
+  it('CS-072: refused labels stay out of SQL while other rows and a content-free refusal ledger commit', async () => {
+    const transport = new FakeSheetTransport(), sheet = new SheetsContentRepository(transport);
+    const grid = transport.rawTab(SHEET_TABS.library.name);
+    const column = grid[0]!.findIndex(c => c.value === LIBRARY_HEADERS.contentAngle);
+    const invalid = ['0. Example angle', '15. Example angle', 'x. y', '7 Example angle'];
+    invalid.forEach((text, i) => transport.externalEdit(SHEET_TABS.library.name, i + 2, column, text));
+    const sources = await sheet.listLibrary();
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(sheet, { sourceKey: 'synthetic_workbook' }), new Map(), actor);
+    expect(e.counts.library).toBe(sources.length - invalid.length);
+    expect(e.exceptions.filter(e => e.class === 'refused_numeric')).toHaveLength(invalid.length);
+    expect((await rpc(e)).rows[0]!.result.ok).toBe(true);
+    const rows = await db.asService(q => q.query<{ library_id: string }>("select library_id from content_studio_posts where collection='library'"));
+    for (const source of sources.slice(0, invalid.length)) expect(rows.rows.some(r => r.library_id === source.value.libraryId)).toBe(false);
+    const ledger = await db.asService(q => q.query<{ exceptions: unknown }>('select exceptions from content_studio_import_runs where operation_id=$1', [e.operationId]));
+    expect(ledger.rows[0]!.exceptions).toEqual(e.exceptions);
+    for (const text of invalid) expect(JSON.stringify(ledger.rows[0])).not.toContain(text);
+  });
+  it.each((['library', 'queue'] as const).flatMap(kind => ['\uFF17. x', '\u0667. x'].map(text => ({ kind, text }))))('CS-072: $kind/$text non-ASCII digits are refused with a SQL ledger entry', async ({ kind, text }) => {
+    const transport = new FakeSheetTransport(), sheet = new SheetsContentRepository(transport);
+    const tab = SHEET_TABS[kind].name, grid = transport.rawTab(tab);
+    const column = grid[0]!.findIndex(c => c.value === LIBRARY_HEADERS.contentAngle);
+    transport.externalEdit(tab, 2, column, text);
+    const sources = await (kind === 'library' ? sheet.listLibrary() : sheet.listQueue());
+    const e = buildTypedImport(await buildSheetMirrorSnapshot(sheet, { sourceKey: 'synthetic_workbook' }), new Map(), actor);
+    expect(e.counts[kind]).toBe(sources.length - 1);
+    const refusal = { class: 'refused_numeric', collection: kind, field: 'content_angle', hash: expect.stringMatching(/^[a-f0-9]{64}$/) };
+    expect(e.exceptions.filter(e => e.class.startsWith('refused_'))).toEqual([refusal]);
+    expect((await rpc(e)).rows[0]!.result.ok).toBe(true);
+    const rows = await db.asService(q => q.query('select library_id from content_studio_posts where collection=$1 and library_id=$2', [kind, sources[0]!.value.libraryId]));
+    expect(rows.rows).toEqual([]);
+    const ledger = await db.asService(q => q.query<{ exceptions: ImportEnvelope['exceptions'] }>('select exceptions from content_studio_import_runs where operation_id=$1', [e.operationId]));
+    expect(ledger.rows[0]!.exceptions.filter(e => e.class.startsWith('refused_'))).toEqual([refusal]);
+    expect(JSON.stringify(ledger.rows[0])).not.toContain(text);
+  });
   it.each(['formula_display', 'number_formatting', 'trailing_whitespace', 'blank_boolean', 'boolean_formatting', 'timestamp_formatting'])('the complete migration chain still accepts %s', async kind => {
     const snapshot = await buildSheetMirrorSnapshot(new SheetsContentRepository(new FakeSheetTransport()), { sourceKey: 'synthetic_workbook' });
     const e = buildTypedImport(snapshot, new Map(), actor);
