@@ -11,10 +11,11 @@ import { getServices, resetServices } from '@/application/container';
 import { resetEnvCache } from '@/lib/env';
 import { runConfiguredSheetMirror } from '@/lib/sheet-mirror-operation';
 import { CONTENT_ANGLE_RAW_KEY } from '@/domain/content-angle';
-import { LIBRARY_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
+import { LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
 import { SupabaseContentRepository } from '@/integrations/supabase/content-repository';
 import { ContentExporter, ContentWriteCutover, contentExportRows } from '@/application/content-export';
 import { compareContent } from '@/application/content-parity';
+import { AppError } from '@/domain/errors';
 
 beforeEach(async () => {
   vi.stubEnv('CS_CONTENT_STORE', 'db-shadow');
@@ -34,6 +35,72 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); });
 
 describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
+  it('CS-075: schedule instants, empty Ready sentinel and absent summary match actual SQL views', async () => {
+    const sourceNames = ['Mixed', 'Mixed', 'Mixed', 'Mixed', 'Mixed', 'Mixed', 'Mixed', 'Mixed', 'Fallback', 'Fallback', 'Blank links', 'Cafe\u0301', 'Caf\u00e9', '\uFF21', 'A\t', 'A', '', ' ', ' A '];
+    const statuses = ['', 'Not Reviewed', 'Pending', 'Approved', 'Changes Requested', 'Skipped', 'Approved ', 'pending'];
+    const headers = Object.keys(LIBRARY_HEADERS);
+    const queue = sourceNames.map((source, i) => {
+      const values: Record<string, string> = { libraryId: `SYN-SUM-${i}`, contentSource: source,
+        reviewStatus: statuses[i % statuses.length]!, queueForSchedule: i % 2 ? 'yes' : 'FALSE',
+        copyrightQa: i === 4 || i === 5 ? 'REWORK' : '', duplicateQa: i === 4 || i === 6 ? 'CHECK' : i === 7 ? 'DUPLICATE' : '',
+        sourceMasterFile: i < 2 ? 'Open master' : '', sourceMarkdown: i < 10 ? 'Open markdown' : '' };
+      return { values: headers.map(field => values[field] ?? ''), links: headers.map(field => field === 'sourceMasterFile' && i < 2
+        ? `https://synthetic.example/${i === 0 ? '\u{10000}' : '\uE000'}`
+        : field === 'sourceMarkdown' && i < 10 ? `https://synthetic.example/md-${10 - i}` : '') };
+    });
+    // An unfinished queue row and a Library-only source cannot enter the queue view.
+    queue.push({ values: headers.map(field => field === 'libraryId' ? ' ' : field === 'contentSource' ? 'Excluded' : ''), links: [] });
+    const transport = new FakeSheetTransport({ [SHEET_TABS.queue.name]: [{ values: Object.values(LIBRARY_HEADERS) }, ...queue],
+      [SHEET_TABS.readyQueue.name]: [{ values: Object.values(LIBRARY_HEADERS) }, { values: ['No posts queued'] }] });
+    const read = transport.readTab.bind(transport);
+    let absent = true;
+    vi.spyOn(transport, 'readTab').mockImplementation((tab, column, options) => {
+      if (tab === SHEET_TABS.queueSummary.name && absent) throw new AppError('VALIDATION_FAILED');
+      return read(tab, column, options);
+    });
+    const sheet = new SheetsContentRepository(transport);
+    const library = transport.rawTab(SHEET_TABS.library.name), queueColumn = library[0]!.findIndex(c => c.value === LIBRARY_HEADERS.queueForSchedule);
+    library.slice(1).forEach(row => { row[queueColumn] = { value: 'FALSE' }; });
+    const schedule = transport.rawTab(SHEET_TABS.schedule.name), stampColumn = schedule[1]!.findIndex(c => c.value === SCHEDULE_HEADERS.finalSyncedAt);
+    const stamps = ['2026-09-21T02:59:52.000Z #synthetic-hash', '2026-09-20T22:59:52.1200-04:00', '2026-09-21T10:59:52.123456+08:00'];
+    stamps.forEach((text, i) => { schedule[i + 2]![stampColumn] = { value: text }; });
+    const snapshot = await buildSheetMirrorSnapshot(sheet, { sourceKey: 'synthetic_workbook' });
+    expect(snapshot.counts.ready).toBe(0);
+    const envelope = buildTypedImport(snapshot, new Map(), actor);
+    expect(envelope.rows.some(r => r.target_id === 'No posts queued')).toBe(false);
+    expect((await rpc(envelope)).rows[0]!.result.ok).toBe(true);
+    const query = async <T>(sql: string): Promise<T[]> => JSON.parse(JSON.stringify((await db.asService(q => q.query<T>(sql))).rows));
+    const reader = new FakeContentDb({ posts: await query<ContentPostRow>('select * from content_studio_posts'),
+      schedule: await query<ContentScheduleRow>("select *, to_char(final_synced_at at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') as final_synced_at from content_studio_schedule"), settings: [] });
+    // These two reads use the real SQL views, not the fake's summary implementation.
+    vi.spyOn(reader, 'queueSummary').mockImplementation(() => query('select * from content_studio_queue_summary order by content_source collate "C"'));
+    const listPosts = reader.listPosts.bind(reader);
+    vi.spyOn(reader, 'listPosts').mockImplementation(collection => collection === 'ready'
+      ? query('select * from content_studio_ready_queue') : listPosts(collection));
+    const repo = new SupabaseContentRepository(reader);
+    expect(await repo.listReadyQueue()).toEqual([]);
+    expect(compareContent('ready', await sheet.listReadyQueue(), await repo.listReadyQueue(), 100, 0)).toMatchObject({ idsEqual: true, blocking: 0, fields: 0 });
+    const expectedSummary = await sheet.queueSummary(), actualSummary = await repo.queueSummary();
+    expect(expectedSummary).toEqual(actualSummary);
+    expect(expectedSummary.find(r => r.source === 'Mixed')).toEqual({ source: 'Mixed', masterLink: 'https://synthetic.example/\uE000',
+      counts: { Total: 8, 'Not Reviewed': 3, Approved: 1, Queued: 4, 'Needs Fix': 4 } });
+    expect(expectedSummary.some(r => r.source === 'Excluded')).toBe(false);
+    expect(expectedSummary.find(r => r.source === 'Fallback')?.masterLink).toBe('https://synthetic.example/md-1');
+    expect(expectedSummary.find(r => r.source === 'Blank links')?.masterLink).toBe('');
+    expect(compareContent('queue_summary', expectedSummary, actualSummary, 100, 0)).toMatchObject({ idsEqual: true, blocking: 0, facts: [] });
+    const expectedSchedule = await sheet.listSchedule(), actualSchedule = await repo.listSchedule();
+    const equal = compareContent('schedule', expectedSchedule, actualSchedule, 100, 0);
+    expect(equal.blocking).toBe(0); expect(equal.equal).toBe(equal.fields);
+    expect(equal.facts).toEqual([]); // The original timestamp text now survives SQL normalization.
+    actualSchedule[0]!.cells.finalSyncedAt = actualSchedule[0]!.value.finalSyncedAt = '2026-09-21T02:59:53Z #synthetic-hash';
+    expect(compareContent('schedule', expectedSchedule, actualSchedule, 100, 0).blocking).toBe(2);
+    actualSummary[0]!.counts.Total!++;
+    expect(compareContent('queue_summary', expectedSummary, actualSummary, 100, 0).blocking).toBe(1);
+    // A present empty tab remains evidence of a real mismatch, not a fallback.
+    absent = false; transport.rawTab(SHEET_TABS.queueSummary.name).splice(0);
+    expect(await sheet.queueSummary()).toEqual([]);
+    expect(compareContent('queue_summary', await sheet.queueSummary(), await repo.queueSummary(), 100, 0).idsEqual).toBe(false);
+  });
   it.each((['library', 'queue'] as const).flatMap(kind => [
     { kind, text: ' \t3. Example angle \u81fa  ', angle: 3, changed: '3. Example angle \u81fa' },
     { kind, text: '7. Cafe\u0301', angle: 7, changed: '7. Caf\u00e9' },

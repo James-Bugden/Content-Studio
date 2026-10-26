@@ -8,6 +8,7 @@ import { CONTENT_ANGLE_RAW_KEY, numberedContentAngle } from '@/domain/content-an
 import { HOOK_SCORE_RAW_KEY, decimalHookScore } from '@/domain/hook-score';
 import type { LibraryRecord, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import { assertContentSchemaVersion } from '@/integrations/supabase/content-schema';
+import { CONTENT_TIMESTAMP_FIELDS, FINAL_SYNCED_AT_RAW_KEY, contentTimestampParts, sameContentTimestamp, taipeiContentTimestamp } from './content-timestamps';
 
 export const IMPORT_COLLECTIONS = ['library', 'queue', 'schedule', 'workflow_settings'] as const;
 export type ImportCollection = typeof IMPORT_COLLECTIONS[number];
@@ -27,7 +28,6 @@ export interface ContentImportStore {
 }
 export const importColumn = (field: string) => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
 const numeric = new Set(['hookScore', 'contentAngle', 'views', 'likes', 'reposts', 'replies', 'bookmarks', 'newFollowers']);
-const stamps = new Set(['finalSyncedAt', 'publishedAt', 'analyticsSyncedAt']);
 const blocked = () => new AppError('VALIDATION_FAILED', { reason: 'unclassified_import_difference' });
 // PostgreSQL's jsonb::text includes spaces after separators. Match that size
 // before submitting a batch, so one boundary-size row cannot abort other rows.
@@ -52,11 +52,7 @@ export function classifyDifference(expected: unknown, actual: unknown, field = '
     && Number(expected.trim().replace(/,/g, '')) === Number(actual) && /^-?\d+$/.test(actual)) return 'number_formatting';
   if (['posted', 'queueForSchedule'].includes(field) && (actual === 'TRUE' || actual === 'FALSE')
     && parseBoolean(expected) === (actual === 'TRUE')) return expected === '' ? 'blank_boolean' : 'boolean_formatting';
-  if (stamps.has(field)) {
-    const left = expected.split(' #'), right = actual.split(' #');
-    if (left.length <= 2 && right.length <= 2 && (left[1] ?? '') === (right[1] ?? '')
-      && Number.isFinite(Date.parse(left[0]!)) && Date.parse(left[0]!) === Date.parse(right[0]!)) return 'timestamp_formatting';
-  }
+  if (sameContentTimestamp(expected, actual, field)) return 'timestamp_formatting';
   // A single terminal suffix (ASCII spaces, optionally ONE newline), never post copy.
   if (['nextAction', 'imageNextAction', 'hasImage'].includes(field)
     && expected.replace(/ +(?:\r?\n)?$|\r?\n$/, '') === actual && expected !== actual) return 'trailing_whitespace';
@@ -175,15 +171,17 @@ export function typedContentRow(collection: Exclude<ImportCollection, 'workflow_
       value = parseBoolean(text);
       if (value === null) throw blocked();
       rendered = value ? 'TRUE' : 'FALSE';
-    } else if (stamps.has(field)) {
-      const parts = field === 'finalSyncedAt' ? text.split(' #') : [text];
-      if (parts.length > 2 || (parts.length === 2 && (!parts[0] || !parts[1]))) throw blocked();
-      const [stamp, hash = ''] = parts;
-      if (stamp && (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d\d:\d\d)$/.test(stamp) || !Number.isFinite(Date.parse(stamp)))) throw blocked();
+    } else if (CONTENT_TIMESTAMP_FIELDS.has(field)) {
+      const parts = contentTimestampParts(text, field);
+      if (!parts) throw blocked();
+      const { stamp, hash } = parts;
       value = stamp || null;
-      rendered = stamp ? new Date(Date.parse(stamp) + 8 * 3600_000).toISOString().replace(/\.000Z$/, '+08:00').replace(/Z$/, '+08:00') : '';
-      if (field === 'finalSyncedAt' && hash) rendered += ` #${hash}`;
-      if (field === 'finalSyncedAt') row.final_synced_hash = hash;
+      rendered = taipeiContentTimestamp(stamp)!;
+      if (field === 'finalSyncedAt') {
+        row.final_synced_hash = hash;
+        row.passthrough = { ...(row.passthrough as Record<string, unknown>), [FINAL_SYNCED_AT_RAW_KEY]: text };
+        rendered = text;
+      }
     } else if (field === 'parentContentId') value = text || null;
     if (rendered !== text) {
       const kind = classifyDifference(text, rendered, field);

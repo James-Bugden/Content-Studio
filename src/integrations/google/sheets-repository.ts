@@ -31,6 +31,8 @@ import { emit, targetHash, timed } from '@/observability/events';
 import type { ContentRepository, QueueIdeaCreate, SchemaStatus } from '@/application/ports';
 import { MAX_TAB_ROWS, PAGE_ROWS, type CellWrite, type SheetTransport } from './sheet-transport';
 import { sheetCellValue } from './sheet-cell';
+import { isReadyQueuePlaceholder } from '@/application/sheet-records';
+import { deriveQueueSummary } from '@/application/queue-summary';
 
 /**
  * Sheet-backed ContentRepository (CS-003).
@@ -54,7 +56,8 @@ const OP_CACHE_MAX = 500;
 type OpRecord = { patchHash: string; result: MutationResult<unknown> };
 
 type TabRead<F extends string> = { index: HeaderIndex<F>; rows: { raw: RawRow; row: number }[] };
-type ReadEntry = { generation: number; expiresAt: number | null; rows: Promise<RawRow[]>; lastGood?: { rows: RawRow[]; at: number; generation: number } };
+type TabSnapshot = { rows: RawRow[]; absent: boolean };
+type ReadEntry = { generation: number; expiresAt: number | null; rows: Promise<TabSnapshot>; lastGood?: { rows: RawRow[]; at: number; generation: number } };
 const LAST_GOOD_MAX_AGE_MS = 5 * 60_000;
 
 export class SheetsContentRepository implements ContentRepository {
@@ -75,7 +78,7 @@ export class SheetsContentRepository implements ContentRepository {
   private readonly readCache = new Map<string, ReadEntry>();
   private readGeneration = 0;
 
-  private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<RawRow[]> {
+  private cachedReadAll(tabKey: SheetTabKey, withExtras: boolean, fresh = false): Promise<TabSnapshot> {
     // Filter/search/editor navigation shares a short-lived Library snapshot.
     // Writes clear this cache; mutation preconditions always read fresh.
     const ttl = tabKey === 'library' ? this.options.libraryReadCacheMs ?? this.options.readCacheMs ?? 0
@@ -101,10 +104,10 @@ export class SheetsContentRepository implements ContentRepository {
       // zero retention). An identical completed snapshot still witnesses the
       // same derived counts. Pending/failed/changed reads remain unknown, and
       // mutation invalidation drops lastGood along with the entry.
-      if (hit?.lastGood && JSON.stringify(hit.lastGood.rows) === JSON.stringify(snapshot)) {
+      if (hit?.lastGood && JSON.stringify(hit.lastGood.rows) === JSON.stringify(snapshot.rows)) {
         entry.generation = hit.lastGood.generation;
       }
-      entry.lastGood = { rows: snapshot, at: Date.now(), generation: entry.generation };
+      entry.lastGood = { rows: snapshot.rows, at: Date.now(), generation: entry.generation };
       entry.expiresAt = Date.now() + ttl;
     }, () => {
       // An old rejected read must not evict a post-invalidation replacement.
@@ -122,7 +125,7 @@ export class SheetsContentRepository implements ContentRepository {
 
   // ------------------------------------------------------------------ reads
 
-  private async readAll(tabKey: SheetTabKey, withExtras: boolean): Promise<RawRow[]> {
+  private async readAll(tabKey: SheetTabKey, withExtras: boolean): Promise<TabSnapshot> {
     const tab = SHEET_TABS[tabKey];
     const rows: RawRow[] = [];
     let start = 1;
@@ -135,10 +138,10 @@ export class SheetsContentRepository implements ContentRepository {
         );
       } catch (error) {
         // This optional, rebuildable summary tab is absent from some workbooks.
-        // Only its first-page validation failure means an empty collection.
+        // Only its first-page validation failure marks the tab as absent.
         if (tabKey === 'queueSummary' && start === 1 && isAppError(error) && error.code === 'VALIDATION_FAILED') {
           emit({ name: 'sheet.tab_absent', adapter: 'sheet', outcome: 'ok', facts: { tab: tabKey, tabAbsent: true, startRow: start } });
-          return [];
+          return { rows: [], absent: true };
         }
         // A prior page already returned exactly PAGE_ROWS rows, so this request is shaped
         // exactly like every earlier one. Sheets answers a range that starts past the tab's
@@ -153,12 +156,12 @@ export class SheetsContentRepository implements ContentRepository {
       start += PAGE_ROWS;
       if (start > MAX_TAB_ROWS) throw new AppError('VALIDATION_FAILED', { reason: 'tab_too_large', tab: tabKey });
     }
-    return rows;
+    return { rows, absent: false };
   }
 
   private async readTab<F extends string>(tabKey: 'library' | 'queue' | 'readyQueue' | 'schedule', headers: Record<F, string>, fresh = false): Promise<TabRead<F>> {
     const tab = SHEET_TABS[tabKey];
-    const all = await this.cachedReadAll(tabKey, true, fresh);
+    const { rows: all } = await this.cachedReadAll(tabKey, true, fresh);
     const headerRow = all[tab.headerRow - 1];
     const found = discoverHeaders(headers, headerRow?.values ?? []);
     if (!found.ok) {
@@ -244,7 +247,7 @@ export class SheetsContentRepository implements ContentRepository {
 
   async listReadyQueue(): Promise<LibraryRecord[]> {
     const { index, rows } = await this.readTab('readyQueue', LIBRARY_HEADERS);
-    return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row));
+    return rows.map(({ raw, row }) => toLibraryRecord(index, raw, row)).filter(record => !isReadyQueuePlaceholder(record));
   }
 
   async listSchedule(fresh = false): Promise<ScheduleRecord[]> {
@@ -258,11 +261,12 @@ export class SheetsContentRepository implements ContentRepository {
   }
 
   async queueSummary(): Promise<QueueSummaryRow[]> {
-    return parseQueueSummary(await this.cachedReadAll('queueSummary', true));
+    const snapshot = await this.cachedReadAll('queueSummary', true);
+    return snapshot.absent ? deriveQueueSummary(await this.listQueue()) : parseQueueSummary(snapshot.rows);
   }
 
   async workflowSettings(): Promise<WorkflowSettings> {
-    const rows = await this.cachedReadAll('settings', false);
+    const { rows } = await this.cachedReadAll('settings', false);
     return parseWorkflowSettings(rows.map((r) => r.values));
   }
 

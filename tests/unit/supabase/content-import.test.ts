@@ -102,7 +102,6 @@ describe('MIG-09 typed complete imports', () => {
     ['views', '1,234', 1234, 'number_formatting'], ['posted', '', false, 'blank_boolean'],
     ['posted', 'yes', true, 'boolean_formatting'], ['posted', '1', true, 'boolean_formatting'],
     ['publishedAt', '2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z', 'timestamp_formatting'],
-    ['finalSyncedAt', '2026-10-01T00:00:00Z #abc', '2026-10-01T00:00:00Z', 'timestamp_formatting'],
   ])('records every changed representation: %s=%s', async (field, text, value, kind) => {
     const source = await snapshot(), row = source.rows.find(r => r.collection === 'schedule')!;
     const record = row.payload as { cells: Record<string, string> };

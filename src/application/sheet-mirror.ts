@@ -3,7 +3,7 @@ import { createHash, createHmac, randomUUID, randomBytes } from 'node:crypto';
 import { AppError } from '@/domain/errors';
 import type { LibraryRecord, QueueSummaryRow, ScheduleRecord, WorkflowSettings } from '@/domain/records';
 import type { ContentRepository } from './ports';
-import { hasStableSheetId } from './sheet-records';
+import { hasStableSheetId, isReadyQueuePlaceholder } from './sheet-records';
 import { emit } from '@/observability/events';
 
 export const MIRROR_SCHEMA_VERSION = 1 as const;
@@ -92,7 +92,7 @@ function row(collection: MirrorCollection, stableId: string, payload: unknown, p
 }
 
 function recordRows(collection: 'library' | 'queue' | 'ready', records: LibraryRecord[]): MirrorRow[] {
-  return records.flatMap((record, position) => hasStableSheetId(record) ? [row(collection, record.value.libraryId, record, position, record)] : []);
+  return records.flatMap((record, position) => hasStableSheetId(record) && !(collection === 'ready' && isReadyQueuePlaceholder(record)) ? [row(collection, record.value.libraryId, record, position, record)] : []);
 }
 
 function scheduleRows(records: ScheduleRecord[]): MirrorRow[] {
@@ -100,7 +100,9 @@ function scheduleRows(records: ScheduleRecord[]): MirrorRow[] {
 }
 
 function summaryRows(records: QueueSummaryRow[]): MirrorRow[] {
-  return records.map((record, position) => row('queue_summary', record.source, record, position));
+  // Sources are exact SQL grouping keys, including blank/whitespace strings.
+  // Quote the key so the generic stable-ID trim cannot merge or reject them.
+  return records.map((record, position) => row('queue_summary', `source:${JSON.stringify(record.source)}`, record, position));
 }
 
 function settingsRows(settings: WorkflowSettings): MirrorRow[] {
