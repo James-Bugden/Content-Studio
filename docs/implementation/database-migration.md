@@ -84,6 +84,10 @@ Derived Sheet tabs become SQL views, never tables:
 - `passthrough jsonb not null default '{}'` on posts and schedule keeps every
   unknown Sheet column from the final import, so MAP-02 (unknown columns
   survive round trips) still holds and the one-way export can write them back.
+  Posts also reserve `@content_angle` for the exact original numbered angle
+  cell. The DB adapter consumes this metadata (it is not an unknown column)
+  and renders it only while its valid 1..14 prefix equals `content_angle`;
+  otherwise it renders the current integer. Sheet mapping stays unchanged.
 - Every row carries `row_version bigint not null default 1`, `created_at`,
   `updated_at`, `created_by_op`, `updated_by_op` (operation ids),
   `source_sheet_row integer` (the last known Sheet row, used only by the import

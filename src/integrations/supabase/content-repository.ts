@@ -6,6 +6,7 @@ import type { ContentRepository, QueueIdeaCreate } from '@/application/ports';
 import { AppError, isAppError } from '@/domain/errors';
 import { fingerprintValues } from '@/domain/hash';
 import { cellText, toLibraryItem, toScheduledPost, type LibraryPatch, type SchedulePatch } from '@/domain/mapping';
+import { CONTENT_ANGLE_RAW_KEY, numberedContentAngle } from '@/domain/content-angle';
 import { libraryIdSchema, operationIdSchema, type MutationEnvelope, type MutationResult } from '@/domain/mutation';
 import type { LibraryRecord, ScheduleRecord } from '@/domain/records';
 import { LIBRARY_HEADERS, SCHEDULE_HEADERS, LIBRARY_WRITABLE, SCHEDULE_WRITABLE } from '@/domain/sheet-schema';
@@ -59,8 +60,13 @@ export class SupabaseContentRepository implements ContentRepository {
   private post(row: ContentPostRow): LibraryRecord {
     row = validateContentRow(row);
     const c = cells(LIBRARY_HEADERS, row);
+    const { [CONTENT_ANGLE_RAW_KEY]: originalAngle, ...passthrough } = row.passthrough;
+    // A later DB edit must never export a label for a different angle. The
+    // ordinary Sheet mapper still sees the exact original text in both modes.
+    if (typeof originalAngle === 'string' && numberedContentAngle(originalAngle) !== null
+      && numberedContentAngle(originalAngle) === row.content_angle) c.contentAngle = originalAngle;
     return { value: toLibraryItem(c), cells: c, row: row.source_sheet_row ?? 0,
-      revision: this.revision(row, 'content_studio_posts', `${row.collection}:${c.libraryId}`), formulaFields: [], passthrough: row.passthrough,
+      revision: this.revision(row, 'content_studio_posts', `${row.collection}:${c.libraryId}`), formulaFields: [], passthrough,
       links: { ...(row.source_markdown_url ? { sourceMarkdown: row.source_markdown_url } : {}),
         ...(row.source_master_file_url ? { sourceMasterFile: row.source_master_file_url } : {}),
         ...(row.image_file_url ? { imageFile: row.image_file_url } : {}) } };
