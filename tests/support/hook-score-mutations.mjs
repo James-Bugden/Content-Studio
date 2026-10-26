@@ -12,6 +12,10 @@ const adapter = 'src/integrations/supabase/content-repository.ts', mapping = 'sr
 const schema = 'src/integrations/supabase/content-row-schema.ts', parity = 'src/application/content-parity.ts';
 const sql = 'supabase/migrations/20261026000100_content_hook_score_decimal.sql';
 const unit = 'tests/unit/supabase/hook-score.test.ts', pglite = 'tests/unit/supabase/hook-score-pglite.test.ts';
+const cutover = 'tests/unit/application/content-read-cutover.test.ts';
+const importPglite = 'tests/unit/supabase/content-import-pglite.test.ts';
+const fakeImport = 'src/integrations/supabase/fake-content-import.ts', fakeDb = 'src/integrations/supabase/fake-content-db.ts';
+const metadataSql = 'supabase/migrations/20261026000200_content_metadata_history.sql';
 // [name, path, original, replacement, files, occurrence, total occurrences]
 const mutations = [
   ['G01-grammar', parser, 'if (!/^-?', 'if (false && !/^-?'],
@@ -20,7 +24,7 @@ const mutations = [
   ['G04-required-dot', parser, '\\.', '.'],
   ['G05-start-anchor', parser, '/^-?', '/-?'],
   ['G06-end-anchor', parser, '?$/', '?/'],
-  ['G07-ASCII-NFKC', parser, '.test(text.trim())', ".test(text.normalize('NFKC').trim())", [unit, pglite]],
+  ['G07-ASCII-NFKC', parser, 'export function decimalHookScore(text: string): number | null {', "export function decimalHookScore(text: string): number | null {\n  text = text.normalize('NFKC');", [unit, pglite]],
   ['G08-hook-only', importer, "else if (field === 'hookScore')", 'else if (true)'],
   ['G09-refuse-null', importer, "if (value === null) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });", "if (false) throw new AppError('VALIDATION_FAILED', { reason: 'copy_numeric', field: column });"],
   ['G10-raw-NBSP', importer, '[HOOK_SCORE_RAW_KEY]: text', '[HOOK_SCORE_RAW_KEY]: text.trim()', [unit, pglite]],
@@ -48,10 +52,23 @@ const mutations = [
   ['G32-view-invoker', sql, 'security_invoker = true', 'security_invoker = false', [pglite]],
   ['G33-view-ACL', sql, 'revoke all on public.content_studio_ready_queue from public, anon, authenticated;', '', [pglite]],
   ['G34-atomic-migration', sql, 'begin;', '', [pglite]],
+  ['G35-leading-digit', parser, '\\d+(?:', '\\d*(?:'],
+  ['G36-fraction-digit', parser, '{1,2}', '{0,2}'],
+  ['G37-sign', parser, '/^-?', '/^[-+]?'],
+  ['G38-driver-string', schema, 'z.union([z.number(), z.string()])', 'z.number()', [cutover]],
+  ['G39-driver-canonical', schema, '.transform(Number)', '', [cutover]],
+  ['G40-import-canonical', fakeImport, 'validateContentRow(stored as ContentPostRow | ContentScheduleRow)', 'stored', [cutover]],
+  ['G41-copy-canonical', fakeDb, 'row && validateContentRow(row)', 'row', [cutover]],
+  ['G42-copy-metadata-history', fakeDb, "if (!before || fields.some(f => !['source_sheet_row', 'sheet_revision'].includes(f)))", 'if (true)', [cutover]],
+  ['G43-SQL-metadata-history', metadataSql, 'if before_row is null or content_changed then', 'if true then', [cutover, importPglite]],
 ];
-const originals = new Map([...new Set([...mutations.map(m => m[1]), unit, pglite])].map(path => [path, readFileSync(path)]));
+const selected = process.argv.slice(2);
+for (const name of selected) assert.ok(mutations.some(m => m[0] === name), `Unknown mutation: ${name}`);
+const active = mutations.filter(m => !selected.length || selected.includes(m[0]));
+const baselineFiles = [...new Set([unit, pglite, cutover, ...active.flatMap(m => m[4] ?? [])])];
+const originals = new Map([...new Set([...mutations.map(m => m[1]), ...baselineFiles])].map(path => [path, readFileSync(path)]));
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
-const output = resolve('score-mutation-results'); mkdirSync(output, { recursive: true });
+const output = resolve('score-mutation-results', selected.length ? 'selected' : '.'); mkdirSync(output, { recursive: true });
 const results = [];
 function run(name, files = [unit, pglite]) {
   const reportPath = resolve(output, `${name}.json`);
@@ -63,8 +80,8 @@ function run(name, files = [unit, pglite]) {
     failures: report.testResults.flatMap(s => s.assertionResults.filter(t => t.status === 'failed').map(t => ({ file: s.name, name: t.fullName }))) };
 }
 try {
-  const baseline = run('baseline'); assert.equal(baseline.status, 0, 'Baseline must pass');
-  for (const [name, path, from, to, files = [unit], occurrence = 1, count = 1] of mutations) {
+  const baseline = run('baseline', baselineFiles); assert.equal(baseline.status, 0, 'Baseline must pass');
+  for (const [name, path, from, to, files = [unit], occurrence = 1, count = 1] of active) {
     const original = originals.get(path), source = original.toString('utf8');
     assert.equal(source.split(from).length - 1, count, `${name}: exact mutation target count`);
     let start = -1; for (let i = 0; i < occurrence; i++) start = source.indexOf(from, start + 1);
@@ -79,7 +96,7 @@ try {
     for (const file of files) assert.ok(result.failures.some(f => f.file.replaceAll('\\', '/').endsWith(file)), `${name}: failed assertions required in ${file}`);
     process.stdout.write(`${name}: killed (${result.failed}); SHA-256 restored ${before}\n`);
   }
-  assert.equal(run('restored').status, 0, 'Restored tests must pass');
+  assert.equal(run('restored', baselineFiles).status, 0, 'Restored tests must pass');
 } finally {
   for (const [path, bytes] of originals) { writeFileSync(path, bytes); assert.deepEqual(readFileSync(path), bytes, `${path}: final restoration`); }
 }

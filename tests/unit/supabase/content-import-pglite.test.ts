@@ -180,7 +180,9 @@ describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
     vi.spyOn(services.repo, 'listLibrary').mockResolvedValue(changed);
     await runConfiguredSheetMirror({ kind: 'scheduled' });
     expect(await state()).toEqual({ ...start, sheet_revision: 'abcdefabcdefabcd' });
-    expect(await history()).toBe(initialHistory + 1);
+    expect(await history()).toBe(initialHistory);
+    expect(await query('select outcome,changed_fields from content_studio_audit_events where operation_id=$1 and target_kind=$2 and target_id=$3',
+      [envelopes.at(-1)!.operationId, 'library', id])).toEqual([{ outcome: 'applied', changed_fields: ['sheet_revision'] }]);
     const patch = async (op: string, version: number, text: string) => query<{ result: { ok: boolean; code: string } }>('select content_studio_apply_patch($1,$2,$3,$4,$5,$6,$7) as result', [op, mirrorHash([op, text]), actor, 'library', id, version, { draft_content: text }]);
     expect((await patch('synthetic-external-1', 1, 'Synthetic external edit'))[0]!.result.ok).toBe(true);
     await runConfiguredSheetMirror({ kind: 'scheduled' });

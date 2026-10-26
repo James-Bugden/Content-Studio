@@ -89,8 +89,13 @@ describe('CS-074 decimal Hook Score exact Sheet round-trip', () => {
     for (const [text, changed] of [['6.0', '6'], ['7.50', '7.5'], ['006', '6'], ['6.5\u00a0', '6.5'], ['6.5\t', '6.5']]) {
       const { repo } = scoreFixture(text!, kind), store = new FakeContentImportStore({ posts: [], schedule: [], settings: [] });
       await runTypedImport(repo, store, 'synthetic_workbook', actor);
-      const actual = await new SupabaseContentRepository(store.db)[scoreMethod(kind)](); actual[0]!.cells.hookScore = changed!;
-      const report = compareContent(kind, await repo[scoreMethod(kind)](), actual, 1, 0);
+      const expected = await repo[scoreMethod(kind)](), source = expected[0]!;
+      const id = 'libraryId' in source.value ? source.value.libraryId : source.value.contentId;
+      const actual = await new SupabaseContentRepository(store.db)[scoreMethod(kind)]();
+      const target = actual.find(r => ('libraryId' in r.value ? r.value.libraryId : r.value.contentId) === id)!;
+      expect(target.cells.hookScore).toBe(text);
+      target.cells.hookScore = changed!;
+      const report = compareContent(kind, expected, actual, 1, 0);
       expect(report.blocking).toBeGreaterThan(0);
       expect(report.facts).toContainEqual(expect.objectContaining({ field: 'cells.hookScore', kind: 'changed' }));
       expect(classifyDifference(text, changed, 'hookScore')).toBeNull();
@@ -112,7 +117,7 @@ describe('CS-074 decimal Hook Score exact Sheet round-trip', () => {
     }
     const store = new FakeContentImportStore({ posts: [], schedule: [], settings: [] });
     await runTypedImport(repo, store, 'synthetic_workbook', actor);
-    for (const score of [6.555, 1000, Infinity, NaN]) {
+    for (const score of [6.555, 1000, Infinity, NaN, ...refusedScores, '', ' ', {}, true]) {
       store.db.externalEdit('library', source.value.libraryId, { hook_score: score });
       await expect(new SupabaseContentRepository(store.db).getLibrary(source.value.libraryId)).rejects.toMatchObject({ code: 'SCHEMA_DRIFT' });
     }

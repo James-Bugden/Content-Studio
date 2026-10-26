@@ -92,6 +92,14 @@ Derived Sheet tabs become SQL views, never tables:
 - Posts and schedule reserve `@hook_score` for exact nonblank Sheet score text,
   including decimal zeroes and surrounding whitespace. Accept ASCII signed
   decimals with at most two fractional digits and absolute value below 1000.
+  SQL driver numeric strings and PostgREST JSON numbers normalize to the same
+  number before rendering or import/write-through comparisons. An unchanged
+  import or a repair of only Sheet revision/row metadata keeps `row_version`
+  stable and creates no content history; repairs remain audited. Exact changes
+  to the preserved Sheet score spelling are content changes. The additive
+  `20261026000200_content_metadata_history.sql` repair is UNAPPLIED and follows
+  `20261026000100_content_hook_score_decimal.sql`; both require review before
+  an explicit production apply.
   The reader/exporter uses this text only while it still parses to the stored
   value; a changed or null score renders the current number or blank. Metadata
   is excluded from unknown-column export, and parity compares exact score text.

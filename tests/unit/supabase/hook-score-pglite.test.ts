@@ -13,6 +13,7 @@ import { LIBRARY_HEADERS } from '@/domain/sheet-schema';
 import { acceptedScores, refusedScores, scoreFixture, scoreKinds, scoreMethod } from '../../support/hook-score';
 
 const migration = '20261026000100_content_hook_score_decimal.sql';
+const metadataMigration = '20261026000200_content_metadata_history.sql';
 let db: TestDatabase;
 const actor = mirrorHash('synthetic-score-sql');
 const query = async <T>(sql: string, params: unknown[] = []): Promise<T[]> => (await db.asService(q => q.query<T>(sql, params))).rows;
@@ -44,6 +45,7 @@ describe('CS-074 full sorted SQL chain decimal scores', () => {
   it('upgrades populated tables and re-runs with data, preserving RLS/ACL/view/function conventions', async () => {
     const before = await query('select content_studio_cutover_snapshot() as r');
     await db.raw.exec(readFileSync(`supabase/migrations/${migration}`, 'utf8'));
+    await db.raw.exec(readFileSync(`supabase/migrations/${metadataMigration}`, 'utf8'));
     expect(await query('select content_studio_cutover_snapshot() as r')).toEqual(before);
     expect(before).toMatchObject([{ r: { posts: [expect.objectContaining({ hook_score: 7, row_version: 4, passthrough: { synthetic: 'Café\t' } })], schedule: [expect.objectContaining({ hook_score: -7, row_version: 3 })] } }]);
     expect(await query("select table_name,numeric_precision,numeric_scale from information_schema.columns where table_name in ('content_studio_posts','content_studio_schedule','content_studio_ready_queue') and column_name='hook_score' order by table_name")).toEqual(['content_studio_posts','content_studio_ready_queue','content_studio_schedule'].map(table_name => ({ table_name, numeric_precision: 6, numeric_scale: 2 })));

@@ -6,7 +6,7 @@ export const scoreKinds = ['library', 'queue', 'schedule'] as const;
 export type ScoreKind = typeof scoreKinds[number];
 export const scoreMethod = (kind: ScoreKind) => kind === 'library' ? 'listLibrary' : kind === 'queue' ? 'listQueue' : 'listSchedule';
 export const acceptedScores = ['6', '6.0', '6.5', '7.50', '0', '-6.25', '-0.00', '999.99', '-999.99', '0006.50', ' 6.5 ', '6.5\u00a0', '6.5\t'];
-export const refusedScores = ['6.', '.5', '1e3', '6,5', '\uFF16.\uFF15', '\u0666.\u0665', '-', '+6', '6.555', '1000', '-1000', '9'.repeat(80), 'NaN', 'Infinity', 'x6.5', '6.5x', '6.5\n7', '6.5 Cafe\u0301'];
+export const refusedScores = ['6.', '.5', '1e3', '6e1', '6,5', '\uFF16.\uFF15', '\u0666.\u0665', '-', '+6', '6.555', '1000', '-1000', '9'.repeat(80), 'NaN', 'Infinity', 'x6.5', '6.5x', '6.5\n7', '6.5 Cafe\u0301'];
 export function scoreFixture(text: string, kind: ScoreKind = 'library') {
   const sheet = new FakeSheetTransport(), tab = SHEET_TABS[kind].name;
   const grid = sheet.rawTab(tab), header = kind === 'schedule' ? 1 : 0, row = header + 2;
