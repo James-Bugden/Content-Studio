@@ -129,11 +129,7 @@ export function QaPanel({ libraryId, text, canEdit, onApply }: { libraryId: stri
           </div>
         ) : null}
       </div>
-      <p className="text-sm text-ink-soft">
-        Checks spelling, grammar, punctuation, banned words, clarity, British English, voice, facts and platform fit. Findings are suggestions only: nothing changes unless you accept
-        one.
-      </p>
-      {!canEdit ? <p className="text-sm text-ink-soft">Read-only access: only the owner can run checks.</p> : null}
+      {!canEdit ? <p className="text-sm text-ink-soft">Read-only access.</p> : null}
 
       {run.kind === 'loading' ? <StateView kind="loading" title="Checking the English" detail="Your draft stays editable while this runs." nextStep={null} /> : null}
       {run.kind === 'cancelled' ? <InlineResult tone="info">Check cancelled. Nothing was changed.</InlineResult> : null}

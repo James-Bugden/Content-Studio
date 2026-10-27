@@ -124,14 +124,15 @@ export class SupabaseContentRepository implements ContentRepository {
     const fail = (code: AppError['code']) => this.fail<PostProperties>(m.operationId, 'save post versions', code);
     if (m.actor.role !== 'owner' || this.revisionMode !== 'db') return fail('FORBIDDEN');
     if (!operationIdSchema.safeParse(m.operationId).success || !libraryIdSchema.safeParse(m.target.libraryId).success) return fail('VALIDATION_FAILED');
-    const patch = z.object({ versions: postVersionsSchema.optional(), draft: z.string().max(40_000).optional(), deletedAt: z.string().datetime().nullable().optional() }).strict().safeParse(m.patch);
+    const patch = z.object({ versions: postVersionsSchema.optional(), draft: z.string().max(40_000).optional(), deletedAt: z.string().datetime().nullable().optional(), currentHook: z.string().max(500).optional() }).strict().safeParse(m.patch);
     if (!patch.success || !Object.keys(patch.data).length) return fail('VALIDATION_FAILED');
     try {
       await this.schema();
       const row = await this.db.getPost('library', m.target.libraryId);
       const data = { ...(patch.data.versions !== undefined ? { platform_versions: patch.data.versions } : {}),
         ...(patch.data.draft !== undefined ? { draft_content: patch.data.draft } : {}),
-        ...(patch.data.deletedAt !== undefined ? { deleted_at: patch.data.deletedAt } : {}) };
+        ...(patch.data.deletedAt !== undefined ? { deleted_at: patch.data.deletedAt } : {}),
+        ...(patch.data.currentHook !== undefined ? contentPatch({ currentHook: patch.data.currentHook }) : {}) };
       const result = await this.db.applyPatch({ operationId: m.operationId, actorHash: sha256(m.actor.sub),
         patchHash: sha256(JSON.stringify(['post-properties', m.target.libraryId, data])), kind: 'library', id: m.target.libraryId,
         expectedVersion: row && this.post(row).revision === m.expectedRevision ? String(row.row_version) : null, data });

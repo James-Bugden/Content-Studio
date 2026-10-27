@@ -93,7 +93,6 @@ export function QueuePanel({ libraryId }: { libraryId: string }) {
           <h2 id="panel-title" className="text-lg font-semibold first-letter:uppercase">
             {item.hook || readableTitle(item.slug) || item.libraryId}
           </h2>
-          <p className="text-sm text-ink-soft">Idea-stage · not yet reviewed</p>
         </div>
       </header>
 

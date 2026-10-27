@@ -199,7 +199,6 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
           {preview ? (
             preview.ok ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2">
-                <p className="text-sm text-ink-soft">These cells will be written to the Schedule. Nothing else changes.</p>
                 <ul className="min-h-0 flex-1 overflow-y-auto text-sm" tabIndex={0} aria-label="Cells to write">
                   {preview.preview.map((r) => (
                     <li key={r.field} className="flex gap-2 border-t border-line py-1">

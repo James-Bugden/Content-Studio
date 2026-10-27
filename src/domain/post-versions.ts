@@ -12,7 +12,7 @@ export const postVersionSchema = z.object({
 export const postVersionsSchema = z.array(postVersionSchema).max(3).refine(v => new Set(v.map(p => p.platform)).size === v.length);
 export type PostVersion = z.infer<typeof postVersionSchema>;
 export type PostProperties = { revision: string; versions: PostVersion[]; deletedAt: string | null };
-export type PostPropertiesPatch = { versions?: PostVersion[]; draft?: string; deletedAt?: string | null };
+export type PostPropertiesPatch = { versions?: PostVersion[]; draft?: string; deletedAt?: string | null; currentHook?: string };
 export type SaveSelection = { platforms: SavePlatform[]; includeChinese?: boolean; chinese?: { source: string; content: string } };
 export const saveSelectionSchema = z.object({ platforms: z.array(z.enum(SAVE_PLATFORMS)).max(3), includeChinese: z.boolean().optional(),
   chinese: z.object({ source: z.string().max(40_000), content: z.string().max(40_000) }).optional() });

@@ -11,7 +11,8 @@ import { TONES, type ResultTone } from './inline-result';
  * a decision or explains a failure belongs in an InlineResult or StateView next to
  * the thing it concerns, because toasts disappear. Messages must be content-free.
  */
-type ToastAction = { label: string; run: () => Promise<void>; durationMs?: number };
+/** `deadline` (epoch ms) shows a countdown and removes the toast when the undo window closes. */
+type ToastAction = { label: string; run: () => Promise<void>; durationMs?: number; deadline?: number };
 type Toast = { id: number; tone: ResultTone; message: string; action?: ToastAction; busy?: boolean };
 type ToastApi = { notify: (message: string, tone?: ResultTone) => void; notifyAction: (message: string, action: ToastAction) => void };
 
@@ -22,6 +23,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const [now, setNow] = useState(() => Date.now());
+  const counting = toasts.some((t) => t.action?.deadline !== undefined && !t.busy);
+  useEffect(() => {
+    if (!counting) return;
+    const tick = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(tick);
+  }, [counting]);
 
   const dismiss = useCallback((id: number) => {
     setToasts((all) => all.filter((t) => t.id !== id));
@@ -44,7 +52,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const notifyAction = useCallback((message: string, action: ToastAction) => {
     const id = nextId.current++;
     setToasts(all => [...all, { id, tone: 'success', message, action }]);
-    timers.current.set(id, setTimeout(() => dismiss(id), action.durationMs ?? 12_000));
+    const lifetime = action.deadline !== undefined ? Math.max(0, action.deadline - Date.now()) : action.durationMs ?? 12_000;
+    timers.current.set(id, setTimeout(() => dismiss(id), lifetime));
   }, [dismiss]);
 
   async function runAction(toast: Toast) {
@@ -84,8 +93,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <p className="min-w-0 flex-1 text-sm">
                 <span className="font-semibold">{t.label}: </span>
                 {toast.message}
+                {toast.action?.deadline !== undefined && !toast.busy ? <span aria-hidden="true" className="ml-2 tabular-nums text-xs">{Math.max(0, Math.ceil((toast.action.deadline - now) / 1000))} s left</span> : null}
               </p>
-              {toast.action ? <button type="button" disabled={toast.busy} onClick={() => void runAction(toast)} className="-my-2 min-h-11 px-2 text-sm font-semibold underline">{toast.busy ? 'Restoring…' : toast.action.label}</button> : null}
+              {toast.action ? <button type="button" disabled={toast.busy} onClick={() => void runAction(toast)} className={toast.action.deadline !== undefined ? '-my-1 inline-flex min-h-12 min-w-24 items-center justify-center rounded-md border-2 border-current bg-card px-5 text-base font-bold hover:bg-paper disabled:opacity-60 motion-safe:active:scale-[.97]' : '-my-2 min-h-11 px-2 text-sm font-semibold underline'}>{toast.busy ? 'Restoring…' : toast.action.label}</button> : null}
               <button type="button" onClick={() => dismiss(toast.id)} className="-my-1 rounded px-2 py-1 text-sm underline">
                 Dismiss
               </button>

@@ -5,7 +5,7 @@ alter table public.content_studio_posts drop constraint if exists content_studio
 alter table public.content_studio_posts add constraint content_studio_image_sketch_size check (octet_length(image_sketch) <= 16000);
 alter table public.content_studio_ai_calls drop constraint if exists content_studio_ai_calls_feature_check;
 alter table public.content_studio_ai_calls add constraint content_studio_ai_calls_feature_check check
-  (feature in ('english_qa','hooks','zh_tw','zh_qa','replies_ideas','replies_rewrite','replies_translation','embeddings','image_check','ascii_sketch','image_render'));
+  (feature in ('english_qa','hooks','zh_tw','zh_qa','replies_ideas','replies_rewrite','replies_translation','embeddings','image_check','ascii_sketch','image_render','image_need'));
 create or replace function content_studio_private.content_studio_mutate(
   p_mode text, p_operation_id text, p_patch_hash text, p_actor_hash text,
   p_target_kind text, p_target_id text, p_expected_version bigint, p_data jsonb

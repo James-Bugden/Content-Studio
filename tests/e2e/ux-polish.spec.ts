@@ -22,7 +22,7 @@ test('CS-059c: scheduling previews the earliest open slot before the explicit co
   });
   await page.goto('/review?post=SYN-L005');
   const panel = page.getByRole('dialog');
-  await expect(panel.getByText('These cells will be written to the Schedule. Nothing else changes.')).toBeVisible();
+  await expect(panel.getByRole('list', { name: 'Cells to write' })).toBeVisible();
   const confirm = panel.getByRole('button', { name: 'Confirm and write to Thu 1 Oct \u00b7 21:00', exact: true });
   await expect(confirm).toBeVisible();
   expect(writes).toBe(0);

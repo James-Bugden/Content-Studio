@@ -132,8 +132,7 @@ export function SlotPanel({ contentId }: { contentId: string }) {
           {preview ? (
             preview.ok ? (
               <div className="mt-3 flex flex-col gap-2">
-                <p className="text-sm text-ink-soft">These cells will be written to the Schedule. Nothing else changes.</p>
-                <ul className="text-sm">
+                <ul className="text-sm" aria-label="Cells to write">
                   {preview.preview.map((r) => (
                     <li key={r.field} className="flex gap-2 border-t border-line py-1">
                       <span className="w-40 shrink-0 font-medium">{r.header}</span>

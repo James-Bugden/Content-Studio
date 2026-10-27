@@ -27,6 +27,11 @@ the repository's normal deployment migration process before enabling this code
 with a live AI provider. Missing database configuration/schema fails closed for
 AI while manual editing remains available.
 
+The `image_need` feature (the single-post image check, #242) and the image pipeline features
+(`image_check`, `ascii_sketch`, `image_render`, #243) are added to the ledger's feature list by the
+single idempotent `20261027000400_image_pipeline.sql`. Until it is applied, those checks fail
+closed while hooks and the other features keep working.
+
 Amounts are integer USD microdollars. Rates are a versioned estimate, verified
 2026-10-27 against [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)
 and [OpenAI embedding pricing](https://developers.openai.com/api/docs/pricing).

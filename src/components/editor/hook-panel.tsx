@@ -61,7 +61,7 @@ export type HookPanelProps = {
 };
 
 export function HookPanel(props: HookPanelProps) {
-  const { libraryId, platform, currentHook, text, dirty, markdownOk, sheetRevision, sectionHash, canEdit, onChanged, contentStore = 'Sheet' } = props;
+  const { libraryId, currentHook, text, dirty, markdownOk, sheetRevision, sectionHash, canEdit, onChanged, contentStore = 'Sheet' } = props;
   const headingId = useId();
   const groupName = useId();
   const [gen, setGen] = useState<Gen>({ kind: 'idle' });
@@ -180,11 +180,7 @@ export function HookPanel(props: HookPanelProps) {
           )
         ) : null}
       </div>
-      <p className="text-sm text-ink-soft">
-        Your current hook stays unless you choose another. Each suggestion names its framework and scores five things out of 2.
-        {platform === 'LinkedIn' ? ' LinkedIn suggestions also check audience, role or keyword, and direct relevance.' : ''}
-      </p>
-      {!canEdit ? <p className="text-sm text-ink-soft">Read-only access: only the owner can generate or choose hooks.</p> : null}
+      {!canEdit ? <p className="text-sm text-ink-soft">Read-only access.</p> : null}
 
       {gen.kind === 'loading' ? <StateView kind="loading" title="Writing three hook options" detail="Nothing is written while this runs." nextStep={null} /> : null}
       {gen.kind === 'cancelled' ? <InlineResult tone="info">Cancelled. Nothing was changed.</InlineResult> : null}
@@ -200,7 +196,6 @@ export function HookPanel(props: HookPanelProps) {
       {sel.kind === 'stale' || (proposal && stale) ? (
         <div role="status" className="rounded-md border-2 border-block bg-block-soft p-3 text-sm">
           <p className="font-semibold">{STALE_HOOK_MESSAGE}</p>
-          <p className="mt-1">These suggestions were made for an earlier version of the draft, so they cannot be used. Nothing was written.</p>
         </div>
       ) : null}
       {sel.kind === 'error' ? <InlineResult tone="error">{sel.message}</InlineResult> : null}
@@ -215,7 +210,7 @@ export function HookPanel(props: HookPanelProps) {
             <input type="radio" name={groupName} className="mt-1 size-4 shrink-0" checked={picked === 'current'} onChange={() => setPicked('current')} disabled={!canEdit || busy} />
           ) : null}
           <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold text-ink-soft">Current hook (kept unless you choose another)</span>
+            <span className="block text-xs font-semibold text-ink-soft">Current hook</span>
             <span className="copy mt-1 block">{currentHook || 'No hook yet'}</span>
           </span>
         </label>

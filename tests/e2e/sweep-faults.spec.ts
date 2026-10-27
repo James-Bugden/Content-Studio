@@ -48,7 +48,7 @@ for (const [code, kind] of FAULTS) {
           await navigate(page, '/review/SYN-L001');
           await settled(page);
           // Drive read failures use an InlineResult instead of ErrorState by design.
-          await expect(page.getByText(/Saving is disabled so the Sheet and Markdown cannot drift apart/)).toBeVisible();
+          await expect(page.getByText(/Saving is disabled\./)).toBeVisible();
           await expect(page.getByRole('button', { name: 'Save draft', exact: true })).toBeDisabled();
           await monitor.assertClean();
         });

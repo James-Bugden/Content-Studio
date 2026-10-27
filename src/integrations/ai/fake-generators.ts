@@ -5,6 +5,7 @@ import { glossaryTermsIn, type ZhAdaptationOutput } from '@/domain/zh-terms';
 import type { EnglishQaInput } from '@/application/english-qa';
 import type { HookInput } from '@/application/hooks';
 import type { ZhInput } from '@/application/zh-tw';
+import type { ImageNeedInput, ImageNeedOutput } from '@/application/image-need';
 
 /**
  * Deterministic stand-ins for the model (fake mode, unit and e2e tests).
@@ -129,6 +130,14 @@ function alt(template: string, text: string, scores: HookScores, input: HookInpu
       ? { linkedinChecks: { audience: true, roleOrKeyword: true, directRelevance: true, notes: `Speaks to job seekers; keyword: ${k}.` } }
       : {}),
   };
+}
+
+/** Lists, numbers and step-by-step posts read better with a graphic; the rest stay text only. */
+export function fakeImageNeed(input: ImageNeedInput): ImageNeedOutput {
+  const structured = /^\s*(?:[-*\u2022]|\d+[.)])\s/m.test(input.draft) || /\d+\s*%/.test(input.draft);
+  return structured
+    ? { verdict: 'needs_image', reason: 'The steps or numbers are easier to scan as a simple graphic.' }
+    : { verdict: 'no_image', reason: 'The point lands as plain text.' };
 }
 
 export function fakeHooks(input: HookInput): HookOutput {

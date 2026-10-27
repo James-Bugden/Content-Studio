@@ -52,6 +52,19 @@ describe('post version and lifecycle contract', () => {
     expect(await savePostVersions(repo, owner, id, { ...input, operationId: 'synthetic_stale', proposed: 'Another edit', chinese: undefined })).toMatchObject({ ok: false, code: 'STALE_READ' });
   });
 
+  it('saves a chosen hook with the text in one revision', async () => {
+    const { db, repo } = setup();
+    const before = await repo.getLibrary(id);
+    const input = { operationId: 'synthetic_hook_with_text', expectedRevision: before.revision, proposed: 'Synthetic hook line\n\nBody.', currentHook: 'Synthetic hook line', platforms: ['LinkedIn'] as ['LinkedIn'] };
+    const saved = await savePostVersions(repo, owner, id, input);
+    expect(saved.ok).toBe(true);
+    const after = await repo.getLibrary(id);
+    expect(after.value.currentHook).toBe('Synthetic hook line');
+    expect(after.value.draftContent).toBe('Synthetic hook line\n\nBody.');
+    expect(db.history).toHaveLength(1);
+    expect(await savePostVersions(repo, owner, id, input)).toMatchObject({ ok: true, replayed: true });
+  });
+
   it('refuses stale Chinese and unsafe Markdown without writing', async () => {
     const { db, repo } = setup();
     const before = await repo.getLibrary(id);

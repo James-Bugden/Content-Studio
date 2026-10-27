@@ -100,10 +100,9 @@ test('VIS: real clipboard image/png, PNG download and keyboard actions', async (
   for (const image of await phonePreviews.locator('img').all()) {
     await expect(image.locator('..')).toHaveAttribute('draggable', 'false');
   }
-  const live = page.locator('figure').filter({ hasText: 'Draft preview of the brief as typed' });
+  const live = page.locator('figure').filter({ hasText: 'Draft preview' });
   await expect(live.getByRole('group', { name: 'Image actions' })).toHaveCount(0);
   await expect(live.locator('img').locator('..')).toHaveAttribute('draggable', 'false');
-  await expect(live).toContainText('Only saved Library or Schedule images');
   await copy.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText('Image copied. Paste it into the composer.').first()).toBeVisible();
