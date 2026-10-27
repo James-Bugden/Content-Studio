@@ -17,7 +17,7 @@ test('shared states, route loading, AI errors and stale metadata are accessible'
     await expect(state).toHaveAttribute('role', kind === 'loading' || kind === 'empty' || kind === 'no_match' ? 'status' : 'alert');
   }
   await expect(page.getByRole('region', { name: 'Route loading', exact: true }).locator('[data-state="loading"]')).toHaveAttribute('aria-busy', 'true');
-  await expect(page.getByRole('region', { name: 'AI errors', exact: true }).locator('[data-state]')).toHaveCount(14);
+  await expect(page.getByRole('region', { name: 'AI errors', exact: true }).locator('[data-state]')).toHaveCount(15);
   await expect(page.getByText(/as of 12:30 Taipei/)).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
