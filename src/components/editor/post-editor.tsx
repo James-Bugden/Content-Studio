@@ -306,6 +306,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         </InlineResult>
       ) : null}
 
+      {model.contentProvider === 'db' ? <p className="text-sm text-ink-soft">The database holds your saved draft. Drive receives a separate export; export delays appear in Fix issues.</p> : null}
       {model.markdown.state !== 'ok' ? (
         <InlineResult tone="warning">
           {markdownFailure(model.markdown)} Saving is disabled so the {contentStore} and Markdown cannot drift apart. Any saved draft shown below can still be copied.

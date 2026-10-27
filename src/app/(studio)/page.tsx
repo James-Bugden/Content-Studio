@@ -28,11 +28,11 @@ export default async function NextUpPage({ searchParams = Promise.resolve({}) }:
   } catch (error) {
     return (
       <>
-        <PageHeader title="Next up" description="Here is what needs you" />
+        <PageHeader title="Next up" />
         <StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
   }
-  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} nowPage={page('nowPage')} nextPage={page('nextPage')} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
+  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} slots={board.slots} nowPage={page('nowPage')} nextPage={page('nextPage')} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
 }

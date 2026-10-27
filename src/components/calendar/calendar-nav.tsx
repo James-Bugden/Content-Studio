@@ -20,22 +20,22 @@ function href(view: CalendarView, key: 'week' | 'month', value?: string): string
   return `/schedule?${p.toString()}`;
 }
 
-const pill = 'inline-flex min-h-11 items-center justify-center px-4 text-sm font-medium';
+const pill = 'inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-sm font-semibold';
 
 export function CalendarNav({ view, period, week, month }: { view: CalendarView; period: Period; week: string; month: string }) {
   const key = period.unit;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
       <nav aria-label="Calendar view">
-        <ul className="inline-flex overflow-hidden rounded-md border border-line bg-card">
-          {VIEWS.map((v, i) => {
+        <ul className="inline-flex gap-1 rounded-lg border border-line bg-paper p-1">
+          {VIEWS.map((v) => {
             const active = v.view === view;
             return (
-              <li key={v.view} className={i > 0 ? 'border-l border-line' : ''}>
+              <li key={v.view}>
                 <GuardedLink
                   href={v.view === 'month' ? href('month', 'month', month) : href(v.view, 'week', week)}
                   aria-current={active ? 'page' : undefined}
-                  className={`${pill} ${active ? 'bg-ink text-white' : 'text-ink hover:bg-paper'}`}
+                  className={`${pill} rounded-md ${active ? 'bg-card text-ink shadow-sm' : 'text-ink-soft hover:bg-card'}`}
                 >
                   {v.label}
                 </GuardedLink>
@@ -46,13 +46,13 @@ export function CalendarNav({ view, period, week, month }: { view: CalendarView;
       </nav>
       <nav aria-label={period.unit === 'week' ? 'Weeks' : 'Months'} className="flex flex-wrap items-center gap-2">
         <GuardedLink href={href(view, key, period.prev)} aria-label={`Previous ${period.unit}`} className={`${pill} rounded-md border border-line bg-card hover:bg-paper`}>
-          <span aria-hidden="true">‹</span>&nbsp;Previous
+          <span aria-hidden="true">‹</span><span className="sr-only">Previous {period.unit}</span>
         </GuardedLink>
         <GuardedLink href={href(view, key)} className={`${pill} rounded-md border border-line bg-card hover:bg-paper`}>
           Today
         </GuardedLink>
         <GuardedLink href={href(view, key, period.next)} aria-label={`Next ${period.unit}`} className={`${pill} rounded-md border border-line bg-card hover:bg-paper`}>
-          Next&nbsp;<span aria-hidden="true">›</span>
+          <span className="sr-only">Next {period.unit}</span><span aria-hidden="true">›</span>
         </GuardedLink>
         <p className="w-full text-sm font-semibold sm:w-auto sm:pl-2" aria-live="polite">
           {period.label}

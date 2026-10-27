@@ -1,101 +1,108 @@
-# Builder handoff: #237, stages 3–5
+# Stage 2 UI build handoff — round 1
 
-Merge-fix round 1 now incorporates #235; current verification and integration
-fixes are recorded in [the merge report](docs/qa/pr237-merge-r1.md).
+Scope: standard build for #236 on feat/236-ui. Base: 4a1fd99.
+Contract: supplied builder brief and approved studio-A-polished.html mockup,
+MASTER-SPEC.md, AGENTS.md and the supplied design handover. No GitHub commands,
+push, deployment, production access or secret changes were performed.
 
-Heavy / build / round 1. Branch: `feat/237-ui`. Base: `4a1fd99`.
-No push, GitHub writes, migration application, secret access or production changes.
-The supplied task brief is the implementation contract; the issue connector returned 404 for #237.
+## Acceptance
 
-## Delivered
-
-- English master editor opens directly in the post panel. Exact copy, recovery,
-  conflicts, hooks, QA, review actions, visual links and existing Typefully flows remain.
-- LinkedIn, Threads and X reading previews update from the current editor text.
-  Real brand logos, platform reading layouts, reading folds, image previews and
-  character counts; desktop columns and a stacked phone layout.
-- Save as selects LinkedIn / Threads / X and optionally reviewed Chinese from
-  English. The existing zh-TW task, terminology and validation are reused.
-  Changing English invalidates its Chinese proposal. English and selected version
-  snapshots save atomically in the existing database post under one revision,
-  idempotency ledger and audit/history transaction. They remain drafts; this
-  action does not create schedule rows or publish versions automatically.
-- Platform choices and Chinese participate in the leave guard and tab recovery.
-  Adopting the current version after a conflict reloads all saved versions.
-- Delete uses a tombstone, removes the post from active reads, and blocks later
-  writes to it. Undo is offered for 12 seconds; the database permits 30 seconds
-  for transport grace and uses its own deletion clock. Existing schedule copies
-  and Typefully drafts are retained, as stated beside Delete.
-- Posts and Backlog show compact excerpts, keep filters/grouping/paging/inline
-  edits, and retain the phone layout. Idea excerpts sent to the table are capped
-  at 240 characters. List logos do not import the interactive preview bundle.
-- Fewer line breaks is an explicit formatting action; ordinary saves never
-  normalize copy. Empty drafts still save and do not grant release approval.
-
-## Migration — applied in production per owner
-
-`supabase/migrations/20261027000200_post_versions_and_soft_delete.sql`
-
-Adds `platform_versions` and `deleted_at`, extends guarded writes, preserves
-service-only grants and rebuilds the derived Ready view to exclude tombstones.
-The owner confirmed during merge-fix round 1 that this existing migration is
-already applied to production. This fix adds no migration and inspects or changes
-no live database. Rows and their history are retained.
+- Home: responsive summary tiles, urgent-first action groups (review/fix, visuals,
+  Chinese adaptation, scheduling), truthful status pills and platform logos.
+  First action retains the primary button; every existing task target remains
+  available through independent 12-item urgent/upcoming pagination. Upcoming scheduled/planned work uses at most five
+  cards from the board's existing schedule window and links to Calendar.
+- Calendar: day lists below 1024px, platform/week grid on desktop, compact URL-based
+  period/view controls, day dividers and explicit status pills. Ready, Scheduled,
+  Planned and Published remain distinct in words, using existing status colours.
+  Month/List views, empty-slot disclosures, panel links and actions remain intact.
+- Lists collapse whitespace in displayed post titles without rewriting stored copy.
+  Real platform SVGs reuse stage 1. Touch controls are at least 44px tall; calendar
+  arrows are also at least 44px wide. Image dimensions remain reserved.
+- No new client component, full-library client serialization, data-loading change,
+  dependency, schema, mutation or provider changes. PR 235's read/payload work can
+  proceed independently. Hooks, QA, Typefully, visual and Chinese editors retain
+  their existing panel entry points; Replies was untouched.
 
 ## Verification
 
-Every Vitest, typecheck, build and Playwright command used `bash ~/bin/heavy`.
-The full repository suite was not run. No unrelated Node process was killed.
+All heavy commands use bash ~/bin/heavy. No full repository test suite was run.
 
-- Required directory run: `npx vitest run tests/unit/application tests/unit/security tests/unit/components tests/unit/supabase --maxWorkers=1`
-  — **91 files / 1,675 tests passed**.
-- After the last editor/presentation refinements: focused application, SQL,
-  editor-save, preview and panel tests — **5 files / 30 tests passed**.
-- `npm run typecheck` and `npm run lint` — passed.
-- Production build — passed. Final synthetic build ID:
-  `-2Z7CCiHRlFyUB3fuUY7b`.
-- Existing journeys at w375 and w1280: editor, panel, backlog, backlog pagination,
-  AI, review, Typefully, visuals, image transfer and UX polish — 199 passed in
-  the broad run. Two failures from an extra empty-state live region were fixed;
-  all **20 UX polish retests passed** on the final build. One existing test
-  explicitly skips the wide-table-only expansion check below 768px; its desktop
-  case passed. That skip is not counted as a pass.
-- Final DB browser run: `post-versions.spec.ts`, both widths — **10 passed**.
-  Covers persisted selections/copy, stale Chinese, Delete/Undo, owner/origin/CAS
-  boundaries, and reflow at 375/500/640/750/1280 CSS px. Axe found no serious or
-  critical WCAG A/AA violations in the editor at 375 and 1280.
-- `node scripts/check-private-paths.mjs`, `node scripts/scan-secrets.mjs`, and
-  `git diff --check` — passed with the new files staged.
+- Full requested groups: vitest run tests/unit/application tests/unit/security
+  tests/unit/components --maxWorkers=1: 61 files / 761 tests passed.
+- Changed component retests after fixes: next-up-view, next-up-page and
+  calendar-cards: 3 files / 12 tests passed.
+- npm run typecheck: passed. Production build also runs TypeScript.
+- npm run lint: passed. Private-path and secret scans: clean.
+- Final production build: passed; Next build ID 7Zudc4p_7-NhysvW3N9h7.
+- Final browser pass: 56/56 passed in synthetic CS_CONTENT_STORE=db mode at
+  w375 and w1280, against that prebuilt production artifact. Command:
+  CS_E2E_PREBUILT=1 CS_E2E_CONTENT_STORE=db CS_E2E_PORT=3360 bash ~/bin/heavy
+  npx playwright test tests/e2e/home.spec.ts tests/e2e/calendar.spec.ts
+  tests/e2e/home-calendar-polish.spec.ts tests/e2e/panel.spec.ts
+  --project=w375 --project=w1280 --workers=1.
+  Includes axe checks, approval/queue, scheduling/fill, Chinese panels, keyboard
+  close, responsive overflow and 44px control assertions.
 
-Local synthetic evidence is in `artifacts/237/`: backlog, editor and preview PNGs
-for both widths. Screenshots were visually reviewed; no production screenshots
-or private voice files are included. The browser tool blocked the local mockup
-file URL; its source was read. An extra local manual-QA server was rejected by
-automatic approval review with only “blocked by policy”, so no separate manual
-Chrome session is claimed. Native 200% zoom and physical-device testing are not
-claimed. Browser tests and intermediate-width reflow are emulated evidence.
+Local build workaround: the shared node_modules junction leaves Turbopack's
+inferred filesystem root. Webpack also exposes an existing Replies node:crypto
+client import. Successful Turbopack builds use a temporary local root containing
+both the checkout and junction target; next.config.ts is restored byte-for-byte.
+No workaround is included in the implementation diff.
 
-The provided worktree uses a node_modules junction outside Turbopack's inferred
-root. Local builds used a temporary common-parent root setting; it was restored
-and is absent from the committed diff. Default Turbopack failed on that junction;
-Webpack also hit an existing Replies `node:crypto` import. Neither unrelated
-problem was changed.
+First browser pass: 55/56 passed; the added phone test reloaded before its List
+navigation settled (the day list is already visible in phone Week mode). The test
+now waits for the URL before reload. Visual inspection at 375/1280 caught and
+fixed wrapped platform names/status text and increased arrow target width.
 
-## Adversarial checks and remaining review
+Synthetic screenshot evidence is generated by home-calendar-polish.spec.ts in
+ignored test-results: next-up.png and calendar-week.png for w375 and w1280.
+T2 inspection covers grouped cards, real logos, status legibility, title wrapping,
+mobile day lists, desktop grid, overflow, and access to panel actions. Playwright
+phone viewport checks are emulator evidence, not physical-device T4 evidence.
 
-1. Correctness/concurrency: real SQL and fake tests cover stale revisions,
-   same-operation replay, changed-patch conflict, exact round trips, stale Chinese,
-   tombstone edit refusal, expired restore and server deletion time. Conflict
-   adoption and a Chinese response arriving after changed platform selections
-   have component regressions.
-2. Auth/privacy: owner/origin checks run before services; validated IDs and bodies;
-   service-only SQL access; viewer refusal; explicit write freeze; no private copy
-   in audit output or fixtures. The private voice files were not read or printed.
-3. UX/performance: stable editor height; live exact-copy previews; list excerpts
-   and bounded paging; no new whole-library client payload; existing review,
-   scheduling, image and publishing journeys retested.
+## Limits
 
-Independent review, hosted CI, migration application and deployed verification
-remain coordinator steps. This builder did not push, use gh, merge, deploy or
-close an issue. Live AI voice fidelity and native-platform pixel equivalence
-cannot be established by deterministic synthetic providers.
+No production performance/cutover claim; the existing board read path is retained.
+T4 is not required for these CSS/list changes. Independent PR review, CI, push and
+merge/deployment belong to the coordinator; this build is local only.
+
+
+## PR 236 merge fix, round 1 (2026-10-27)
+
+Standard conflict-resolution fix on `feat/236-ui`. Merged origin/main
+`e8698ce00c2f93c658bd05831615400722a2dd16` into stage-2 commit
+`2034ed473feec0cc831cf29fc23ab2ffb143f93f` (the merge commit containing this
+report identifies the final source). No push, GitHub CLI, deployment, live data
+or secret access is part of this round.
+
+Resolved all three conflicts by keeping the stage-2 summary tiles, action groups,
+status pills, platform marks, responsive workspace and five-card Coming up column,
+with main's independent `nowPage`/`nextPage` pagination. Each urgency list renders
+at most 12 tasks; totals cover the complete list and links preserve the other
+list's page. The closed all-task disclosure is removed. Backlog's projected
+excerpt and full-copy-on-open behavior merged unchanged. Unit assertions cover
+both redesign semantics and bounded rendering, last-page rows and independent
+previous/next links.
+
+Verification (all heavy commands use `bash ~/bin/heavy`; no full suite):
+
+- `npx vitest run tests/unit/components tests/unit/application tests/unit/security tests/unit/supabase --maxWorkers=1 --silent`: 90 files / 1,671 tests passed.
+- `npm run typecheck` and `npm run lint`: passed on the final source.
+  Initial lint caught an obsolete `splitTasks` import; removed it and reran
+  both checks plus the focused Next up page/view tests (2 files / 9 passed).
+  The only source difference after browser verification is that unused import.
+- Production artifact: `a9PII5v5a8XRQHn6urr_c`; successful compilation,
+  TypeScript, page generation and route output. The documented temporary
+  Turbopack root workaround was restored byte-for-byte after generation.
+- `CS_E2E_PREBUILT=1 CS_E2E_CONTENT_STORE=db CS_E2E_PORT=3360 npx playwright test tests/e2e/home.spec.ts tests/e2e/calendar.spec.ts tests/e2e/home-calendar-polish.spec.ts tests/e2e/payload.spec.ts --project=w375 --project=w1280 --workers=1`: 46 passed against that artifact.
+- Seeded 2,000-post DB fixture at both widths: `/` = 154,564 bytes and
+  `/backlog` = 258,364 bytes (complete uncompressed document including inline
+  RSC). Both are below 300,000 bytes. Home warm samples: 48/36/33 ms at 375;
+  27/22/20 ms at 1280. Local synthetic timings are not production benchmarks.
+- T2: inspected all four Next up/Calendar screenshots from
+  `test-results/home-calendar-polish-*` at 375 and 1280. Grouped cards, platform
+  marks, status text, Coming up, phone day list and desktop grid retained.
+  Browser tests also passed axe, overflow, touch-size and panel navigation checks.
+
+This round is local only; no production verification or deployment is claimed.

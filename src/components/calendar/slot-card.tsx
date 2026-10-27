@@ -3,20 +3,21 @@ import { slotStatus, type SlotLook } from '@/domain/calendar';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { PillarTag } from '../pillar-tag';
 import { PostThumb } from '../panel/post-thumb';
+import { ListPill, ListPlatform } from '../list-meta';
 
 /**
  * One schedule slot as a card (UX redesign). The whole card is one link that opens
  * the slot panel (`?slot=<Content ID>`); the Content ID itself stays out of the
  * visible text and lives in `data-content-id`. Status is a word plus a glyph.
  */
-const STATUS_TEXT: Record<SlotLook, string> = {
-  published: 'text-green',
-  scheduled: 'text-green',
-  review: 'text-attention',
-  open: 'text-ink-soft',
-  waiting: 'text-attention',
-  missed: 'text-block',
-  problem: 'text-block',
+const STATUS_TONE: Record<SlotLook, 'green' | 'attention' | 'block' | 'neutral'> = {
+  published: 'green',
+  scheduled: 'green',
+  review: 'attention',
+  open: 'neutral',
+  waiting: 'attention',
+  missed: 'block',
+  problem: 'block',
 };
 
 export function hasStep(slot: SlotSummary): boolean {
@@ -25,10 +26,11 @@ export function hasStep(slot: SlotSummary): boolean {
 
 export function StatusLine({ slot }: { slot: SlotSummary }) {
   const st = slotStatus(slot);
+  const ready = !slot.empty && slot.statusLabel === 'Ready';
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium ${STATUS_TEXT[st.look]}`}>
-      <span aria-hidden="true">{st.glyph}</span> {st.label}
-    </span>
+    <ListPill tone={ready ? 'green' : STATUS_TONE[st.look]}>
+      <span aria-hidden="true">{ready ? '✓' : st.glyph}</span> {ready ? 'Ready' : st.label}
+    </ListPill>
   );
 }
 
@@ -55,24 +57,22 @@ export function WeekSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
   const st = slotStatus(slot);
   return (
     <div data-content-id={slot.contentId} data-slot-state={st.look}>
-      <OpenPanelLink target={{ slot: slot.contentId }} className={`block rounded-md p-1.5 text-left text-xs hover:border-ink ${cardFrame(slot, past)}`}>
+      <OpenPanelLink target={{ slot: slot.contentId }} className={`block min-h-11 rounded-md p-2 text-left text-xs hover:border-ink ${cardFrame(slot, past)}`}>
         {slot.empty ? (
           <EmptyBody slot={slot} />
         ) : (
           <>
             <span className="flex min-w-0 flex-wrap items-center gap-1 text-[11px] text-ink-soft">
-              <span><span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span></span>
+              <ListPlatform platform={slot.platform} compact /> <span className="tabular-nums">{slot.time}</span>
               {slot.expectedPillar ? <PillarTag value={slot.expectedPillar} /> : null}
             </span>
             <span className="mt-0.5 flex items-start gap-1.5">
               <span className="min-w-0 flex-1">
-                <span className="copy line-clamp-2 break-words font-medium text-ink">{slot.hook || 'No hook yet'}</span>
-                <span className="mt-0.5 block">
-                  <StatusLine slot={slot} />
-                </span>
+                <span className="line-clamp-3 break-words font-semibold text-ink">{slot.hook || 'No hook yet'}</span>
               </span>
               <PostThumbSmall slot={slot} />
             </span>
+            <span className="mt-1 block"><StatusLine slot={slot} /></span>
             <StepLine slot={slot} />
           </>
         )}
@@ -84,7 +84,7 @@ export function WeekSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
 function PostThumbSmall({ slot }: { slot: SlotSummary }) {
   return (
     <span className="block w-8 shrink-0 [&_figure>div]:size-8">
-      <PostThumb thumb={slot.thumb} size="sm" showLabel={false} />
+      <PostThumb thumb={slot.thumb} size="sm" showLabel={false} imageOnly />
     </span>
   );
 }
@@ -125,10 +125,10 @@ export function ListSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
         target={{ slot: slot.contentId }}
         className={`flex min-h-11 items-start gap-3 rounded-md p-3 text-left text-sm hover:border-ink ${cardFrame(slot, past)}`}
       >
-        {slot.empty ? null : <PostThumb thumb={slot.thumb} size="sm" showLabel={false} />}
+        {slot.empty ? null : <PostThumb thumb={slot.thumb} size="sm" showLabel={false} imageOnly />}
         <span className="min-w-0 flex-1">
-          <span className="block text-xs text-ink-soft">
-            <span className="font-semibold text-ink">{slot.platform}</span> · <span className="tabular-nums">{slot.time}</span>
+          <span className="flex items-center gap-2 text-xs text-ink-soft">
+            <ListPlatform platform={slot.platform} /> · <span className="tabular-nums">{slot.time}</span>
           </span>
           {slot.expectedPillar ? <span className="mt-1 block"><PillarTag value={slot.expectedPillar} /></span> : null}
           {slot.empty ? (
@@ -138,7 +138,7 @@ export function ListSlotCard({ slot, past }: { slot: SlotSummary; past: boolean 
             </span>
           ) : (
             <>
-              <span className="copy mt-0.5 line-clamp-2 break-words font-medium">{slot.hook || 'No hook yet'}</span>
+              <span className="mt-1.5 line-clamp-2 break-words font-semibold">{slot.hook || 'No hook yet'}</span>
               <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <StatusLine slot={slot} />
                 <StepLine slot={slot} />

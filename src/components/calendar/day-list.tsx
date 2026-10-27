@@ -4,6 +4,7 @@ import { addDays } from '@/domain/schedule';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { ListSlotCard } from './slot-card';
 import { StateView } from '../state-view';
+import { ListPlatform } from '../list-meta';
 
 /**
  * List view (UX redesign), and the phone layout of the week view. Only days with
@@ -24,7 +25,7 @@ export function DayList({ start, today, slots, className = '' }: { start: string
           const id = `list-${d.date}`;
           return (
             <section key={d.date} aria-labelledby={id} data-date={d.date}>
-              <div className="flex flex-wrap items-baseline gap-2">
+              <div className="flex flex-wrap items-baseline gap-2 border-b border-line pb-2">
                 <h2 id={id} className="text-base font-semibold">
                   {formatDayLong(d.date)}
                 </h2>
@@ -65,7 +66,7 @@ function EmptyRun({ slots }: { slots: SlotSummary[] }) {
           return (
             <li key={s.contentId} data-content-id={s.contentId} className="flex min-h-11 items-center justify-between gap-2 border-b border-line px-3 last:border-b-0">
               <span>
-                <span className="font-semibold">{s.platform}</span> · <span className="tabular-nums">{s.time}</span>
+                <ListPlatform platform={s.platform} /> · <span className="tabular-nums">{s.time}</span>
                 {st.look !== 'open' ? (
                   <span className="text-ink-soft">
                     {' '}

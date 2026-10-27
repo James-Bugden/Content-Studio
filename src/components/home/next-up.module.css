@@ -1,0 +1,9 @@
+﻿.workspace { display: grid; gap: 24px; margin-top: 24px; }
+.task { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; }
+.task:hover { background: var(--color-paper); }
+.taskBody { min-width: 0; flex: 1 1 180px; }
+.taskAction { display: flex; justify-content: flex-end; width: 100%; }
+@media (min-width: 1024px) {
+  .workspace { grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr); align-items: start; }
+  .taskAction { width: auto; }
+}
