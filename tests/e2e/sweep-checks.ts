@@ -301,6 +301,13 @@ export async function monkey(page: Page, route: string) {
       await expect(page).toHaveURL(new URL(target.href, page.url()).href);
       await settled(page);
       actions.push(`navigate:${target.href}`);
+    } else if (action === 'Escape' && await page.locator('dialog[open]').count()) {
+      // Escape on a side panel closes it through a client navigation. Wait for
+      // that to land before building the next inventory; otherwise the next
+      // action can target controls of the panel that is still unmounting.
+      await escapeDialog(page);
+      await settled(page);
+      actions.push(action);
     } else {
       await page.keyboard.press(action);
       actions.push(action);
