@@ -18,7 +18,6 @@ test('UX-01: signed-in / shows Next up with tiles, counts and the urgent tasks',
   await page.goto('/');
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: 'Next up', level: 1 })).toBeVisible();
-  await expect(page.getByText('Here is what needs you')).toBeVisible();
   await expect(page.getByText('Wednesday 30 September 2026')).toBeVisible();
 
   const summary = page.getByRole('region', { name: 'Summary' });

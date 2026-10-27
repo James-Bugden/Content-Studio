@@ -2,6 +2,7 @@ import type { SlotSummary } from '@/domain/board';
 import { formatDayShort } from '@/domain/calendar';
 import { StepButton } from '../panel/step-button';
 import { InlineResult } from '../inline-result';
+import { ListPlatform } from '../list-meta';
 
 /**
  * "Needs you this week" (UX redesign): the week's slot steps due now or soon, one
@@ -22,7 +23,7 @@ export function NeedsStrip({ heading, emptyText, items }: { heading: string; emp
   const fills = items.filter((s) => s.step.kind === 'fill_slot');
   return (
     <section aria-labelledby="needs-you" className="mb-6 rounded-lg border border-line bg-card p-4" data-testid="needs-strip">
-      <h2 id="needs-you" className="text-lg font-semibold">
+      <h2 id="needs-you" className="text-sm font-semibold">
         {heading}
       </h2>
       {items.length === 0 ? (
@@ -39,8 +40,8 @@ export function NeedsStrip({ heading, emptyText, items }: { heading: string; emp
                   </span>
                 ) : null}
                 <span className="shrink-0 tabular-nums text-ink-soft">{when(s)}</span>
-                <span className="shrink-0 font-semibold">{s.platform}</span>
-                <span className="copy min-w-0 flex-[1_1_12rem] truncate">{title(s)}</span>
+                <ListPlatform platform={s.platform} />
+                <span className="min-w-0 flex-[1_1_8rem] line-clamp-2 font-medium">{title(s)}</span>
                 <StepButton step={s.step} target={{ slot: s.contentId }} />
               </li>
             );
@@ -56,7 +57,7 @@ export function NeedsStrip({ heading, emptyText, items }: { heading: string; emp
                   {fills.map((s) => (
                     <li key={s.contentId} data-task-content-id={s.contentId} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="tabular-nums text-ink-soft">{when(s)}</span>
-                      <span className="font-semibold">{s.platform}</span>
+                      <ListPlatform platform={s.platform} />
                       <StepButton step={s.step} target={{ slot: s.contentId }} />
                     </li>
                   ))}

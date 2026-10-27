@@ -2,6 +2,7 @@ import type { SlotSummary } from '@/domain/board';
 import { CALENDAR_PLATFORMS, formatDayLong, formatDayShort, sortByTime } from '@/domain/calendar';
 import { addDays } from '@/domain/schedule';
 import { WeekSlotCard } from './slot-card';
+import { ListPlatform } from '../list-meta';
 
 /**
  * Week view (UX redesign): one row per platform, one column per day, Monday first.
@@ -37,7 +38,7 @@ function PlatformRow({ platform, days, today, slots, last }: { platform: string;
   return (
     <>
       <div data-platform-row={platform} className={`${border} border-line bg-paper p-2 text-sm font-semibold`}>
-        {platform}
+        <ListPlatform platform={platform} />
       </div>
       {days.map((d) => {
         const mine = sortByTime(slots.filter((s) => s.platform === platform && s.isoDate === d));
