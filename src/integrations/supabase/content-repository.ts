@@ -14,6 +14,7 @@ import { LIBRARY_HEADERS, SCHEDULE_HEADERS, LIBRARY_WRITABLE, SCHEDULE_WRITABLE 
 import { parseWorkflowSettings } from '@/domain/settings';
 import { assertContentSchemaVersion } from './content-schema';
 import { validateContentRow } from './content-row-schema';
+import { postVersionsSchema, type PostProperties, type PostPropertiesPatch } from '@/domain/post-versions';
 import { CONTENT_TIMESTAMP_FIELDS, FINAL_SYNCED_AT_RAW_KEY, contentTimestampParts, sameContentTimestamp, taipeiContentTimestamp } from '@/application/content-timestamps';
 
 export const contentColumn = (field: string): string => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`);
@@ -101,11 +102,42 @@ export class SupabaseContentRepository implements ContentRepository {
   listLibrary() { return this.listPosts('library'); }
   listQueue() { return this.listPosts('queue'); }
   listReadyQueue() { return this.listPosts('ready'); }
-  private listPosts(collection: 'library' | 'queue' | 'ready') { return this.checked(async () => (await this.db.listPosts(collection)).map(row => this.post(row))); }
+  private listPosts(collection: 'library' | 'queue' | 'ready') { return this.checked(async () => (await this.db.listPosts(collection)).filter(row => !row.deleted_at).map(row => this.post(row))); }
   getLibrary(id: string) { return this.getPost('library', id); }
   getQueue(id: string) { return this.getPost('queue', id); }
   private getPost(collection: 'library' | 'queue', id: string) {
-    return this.checked(async () => { const row = await this.db.getPost(collection, id); if (!row) throw new AppError('NOT_FOUND'); return this.post(row); });
+    return this.checked(async () => { const row = await this.db.getPost(collection, id); if (!row || row.deleted_at) throw new AppError('NOT_FOUND'); return this.post(row); });
+  }
+  private properties(row: ContentPostRow): PostProperties {
+    return { revision: this.post(row).revision, versions: postVersionsSchema.parse(row.platform_versions ?? []), deletedAt: row.deleted_at ?? null };
+  }
+  async postProperties(id: string): Promise<PostProperties> {
+    return this.checked(async () => {
+      const row = await this.db.getPost('library', id);
+      if (!row) throw new AppError('NOT_FOUND');
+      return this.properties(row);
+    });
+  }
+  async updatePostProperties(m: MutationEnvelope<{ libraryId: string }, PostPropertiesPatch>): Promise<MutationResult<PostProperties>> {
+    const fail = (code: AppError['code']) => this.fail<PostProperties>(m.operationId, 'save post versions', code);
+    if (m.actor.role !== 'owner' || this.revisionMode !== 'db') return fail('FORBIDDEN');
+    if (!operationIdSchema.safeParse(m.operationId).success || !libraryIdSchema.safeParse(m.target.libraryId).success) return fail('VALIDATION_FAILED');
+    const patch = z.object({ versions: postVersionsSchema.optional(), draft: z.string().max(40_000).optional(), deletedAt: z.string().datetime().nullable().optional() }).strict().safeParse(m.patch);
+    if (!patch.success || !Object.keys(patch.data).length) return fail('VALIDATION_FAILED');
+    try {
+      await this.schema();
+      const row = await this.db.getPost('library', m.target.libraryId);
+      const data = { ...(patch.data.versions !== undefined ? { platform_versions: patch.data.versions } : {}),
+        ...(patch.data.draft !== undefined ? { draft_content: patch.data.draft } : {}),
+        ...(patch.data.deletedAt !== undefined ? { deleted_at: patch.data.deletedAt } : {}) };
+      const result = await this.db.applyPatch({ operationId: m.operationId, actorHash: sha256(m.actor.sub),
+        patchHash: sha256(JSON.stringify(['post-properties', m.target.libraryId, data])), kind: 'library', id: m.target.libraryId,
+        expectedVersion: row && this.post(row).revision === m.expectedRevision ? String(row.row_version) : null, data });
+      if (!result.ok) return fail(result.code ?? 'PROVIDER_UNAVAILABLE');
+      const after = await this.db.mutationRow('library', m.target.libraryId, String(result.revision));
+      return { ok: true, operationId: m.operationId, replayed: result.replayed === true, value: this.properties(after as ContentPostRow),
+        steps: [{ step: 'save post versions', provider: 'db', status: result.steps[0]?.state === 'already_applied' ? 'skipped_already_applied' : 'done' }] };
+    } catch (error) { return fail(isAppError(error) ? error.code : 'PROVIDER_UNAVAILABLE'); }
   }
   listSchedule() { return this.checked(async () => (await this.db.listSchedule()).map(row => this.schedule(row))); }
   getSchedule(id: string) { return this.checked(async () => { const row = await this.db.getSchedule(id); if (!row) throw new AppError('NOT_FOUND'); return this.schedule(row); }); }

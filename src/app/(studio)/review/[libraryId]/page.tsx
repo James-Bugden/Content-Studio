@@ -43,11 +43,11 @@ export default async function EditorPage({ params }: { params: Promise<{ library
   return (
     <>
       <PageHeader title={readableTitle(model.slug) || model.sheet.hook || model.libraryId} description={`${model.targetPlatform} · ${model.source}`} actions={back} />
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+      <div className="mt-4 flex flex-col gap-6">
         <div className="min-w-0">
           <EditorWorkspace model={model} canEdit={actor.role === 'owner'} ns={ns} reviewActions />
         </div>
-        <aside aria-label="Status and sources" className="flex min-w-0 flex-col gap-4">
+        <aside aria-label="Status and sources" className="grid min-w-0 gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-line bg-card p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Release gates</h2>

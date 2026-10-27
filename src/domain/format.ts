@@ -144,3 +144,11 @@ export function platformLength(text: string): number {
 }
 
 export const PLATFORM_LIMIT: Record<string, number> = { X: 25_000, LinkedIn: 3_000, Threads: 500 };
+
+/** Explicit compacting action only: keep paragraphs and list boundaries. */
+export function fewerLineBreaks(text: string): string {
+  return text.replace(/\r\n/g, '\n').split(/\n{2,}/).map(paragraph => paragraph.split('\n').reduce((out, line, i, lines) => {
+    const list = (s: string) => /^\s*(?:[-*+•]|\d+[.)])\s/.test(s);
+    return out + (i ? list(line) || list(lines[i - 1]!) ? '\n' : ' ' : '') + line;
+  }, '')).join('\n\n');
+}

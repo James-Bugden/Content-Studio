@@ -52,7 +52,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
   const previousFilters = useRef(filtersKey);
   const requestedPage = Number(params.get('page'));
   const page = search.trim() ? searchPage : Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const queryKey = JSON.stringify([search, page, filtersKey]);
+  const queryKey = JSON.stringify([search, page, filtersKey, retry]);
   const currentQuery = useRef<string | null>(queryKey);
   const pageRequests = useRef(new Set<AbortController>());
   useEffect(() => {
@@ -74,6 +74,22 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
   }, [filtersKey, setSearchPage, setResult]);
 
   useEffect(() => {
+    const refreshSearch = () => {
+      if (!search.trim()) return;
+      setResult(null);
+      setPending(true);
+      setError(false);
+      setRetry(value => value + 1);
+    };
+    window.addEventListener('cs:post-deleted', refreshSearch);
+    window.addEventListener('cs:post-restored', refreshSearch);
+    return () => {
+      window.removeEventListener('cs:post-deleted', refreshSearch);
+      window.removeEventListener('cs:post-restored', refreshSearch);
+    };
+  }, [search, setResult]);
+
+  useEffect(() => {
     if (!search.trim()) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
@@ -87,7 +103,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
         });
         const body = await response.json() as BacklogResult;
         if (!response.ok || !body.ok) throw new Error('search_failed');
-        setResult({ key: queryKey, data: body });
+        if (!controller.signal.aborted) setResult({ key: queryKey, data: body });
       } catch {
         if (!controller.signal.aborted) setError(true);
       } finally {
@@ -108,7 +124,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     const position = adjacentPosition(ids, id, direction, active.page, active.totalPages);
     if (!position) throw new Error('This post is no longer in the current results. Close it and reopen a post from the list.');
     if (position.id) return { id: position.id, page: position.page };
-    const requestedKey = JSON.stringify([search, position.page, filtersKey]);
+    const requestedKey = JSON.stringify([search, position.page, filtersKey, retry]);
     const controller = new AbortController();
     pageRequests.current.add(controller);
     let next: BacklogResult;
@@ -132,7 +148,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     setResult({ key: requestedKey, data: next });
     if (search.trim()) setSearchPage(next.page);
     return { id: target.value.libraryId, page: next.page };
-  }, [usable, active, search, filtersKey, source, platform, pesto, status, sort, dir, group, queryKey, setResult, setSearchPage]);
+  }, [usable, active, search, filtersKey, retry, source, platform, pesto, status, sort, dir, group, queryKey, setResult, setSearchPage]);
 
   useEffect(() => {
     if (!usable) { setNavigation(null); return; }

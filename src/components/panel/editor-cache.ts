@@ -24,6 +24,7 @@ export async function fetchEditor(libraryId: string, signal?: AbortSignal): Prom
 
 const TTL_MS = 60_000;
 const cache = new Map<string, { at: number; promise: Promise<EditorLoad> }>();
+export function invalidateEditor(libraryId: string) { cache.delete(libraryId); }
 
 /** Starts loading a post's editor in the background. Failures are dropped; the real open retries. */
 export function prefetchEditor(libraryId: string): void {

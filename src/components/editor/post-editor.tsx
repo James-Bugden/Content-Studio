@@ -4,13 +4,16 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import type { StepResult } from '@/domain/mutation';
 import type { EditorModel } from '@/domain/views';
 import { newOperationId, postJson } from '@/lib/client/api';
-import { clearRecovery, readRecovery, writeRecovery } from '@/lib/client/recovery';
+import { clearRecovery, readRecovery, writeRecovery, type RecoveryEntry } from '@/lib/client/recovery';
 import { buttonClass } from '../button-styles';
 import { ConflictDialog } from '../conflict-dialog';
 import { FormatToolbar } from './format-toolbar';
 import { InlineResult } from '../inline-result';
 import { RecoveryPanel } from '../recovery-panel';
 import { useDirtyGuard } from '../use-dirty-guard';
+import { fingerprint } from '@/domain/hash';
+import { savedSelection as selectionFromSaved, type SaveSelection, type PostProperties } from '@/domain/post-versions';
+import type { MutationResult } from '@/domain/mutation';
 
 /**
  * Protected Post Editor (CS-008).
@@ -60,6 +63,9 @@ function markdownFailure(model: Extract<EditorModel['markdown'], { state: 'unava
 }
 
 export type PostEditorProps = {
+  selection?: SaveSelection;
+  onSelectionChange?: (value: SaveSelection) => void;
+  saveAsControl?: React.ReactNode;
   model: EditorModel;
   canEdit: boolean;
   ns: string;
@@ -78,7 +84,7 @@ const subscribeHydration = () => () => {};
 const clientHydrated = () => true;
 const serverHydrated = () => false;
 
-export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false }: PostEditorProps) {
+export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false, selection, saveAsControl, onSelectionChange }: PostEditorProps) {
   // SSR copy is readable immediately, but input must wait until React owns the
   // textarea. Otherwise hydration can reset a selection during a fill/keystroke.
   const contentStore = model.contentProvider === 'db' ? 'database' : 'Sheet';
@@ -97,27 +103,31 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
   const [sectionHash, setSectionHash] = useState(model.markdown.state === 'ok' ? model.markdown.sectionHash : '');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const notifySaved = useRef(false);
-  const [restored, setRestored] = useState<string | null>(null);
+  const [restored, setRestored] = useState<RecoveryEntry | null>(null);
   const opRef = useRef<{ id: string; text: string } | null>(null);
   const [mismatch, setMismatch] = useState(model.mismatch);
-  const dirty = text !== base;
+  const selectionKey = JSON.stringify(selection);
+  const [savedSelection, setSavedSelection] = useState(selectionKey);
+  const [versionsSaved, setVersionsSaved] = useState(Boolean(model.versions?.length));
+  const dirty = text !== base || savedSelection !== selectionKey;
+  const invalidSelection = selection && (selection.platforms.length === 0 || selection.includeChinese && !selection.chinese || Boolean(selection.chinese && (selection.chinese.source !== text || !selection.chinese.content.trim())));
   useDirtyGuard(dirty);
 
   // Offer tab-local recovery once, never silently replacing the loaded text.
   useEffect(() => {
     // Deferred: sessionStorage exists only in the browser, after hydration.
     const saved = readRecovery(ns, model.libraryId);
-    if (saved && saved.text !== initialBase) queueMicrotask(() => setRestored(saved.text));
+    if (saved && (saved.text !== initialBase || saved.selection && JSON.stringify(saved.selection) !== selectionKey)) queueMicrotask(() => setRestored(saved));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!dirty) return;
     const t = setTimeout(() => {
-      writeRecovery(ns, { libraryId: model.libraryId, text, base, sheetRevision, sectionHash, savedAt: Date.now() });
+      writeRecovery(ns, { libraryId: model.libraryId, text, base, sheetRevision, sectionHash, selection, savedAt: Date.now() });
     }, 400);
     return () => clearTimeout(t);
-  }, [dirty, text, base, sheetRevision, sectionHash, ns, model.libraryId]);
+  }, [dirty, text, base, sheetRevision, sectionHash, ns, model.libraryId, selection]);
 
   const markdownOk = model.markdown.state === 'ok';
 
@@ -152,10 +162,21 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
   /** Runs one save and reports whether it completed; every outcome also sets `status`. */
   async function attemptSave(): Promise<boolean> {
     // Same operation id for a retry of the same text; a new one if the text changed.
-    const op = opRef.current && opRef.current.text === text ? opRef.current : { id: newOperationId('draft'), text };
+    const identity = JSON.stringify([text, selection]);
+    const op = opRef.current && opRef.current.text === identity ? opRef.current : { id: newOperationId('draft'), text: identity };
     opRef.current = op;
     setStatus({ kind: 'saving' });
-    const res = await postJson<SaveResponse>(`/api/library/${encodeURIComponent(model.libraryId)}/draft`, {
+    const res = selection ? await (async () => {
+      const result = await postJson<MutationResult<PostProperties>>(`/api/library/${encodeURIComponent(model.libraryId)}/versions`, {
+        operationId: op.id, expectedRevision: sheetRevision, proposed: text, platforms: selection.platforms, chinese: selection.chinese,
+      });
+      if (result.body.ok) return { ...result, body: { ...result.body, value: { record: { revision: result.body.value.revision }, sectionHash: fingerprint(text), driveRevision: '' } } as SaveResponse };
+      if (result.body.code === 'STALE_READ') {
+        const fresh = await refreshRevisions();
+        if (fresh) return { ...result, body: { ...result.body, conflict: { provider: 'db', current: fresh.sheet.draft } } as SaveResponse };
+      }
+      return { ...result, body: result.body as SaveResponse };
+    })() : await postJson<SaveResponse>(`/api/library/${encodeURIComponent(model.libraryId)}/draft`, {
       operationId: op.id,
       expectedSheetRevision: sheetRevision,
       expectedSectionHash: sectionHash,
@@ -165,6 +186,8 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
     if (body.ok) {
       opRef.current = null;
       setBase(text);
+      setSavedSelection(selectionKey);
+      if (selection) setVersionsSaved(true);
       setSheetRevision(body.value.record.revision);
       setSectionHash(body.value.sectionHash);
       clearRecovery(ns, model.libraryId);
@@ -224,6 +247,12 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
     setSectionHash(fresh.markdown.sectionHash);
     setBase(fresh.markdown.body);
     setText(fresh.markdown.body);
+    if (selection) {
+      const currentSelection = selectionFromSaved(fresh.versions, fresh.targetPlatform);
+      onSelectionChange?.(currentSelection);
+      setSavedSelection(JSON.stringify(currentSelection));
+      setVersionsSaved(Boolean(fresh.versions?.length));
+    }
     clearRecovery(ns, model.libraryId);
     setStatus({ kind: 'idle' });
   }
@@ -255,7 +284,8 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
             type="button"
             className="underline"
             onClick={() => {
-              setText(restored);
+              setText(restored.text);
+              if (restored.selection) onSelectionChange?.(restored.selection);
               setRestored(null);
             }}
           >
@@ -284,7 +314,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
       ) : null}
 
       <label htmlFor={textId} className="text-sm font-medium">
-        Post copy <span className="font-normal text-ink-soft">(exact text; line breaks and spacing are kept as typed)</span>
+        Post copy <span className="font-normal text-ink-soft">· English</span>
       </label>
       <FormatToolbar
         textarea={textareaRef}
@@ -307,8 +337,8 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         readOnly={!canEdit || !hydrated}
         spellCheck
         lang="en-GB"
-        rows={Math.min(24, Math.max(8, text.split('\n').length + 2))}
-        className="copy w-full rounded-md border border-line bg-card p-3 font-sans text-base leading-relaxed"
+        rows={12}
+        className="copy w-full resize-y rounded-md border border-line bg-card p-4 font-sans text-base leading-[1.65]"
       />
       <p className="text-xs text-ink-soft" aria-live="polite">
         {dirty ? 'Unsaved changes, kept in this tab until you save' : 'Matches the saved version'}
@@ -323,12 +353,14 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         <RecoveryPanel operationId={status.operationId} steps={status.steps.map((s) => ({ step: s.step, status: s.status, provider: s.provider }))} onRetry={() => void save()} />
       ) : null}
 
+      {saveAsControl}
+
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
-          <button type="button" data-shortcut="save-draft" aria-keyshortcuts="Control+S Meta+S" className={buttonClass('primary')} disabled={!markdownOk || (!dirty && !mismatch) || status.kind === 'saving'} onClick={() => void save()}>
+          <button type="button" data-shortcut="save-draft" aria-keyshortcuts="Control+S Meta+S" className={buttonClass('primary')} disabled={!markdownOk || Boolean(invalidSelection) || (!dirty && !mismatch && !(selection && !versionsSaved)) || status.kind === 'saving'} onClick={() => void save()}>
             {status.kind === 'saving' ? 'Saving…' : !dirty && mismatch ? `Make the ${contentStore} match the Markdown` : 'Save draft'}
           </button>
-          <button type="button" className={buttonClass()} disabled={!dirty || status.kind === 'saving'} onClick={() => setText(base)}>
+          <button type="button" className={buttonClass()} disabled={!dirty || status.kind === 'saving'} onClick={() => { setText(base); clearRecovery(ns, model.libraryId); if (savedSelection) onSelectionChange?.(JSON.parse(savedSelection) as SaveSelection); }}>
             Undo changes
           </button>
           <button type="button" className={buttonClass()} onClick={copyText}>
@@ -347,7 +379,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
           open
           onClose={() => setStatus({ kind: 'idle' })}
           title={status.provider === 'drive' ? 'The Markdown section changed after you opened it' : status.provider === 'db' ? 'The database row changed after you opened it' : 'The Sheet row changed after you opened it'}
-          description="Nothing was overwritten. Compare the three versions, then choose. Your edit stays in this tab either way."
+          description={selection ? 'Nothing was overwritten. Platform selections or Chinese copy may also have changed. Use the current version to load those saved versions, or keep your English and platform versions to review again.' : 'Nothing was overwritten. Compare the three versions, then choose. Your edit stays in this tab either way.'}
           base={base}
           current={status.current}
           proposed={text}

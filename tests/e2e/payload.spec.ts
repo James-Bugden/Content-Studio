@@ -47,9 +47,22 @@ test('long draft bodies stay out of documents and search responses and load on o
   const result = await response.json();
   expect(result.total).toBe(1);
   expect(JSON.stringify(result)).not.toContain('EXACT_SYNTHETIC_TAIL');
+  expect(result.rows[0].value.draftContent.length).toBeLessThanOrEqual(220);
+  const editorRequests: string[] = [];
+  page.on('request', request => {
+    if (request.url().endsWith('/api/library/SYN-L001/editor')) editorRequests.push(request.url());
+  });
   await page.goto('/backlog');
+  const row = page.locator('[data-backlog-id="SYN-L001"]:visible');
+  await expect(row).toContainText('Synthetic long draft.');
+  await expect(row).not.toContainText('EXACT_SYNTHETIC_TAIL');
+  const excerpt = row.locator('p').filter({ hasText: 'Synthetic long draft.' });
+  await expect(excerpt).toHaveCSS('-webkit-line-clamp', '2');
+  const showFull = row.getByRole('link', { name: 'Show full post', exact: true });
+  expect((await showFull.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(editorRequests).toEqual([]);
   const opened = page.waitForResponse(response => response.url().endsWith('/api/library/SYN-L001/editor'));
-  await page.locator('[data-backlog-id="SYN-L001"]:visible').getByRole('link', { name: 'Show full post', exact: true }).click();
+  await showFull.click();
   expect((await (await opened).json()).model.sheet.draft).toBe(body);
   await expect(page.getByRole('dialog').getByRole('textbox', { name: /Post copy/ })).toBeVisible();
   if (db) await expect(page.getByRole('dialog').getByRole('textbox', { name: /Post copy/ })).toHaveValue(body);

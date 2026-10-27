@@ -11,7 +11,9 @@ const columns = (headers: Record<string, string>, extra: string[]) => [
   ...Object.keys(headers).map(field => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`)),
   'row_version', 'source_sheet_row', 'sheet_revision', 'passthrough', 'image_file_url', ...extra,
 ].join(',');
-const POST_COLUMNS = columns(LIBRARY_HEADERS, ['collection', 'source_markdown_url', 'source_master_file_url']);
+// Tombstones are required by repository filtering even though version bodies
+// and the rest of the storage metadata stay out of inventory reads.
+const POST_COLUMNS = columns(LIBRARY_HEADERS, ['collection', 'source_markdown_url', 'source_master_file_url', 'deleted_at']);
 const SCHEDULE_COLUMNS = columns(SCHEDULE_HEADERS, ['final_synced_hash', 'source_link_url']);
 
 export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number; readOnly?: boolean;

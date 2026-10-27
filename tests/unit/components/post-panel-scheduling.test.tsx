@@ -12,7 +12,9 @@ const slots = [
 const data = {
   summary: { title: 'Synthetic approved post', platform: 'LinkedIn', reviewStatus: 'Approved', thumb: null, scheduledAs: [], step: { kind: 'schedule', action: 'Schedule', why: 'Ready', urgency: 'next' } },
   card: { reviewStatus: 'Approved', gates: { blockers: [], warnings: [] } },
-  model: { markdown: { state: 'unavailable' }, sheet: { draft: 'Synthetic draft.' } },
+  model: { libraryId: 'SYN-L005', slug: 'Synthetic approved post', source: 'Synthetic', targetPlatform: 'LinkedIn', reviewStatus: 'Approved',
+    markdown: { state: 'unavailable', code: 'NOT_FOUND', reason: 'no_link' }, sheet: { draft: 'Synthetic draft.', hook: '', revision: 'a'.repeat(16) },
+    pesto: '', pestoOptions: [], hookAlternatives: '', mismatch: false, visual: 'Text only', gates: { status: 'ready', blockers: [], warnings: [], next: null } },
   ns: 'synthetic', canEdit: true, slotOptions: slots,
 };
 const response = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });

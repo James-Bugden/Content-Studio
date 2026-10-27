@@ -26,6 +26,7 @@ import { PlatformSelectCell } from './platform-select-cell';
  * rows on phones. Both carry `data-library-id` so tests can address either.
  */
 export type BacklogRow = {
+  preview?: string;
   libraryId: string;
   revision: string;
   hook: string;
@@ -281,6 +282,7 @@ export function BacklogGroupTable({
                     maxLength={500}
                     onSave={(next) => saveHook(item.libraryId, next)}
                   />
+                  {item.preview ? <p className="line-clamp-2 whitespace-normal break-words py-1 text-xs leading-relaxed text-ink-soft">{item.preview}</p> : null}
                 </td>
                 <td className={`${cell} text-xs whitespace-nowrap`}>{approvedCell(item.libraryId)}</td>
                 <td className={`${cell} w-56`}>{nextAction(item.libraryId)}</td>
@@ -336,6 +338,7 @@ export function BacklogGroupTable({
               onSave={(next) => saveHook(item.libraryId, next)}
             />
             <p className="text-xs">{approvedCell(item.libraryId)}</p>
+            {item.preview ? <p className="line-clamp-2 whitespace-normal break-words text-sm leading-relaxed text-ink-soft">{item.preview}</p> : null}
             <div>{nextAction(item.libraryId, 'md')}</div>
           </li>
         ))}

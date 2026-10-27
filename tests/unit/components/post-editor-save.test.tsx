@@ -2,6 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
+import { useState } from 'react';
+import type { SaveSelection } from '@/domain/post-versions';
 import { PostEditor } from '@/components/editor/post-editor';
 import { isAnyDirty, resetDirtyStoreForTests } from '@/components/dirty-store';
 import type { EditorModel } from '@/domain/views';
@@ -43,6 +45,26 @@ afterEach(() => {
 });
 
 describe('PostEditor save notification (CS-050)', () => {
+  it('Use current version adopts the saved platforms and Chinese as well as English after a conflict', async () => {
+    const currentText = 'Current synthetic English';
+    const currentModel = { ...model, contentProvider: 'db' as const, sheet: { ...model.sheet, revision: 'current-rev', draft: currentText },
+      markdown: { ...model.markdown, state: 'ok' as const, body: currentText, sectionHash: 'current-hash', fileRevision: '', modifiedTime: '', headingLine: '' },
+      versions: [{ platform: 'LinkedIn' as const, english: currentText, chinese: '目前的中文。', sourceHash: 'a'.repeat(16) }] };
+    vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('/versions')
+      ? Response.json({ ok: false, code: 'STALE_READ' }, { status: 409 })
+      : Response.json({ ok: true, model: currentModel })));
+    function Demo() {
+      const [selection, setSelection] = useState<SaveSelection>({ platforms: ['X'] });
+      return <><PostEditor model={{ ...model, contentProvider: 'db' }} selection={selection} onSelectionChange={setSelection} canEdit ns="synthetic" /><output data-testid="selection">{JSON.stringify(selection)}</output></>;
+    }
+    render(<Demo />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'My older tab edit' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save draft' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Use the current version' })); });
+    expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe(currentText);
+    expect(JSON.parse(screen.getByTestId('selection').textContent!)).toEqual({ platforms: ['LinkedIn'], chinese: { source: currentText, content: '目前的中文。' } });
+    expect(isAnyDirty()).toBe(false);
+  });
   it('names database save outcomes in database mode', async () => {
     const complete = pendingSave();
     render(<PostEditor model={{ ...model, contentProvider: 'db' }} canEdit ns="synthetic" />);

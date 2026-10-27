@@ -29,6 +29,8 @@ export type QueueIdeaCreate = {
 };
 
 export interface ContentRepository {
+  postProperties?(id: string): Promise<import('@/domain/post-versions').PostProperties>;
+  updatePostProperties?(m: MutationEnvelope<{ libraryId: string }, import('@/domain/post-versions').PostPropertiesPatch>): Promise<MutationResult<import('@/domain/post-versions').PostProperties>>;
   capability(): Capability;
   draftBodyAuthority?(): 'db';
   /** Write authority can differ from the read provider during Phase C. */

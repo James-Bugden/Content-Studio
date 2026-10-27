@@ -60,6 +60,8 @@ export type ReviewQueue = {
 };
 
 export type EditorModel = {
+  thumb?: Thumb;
+  versions?: import('./post-versions').PostVersion[];
   contentProvider?: 'sheet' | 'db';
   refreshPending?: boolean;
   libraryId: string;

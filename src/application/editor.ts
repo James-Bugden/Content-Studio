@@ -9,6 +9,7 @@ import { readSection } from './markdown-source';
 import type { ContentRepository, DriveGateway } from './ports';
 import { screenshotUses } from './review';
 import { AppError } from '@/domain/errors';
+import { thumbFor } from '@/domain/next-steps';
 
 /**
  * Editor view model (CS-008). Loads the authoritative Library row and its
@@ -35,6 +36,8 @@ export async function loadEditor(repo: ContentRepository, drive: DriveGateway, l
     screenshotUses: schedule === null && item.visual.source.kind === 'screenshot' ? null : screenshotUses(item, library, schedule ?? []),
   });
   return {
+    thumb: thumbFor(libraryId, item),
+    ...(repo.postProperties ? { versions: (await repo.postProperties(libraryId)).versions } : {}),
     refreshPending: repo.pendingRefresh?.('library', item.libraryId) ?? false,
     contentProvider: repo.mutationProvider?.() ?? (repo.capability().provider === 'db' ? 'db' : 'sheet'),
     libraryId: item.libraryId,

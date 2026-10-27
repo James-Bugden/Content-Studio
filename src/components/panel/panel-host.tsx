@@ -58,6 +58,21 @@ export function PanelHost({ readOnly = false }: { readOnly?: boolean }) {
   const open = Boolean(post || slot || queue) && !(pathname === '/backlog' && readOnly);
 
   useEffect(() => {
+    const onDeleted = () => {
+      navigationEpoch.current++;
+      const next = new URLSearchParams(window.location.search);
+      next.delete('post');
+      window.history.replaceState(null, '', `${pathname}${next.size ? `?${next}` : ''}`);
+      ref.current?.close();
+      refreshTotals();
+      router.refresh();
+    };
+    window.addEventListener('cs:post-deleted', onDeleted);
+    window.addEventListener('cs:post-restored', refreshTotals);
+    return () => { window.removeEventListener('cs:post-deleted', onDeleted); window.removeEventListener('cs:post-restored', refreshTotals); };
+  }, [pathname, refreshTotals, router]);
+
+  useEffect(() => {
     if (pathname === '/backlog' && params.get('view') !== 'ideas') return;
     setSearch('');
     setSearchPage(1);
@@ -204,7 +219,7 @@ export function PanelHost({ readOnly = false }: { readOnly?: boolean }) {
         onClick={(e) => {
           if (e.target === e.currentTarget) close();
         }}
-        className="m-0 ml-auto h-dvh max-h-none w-full max-w-none bg-paper p-0 text-ink backdrop:bg-ink/40 sm:w-[min(44rem,100vw)]"
+        className={`m-0 ml-auto h-dvh max-h-none w-full max-w-none bg-white p-0 text-ink backdrop:bg-ink/30 ${post ? 'sm:w-[min(70rem,calc(100vw-4rem))]' : 'sm:w-[min(44rem,100vw)]'}`}
       >
         {open ? (
           <div className="flex h-full flex-col">
