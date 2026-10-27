@@ -52,7 +52,18 @@ export class SupabaseContentRepository implements ContentRepository {
     assertContentSchemaVersion(await this.db.schemaVersion());
     return { ok: true, tabs: [] };
   }
-  private async checked<T>(read: () => Promise<T>): Promise<T> { await this.schema(); return read(); }
+  private async checked<T>(read: () => Promise<T>): Promise<T> {
+    const [, result] = await Promise.all([this.readSchema(), read()]);
+    return result;
+  }
+  private schemaRead?: { until: number; pending: Promise<unknown> };
+  private readSchema() {
+    if (this.schemaRead && this.schemaRead.until > Date.now()) return this.schemaRead.pending;
+    const entry = { until: Date.now() + 3_000, pending: this.schema() };
+    this.schemaRead = entry;
+    entry.pending.catch(() => { if (this.schemaRead === entry) this.schemaRead = undefined; });
+    return entry.pending;
+  }
   private revision(row: ContentPostRow | ContentScheduleRow, table: string, id: string) {
     if (this.revisionMode === 'db-read') {
       if (!row.sheet_revision || !/^[0-9a-f]{16}$/.test(row.sheet_revision)) throw new AppError('SCHEMA_DRIFT', { kind: 'sheet_revision' });

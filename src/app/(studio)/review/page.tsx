@@ -38,8 +38,9 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const { repo } = getServices();
 
   let queue: ReviewQueue;
+  let summary: QueueSummaryRow[] | null;
   try {
-    queue = await loadReviewQueue(repo, filters);
+    [queue, summary] = await Promise.all([loadReviewQueue(repo, filters), repo.queueSummary().catch(() => null)]);
   } catch (error) {
     return (
       <>
@@ -47,12 +48,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
-  }
-  let summary: QueueSummaryRow[] | null = null;
-  try {
-    summary = await repo.queueSummary();
-  } catch {
-    summary = null;
   }
 
   const lane = filters.lane ?? 'all';

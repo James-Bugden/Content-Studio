@@ -102,13 +102,18 @@ it.each(['epoch','gate-type','reason-array','false-empty','age-null','age-large'
   if(fault==='backup') input.waivers.backup=null as never;
   fetcher.mockResolvedValueOnce(Response.json(input)); const res=await GET(request()); expect(res.status).toBe(500); expect(await res.text()).not.toContain('SYNTHETIC_COPY');
 });
-it.each(['sheet','db-shadow','db-read','db'])('reports effective local freeze in %s', async mode => {
+it.each(['sheet','db-shadow','db-read'])('reports effective local freeze in legacy %s', async mode => {
   vi.stubEnv('CS_CONTENT_STORE',mode); vi.stubEnv('CS_CONTENT_READ_ENABLED','true'); vi.stubEnv('CS_CONTENT_DB_ENABLED','true');
   vi.stubEnv('SUPABASE_READ_MODEL_SOURCE_KEY','synthetic_source'); vi.stubEnv('CS_BACKUP_GATE_WAIVED','2026-10-25');
   for (const flag of ['', 'false','true']) {
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED',flag); resetEnvCache(); const body=await (await GET(request())).json();
-    expect(body.status.writesDisabled).toBe(flag==='false'||mode==='db'&&flag!=='true');
+    expect(body.status.writesDisabled).toBe(flag==='false');
   }
+});
+it('refuses the retired cutover status in db mode without a gate request', async () => {
+  vi.stubEnv('CS_CONTENT_STORE','db'); vi.stubEnv('CS_CONTENT_DB_ENABLED','true'); resetEnvCache();
+  expect((await GET(request())).status).toBe(403);
+  expect(fetcher).not.toHaveBeenCalled();
 });
 it.each(['status','audited','build','hash'])('refuses malformed backup receipt %s', async fault => {
   const receipt={status:'backup_waived',waiver:{audited:true,build,auditHash:'a'.repeat(64)}};

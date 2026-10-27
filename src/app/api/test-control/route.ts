@@ -38,6 +38,7 @@ const typefullyAction = z.discriminatedUnion('type', [
 ]);
 
 const bodySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('store_stats') }),
   z.object({ kind: z.literal('clock'), today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/) }),
   z.object({ kind: z.literal('db_fail_next'), op: z.enum(['read', 'write']), code: z.enum(ERROR_CODES), times: z.number().int().min(1).max(10).optional() }),
   z.object({ kind: z.literal('db_external_edit'), collection: z.enum(['library', 'queue', 'schedule']), id: z.string().max(64), patch: z.record(z.string(), z.string().max(50_000)) }),
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
   }
   const fakes = getServices().fakes;
   if (!fakes) return new Response('Not found', { status: 404 });
+  if (body.kind === 'store_stats') return json({ sheetReads: fakes.sheet.reads, sheetWrites: fakes.sheet.writes.length });
   if (body.kind === 'clock') {
     process.env.CS_FAKE_TODAY = body.today;
     process.env.CS_FAKE_TIME = body.time;

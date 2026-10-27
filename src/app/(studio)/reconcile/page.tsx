@@ -21,6 +21,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function ReconcilePage() {
   const actor = await requireActor('viewer');
+  const databaseOnly = serverEnv().CS_CONTENT_STORE === 'db';
+  const sources = databaseOnly ? 'the database, Drive and Typefully' : 'the Sheet, Drive and Typefully';
   let report: ReconcileReport;
   try {
     const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport, liveCutover } = getServices();
@@ -29,9 +31,9 @@ export default async function ReconcilePage() {
   } catch (error) {
     return (
       <>
-        <PageHeader title="Fix issues" description="Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step." />
+        <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step.`} />
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
-        {actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked /> : null}
+        {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked /> : null}
       </>
     );
   }
@@ -40,11 +42,11 @@ export default async function ReconcilePage() {
 
   return (
     <>
-      <PageHeader title="Fix issues" description={`Everything that disagrees between the Sheet, Drive and Typefully, with the safe next step. Checked ${checked} Taipei.`} />
+      <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <CapabilityBanner capabilities={report.capabilities} />
-        {actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
-        <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
+        {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
+        {databaseOnly ? <p>Store mode: db. Database is the only content store.</p> : <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
           <p>Store mode: {serverEnv().CS_CONTENT_STORE}. {serverEnv().CS_CONTENT_STORE === 'db' ? 'Database is authoritative; Sheet is a one-way comparison export.' : 'Sheet remains authoritative.'}</p>
           {parity ? <>
@@ -64,7 +66,7 @@ export default async function ReconcilePage() {
             </details> : null}
             {actor.role === 'owner' ? <ContentImportButton /> : null}
           </> : <p>Typed import and shadow comparison are inactive. No parity measurements recorded.</p>}
-        </section>
+        </section>}
 
         {serverEnv().CS_CONTENT_STORE === 'db' && actor.role === 'owner' ? <MarkdownImport /> : null}
 

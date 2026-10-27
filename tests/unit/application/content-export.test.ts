@@ -465,9 +465,9 @@ describe('MIG-05/MIG-12 rollback and authority', () => {
     const fake = setup();
     expect(() => new ContentExporter({ ...fake.db, mode: 'live' } as never, fake.sheet, fake.exporter.journal)).toThrow();
   });
-  it('composition wires post-mutation/repair/backup only in fake db; write-disable flag is enforced', async () => {
+  it('legacy harness wires post-mutation/repair/backup; write-disable flag is enforced', async () => {
     let services = getServices(); expect(services.contentCutover).toBeDefined();
-    expect((await save(services.repo)).ok).toBe(true); expect((await repairContentExport()).exact).toBe(true);
+    expect((await save(services.repo)).ok).toBe(true); expect((await repairContentExport() as { exact: boolean }).exact).toBe(true);
     expect(await scheduledContentBackup()).toMatchObject({ status: 'verified' });
     expect(await scheduledContentBackup()).toMatchObject({ status: 'already_verified' });
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'false'); resetEnvCache(); resetServices(); services = getServices();
@@ -502,4 +502,10 @@ it('CS-059j: equals-only refusal gives value recovery without unrelated directio
   const facts = report.items.find(i => i.kind === 'export_mismatch' && i.stableIds.includes('SYN-L001'))!.facts.join(' ');
   expect(facts).toContain('Change authoritative value');
   expect(facts).not.toContain('Review the direction');
+});
+
+vi.mock('@/application/container', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/application/container')>();
+  const { legacyCutoverServices } = await import('../../support/legacy-cutover');
+  return { ...actual, getServices: () => legacyCutoverServices(actual.getServices()) };
 });

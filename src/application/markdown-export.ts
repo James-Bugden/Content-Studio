@@ -43,11 +43,14 @@ export class MarkdownExporter {
   }
   async status() {
     const jobs: { libraryId: string; since: number; code?: string; reason?: string; recovery?: 'restore_markdown_link' }[] = [];
-    for (const job of await this.store.pendingMarkdownExports()) {
+    const [pending, library, editedIds] = await Promise.all([this.store.pendingMarkdownExports(), this.repo.listLibrary(), this.store.markdownBodyEdits()]);
+    const byId = new Map(library.map(record => [record.value.libraryId, record]));
+    for (const job of pending) {
       let failure = this.failures.get(job.libraryId);
       let recovery: 'restore_markdown_link' | undefined;
       try {
-        const record = await this.repo.getLibrary(job.libraryId);
+        const record = byId.get(job.libraryId);
+        if (!record) throw new AppError('NOT_FOUND');
         const read = await readSection(this.drive, record);
         if (!read.ok && read.reason === 'no_link') recovery = 'restore_markdown_link';
         // Reconstruct named blockers after restart, without claiming a worker
@@ -57,8 +60,8 @@ export class MarkdownExporter {
       } catch { /* Keep any known failure; pending work never disappears. */ }
       jobs.push({ libraryId: job.libraryId, since: job.since, ...failure, ...(recovery ? { recovery } : {}) });
     }
-    const edited = new Set(await this.store.markdownBodyEdits());
-    for (const record of await this.repo.listLibrary()) if (edited.has(record.value.libraryId) && !markdownFileId(record) && !jobs.some(j => j.libraryId === record.value.libraryId)) {
+    const edited = new Set(editedIds);
+    for (const record of library) if (edited.has(record.value.libraryId) && !markdownFileId(record) && !jobs.some(j => j.libraryId === record.value.libraryId)) {
       jobs.push({ libraryId: record.value.libraryId, since: 0, code: 'NOT_FOUND', reason: 'markdown_missing', recovery: 'restore_markdown_link' });
     }
     return jobs;

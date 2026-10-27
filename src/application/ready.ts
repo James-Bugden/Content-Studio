@@ -62,13 +62,7 @@ export function evaluateReady(record: LibraryRecord, library: LibraryRecord[], s
 }
 
 export async function loadReadyQueue(repo: ContentRepository): Promise<ReadyQueue> {
-  const [queue, library] = await Promise.all([repo.listReadyQueue(), repo.listLibrary()]);
-  let schedule: ScheduleRecord[] | null = null;
-  try {
-    schedule = await repo.listSchedule();
-  } catch {
-    schedule = null;
-  }
+  const [queue, library, schedule] = await Promise.all([repo.listReadyQueue(), repo.listLibrary(), repo.listSchedule().catch(() => null)]);
   const byId = new Map(library.map((r) => [r.value.libraryId, r]));
   const items: ReadyItem[] = [];
   const orphans: string[] = [];

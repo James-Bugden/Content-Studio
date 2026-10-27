@@ -76,20 +76,17 @@ export function serverEnv(): ServerEnv {
     const names = invalid.filter(([, value, validator]) => value !== undefined && !validator.safeParse(value).success).map(([name]) => name);
     if (names.length) throw new Error(`Invalid environment for: ${names.join(', ')}`);
   }
-  // Synchronous configuration admission only. Durable measurements are checked
-  // by the live repository before every operation (env flags are not evidence).
+  // DB authority is an explicit owner configuration decision. Historical
+  // migration evidence is diagnostic only, never a serving dependency in db.
   if (parsed.data.CS_DATA_MODE === 'live' && (parsed.data.CS_CONTENT_STORE === 'db-read' && parsed.data.CS_CONTENT_READ_ENABLED !== 'true'
     || parsed.data.CS_CONTENT_STORE === 'db' && parsed.data.CS_CONTENT_DB_ENABLED !== 'true')) {
     throw new Error('CS_CONTENT_STORE database modes are not enabled for live data');
-  }
-  if (parsed.data.CS_DATA_MODE === 'live' && parsed.data.CS_CONTENT_STORE === 'db' && !parsed.data.CS_CONTENT_BACKUP_FOLDER_ID && !parsed.data.CS_BACKUP_GATE_WAIVED) {
-    throw new Error('Invalid environment for: CS_CONTENT_BACKUP_FOLDER_ID');
   }
   if (parsed.data.SUPABASE_READ_MODEL_MODE !== 'off' && parsed.data.CS_CONTENT_STORE !== 'db-shadow' || parsed.data.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(parsed.data.CS_CONTENT_STORE)) {
     const missing = [
       ['SUPABASE_READ_MODEL_URL', z.string().url().safeParse(parsed.data.SUPABASE_READ_MODEL_URL).success],
       ['SUPABASE_READ_MODEL_SERVICE_KEY', z.string().min(20).safeParse(parsed.data.SUPABASE_READ_MODEL_SERVICE_KEY).success],
-      ['SUPABASE_READ_MODEL_SOURCE_KEY', parsed.data.SUPABASE_READ_MODEL_SOURCE_KEY],
+      ['SUPABASE_READ_MODEL_SOURCE_KEY', parsed.data.CS_CONTENT_STORE === 'db' || parsed.data.SUPABASE_READ_MODEL_SOURCE_KEY],
     ]
       .filter(([, value]) => !value)
       .map(([name]) => name);
