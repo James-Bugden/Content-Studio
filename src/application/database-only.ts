@@ -7,7 +7,7 @@ import { databaseBodyRepository } from './markdown-export';
 export function databaseOnlyRepository(repo: ContentRepository, writable: boolean, ttlMs = 3_000): ContentRepository {
   const cache = new Map<PropertyKey, { until: number; pending: Promise<unknown> }>();
   const reads = new Set(['listLibrary', 'listQueue', 'listReadyQueue', 'listSchedule', 'queueSummary', 'workflowSettings', 'schema']);
-  const writes = new Set(['updateLibrary', 'updateQueue', 'updateSchedule', 'createQueueIdea']);
+  const writes = new Set(['updateLibrary', 'updateQueue', 'updateSchedule', 'createQueueIdea', 'updatePostProperties']);
   return databaseBodyRepository(new Proxy(repo, { get(target, key) {
     if (key === 'capability') return () => ({ ...target.capability(), state: writable ? 'ready' : 'read_only' });
     const method = Reflect.get(target, key);

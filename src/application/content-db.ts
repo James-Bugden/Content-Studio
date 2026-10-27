@@ -17,6 +17,8 @@ export type ContentRowMeta = {
   passthrough: Record<string, unknown>;
 };
 export type ContentPostRow = Columns<LibraryField> & ContentRowMeta & {
+  platform_versions?: import('@/domain/post-versions').PostVersion[];
+  deleted_at?: string | null;
   collection: ContentCollection;
   source_markdown_url: string;
   source_master_file_url: string;

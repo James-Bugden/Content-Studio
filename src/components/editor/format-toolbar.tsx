@@ -1,6 +1,6 @@
 'use client';
 
-import { cleanMarkdown, findMarkdown, platformLength, PLATFORM_LIMIT, toggleBold, toggleBullets, toggleItalic, toggleNumbers, toPlain } from '@/domain/format';
+import { cleanMarkdown, fewerLineBreaks, findMarkdown, platformLength, PLATFORM_LIMIT, toggleBold, toggleBullets, toggleItalic, toggleNumbers, toPlain } from '@/domain/format';
 
 /**
  * Formatting that the platforms actually display (UX redesign). X, LinkedIn and
@@ -71,6 +71,7 @@ export function FormatToolbar({ textarea, text, platform, disabled, onChange }: 
         <button type="button" className={btn} disabled={disabled} onClick={() => apply('selection', toPlain)} aria-label="Remove bold and italic from the selection">
           Clear style
         </button>
+        <button type="button" className={btn} disabled={disabled || fewerLineBreaks(text) === text} onClick={() => onChange(fewerLineBreaks(text))}>Fewer line breaks</button>
         <span className="ml-auto text-xs tabular-nums text-ink-soft">
           {length.toLocaleString('en-GB')}
           {limit ? ` / ${limit.toLocaleString('en-GB')}` : ''} characters

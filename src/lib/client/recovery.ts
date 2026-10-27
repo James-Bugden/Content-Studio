@@ -7,7 +7,10 @@
  * account in the same tab never sees another session's text. Bounded in size and
  * count; no tokens or source archives are stored, only the draft being edited.
  */
+import { saveSelectionSchema, type SaveSelection } from '@/domain/post-versions';
+
 export type RecoveryEntry = {
+  selection?: SaveSelection;
   libraryId: string;
   text: string;
   base: string;
@@ -39,7 +42,8 @@ export function readRecovery(ns: string, libraryId: string): RecoveryEntry | nul
     const raw = s.getItem(key(ns, libraryId));
     if (!raw) return null;
     const v = JSON.parse(raw) as RecoveryEntry;
-    return typeof v.text === 'string' && v.libraryId === libraryId ? v : null;
+    const selection = saveSelectionSchema.safeParse(v.selection);
+    return typeof v.text === 'string' && v.libraryId === libraryId ? { ...v, selection: selection.success ? selection.data : undefined } : null;
   } catch {
     return null;
   }

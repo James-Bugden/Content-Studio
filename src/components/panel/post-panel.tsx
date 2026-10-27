@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { isAnyDirty, subscribeDirty, serverSnapshot } from '../dirty-store';
 import { useRouter } from 'next/navigation';
 import { slotLabel } from '@/domain/slot-label';
 import type { PostPanelData } from '@/domain/board';
@@ -41,9 +42,10 @@ const DONE: Record<Transition, string> = {
 };
 
 export function PostPanel({ libraryId }: { libraryId: string }) {
+  const dirty = useSyncExternalStore(subscribeDirty, isAnyDirty, serverSnapshot);
   const router = useRouter();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('edit');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -103,6 +105,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
   const previewSlot = preview?.ok ? data.slotOptions.find((o) => o.contentId === preview.contentId) : undefined;
 
   async function transition(action: Transition) {
+    if (dirty) { setResult({ tone: 'warning', text: 'Save or undo the draft before changing its review status.' }); return; }
     setBusy(true);
     setResult(null);
     const res = await postJson<TransitionOutcome>('/api/review/transition', { operationId: newOperationId('review'), libraryId, expectedRevision: card.revision, action });
@@ -119,7 +122,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
     await refresh();
   }
 
-  const approvalBlocked = approvalBlockers(card.gates.blockers).length > 0;
+  const approvalBlocked = dirty || approvalBlockers(card.gates.blockers).length > 0;
   const draft = model.markdown.state === 'ok' ? model.markdown.body : model.sheet.draft;
 
   return (
@@ -247,7 +250,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
             role="tab"
             type="button"
             aria-selected={tab === t}
-            onClick={() => setTab(t)}
+            onClick={() => { if (dirty && tab === 'edit' && t !== 'edit') setResult({ tone: 'warning', text: 'Save or undo the draft before changing views.' }); else setTab(t); }}
             className={`min-h-11 px-3 text-sm ${tab === t ? 'border-b-2 border-ink font-semibold' : 'text-ink-soft hover:text-ink'}`}
           >
             {t === 'overview' ? 'Preview' : t === 'edit' ? 'Edit' : 'Details'}
@@ -269,7 +272,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
 
       {tab === 'edit' ? (
         <div role="tabpanel" aria-label="Edit">
-          <EditorWorkspace model={model} canEdit={canEdit} ns={data.ns} />
+          <EditorWorkspace key={model.sheet.revision} model={model} canEdit={canEdit} ns={data.ns} />
         </div>
       ) : null}
 

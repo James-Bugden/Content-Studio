@@ -11,8 +11,9 @@ import { TONES, type ResultTone } from './inline-result';
  * a decision or explains a failure belongs in an InlineResult or StateView next to
  * the thing it concerns, because toasts disappear. Messages must be content-free.
  */
-type Toast = { id: number; tone: ResultTone; message: string };
-type ToastApi = { notify: (message: string, tone?: ResultTone) => void };
+type ToastAction = { label: string; run: () => Promise<void>; durationMs?: number };
+type Toast = { id: number; tone: ResultTone; message: string; action?: ToastAction; busy?: boolean };
+type ToastApi = { notify: (message: string, tone?: ResultTone) => void; notifyAction: (message: string, action: ToastAction) => void };
 
 const ToastContext = createContext<ToastApi | null>(null);
 const TOAST_MS = 6000;
@@ -40,6 +41,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     },
     [dismiss],
   );
+  const notifyAction = useCallback((message: string, action: ToastAction) => {
+    const id = nextId.current++;
+    setToasts(all => [...all, { id, tone: 'success', message, action }]);
+    timers.current.set(id, setTimeout(() => dismiss(id), action.durationMs ?? 12_000));
+  }, [dismiss]);
+
+  async function runAction(toast: Toast) {
+    if (!toast.action || toast.busy) return;
+    const timer = timers.current.get(toast.id);
+    if (timer) clearTimeout(timer);
+    setToasts(all => all.map(t => t.id === toast.id ? { ...t, busy: true } : t));
+    try { await toast.action.run(); dismiss(toast.id); }
+    catch { setToasts(all => all.map(t => t.id === toast.id ? { ...t, action: { ...toast.action!, label: 'Retry Undo' }, busy: false, tone: 'error', message: 'Restore was not confirmed. Retry Undo or reload to check its state.' } : t)); }
+  }
 
   useEffect(() => {
     const pending = timers.current;
@@ -48,7 +63,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const api = useMemo(() => ({ notify }), [notify]);
+  const api = useMemo(() => ({ notify, notifyAction }), [notify, notifyAction]);
 
   return (
     <ToastContext.Provider value={api}>
@@ -70,6 +85,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 <span className="font-semibold">{t.label}: </span>
                 {toast.message}
               </p>
+              {toast.action ? <button type="button" disabled={toast.busy} onClick={() => void runAction(toast)} className="-my-2 min-h-11 px-2 text-sm font-semibold underline">{toast.busy ? 'Restoring…' : toast.action.label}</button> : null}
               <button type="button" onClick={() => dismiss(toast.id)} className="-my-1 rounded px-2 py-1 text-sm underline">
                 Dismiss
               </button>

@@ -6,6 +6,7 @@ import { parseHookAlternatives } from '@/domain/hook-alternatives';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { PillarTag } from '../pillar-tag';
 import { LibraryPestoField } from './library-pesto-field';
+import { PlatformLogo } from '../panel/platform-logo';
 
 function statusTone(status: BacklogReadiness): string {
   if (status.tone === 'good') return 'bg-green-soft text-green';
@@ -37,10 +38,10 @@ type Row = Pick<LibraryRecord, 'row' | 'value'> & { revision?: string };
 function PostContent({ text }: { text: string }) {
   if (!text.trim()) return <p className="mt-1 text-ink-soft">Open to read and edit the source post.</p>;
   const long = text.length > 280 || text.split('\n').length > 5;
-  if (!long) return <p className="mt-1 whitespace-pre-line break-words text-ink-soft">{text}</p>;
+  if (!long) return <p className="mt-1 line-clamp-2 whitespace-normal break-words leading-relaxed text-ink-soft">{text}</p>;
   return <details className="group mt-1">
     <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-      <span className="line-clamp-5 whitespace-pre-line break-words text-ink-soft group-open:hidden">{text}</span>
+      <span className="line-clamp-2 whitespace-normal break-words leading-relaxed text-ink-soft group-open:hidden">{text}</span>
       <span className="inline-flex min-h-9 items-center text-xs font-medium text-primary underline underline-offset-2"><span className="group-open:hidden">Show full post</span><span className="hidden group-open:inline">Show less</span></span>
     </summary>
     <p className="whitespace-pre-line break-words text-ink-soft">{text}</p>
@@ -95,10 +96,10 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
     <div role="region" aria-label="Content Library posts" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-card">
       {/* CS-054 widths: # fits four digits, Source and Hook Template read without
           clipping, and Hook Alternatives gets room for its formatted list. */}
-      <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[96rem]' : 'min-w-[68rem]'}`}>
+      <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[76rem]' : 'min-w-[60rem]'}`}>
         <colgroup>
-          <col className="w-16" /><col className="w-40" /><col className="w-24" />
-          <col className="w-32" />{showHooks ? <><col className="w-44" /><col className="w-72" /></> : null}
+          <col className="w-12" /><col className="w-32" /><col className="w-28" />
+          <col className="w-28" />{showHooks ? <><col className="w-32" /><col className="w-44" /></> : null}
           {/* Content takes whatever is left; the table's minimum keeps it at least ~24rem. */}
           <col /><col className="w-36" /><col className="w-24" />
         </colgroup>
@@ -129,7 +130,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                 <tr key={item.libraryId} data-backlog-id={item.libraryId} className="border-b border-line align-top last:border-0 hover:bg-paper">
                   <td className={`${cell} tabular-nums text-ink-soft`}>{record.row}</td>
                   <td className={`${cell} font-medium`}><span title={item.contentSource || 'Uncategorised'} className="line-clamp-2 break-words">{item.contentSource || 'Uncategorised'}</span></td>
-                  <td className={cell}>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</td>
+                  <td className={cell}><span className="inline-flex items-center gap-2">{item.targetPlatform.ok ? <><PlatformLogo platform={item.targetPlatform.value} />{item.targetPlatform.value}</> : '—'}</span></td>
                   <td className={cell}>{canEdit && !readOnly && record.revision
                     ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} />
                     : <PillarTag value={item.pesto} />}</td>

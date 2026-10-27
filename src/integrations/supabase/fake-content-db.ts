@@ -124,6 +124,13 @@ export class FakeContentDb implements ContentDb {
     }
     let row = this.row(kind, id);
     const before = structuredClone(row ?? null);
+    if (mode === 'patch' && kind === 'library' && row && (row as ContentPostRow).deleted_at
+      && (Object.keys(data).length !== 1 || data.deleted_at !== null || Date.now() - Date.parse((row as ContentPostRow).deleted_at!) > 30_000)) {
+      this.audit.push({ operation_id: operationId, actor_hash: write.actorHash, target_kind: kind, target_id: id, changed_fields: [],
+        before_hash: sha256(JSON.stringify(before)), after_hash: sha256(JSON.stringify(before)), outcome: 'not_found' });
+      return { ok: false, code: 'NOT_FOUND', steps: [{ state: 'not_found' }], revision: row.row_version };
+    }
+    if (mode === 'patch' && kind === 'library' && data.deleted_at) data.deleted_at = new Date().toISOString();
     if (mode === 'patch' && kind === 'library' && row && 'draft_content' in data && (row as ContentPostRow).draft_content !== data.draft_content && (row as ContentPostRow).review_status === 'Approved') {
       data.review_status = 'Not Reviewed';
     }

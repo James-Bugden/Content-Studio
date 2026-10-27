@@ -4,6 +4,7 @@ import type { ReviewCard } from '@/domain/views';
 import { OpenPanelLink } from '../panel/open-panel-link';
 import { PostThumb } from '../panel/post-thumb';
 import { StepButton } from '../panel/step-button';
+import { PlatformLogo } from '../panel/platform-logo';
 
 /**
  * Posts backlog (UX redesign, Calm Signal): one row per post with a marker for
@@ -78,11 +79,11 @@ export function BacklogTable({ cards }: { cards: ReviewCard[] }) {
                       <OpenPanelLink target={{ post: card.libraryId }} className="inline-flex min-h-9 items-center font-medium hover:underline hover:underline-offset-4">
                         {titleOf(card)}
                       </OpenPanelLink>
-                      {card.hook ? <p className="copy truncate text-xs text-ink-soft">{card.hook}</p> : null}
+                      {card.preview || card.hook ? <p className="line-clamp-2 whitespace-normal break-words pb-2 text-xs leading-relaxed text-ink-soft">{card.preview || card.hook}</p> : null}
                     </div>
                   </div>
                 </td>
-                <td className="px-2 py-2 text-xs font-medium whitespace-nowrap">{platformName(card.targetPlatform)}</td>
+                <td className="px-2 py-2 text-xs font-medium whitespace-nowrap"><span className="inline-flex items-center gap-2"><PlatformLogo platform={card.targetPlatform} />{platformName(card.targetPlatform)}</span></td>
                 {BACKLOG_COLUMNS.map((c) => (
                   <td key={c} className="max-w-40 px-2 py-2">
                     <StepPill pill={card.pills[c]} />
@@ -107,9 +108,10 @@ export function BacklogTable({ cards }: { cards: ReviewCard[] }) {
                 <OpenPanelLink target={{ post: card.libraryId }} className="inline-flex min-h-11 items-center font-semibold underline decoration-line underline-offset-4">
                   {titleOf(card)}
                 </OpenPanelLink>
-                <p className="text-xs text-ink-soft">{platformName(card.targetPlatform)}</p>
+                <p className="flex items-center gap-2 text-xs text-ink-soft"><PlatformLogo platform={card.targetPlatform} />{platformName(card.targetPlatform)}</p>
               </div>
             </div>
+            {card.preview || card.hook ? <p className="line-clamp-2 whitespace-normal break-words text-sm leading-relaxed text-ink-soft">{card.preview || card.hook}</p> : null}
             <ul aria-label="Steps" className="flex flex-wrap gap-1.5">
               {BACKLOG_COLUMNS.map((c) => (
                 <li key={c} className="max-w-full">

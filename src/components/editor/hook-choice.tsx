@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { parseHookAlternatives } from '@/domain/hook-alternatives';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
-import { StateView } from '../state-view';
 
 /**
  * Hook Alternatives and the chosen hook, under PESTO in the post editor (CS-056).
@@ -57,7 +56,7 @@ export function HookChoice({ libraryId, alternatives, currentHook, revision, can
   return (
     <section aria-labelledby={`hooks-${libraryId}`} className="flex flex-col gap-3">
       <h2 id={`hooks-${libraryId}`} className="text-sm font-semibold">Hook alternatives</h2>
-      {items.length === 0 ? <StateView kind="empty" title={`No alternatives in the ${contentStore} for this post.`} nextStep={null} /> : (
+      {items.length === 0 ? <p className="text-xs text-ink-soft">No saved alternatives.</p> : (
         <ol className="flex flex-col gap-2">
           {items.map((alt, i) => (
             <li key={i} className="flex items-start gap-3 rounded-md border border-line bg-card p-2.5">
