@@ -1,3 +1,8 @@
+> Owner decision 2026-10-27 (#234) supersedes the phased serving admission
+> described below. DB mode is the sole Content store and needs no historical
+> gate evidence. See [current operation](../ops/cutover.md). Legacy modes retain
+> this historical migration tooling; no production flip is recorded here.
+
 # Database migration design: Sheet authority to Postgres
 
 DB-10 (#198) preparation: the owner's 2026-10-25 instruction replaces calendar

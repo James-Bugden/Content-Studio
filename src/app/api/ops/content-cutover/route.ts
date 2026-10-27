@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   try {
     const env = serverEnv();
     const actor = await requireCutoverActor(request, env.CRON_SECRET);
+    if (env.CS_CONTENT_STORE === 'db' && !getServices().liveCutover) throw new AppError('FORBIDDEN', { reason: 'database_only' });
     if (new URL(request.url).search || request.headers.has('Content-Type') || request.body !== null) throw new AppError('VALIDATION_FAILED');
     // Keep the runner's response and provider reads identical. Only the owner
     // panel needs an import countdown; failure is unknown, never a green age.
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   try {
     const env = serverEnv();
     const actor = await requireCutoverActor(request, env.CRON_SECRET);
+    if (env.CS_CONTENT_STORE === 'db' && !getServices().liveCutover) throw new AppError('FORBIDDEN', { reason: 'database_only' });
     const body: unknown = await request.json();
     const parsed = operation.safeParse(body);
     if (!parsed.success) {

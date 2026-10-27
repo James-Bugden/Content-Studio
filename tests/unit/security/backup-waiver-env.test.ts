@@ -3,12 +3,12 @@ import { resetEnvCache, serverEnv } from '@/lib/env';
 import { getServices, resetServices } from '@/application/container';
 
 afterEach(() => { vi.unstubAllEnvs(); resetEnvCache(); resetServices(); });
-it('CS-066: live DB folder admission requires the exact optional waiver switch', () => {
+it('DB-only admission needs no backup folder or waiver; obsolete values remain validated', () => {
   for (const [key, value] of Object.entries({ CS_DATA_MODE: 'live', CS_CONTENT_STORE: 'db', CS_CONTENT_DB_ENABLED: 'true',
     CS_CONTENT_BACKUP_FOLDER_ID: '', SUPABASE_READ_MODEL_URL: 'https://synthetic.supabase.co',
     SUPABASE_READ_MODEL_SERVICE_KEY: 'synthetic-service-key-00000', SUPABASE_READ_MODEL_SOURCE_KEY: 'synthetic_source' })) vi.stubEnv(key, value);
   vi.stubEnv('CS_BACKUP_GATE_WAIVED', undefined);
-  expect(() => serverEnv()).toThrow('CS_CONTENT_BACKUP_FOLDER_ID');
+  expect(serverEnv().CS_CONTENT_STORE).toBe('db');
   vi.stubEnv('CS_BACKUP_GATE_WAIVED', 'wrong'); resetEnvCache();
   expect(() => serverEnv()).toThrow('CS_BACKUP_GATE_WAIVED');
   vi.stubEnv('CS_BACKUP_GATE_WAIVED', '2026-10-25'); resetEnvCache();

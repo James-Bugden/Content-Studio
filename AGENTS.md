@@ -13,19 +13,17 @@ isolated branch/worktree or managed isolated checkout.
 
 ## Sources of truth
 
-- Google Sheet: operational source of truth.
-- Drive: canonical Markdown/source assets.
+- Database (Supabase): sole Content store in `CS_CONTENT_STORE=db`.
+- Drive: canonical source assets and guarded Markdown import/export.
 - Typefully: final editing/publishing surface.
-- Supabase: later migration option, not an MVP dependency.
 
-Pending cutover: the Sheet authority is being replaced in phases by Postgres
-(Supabase) per `docs/implementation/database-migration.md`. Until a phase is
-flipped in production the list above stands; each flip updates this note.
-DB-6 export/backup/rollback code is exercised with fakes and PGlite only;
-cutover is still pending. DB-9 prepares live `db-shadow` only; Sheet remains
-authoritative. Live `db-read` and `db` remain explicitly refused until
-the owner/live gates in `docs/ops/database-write-cutover.md` are evidenced.
-Record a cutover date only after an actual production flip.
+Owner decision 2026-10-27 (#234): this is a personal tool, the Sheet is no
+longer used. DB mode requires `CS_CONTENT_DB_ENABLED=true` and the existing
+server-only database credentials. `CS_CONTENT_WRITE_ENABLED=false` explicitly
+freezes writes; omitted/true permits guarded writes. No activation epoch,
+parity freshness, backup/rehearsal evidence or waiver is required for serving.
+Legacy Sheet/shadow/read modes retain their historical migration tooling.
+No production flip is attested by this local implementation change.
 
 Do not create a parallel source of truth.
 

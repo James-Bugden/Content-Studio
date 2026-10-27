@@ -93,3 +93,9 @@ it('CS-059j: unreadable untouched legacy masters refuse rollback', async () => {
   await expect(s.contentCutover!.rollbackToSheet(flip)).rejects.toMatchObject({ code: 'CONFLICT', details: { reason: 'rollback_markdown_not_exact' } });
   expect(flip).not.toHaveBeenCalled(); expect(s.repo.capability().state).toBe('ready');
 });
+
+vi.mock('@/application/container', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/application/container')>();
+  const { legacyCutoverServices } = await import('../../support/legacy-cutover');
+  return { ...actual, getServices: () => legacyCutoverServices(actual.getServices()) };
+});

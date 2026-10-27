@@ -85,7 +85,7 @@ export async function requireMutation(request: Request): Promise<Actor> {
   assertSameOrigin(request);
   const actor = await requireActor('owner');
   const env = serverEnv(), path = new URL(request.url).pathname;
-  const frozen = env.CS_CONTENT_STORE === 'db' ? env.CS_CONTENT_WRITE_ENABLED !== 'true' : env.CS_CONTENT_WRITE_ENABLED === 'false';
+  const frozen = env.CS_CONTENT_WRITE_ENABLED === 'false';
   const maintenanceImport = path === '/api/ops/sheet-mirror' || path === '/api/ops/sheet-mirror/parity'
     || path === '/api/ops/content-cutover';
   const replies = path === '/api/replies' || path.startsWith('/api/replies/');
@@ -97,7 +97,7 @@ export async function requireMutation(request: Request): Promise<Actor> {
     && frozen && !maintenanceImport && !replies) {
     throw new AppError('FORBIDDEN', { reason: 'rollback_read_only' });
   }
-  if (env.CS_DATA_MODE === 'live' && ['db-read', 'db'].includes(env.CS_CONTENT_STORE) && !maintenanceImport && !replies) {
+  if (env.CS_DATA_MODE === 'live' && env.CS_CONTENT_STORE === 'db-read' && !maintenanceImport && !replies) {
     const { getServices } = await import('@/application/container');
     const status = await getServices().liveCutover!.status();
     if (status.blocking) throw new AppError('FORBIDDEN', { reason: status.blocking });

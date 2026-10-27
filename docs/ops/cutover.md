@@ -1,3 +1,36 @@
+# Database-only operation (owner decision 2026-10-27, #234)
+
+The owner permanently retired the Sheet for this personal tool. This decision
+supersedes the historical admission/backup/parity/activation requirements below
+for `CS_CONTENT_STORE=db`. The application reads and writes Content only in
+Supabase. Drive and Typefully retain their existing guarded integrations.
+
+Deploy the reviewed `20261027000100_content_database_only.sql` migration before
+the application: it removes historical epoch admission from the guarded SQL
+write RPCs while retaining service-role permissions, validation, idempotency,
+version checks, audit/history and the Markdown outbox. It neither imports data
+nor deletes data. Then configure `CS_DATA_MODE=live`, `CS_CONTENT_STORE=db`,
+`CS_CONTENT_DB_ENABLED=true` and the existing server-only database URL/key.
+`CS_CONTENT_READ_ENABLED`, a source alias, a build SHA, backup folders, waivers
+and recorded gate evidence are not required in db mode.
+`CS_CONTENT_WRITE_ENABLED=false` deliberately freezes writes; omitted or true
+permits them independently of the Google write flag. Google credentials remain
+needed only for Drive operations. Never put their values in source or logs.
+
+In db mode the switch panel is hidden and its operations are refused; imports,
+Sheet write-through, Sheet export and parity are not composed. The retained
+content-export cron repairs Drive only. The old live backup endpoint refuses
+without a configured backup adapter; Supabase backup administration remains
+outside the content-serving path. Display reads share a three-second per-instance
+cache; all point reads and SQL CAS checks stay fresh. Mutation attempts clear
+the display cache before and after execution, including failures.
+
+This is implementation guidance, not evidence of a production deployment or
+flag flip. No secrets, live configuration or production data were changed here.
+The rest of this document is historical tooling for the legacy modes.
+
+---
+
 # DB-10: measured live cutover in one coordinator session
 
 ## Owner terminal and coordinator responsibilities (CS-067)
