@@ -283,17 +283,11 @@ Use the Content Studio Vercel project with preview and production environments. 
 
 Do not dual-write Content records. The `content_studio_*` Supabase namespace is an optional read model only; Sheet writes remain authoritative. Reply tables are a separate authority for Replies and are never joined into Content snapshot tables. Any future Content authority cutover still requires parity reports, explicit approval, rollback and history export.
 
-**Pending cutover (2026-10-24, owner decision).** The Sheet authority above is being replaced in phases by a Postgres authority in the same Supabase project; the design, phase gates, thresholds and rollback are in `docs/implementation/database-migration.md`. Until a phase flips in production, the paragraph above and sections 2, 5 and 7 remain the operative contract. Each flipped phase updates this note with its date and store mode. Authority per phase is single and explicit: Sheet in `sheet`, `db-shadow` and `db-read`; database in `db`. **Bounded carve-out from the dual-write rule:** in `db-read` only, a successful Sheet write is followed in the same request by a copy of the Sheet read-back record into the database. The copy is derived data, is never compared against for a Sheet write, and a failed copy is marked `refresh_pending`. Imports repair representable rows; numeric/size refusals remain row-specific blocking items while other rows continue; no period has two authorities. In `db`, the Sheet receives a one-way, precondition-checked export that skips and flags any row changed in the Sheet since the last export rather than overwriting it.
+**Cut over on 2026-10-27 (owner decision).** The database (Supabase) is the sole Content store (`CS_CONTENT_STORE=db`, #234); the Sheet is no longer read or written. Where sections 2, 5 and 7 describe Sheet authority, they describe the historical contract and the migration tooling kept for reference in `docs/implementation/database-migration.md`.
 
 ## 12. Recommended execution order
 
-DB-6 status: **pending cutover**, local fake/PGlite implementation only. The
-runtime still defaults to `sheet` and refuses live database modes. No database
-or workbook was changed. Keep the authority table above operative until the
-Phase D gates in [the write-cutover runbook](ops/database-write-cutover.md) are
-met and the exact deployed flip is recorded; only then record "cut over on
-<date>". Supabase plan backups require explicit owner confirmation; the private
-history export is an additional safeguard, not proof of plan backups.
+DB-6 status: **cut over on 2026-10-27**. Production runs the database-only build; the Phase D evidence gates were waived by the owner (personal tool, no other users). Supabase plan backups remain the backup mechanism.
 
 1. Planning/foundation: [CS-001](https://github.com/James-Bugden/Content-Studio/issues/2) -> [CS-002](https://github.com/James-Bugden/Content-Studio/issues/3), then [CS-003](https://github.com/James-Bugden/Content-Studio/issues/4), [CS-004](https://github.com/James-Bugden/Content-Studio/issues/5), [CS-005](https://github.com/James-Bugden/Content-Studio/issues/6) and [CS-006](https://github.com/James-Bugden/Content-Studio/issues/7) behind the shared contracts.
 2. Core review slice: [CS-007](https://github.com/James-Bugden/Content-Studio/issues/8) -> [CS-008](https://github.com/James-Bugden/Content-Studio/issues/9) -> [CS-009](https://github.com/James-Bugden/Content-Studio/issues/10) -> [CS-010](https://github.com/James-Bugden/Content-Studio/issues/11) -> [CS-011](https://github.com/James-Bugden/Content-Studio/issues/12).
