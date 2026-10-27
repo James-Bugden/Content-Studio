@@ -72,7 +72,7 @@ test('a viewer sees the panel without actions', async ({ page }) => {
   await signInAs(page.request, 'viewer');
   await page.goto('/review?post=SYN-L001');
   const panel = page.getByRole('dialog');
-  await expect(panel.getByText('Read-only access.')).toBeVisible();
+  await expect(panel.getByText('Read-only access.').first()).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Approve and queue' })).toHaveCount(0);
 });
 

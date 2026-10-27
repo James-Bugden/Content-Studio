@@ -208,7 +208,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
   useImperativeHandle(handleRef, () => ({
     setRevision: (revision: string) => setSheetRevision(revision),
     replaceText: (next: string) => edit(next),
-    applyHook: (hook: string) => edit(placeHookInText(textRef.current, hook, savedHook).text, { hook: hook.trim() }),
+    applyHook: (hook: string) => edit(placeHookInText(textRef.current, hook, savedHook).text, { hook: hook.trim(), focus: true }),
   }));
 
   // Offer tab-local recovery once, never silently replacing the loaded text.
