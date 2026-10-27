@@ -7,8 +7,8 @@ import { errorResponse, json } from '@/lib/http';
 export const dynamic = 'force-dynamic';
 
 /**
- * Field edits on a Content Library post: PESTO (CS-054) and the chosen hook
- * (CS-056). Owner, same origin, validated body, expected revision and operation
+ * Field edits on a Content Library post: PESTO, chosen hook and human QA decisions.
+ * Owner, same origin, validated body, expected revision and operation
  * id, like every other guarded write. The post id in the path must match the body.
  */
 export async function POST(request: Request, ctx: { params: Promise<{ libraryId: string }> }) {

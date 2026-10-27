@@ -15,6 +15,13 @@ export type ReuseState = 'not_applicable' | 'clear' | 'other_platform' | 'same_p
 
 export type ReuseCheck = { state: ReuseState; uses: ScreenshotUse[]; message: string };
 
+/** Encoded inside the existing workflow note so user text cannot introduce approval stamps. */
+export function imageReason(note: string): string {
+  const encoded = /(?:^|\n)Image reason: ([^\n]*)/.exec(note)?.[1];
+  if (!encoded) return '';
+  try { return decodeURIComponent(encoded); } catch { return ''; }
+}
+
 /** VIS-05: same platform blocks; another platform is allowed with a note; an unreadable Schedule is uncertain and blocks. */
 export function reuseCheck(platform: Platform | null, uses: ScreenshotUse[] | null): ReuseCheck {
   if (uses === null) {
@@ -40,6 +47,7 @@ export function reuseCheck(platform: Platform | null, uses: ScreenshotUse[] | nu
 }
 
 export type VisualItemView = {
+  reason?: string;
   libraryId: string;
   /** Sheet row revision, the expected revision for the next write. */
   revision: string;

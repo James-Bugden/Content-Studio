@@ -15,6 +15,7 @@ const bodySchema = z.object({
   expectedSheetRevision: revisionSchema,
   expectedSectionHash: revisionSchema,
   generationDraftHash: revisionSchema,
+  sourceDraft: z.string().max(40_000).optional(),
   choice: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('current') }),
     z.object({ kind: z.literal('alternative'), index: z.number().int().min(0).max(2), alternative: z.unknown() }),

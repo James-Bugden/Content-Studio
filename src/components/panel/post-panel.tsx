@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { slotLabel } from '@/domain/slot-label';
 import type { PostPanelData } from '@/domain/board';
 import type { Gate } from '@/domain/gates';
-import { approvalBlockers } from '@/domain/approval';
 import type { ReviewCard } from '@/domain/views';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
@@ -91,7 +90,8 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
       setLoad({ state: 'error', message: body?.message ?? 'This post could not be loaded. Nothing was changed.' });
       return;
     }
-    setLoad({ state: 'ok', data: body.data });
+    const next = body.data;
+    setLoad(previous => ({ state: 'ok', data: previous.state === 'ok' && isAnyDirty() ? { ...next, model: previous.data.model } : next }));
   }, [libraryId]);
 
   useEffect(() => {
@@ -119,11 +119,10 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
       return;
     }
     const why = body.blockers?.map((b) => b.message).join(' ');
-    setResult({ tone: body.code === 'STALE_READ' ? 'warning' : 'error', text: body.code === 'STALE_READ' ? 'This post changed in the Sheet. The latest version is loaded; check it and try again.' : why || body.message || 'Not done. Nothing was written.' });
+    setResult({ tone: body.code === 'STALE_READ' ? 'warning' : 'error', text: body.code === 'STALE_READ' ? 'This post changed. The latest version is loaded; check it and try again.' : why || body.message || 'Not done. Nothing was written.' });
     await refresh();
   }
 
-  const approvalBlocked = dirty || approvalBlockers(card.gates.blockers).length > 0;
   const draft = model.markdown.state === 'ok' ? model.markdown.body : model.sheet.draft;
 
   return (
@@ -151,39 +150,15 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
         </p>
         {canEdit ? (
           <div className="mt-3 flex flex-wrap gap-2">
-            {step.kind === 'review' || step.kind === 'queue' ? (
-              <>
-                {step.kind === 'review' ? (
-                  <>
-                    <button type="button" className={buttonClass('approve')} disabled={busy || approvalBlocked} onClick={() => void transition('approve_and_queue')}>
-                      Approve and queue
-                    </button>
-                    <button type="button" className={buttonClass()} disabled={busy || approvalBlocked} onClick={() => void transition('approve')}>
-                      Approve only
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" className={buttonClass('primary')} disabled={busy} onClick={() => void transition('queue')}>
-                    Queue for scheduling
-                  </button>
-                )}
-                <button type="button" className={buttonClass()} disabled={busy} onClick={() => void transition('request_changes')}>
-                  Request changes
-                </button>
-                <button type="button" className={buttonClass()} disabled={busy} onClick={() => void transition('skip')}>
-                  Skip
-                </button>
-              </>
-            ) : null}
+            {step.kind === 'review' ? <button type="button" className={buttonClass()} disabled={busy || dirty} onClick={() => void transition('skip')}>Skip</button> : null}
+            {step.kind === 'queue' ? <button type="button" className={buttonClass('primary')} disabled={busy || dirty} onClick={() => void transition('queue')}>Queue for scheduling</button> : null}
             {step.kind === 'fix_copy' || step.kind === 'decide_duplicate' ? (
               <button type="button" className={buttonClass('primary')} onClick={() => setTab('edit')}>
                 Edit the post
               </button>
             ) : null}
             {['choose_image', 'finish_image', 'approve_image'].includes(step.kind) ? (
-              <GuardedLink href={`/visuals/${encodeURIComponent(libraryId)}`} className={buttonClass('primary')}>
-                Open the image studio
-              </GuardedLink>
+              <a href="#panel-image" className={buttonClass('primary')}>Edit image decision</a>
             ) : null}
             {card.reviewStatus === 'Skipped' || card.reviewStatus === 'Changes Requested' ? (
               <button type="button" className={buttonClass()} disabled={busy} onClick={() => void transition('reopen')}>
@@ -194,7 +169,6 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
         ) : (
           <p className="mt-2 text-xs text-ink-soft">Read-only access.</p>
         )}
-        {approvalBlocked && step.kind === 'review' ? <p className="mt-2 text-xs text-ink-soft">Approval opens once the blockers in Details are fixed.</p> : null}
         {result ? (
           <div className="mt-3">
             <InlineResult tone={result.tone}>{result.text}</InlineResult>
@@ -273,7 +247,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
 
       {tab === 'edit' ? (
         <div role="tabpanel" aria-label="Edit">
-          <EditorWorkspace key={model.sheet.revision} model={model} canEdit={canEdit} ns={data.ns} />
+          <EditorWorkspace key={model.sheet.revision} model={model} canEdit={canEdit} ns={data.ns} reviewActions inlineImage onSaved={() => { void refresh().then(() => setResult({ tone: 'success', text: model.contentProvider === 'db' ? 'Saved in the database. Drive export is queued.' : 'Saved to the master Markdown and mirrored to the Sheet.' })); }} onReviewed={(text) => { void refresh().then(() => setResult({ tone: 'success', text })); }} />
         </div>
       ) : null}
 

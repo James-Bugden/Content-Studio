@@ -7,6 +7,7 @@ import { generateHooks, HOOK_TASK, selectHook, type HookProposal, type SelectHoo
 import { readSection } from '@/application/markdown-source';
 import { findTemplate, formatHookAlternatives, hookProblems, normaliseHook, scoreTotal, type HookAlternative } from '@/domain/hook-frameworks';
 import { fingerprint } from '@/domain/hash';
+import { fewerLineBreaks } from '@/domain/format';
 import { findSection } from '@/domain/markdown';
 import type { Platform } from '@/domain/enums';
 import type { Actor } from '@/domain/mutation';
@@ -154,7 +155,7 @@ describe('HOOK-03: selection updates hook and opening together', () => {
       ['sheet', 'done'],
     ]);
     const md = findSection(drive.textOf(SYNTH_MASTER_FILE_ID), 'SYN-L001');
-    expect(md.ok && md.section.body).toBe(`${chosen.text}\n\nThe best candidates negotiate the scope first.\n\nScope decides the salary band.`);
+    expect(md.ok && md.section.body).toBe(`${chosen.text}\n\nThe best candidates negotiate the scope first. Scope decides the salary band.`);
     const row = (await repo.getLibrary('SYN-L001')).value;
     expect(row.currentHook).toBe(chosen.text);
     expect(row.draftContent).toBe(md.ok ? md.section.body : '');
@@ -180,6 +181,7 @@ describe('HOOK-03: selection updates hook and opening together', () => {
   it('a Sheet failure after the draft saved is PARTIAL_FAILURE, and a retry completes only the hook fields', async () => {
     const g = await generate('SYN-L001');
     const input = selection(g, pick(g, 0));
+    input.sourceDraft = (await load('SYN-L001')).section.body;
     // Draft saga: Sheet write 1 succeeds. Hook fields: Sheet write 2 fails.
     let writes = 0;
     sheet.beforeWrite = () => {
@@ -191,6 +193,7 @@ describe('HOOK-03: selection updates hook and opening together', () => {
     expect(first.steps.map((s) => s.status)).toEqual(['done', 'done', 'failed']);
     sheet.beforeWrite = null;
     const partial = (await repo.getLibrary('SYN-L001')).value;
+    expect(partial.draftContent).toBe(fewerLineBreaks(g.proposal.alternatives[0]!.text + input.sourceDraft.slice(g.record.value.currentHook.length)));
     expect(partial.draftContent.startsWith(g.proposal.alternatives[0]!.text)).toBe(true);
     expect(partial.currentHook).toBe('Most people negotiate the salary.');
 

@@ -59,6 +59,9 @@ export type ReviewQueue = {
 };
 
 export type EditorModel = {
+  visualItem?: import('./visual-studio').VisualItemView;
+  imageBrief?: string;
+  qa?: { copyright: string; duplicate: string };
   thumb?: Thumb;
   versions?: import('./post-versions').PostVersion[];
   contentProvider?: 'sheet' | 'db';

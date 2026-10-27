@@ -6,6 +6,7 @@ import { savePostVersions, changePostLifecycle, proposePostChinese } from '@/app
 import { FakeAiGateway } from '@/integrations/ai/fake-gateway';
 import { fingerprint } from '@/domain/hash';
 import { fewerLineBreaks } from '@/domain/format';
+import { savedSelection } from '@/domain/post-versions';
 
 const owner = { sub: 'synthetic-owner', role: 'owner' as const };
 const id = 'SYN-L001';
@@ -15,6 +16,25 @@ function setup(writable = true) {
 }
 
 describe('post version and lifecycle contract', () => {
+  it('compacts every saved platform draft while retaining the exact master and Chinese lineage', async () => {
+    const { repo } = setup();
+    const before = await repo.getLibrary(id);
+    const proposed = 'Hook.\n\nFirst.\n\nSecond.\n\nThird.';
+    const chinese = '開場。\n\n第一句。\n\n第二句。\n\n第三句。';
+    const result = await savePostVersions(repo, owner, id, { operationId: 'synthetic_compact', expectedRevision: before.revision, proposed, platforms: ['LinkedIn', 'Threads', 'X'], chinese: { source: proposed, content: chinese } });
+    expect(result.ok).toBe(true);
+    const properties = await repo.postProperties!(id);
+    expect(properties.versions).toHaveLength(3);
+    for (const version of properties.versions) {
+      expect(version.english).toBe('Hook.\n\nFirst. Second. Third.');
+      expect(version.chinese).toBe('開場。\n\n第一句。 第二句。 第三句。');
+      expect(version.sourceHash).toBe(fingerprint(proposed));
+    }
+    expect((await repo.getLibrary(id)).value.draftContent).toBe(proposed);
+    expect(savedSelection(properties.versions, 'LinkedIn', proposed).chinese?.source).toBe(proposed);
+    expect(savedSelection(properties.versions, 'LinkedIn', 'Changed source').chinese?.source).not.toBe('Changed source');
+    expect(savedSelection(properties.versions, 'LinkedIn', fewerLineBreaks(proposed)).chinese?.source).toBe('');
+  });
   it('saves only selected platform versions atomically with exact English and Chinese; retries replay', async () => {
     const { db, repo } = setup();
     const before = await repo.getLibrary(id);
