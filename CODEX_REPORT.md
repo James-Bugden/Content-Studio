@@ -1,5 +1,8 @@
 # Builder handoff: #237, stages 3–5
 
+Merge-fix round 1 now incorporates #235; current verification and integration
+fixes are recorded in [the merge report](docs/qa/pr237-merge-r1.md).
+
 Heavy / build / round 1. Branch: `feat/237-ui`. Base: `4a1fd99`.
 No push, GitHub writes, migration application, secret access or production changes.
 The supplied task brief is the implementation contract; the issue connector returned 404 for #237.
@@ -29,14 +32,15 @@ The supplied task brief is the implementation contract; the issue connector retu
 - Fewer line breaks is an explicit formatting action; ordinary saves never
   normalize copy. Empty drafts still save and do not grant release approval.
 
-## Migration — UNAPPLIED
+## Migration — applied in production per owner
 
 `supabase/migrations/20261027000200_post_versions_and_soft_delete.sql`
 
 Adds `platform_versions` and `deleted_at`, extends guarded writes, preserves
 service-only grants and rebuilds the derived Ready view to exclude tombstones.
-Apply through the normal migration process before enabling these actions live.
-No live database was inspected or changed. Rows and their history are retained.
+The owner confirmed during merge-fix round 1 that this existing migration is
+already applied to production. This fix adds no migration and inspects or changes
+no live database. Rows and their history are retained.
 
 ## Verification
 

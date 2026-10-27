@@ -66,7 +66,7 @@ describe('Backlog sort comparator', () => {
   it('sorts by computed status using the readiness label when one exists', async () => {
     const base = await template();
     const rows = [make(base, 2, { review: 'Approved' }), make(base, 3, { review: 'Skipped' }), make(base, 4, { review: 'Pending' })];
-    const statusOf = (r: LibraryRecord) => r.row === 4 ? 'Ready to schedule' : undefined;
+    const statusOf = (r: { row: number }) => r.row === 4 ? 'Ready to schedule' : undefined;
     expect(ids([...rows].sort((a, b) => compareBacklog(a, b, 'status', 'asc', statusOf)))).toEqual([2, 4, 3]);
     expect(ids([...rows].sort((a, b) => compareBacklog(a, b, 'status', 'desc', statusOf)))).toEqual([3, 4, 2]);
   });

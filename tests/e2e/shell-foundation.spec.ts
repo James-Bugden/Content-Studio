@@ -44,7 +44,6 @@ for (const width of [1280, 375, 500, 750, 800, 801]) {
     await expect(status).toContainText('Editing and saving are disabled until a fresh read succeeds.');
     await expect(page.getByRole('main').getByRole('region', { name: 'Integration status' })).toHaveCount(0);
     expect(await status.evaluate(el => el.previousElementSibling?.tagName)).toBe('HEADER');
-    await expect(page.getByRole('searchbox', { name: 'Search studio' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New post' })).toBeVisible();
     await expect(page.getByLabel('Account menu')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

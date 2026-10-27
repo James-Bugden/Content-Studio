@@ -11,10 +11,11 @@ import { FilterBar } from '@/components/filter-bar';
 import { SortDirectionToggle } from '@/components/backlog/sort-direction-toggle';
 import { PLATFORMS, type Platform } from '@/domain/enums';
 import { isAppError, type ErrorCode } from '@/domain/errors';
-import { libraryBacklogTotals, libraryBacklogView } from '@/domain/library-backlog';
+import { backlogListRow, libraryBacklogTotals, libraryBacklogView } from '@/domain/library-backlog';
 import { BacklogTotalsStrip } from '@/components/backlog/backlog-totals';
 import { BACKLOG_DIRECTIONS, BACKLOG_GROUPS, BACKLOG_SORTS, type BacklogDirection, type BacklogGroup, type BacklogSort } from '@/domain/library-backlog';
 import { backlogReadiness } from '@/application/backlog-readiness';
+import { readBacklogSources } from '@/application/backlog-sources';
 import { requireActor } from '@/lib/auth';
 import { timed } from '@/observability/events';
 
@@ -69,9 +70,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     let queue: Awaited<ReturnType<typeof repo.listReadyQueue>> | null;
     let schedule: Awaited<ReturnType<typeof repo.listSchedule>> | null;
     try {
-      [library, queue, schedule] = await timed({ name: 'backlog.load', adapter: 'app', facts: { view: 'posts' } }, () => Promise.all([
-        repo.listLibrary(), repo.listReadyQueue().catch(() => null), repo.listSchedule().catch(() => null),
-      ]));
+      [library, queue, schedule] = await timed({ name: 'backlog.load', adapter: 'app', facts: { view: 'posts' } }, () => readBacklogSources(repo));
     } catch (error) {
       const cached = repo.lastGoodLibrary?.(error);
       if (!cached) return <><PageHeader title="Backlog" description="Posts from Content Library." /><ErrorState code={safeBacklogErrorCode(error)} action={<a href={retryHref} className="inline-flex min-h-11 items-center font-semibold underline">Try again</a>} /></>;
@@ -104,8 +103,8 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
           { key: 'group', label: 'Group', allLabel: 'None', options: BACKLOG_GROUP_OPTIONS },
           { key: 'sort', label: 'Sort', allLabel: 'Sheet order (#)', options: BACKLOG_SORT_OPTIONS },
         ]} variant="toolbar" trailing={<SortDirectionToggle />} />
-        {stale ? view.total === 0 ? <StateView kind={library.length ? 'no_match' : 'empty'} nextStep={library.length ? undefined : null} /> : <LibraryBacklogTable rows={view.rows} readOnly statuses={Object.fromEntries(readiness)} sort={filters.sort} dir={filters.dir} group={filters.group} groupTotals={view.groupTotals} /> : <LibraryBacklogExplorer
-          initial={{ ok: true, rows: view.rows, statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
+        {stale ? view.total === 0 ? <StateView kind={library.length ? 'no_match' : 'empty'} nextStep={library.length ? undefined : null} /> : <LibraryBacklogTable rows={view.rows.map(backlogListRow)} readOnly statuses={Object.fromEntries(view.rows.map(r => [r.value.libraryId, readiness.get(r.value.libraryId)!]))} sort={filters.sort} dir={filters.dir} group={filters.group} groupTotals={view.groupTotals} /> : <LibraryBacklogExplorer
+          initial={{ ok: true, rows: view.rows.map(backlogListRow), statuses: Object.fromEntries(view.rows.map((r) => [r.value.libraryId, readiness.get(r.value.libraryId)!])), total: view.total, page: view.page, totalPages: view.totalPages, groupTotals: view.groupTotals }}
           filters={filters} canEdit={actor.role === 'owner'} pestoOptions={view.pestoOptions} emptyLibrary={library.length === 0} />}
         <PanelHost readOnly={stale} />
       </>

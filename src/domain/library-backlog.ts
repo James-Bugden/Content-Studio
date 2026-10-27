@@ -2,6 +2,21 @@ import type { LibraryRecord } from './records';
 import { PLATFORMS, type Platform } from './enums';
 import { readableTitle } from './display';
 
+/** Only inventory fields cross the list boundary. Full copy is read by the editor. */
+export type BacklogListRow = Pick<LibraryRecord, 'row' | 'revision'> & {
+  value: Pick<LibraryRecord['value'], 'libraryId' | 'state' | 'reviewStatus' | 'queueForSchedule' | 'contentSource' | 'targetPlatform' | 'pesto' | 'hookTemplate' | 'currentHook' | 'slug' | 'hookAlternatives'> & { draftContent: string };
+};
+
+export function backlogListRow(record: LibraryRecord): BacklogListRow {
+  const v = record.value;
+  return { row: record.row, revision: record.revision, value: {
+    libraryId: v.libraryId, state: v.state, reviewStatus: v.reviewStatus, queueForSchedule: v.queueForSchedule,
+    contentSource: v.contentSource, targetPlatform: v.targetPlatform, pesto: v.pesto, hookTemplate: v.hookTemplate,
+    currentHook: v.currentHook, slug: v.slug, hookAlternatives: v.hookAlternatives.slice(0, 1200),
+    draftContent: v.draftContent.length > 220 ? `${v.draftContent.slice(0, 219)}…` : v.draftContent,
+  } };
+}
+
 /** `hook` (current hook text) predates CS-043 and stays valid for old links. */
 export const BACKLOG_SORTS = ['sheet', 'source', 'platform', 'pesto', 'hookTemplate', 'status', 'approved', 'hook'] as const;
 export type BacklogSort = (typeof BACKLOG_SORTS)[number];
@@ -17,7 +32,7 @@ export type LibraryBacklogFilters = {
 export type BacklogReadiness = { label: string; reason: string; tone: 'good' | 'attention' | 'blocked' | 'neutral' };
 export const LIBRARY_BACKLOG_PAGE_SIZE = 40;
 
-export function libraryBacklogStatus(record: Pick<LibraryRecord, 'value'>): string {
+export function libraryBacklogStatus(record: Pick<BacklogListRow, 'value'>): string {
   const { state, reviewStatus, queueForSchedule } = record.value;
   if (reviewStatus.ok && reviewStatus.value === 'Skipped') return 'Rejected';
   if (reviewStatus.ok && reviewStatus.value === 'Changes Requested') return 'Needs changes';
@@ -27,11 +42,11 @@ export function libraryBacklogStatus(record: Pick<LibraryRecord, 'value'>): stri
   return record.value.draftContent.trim() ? 'Drafting' : 'Needs review';
 }
 
-type StatusOf = (record: LibraryRecord) => string | undefined;
-type Row = Pick<LibraryRecord, 'row' | 'value'>;
+type StatusOf = (record: Row) => string | undefined;
+type Row = Pick<BacklogListRow, 'row' | 'value'>;
 
 function statusLabel(record: Row, statusOf?: StatusOf): string {
-  return statusOf?.(record as LibraryRecord) ?? libraryBacklogStatus(record);
+  return statusOf?.(record) ?? libraryBacklogStatus(record);
 }
 
 /** The text a column sorts on. An empty string is a blank cell and always sorts last. */

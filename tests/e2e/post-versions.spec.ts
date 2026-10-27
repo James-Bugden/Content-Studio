@@ -76,11 +76,32 @@ test('Delete closes the panel, removes the post and Undo restores its saved copy
   expect((await (await page.request.get('/api/library/SYN-L001/editor')).json()).model.sheet.draft).toBe(before);
 });
 
+test('Delete and Undo refresh private search results while preserving the query', async ({ page }) => {
+  await page.goto('/backlog');
+  const search = page.getByLabel('Find a post');
+  await search.fill('Scope decides the salary band.');
+  await expect(page.getByText('1 post · page 1 of 1.', { exact: true })).toBeVisible();
+  const row = page.locator('[data-backlog-id="SYN-L001"]:visible');
+  await expect(row).toBeVisible();
+  await row.getByRole('link', { name: 'Show full post', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete post', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(page.getByText('No items match these filters', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 posts · page 1 of 1.', { exact: true })).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await expect(search).toHaveValue('Scope decides the salary band.');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Notifications' })).toContainText('Post restored.');
+  await expect(row).toBeVisible();
+  await expect(search).toHaveValue('Scope decides the salary band.');
+  expect(page.url()).not.toContain('salary');
+});
+
 test('new APIs require owner and same-origin and never accept stale platform saves', async ({ page }) => {
   const model = (await (await page.request.get('/api/library/SYN-L001/editor')).json()).model;
   const data = { operationId: 'synthetic_e2e_versions', expectedRevision: model.sheet.revision, proposed: 'Synthetic next version', platforms: ['X'] };
   const url = '/api/library/SYN-L001/versions';
-  const origin = 'http://127.0.0.1:3200';
+  const origin = new URL(test.info().project.use.baseURL!).origin;
   expect((await page.request.post(url, { headers: { origin: 'https://different.example' }, data })).status()).toBe(403);
   expect((await page.request.post(url, { headers: { origin }, data })).status()).toBe(200);
   expect((await page.request.post(url, { headers: { origin }, data: { ...data, operationId: 'synthetic_e2e_stale', proposed: 'An older tab' } })).status()).toBe(409);

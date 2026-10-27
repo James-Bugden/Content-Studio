@@ -10,6 +10,41 @@ const serviceKey = 'SYNTHETIC_SERVICE_KEY_ONLY';
 const options = { url, serviceKey };
 
 describe('read-only PostgREST transport', () => {
+  it.each(['library', 'queue'] as const)('keeps deleted %s posts out of projected inventories and totals', async collection => {
+    const source = syntheticContentDbSeed().posts.filter(row => row.collection === collection).slice(0, 2);
+    source[0]!.deleted_at = null;
+    source[1]!.deleted_at = '2026-10-27T00:00:00Z';
+    const request = vi.fn<typeof fetch>(async input => {
+      const target = new URL(String(input));
+      if (target.pathname.endsWith('schema_version')) return Response.json([{ version: 2 }], { headers: { 'content-range': '0-0/1' } });
+      expect(target.searchParams.get('collection')).toBe(`eq.${collection}`);
+      // Model the real provider: omitted columns are absent from every row.
+      const selected = target.searchParams.get('select')!.split(',');
+      expect(selected).not.toContain('platform_versions');
+      const rows = source.map(row => Object.fromEntries(selected.map(key => [key, row[key as keyof typeof row]])));
+      return Response.json(rows, { headers: { 'content-range': '0-1/2' } });
+    });
+    const repo = new SupabaseContentRepository(new SupabaseContentDb({ ...options, fetch: request }));
+    const rows = await (collection === 'library' ? repo.listLibrary() : repo.listQueue());
+    expect(rows.map(row => row.value.libraryId)).toEqual([source[0]!.library_id]);
+  });
+  it('list queries select domain columns explicitly and exclude storage bookkeeping', async () => {
+    const request = vi.fn<typeof fetch>(async input => {
+      const selected = new URL(String(input)).searchParams.get('select')!.split(',');
+      expect(selected).not.toContain('*');
+      expect(selected).toContain('row_version');
+      expect(selected).not.toContain('created_by_op');
+      expect(selected).not.toContain('updated_by_op');
+      expect(new Set(selected).size).toBe(selected.length);
+      return Response.json([], { headers: { 'content-range': '*/0' } });
+    });
+    const db = new SupabaseContentDb({ ...options, fetch: request });
+    await db.listPosts('library');
+    await db.listPosts('queue');
+    await db.listPosts('ready');
+    await db.listSchedule();
+    expect(request).toHaveBeenCalledTimes(4);
+  });
   it.each([{ rows: [] }, { rows: [{ operation_id: 'synthetic_import_latest' }] }])('reads only the latest committed import identity: $rows', async ({ rows }) => {
     const request = vi.fn<typeof fetch>(async (input, init) => {
       const target = new URL(String(input));

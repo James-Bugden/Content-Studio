@@ -26,12 +26,7 @@ export function ShellFrame({ children, navigation, accountSlot, statusSlot }: {
     </aside>
     <div className="studio-workspace">
       <header className="studio-topbar">
-        <div className="studio-search" title="Search is not available yet">
-          <ShellIcon name="search" />
-          <input type="search" aria-label="Search studio" placeholder="Search studio" disabled aria-describedby="studio-search-help" />
-          <kbd aria-hidden="true">/</kbd>
-          <span id="studio-search-help" className="sr-only">Search is not available yet.</span>
-        </div>
+        <div className="studio-search" aria-hidden="true" />
         <button type="button" className="studio-new-post" disabled title="New post creation is not available yet"><ShellIcon name="plus" /><span>New post</span></button>
         <button type="button" className="studio-icon-button" aria-label="Notifications" disabled title="Notifications are not available yet"><ShellIcon name="bell" /></button>
         <details ref={account} className="studio-account" onKeyDown={event => {

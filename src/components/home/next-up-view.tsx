@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Board, Task } from '@/domain/board';
-import { longDate, platformName, shortWhen, splitTasks, taskTitle } from '@/domain/display';
+import { longDate, platformName, shortWhen, taskTitle } from '@/domain/display';
 import type { Thumb } from '@/domain/next-steps';
 import { PageHeader } from '../page-header';
 import { PostThumb } from '../panel/post-thumb';
@@ -12,10 +12,16 @@ import { StepButton } from '../panel/step-button';
  * the next list. Every row has one button that opens the side panel on the right
  * post or slot; only the very first task gets the filled primary button.
  */
-export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'> & { integrationStatus?: React.ReactNode };
+export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'> & { integrationStatus?: React.ReactNode; nowPage?: number; nextPage?: number };
 
-export function NextUpView({ today, counts, tasks, posts, integrationStatus }: NextUpViewProps) {
-  const { now, next, more } = splitTasks(tasks, 12);
+export function NextUpView({ today, counts, tasks, posts, integrationStatus, nowPage = 1, nextPage = 1 }: NextUpViewProps) {
+  const urgent = tasks.filter(t => t.step.urgency === 'now');
+  const soon = tasks.filter(t => t.step.urgency === 'soon');
+  const pageOf = (page: number, total: number) => Math.min(Math.max(1, page), Math.max(1, Math.ceil(total / 12)));
+  nowPage = pageOf(nowPage, urgent.length);
+  nextPage = pageOf(nextPage, soon.length);
+  const now = urgent.slice((nowPage - 1) * 12, nowPage * 12);
+  const next = soon.slice((nextPage - 1) * 12, nextPage * 12);
   const thumbs = new Map(posts.map((p) => [p.libraryId, p.thumb]));
   const tiles = [
     { label: 'To review', count: counts.review, href: '/review?lane=review' },
@@ -73,31 +79,36 @@ export function NextUpView({ today, counts, tasks, posts, integrationStatus }: N
           {now.length > 0 ? (
             <section aria-labelledby="now-h" className="mt-8">
               <h2 id="now-h" className="text-lg font-semibold">
-                Do these now <span className="font-normal text-ink-soft tabular-nums">({now.length})</span>
+                Do these now <span className="font-normal text-ink-soft tabular-nums">({urgent.length})</span>
               </h2>
               <TaskList tasks={now} thumbs={thumbs} firstIsPrimary />
+              <TaskPages label="Urgent task pages" page={nowPage} total={urgent.length} parameter="nowPage" other={{ nextPage }} />
             </section>
           ) : null}
           {next.length > 0 ? (
             <section aria-labelledby="next-h" className="mt-8">
               <h2 id="next-h" className="text-lg font-semibold">
-                Next <span className="font-normal text-ink-soft tabular-nums">({next.length + more.length})</span>
+                Next <span className="font-normal text-ink-soft tabular-nums">({soon.length})</span>
               </h2>
               <TaskList tasks={next} thumbs={thumbs} firstIsPrimary={now.length === 0} />
-              {more.length > 0 ? (
-                <details className="mt-2">
-                  <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-medium underline underline-offset-4">
-                    Show all ({more.length} more)
-                  </summary>
-                  <TaskList tasks={more} thumbs={thumbs} />
-                </details>
-              ) : null}
+              <TaskPages label="Next task pages" page={nextPage} total={soon.length} parameter="nextPage" other={{ nowPage }} />
             </section>
           ) : null}
         </>
       )}
     </>
   );
+}
+
+function TaskPages({ label, page, total, parameter, other }: { label: string; page: number; total: number; parameter: string; other: Record<string, number> }) {
+  const pages = Math.ceil(total / 12);
+  if (pages <= 1) return null;
+  const href = (target: number) => `/?${new URLSearchParams(Object.entries({ ...other, [parameter]: target }).map(([k, v]) => [k, String(v)]))}`;
+  return <nav aria-label={label} className="mt-2 flex items-center justify-between text-sm">
+    {page > 1 ? <Link prefetch={false} href={href(page - 1)} className="inline-flex min-h-11 items-center underline">Previous page</Link> : <span />}
+    <span>Page {page} of {pages}</span>
+    {page < pages ? <Link prefetch={false} href={href(page + 1)} className="inline-flex min-h-11 items-center underline">Next page</Link> : <span />}
+  </nav>;
 }
 
 /** Dot colour by urgency: red only for "do now", amber soon, grey otherwise. Always paired with words. */
