@@ -1,6 +1,6 @@
 ﻿import Link from 'next/link';
 import type { Board, Task } from '@/domain/board';
-import { longDate, platformName, shortWhen, splitTasks, taskTitle } from '@/domain/display';
+import { longDate, platformName, shortWhen, taskTitle } from '@/domain/display';
 import type { Thumb } from '@/domain/next-steps';
 import { PageHeader } from '../page-header';
 import { PostThumb } from '../panel/post-thumb';
@@ -10,10 +10,16 @@ import { ListSlotCard } from '../calendar/slot-card';
 import { sortByTime } from '@/domain/calendar';
 import styles from './next-up.module.css';
 
-export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'> & { slots?: Board['slots']; integrationStatus?: React.ReactNode };
+export type NextUpViewProps = Pick<Board, 'today' | 'counts' | 'tasks' | 'posts'> & { slots?: Board['slots']; integrationStatus?: React.ReactNode; nowPage?: number; nextPage?: number };
 
-export function NextUpView({ today, counts, tasks, posts, slots = [], integrationStatus }: NextUpViewProps) {
-  const { now, next, more } = splitTasks(tasks, 12);
+export function NextUpView({ today, counts, tasks, posts, slots = [], integrationStatus, nowPage = 1, nextPage = 1 }: NextUpViewProps) {
+  const urgent = tasks.filter(t => t.step.urgency === 'now');
+  const soon = tasks.filter(t => t.step.urgency === 'soon');
+  const pageOf = (page: number, total: number) => Math.min(Math.max(1, page), Math.max(1, Math.ceil(total / 12)));
+  nowPage = pageOf(nowPage, urgent.length);
+  nextPage = pageOf(nextPage, soon.length);
+  const now = urgent.slice((nowPage - 1) * 12, nowPage * 12);
+  const next = soon.slice((nextPage - 1) * 12, nextPage * 12);
   const thumbs = new Map(posts.map((p) => [p.libraryId, p.thumb]));
   const statuses = new Map(posts.map(p => [p.libraryId, p.status]));
   const upcoming = sortByTime(slots.filter(s => !s.empty && s.isoDate >= today && ['Scheduled', 'Planned', 'Typefully Draft'].includes(s.statusLabel))).slice(0, 5);
@@ -46,16 +52,14 @@ export function NextUpView({ today, counts, tasks, posts, slots = [], integratio
             </section>
           ) : <>
             {now.length ? <section aria-labelledby="now-h" className="mb-6">
-              <h2 id="now-h" className="mb-3 text-base font-semibold">Do these now <span className="ml-1 text-sm text-ink-soft">({now.length})</span></h2>
+              <h2 id="now-h" className="mb-3 text-base font-semibold">Do these now <span className="ml-1 text-sm text-ink-soft">({urgent.length})</span></h2>
               <TaskGroups tasks={now} thumbs={thumbs} statuses={statuses} primaryKey={now[0]?.key} />
+              <TaskPages label="Urgent task pages" page={nowPage} total={urgent.length} parameter="nowPage" other={{ nextPage }} />
             </section> : null}
             {next.length ? <section aria-labelledby="next-h">
-              <h2 id="next-h" className="mb-3 text-base font-semibold">Next <span className="ml-1 text-sm text-ink-soft">({next.length + more.length})</span></h2>
+              <h2 id="next-h" className="mb-3 text-base font-semibold">Next <span className="ml-1 text-sm text-ink-soft">({soon.length})</span></h2>
               <TaskGroups tasks={next} thumbs={thumbs} statuses={statuses} primaryKey={now.length ? undefined : next[0]?.key} />
-              {more.length ? <details className="mt-3">
-                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold underline underline-offset-4">Show all ({more.length} more)</summary>
-                <TaskGroups tasks={more} thumbs={thumbs} statuses={statuses} />
-              </details> : null}
+              <TaskPages label="Next task pages" page={nextPage} total={soon.length} parameter="nextPage" other={{ nowPage }} />
             </section> : null}
           </>}
         </div>
@@ -114,4 +118,15 @@ function TaskGroups({ tasks, thumbs, statuses, primaryKey }: { tasks: Task[]; th
       })}</ul>
     </div>)}
   </div>;
+}
+
+function TaskPages({ label, page, total, parameter, other }: { label: string; page: number; total: number; parameter: string; other: Record<string, number> }) {
+  const pages = Math.ceil(total / 12);
+  if (pages <= 1) return null;
+  const href = (target: number) => `/?${new URLSearchParams(Object.entries({ ...other, [parameter]: target }).map(([k, v]) => [k, String(v)]))}`;
+  return <nav aria-label={label} className="mt-2 flex items-center justify-between text-sm">
+    {page > 1 ? <Link prefetch={false} href={href(page - 1)} className="inline-flex min-h-11 items-center underline">Previous page</Link> : <span />}
+    <span>Page {page} of {pages}</span>
+    {page < pages ? <Link prefetch={false} href={href(page + 1)} className="inline-flex min-h-11 items-center underline">Next page</Link> : <span />}
+  </nav>;
 }

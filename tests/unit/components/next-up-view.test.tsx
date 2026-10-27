@@ -51,6 +51,22 @@ describe('Next up view (UX redesign)', () => {
     expect(screen.getByRole('heading', { name: /Ready & schedule/ })).toBeTruthy();
     expect(screen.getByRole('link', { name: /^Schedule:/ }).getAttribute('href')).toContain('post=SYN-L001');
   });
+  it('bounds urgent tasks as well as upcoming tasks and pages without losing totals', () => {
+    const tasks = Array.from({ length: 2000 }, (_, i) => task({ key: `post:${i}`, title: `Task ${i}`, step: { kind: 'review', action: 'Review', why: 'Review copy', urgency: i < 1000 ? 'now' : 'soon' } }));
+    render(<NextUpView today="2026-09-30" counts={counts} tasks={tasks} posts={[]} nowPage={2} nextPage={84} />);
+    expect(document.querySelectorAll('[data-task]')).toHaveLength(16);
+    expect(screen.queryByText('Task 0')).toBeNull();
+    expect(screen.getByText('Task 12')).toBeTruthy();
+    expect(screen.getByText('Task 1999')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Do these now (1000)' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Next (1000)' })).toBeTruthy();
+    const urgent = within(screen.getByRole('navigation', { name: 'Urgent task pages' }));
+    expect(urgent.getByRole('link', { name: 'Previous page' }).getAttribute('href')).toBe('/?nextPage=84&nowPage=1');
+    expect(urgent.getByRole('link', { name: 'Next page' }).getAttribute('href')).toBe('/?nextPage=84&nowPage=3');
+    const next = within(screen.getByRole('navigation', { name: 'Next task pages' }));
+    expect(next.getByRole('link', { name: 'Previous page' }).getAttribute('href')).toBe('/?nowPage=2&nextPage=83');
+    expect(next.queryByRole('link', { name: 'Next page' })).toBeNull();
+  });
   it('shows the four tiles with counts and a calm check for zero', () => {
     render(<NextUpView today="2026-09-30" counts={counts} tasks={[]} posts={[]} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Next up' })).toBeTruthy();
@@ -76,7 +92,9 @@ describe('Next up view (UX redesign)', () => {
     expect(within(now).getByText('Ask for the band.')).toBeTruthy();
     expect(within(now).getByText('X, Fri 2 Oct, 08:00')).toBeTruthy();
     expect(within(now).getByRole('link', { name: /^Update Chinese/ }).getAttribute('href')).toBe('/?slot=2026-10-02-MAIN-X');
-    expect(screen.getByText('Show all (2 more)')).toBeTruthy();
+    expect(screen.getByRole('navigation', { name: 'Next task pages' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Next page' }).getAttribute('href')).toBe('/?nowPage=1&nextPage=2');
+    expect(document.querySelectorAll('[data-task]')).toHaveLength(13);
     expect(document.body.textContent).not.toContain('SYN-P');
   });
 });

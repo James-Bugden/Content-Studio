@@ -33,6 +33,7 @@ for (const code of ['RATE_LIMITED', 'PROVIDER_UNAVAILABLE']) {
     await expect(row.getByRole('button', { name: /^Edit / })).toHaveAttribute('aria-label', /^Edit .+/);
     await expect(page.getByRole('button', { name: /^Edit / }).first()).toBeDisabled();
     await expect(page.getByRole('link', { name: /^Edit / })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Show full post', exact: true })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: /PESTO stage/ })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);

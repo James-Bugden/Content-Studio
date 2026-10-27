@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import type { LibraryRecord } from '@/domain/records';
+import type { BacklogListRow } from '@/domain/library-backlog';
 import { readableTitle } from '@/domain/display';
 import { groupBacklogRows, libraryBacklogStatus, type BacklogDirection, type BacklogGroup, type BacklogReadiness, type BacklogSort } from '@/domain/library-backlog';
 import { parseHookAlternatives } from '@/domain/hook-alternatives';
@@ -27,24 +27,18 @@ function ReadinessExplanation({ status }: { status: BacklogReadiness }) {
   </details>;
 }
 
-type Row = Pick<LibraryRecord, 'row' | 'value'> & { revision?: string };
+type Row = Omit<BacklogListRow, 'revision'> & { revision?: string };
 
 /**
- * Post copy in a row (CS-054): the opening lines, then "Show full post" to read
- * the rest in place, so long posts are never silently cut off. A native
- * <details> keeps it keyboard operable without extra ARIA.
+ * List copy is a short excerpt. The full post is fetched only when the guarded
+ * editor opens, including from "Show full post" on either responsive layout.
  */
-function PostContent({ text }: { text: string }) {
+function PostContent({ text, libraryId, readOnly }: { text: string; libraryId: string; readOnly: boolean }) {
   if (!text.trim()) return <p className="mt-1 text-ink-soft">Open to read and edit the source post.</p>;
-  const long = text.length > 280 || text.split('\n').length > 5;
-  if (!long) return <p className="mt-1 whitespace-pre-line break-words text-ink-soft">{text}</p>;
-  return <details className="group mt-1">
-    <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-      <span className="line-clamp-5 whitespace-pre-line break-words text-ink-soft group-open:hidden">{text}</span>
-      <span className="inline-flex min-h-9 items-center text-xs font-medium text-primary underline underline-offset-2"><span className="group-open:hidden">Show full post</span><span className="hidden group-open:inline">Show less</span></span>
-    </summary>
-    <p className="whitespace-pre-line break-words text-ink-soft">{text}</p>
-  </details>;
+  return <div className="mt-1">
+    <p className="line-clamp-5 whitespace-pre-line break-words text-ink-soft">{text}</p>
+    {readOnly ? null : <OpenPanelLink target={{ post: libraryId }} className="inline-flex min-h-9 items-center text-xs font-medium text-primary underline underline-offset-2">Show full post</OpenPanelLink>}
+  </div>;
 }
 
 /**
@@ -137,7 +131,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                   <td className={cell}><HookAlternativesList raw={item.hookAlternatives} /></td></> : null}
                   <td className={cell}>
                     <p className="line-clamp-2 break-words font-semibold text-ink">{title}</p>
-                    <PostContent text={item.draftContent} />
+                    <PostContent text={item.draftContent} libraryId={item.libraryId} readOnly={readOnly} />
                   </td>
                   <td className={`sticky right-20 z-10 border-l border-line bg-card ${cell}`}><ReadinessExplanation status={status} /></td>
                   <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}>{readOnly ? <button disabled aria-label={`Edit ${title}`} className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}</td>
@@ -157,7 +151,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
             return <li key={item.libraryId} data-backlog-id={item.libraryId} className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><ReadinessExplanation status={status} /></div>
               <p className="text-base font-semibold">{title}</p>
-              <div className="text-sm"><PostContent text={item.draftContent} /></div>
+              <div className="text-sm"><PostContent text={item.draftContent} libraryId={item.libraryId} readOnly={readOnly} /></div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span>
                 {canEdit && !readOnly && record.revision ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} /> : <PillarTag value={item.pesto} />}
                 <span>Hook template: {item.hookTemplate || '—'}</span></div>

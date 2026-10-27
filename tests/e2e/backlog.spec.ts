@@ -620,15 +620,11 @@ test('PESTO is picked from a dropdown on a post in the Posts table and in the po
   await expect(page.locator(`${wide ? 'tr' : 'li'}[data-backlog-id="SYN-L001"]`).getByRole('combobox', { name: 'PESTO stage for SYN-L001' })).toHaveValue('Opinions');
 });
 
-test('a long post in the Content column expands in place instead of being cut off (CS-054)', async ({ page }) => {
-  test.skip((page.viewportSize()?.width ?? 0) < 768, 'the wide table');
+test('full post copy loads on demand in the guarded panel', async ({ page }) => {
   await page.goto('/backlog');
-  const post = page.locator('tr[data-backlog-id="SYN-L008"] details').filter({ hasText: 'Show full post' });
-  await expect(post).not.toHaveAttribute('open');
-  await post.getByText('Show full post').click();
-  await expect(post).toHaveAttribute('open', '');
-  await expect(post.locator('p').getByText('End with a question, not a demand.')).toBeVisible();
-  await expect(post.getByText('Show less')).toBeVisible();
+  const post = page.locator('[data-backlog-id="SYN-L008"]:visible');
+  await post.getByRole('link', { name: 'Show full post', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('textbox', { name: /Post copy/ })).toHaveValue(/End with a question, not a demand\./);
 });
 
 test('the post editor saves a chosen hook to the Sheet under the hook alternatives (CS-056)', async ({ page }) => {

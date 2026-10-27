@@ -9,8 +9,8 @@ push, deployment, production access or secret changes were performed.
 
 - Home: responsive summary tiles, urgent-first action groups (review/fix, visuals,
   Chinese adaptation, scheduling), truthful status pills and platform logos.
-  First action retains the primary button; every existing task target and overflow
-  disclosure remains available. Upcoming scheduled/planned work uses at most five
+  First action retains the primary button; every existing task target remains
+  available through independent 12-item urgent/upcoming pagination. Upcoming scheduled/planned work uses at most five
   cards from the board's existing schedule window and links to Calendar.
 - Calendar: day lists below 1024px, platform/week grid on desktop, compact URL-based
   period/view controls, day dividers and explicit status pills. Ready, Scheduled,
@@ -66,3 +66,43 @@ phone viewport checks are emulator evidence, not physical-device T4 evidence.
 No production performance/cutover claim; the existing board read path is retained.
 T4 is not required for these CSS/list changes. Independent PR review, CI, push and
 merge/deployment belong to the coordinator; this build is local only.
+
+
+## PR 236 merge fix, round 1 (2026-10-27)
+
+Standard conflict-resolution fix on `feat/236-ui`. Merged origin/main
+`e8698ce00c2f93c658bd05831615400722a2dd16` into stage-2 commit
+`2034ed473feec0cc831cf29fc23ab2ffb143f93f` (the merge commit containing this
+report identifies the final source). No push, GitHub CLI, deployment, live data
+or secret access is part of this round.
+
+Resolved all three conflicts by keeping the stage-2 summary tiles, action groups,
+status pills, platform marks, responsive workspace and five-card Coming up column,
+with main's independent `nowPage`/`nextPage` pagination. Each urgency list renders
+at most 12 tasks; totals cover the complete list and links preserve the other
+list's page. The closed all-task disclosure is removed. Backlog's projected
+excerpt and full-copy-on-open behavior merged unchanged. Unit assertions cover
+both redesign semantics and bounded rendering, last-page rows and independent
+previous/next links.
+
+Verification (all heavy commands use `bash ~/bin/heavy`; no full suite):
+
+- `npx vitest run tests/unit/components tests/unit/application tests/unit/security tests/unit/supabase --maxWorkers=1 --silent`: 90 files / 1,671 tests passed.
+- `npm run typecheck` and `npm run lint`: passed on the final source.
+  Initial lint caught an obsolete `splitTasks` import; removed it and reran
+  both checks plus the focused Next up page/view tests (2 files / 9 passed).
+  The only source difference after browser verification is that unused import.
+- Production artifact: `a9PII5v5a8XRQHn6urr_c`; successful compilation,
+  TypeScript, page generation and route output. The documented temporary
+  Turbopack root workaround was restored byte-for-byte after generation.
+- `CS_E2E_PREBUILT=1 CS_E2E_CONTENT_STORE=db CS_E2E_PORT=3360 npx playwright test tests/e2e/home.spec.ts tests/e2e/calendar.spec.ts tests/e2e/home-calendar-polish.spec.ts tests/e2e/payload.spec.ts --project=w375 --project=w1280 --workers=1`: 46 passed against that artifact.
+- Seeded 2,000-post DB fixture at both widths: `/` = 154,564 bytes and
+  `/backlog` = 258,364 bytes (complete uncompressed document including inline
+  RSC). Both are below 300,000 bytes. Home warm samples: 48/36/33 ms at 375;
+  27/22/20 ms at 1280. Local synthetic timings are not production benchmarks.
+- T2: inspected all four Next up/Calendar screenshots from
+  `test-results/home-calendar-polish-*` at 375 and 1280. Grouped cards, platform
+  marks, status text, Coming up, phone day list and desktop grid retained.
+  Browser tests also passed axe, overflow, touch-size and panel navigation checks.
+
+This round is local only; no production verification or deployment is claimed.
