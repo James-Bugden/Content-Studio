@@ -2,6 +2,7 @@ import 'server-only';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { emit } from '@/observability/events';
 import type { AiMeta, AiResult, AiTask } from '@/application/ports';
+import type { AiUsageService } from '@/application/ai-usage';
 
 /**
  * Provider-neutral run loop shared by the Anthropic and fake gateways (AI-01, OBS-03).
@@ -20,6 +21,7 @@ export type ModelReply = {
   model: string;
   inputTokens?: number;
   outputTokens?: number;
+  cacheCreationInputTokens?: number;
 };
 
 export type ModelRequest = {
@@ -51,6 +53,7 @@ export async function runTask<T, I>(
   input: I,
   call: ModelCaller,
   opts: { signal?: AbortSignal } = {},
+  usage?: AiUsageService,
 ): Promise<AiResult<T>> {
   const started = performance.now();
   let model = base.model;
@@ -103,7 +106,12 @@ export async function runTask<T, I>(
     if (opts.signal?.aborted) return fail('PROVIDER_UNAVAILABLE', { cancelled: true }, { cancelled: true });
     let reply: ModelReply;
     try {
-      reply = await call({ system: task.system, messages: [...messages], maxOutputTokens: task.maxOutputTokens, attempt }, opts.signal);
+      const request = { system: task.system, messages: [...messages], maxOutputTokens: task.maxOutputTokens, attempt };
+      // UTF-8 byte count plus schema/framing allowance is a conservative input
+      // reservation. Provider usage replaces it before parsing or repair.
+      const inputEstimate = Buffer.byteLength(task.system + messages.map(m => m.content).join(''), 'utf8') + 4096;
+      reply = usage ? await usage.track(task.name, base.model, inputEstimate, task.maxOutputTokens,
+        () => call(request, opts.signal), result => result) : await call(request, opts.signal);
     } catch (error) {
       if (error instanceof AiCancelled) return fail('PROVIDER_UNAVAILABLE', { cancelled: true }, { cancelled: true });
       return fail(isAppError(error) ? error.code : 'UNKNOWN', { stage: 'call' });

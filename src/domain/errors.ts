@@ -15,6 +15,7 @@ export const ERROR_CODES = [
   'GATE_BLOCKED',
   'AMBIGUOUS_MATCH',
   'RATE_LIMITED',
+  'AI_LIMIT_REACHED',
   'PROVIDER_UNAVAILABLE',
   'PARTIAL_FAILURE',
   'VALIDATION_FAILED',
@@ -67,6 +68,7 @@ export const ERROR_CATALOGUE: Record<ErrorCode, { status: number; message: strin
   GATE_BLOCKED: { status: 422, message: 'A release gate is not met yet. Resolve the listed blocker first.', recovery: 'resolve_gate', retryable: false },
   AMBIGUOUS_MATCH: { status: 409, message: 'More than one candidate matches. Choose the right one to continue.', recovery: 'choose_match', retryable: false },
   RATE_LIMITED: { status: 429, message: 'The provider asked us to slow down. Nothing was lost; try again shortly.', recovery: 'retry_later', retryable: true },
+  AI_LIMIT_REACHED: { status: 429, message: 'Monthly AI limit reached', recovery: 'none', retryable: false },
   PROVIDER_UNAVAILABLE: {
     status: 503,
     message: 'A provider is unavailable. Nothing was confirmed as written; manual work is still available.',

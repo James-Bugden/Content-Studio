@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { signOutAction } from '@/app/actions/auth';
 import { SignOutButton } from '@/components/auth/sign-out-button';
+import { AccountAiUsage } from '@/components/account-ai-usage';
 import { AppShell } from '@/components/app-shell';
 import { StudioPanelHost } from '@/components/panel/panel-host';
 import { BacklogNavigationProvider } from '@/components/backlog/backlog-navigation';
@@ -23,7 +24,8 @@ export default async function StudioLayout({ children }: { children: React.React
     <AppShell
       statusSlot={<CapabilityBanner capabilities={capabilities()} />}
       accountSlot={
-        <div className="flex items-center gap-3 text-sm">
+        <div className="text-sm">
+          {actor.role === 'owner' ? <AccountAiUsage /> : null}
           {actor.role === 'owner' ? null : <span className="text-ink-soft">Read only</span>}
           <SignOutButton action={signOutAction} />
         </div>

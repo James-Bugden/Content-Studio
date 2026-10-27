@@ -6,6 +6,7 @@ import type { Capability } from '@/domain/capability';
 import { AppError, type ErrorCode } from '@/domain/errors';
 import type { AiGateway, AiResult, AiTask } from '@/application/ports';
 import { AiCancelled, runTask, type ModelCaller, type ModelReply } from './pipeline';
+import type { AiUsageService } from '@/application/ai-usage';
 
 /**
  * Anthropic adapter (CS-009). Official SDK, structured JSON output, adaptive
@@ -32,9 +33,9 @@ export class AnthropicAiGateway implements AiGateway {
   private readonly messages: MessagesApi;
   readonly model: string;
 
-  constructor(options: { apiKey: string; model?: string; messages?: MessagesApi }) {
+  constructor(private readonly options: { apiKey: string; model?: string; messages?: MessagesApi; usage?: AiUsageService }) {
     this.model = options.model?.trim() || DEFAULT_AI_MODEL;
-    this.messages = options.messages ?? new Anthropic({ apiKey: options.apiKey, timeout: 45_000, maxRetries: 1 }).beta.messages;
+    this.messages = options.messages ?? new Anthropic({ apiKey: options.apiKey, timeout: 45_000, maxRetries: 0 }).beta.messages;
   }
 
   capability(): Capability {
@@ -70,11 +71,12 @@ export class AnthropicAiGateway implements AiGateway {
         stopReason: stop === 'end_turn' || stop === 'max_tokens' || stop === 'refusal' ? stop : 'other',
         text: texts.length ? texts.join('') : null,
         model: res.model,
-        inputTokens: res.usage.input_tokens,
+        inputTokens: res.usage.input_tokens + (res.usage.cache_read_input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0),
         outputTokens: res.usage.output_tokens,
+        cacheCreationInputTokens: res.usage.cache_creation_input_tokens ?? 0,
       };
       return reply;
     };
-    return runTask({ provider: 'anthropic', model: this.model }, task, input, call, opts);
+    return runTask({ provider: 'anthropic', model: this.model }, task, input, call, opts, this.options.usage);
   }
 }

@@ -258,6 +258,8 @@ describe('embedding worker', () => {
 });
 
 describe('createEmbedder', () => {
+  // The usage guard requires a priced model even with a mocked HTTP transport.
+  const providerModel = 'text-embedding-3-small';
   it('returns an unconfigured embedder when no key is present, and does not throw', async () => {
     const embedder = createEmbedder({
       generation: { mode: 'unconfigured', provider: 'anthropic', model: 'x' },
@@ -291,7 +293,7 @@ describe('createEmbedder', () => {
     const embedder = createEmbedder(
       {
         generation: { mode: 'unconfigured', provider: 'anthropic', model: 'x' },
-        embedding: { mode: 'live', provider: 'openai', model: MODEL, apiKey: 'synthetic-key' },
+        embedding: { mode: 'live', provider: 'openai', model: providerModel, apiKey: 'synthetic-key' },
       },
       {
         fetch: async () =>
@@ -315,7 +317,7 @@ describe('createEmbedder', () => {
     const embedder = createEmbedder(
       {
         generation: { mode: 'unconfigured', provider: 'anthropic', model: 'x' },
-        embedding: { mode: 'live', provider: 'openai', model: MODEL, apiKey: 'synthetic-key' },
+        embedding: { mode: 'live', provider: 'openai', model: providerModel, apiKey: 'synthetic-key' },
       },
       {
         baseUrl: 'https://embeddings.example.com',
@@ -331,14 +333,14 @@ describe('createEmbedder', () => {
 
     const result = await embedder.embed(['one input']);
     expect(requestedUrl).toBe('https://embeddings.example.com/v1/embeddings');
-    expect(result).toMatchObject({ status: 'ok', model: MODEL });
+    expect(result).toMatchObject({ status: 'ok', model: providerModel });
   });
 
   it('turns a rate limit into a retryable failure rather than an exception', async () => {
     const embedder = createEmbedder(
       {
         generation: { mode: 'unconfigured', provider: 'anthropic', model: 'x' },
-        embedding: { mode: 'live', provider: 'openai', model: MODEL, apiKey: 'synthetic-key' },
+        embedding: { mode: 'live', provider: 'openai', model: providerModel, apiKey: 'synthetic-key' },
       },
       { fetch: async () => new Response('', { status: 429 }) },
     );

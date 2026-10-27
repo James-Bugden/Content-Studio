@@ -1,6 +1,7 @@
 import { EMBEDDING } from '@/replies/lib/contracts/limits';
 import type { ErrorCode } from '@/replies/lib/contracts/errors';
 import type { ProviderMode, ServerConfig } from '@/replies/lib/config/env';
+import { trackEmbedder } from '@/application/reply-ai-usage';
 
 /**
  * The embedding provider boundary (C05, C10).
@@ -17,6 +18,7 @@ import type { ProviderMode, ServerConfig } from '@/replies/lib/config/env';
  */
 
 export interface EmbedOk {
+  inputTokens?: number;
   status: 'ok';
   model: string;
   /** One vector per input, in input order. */
@@ -66,9 +68,9 @@ export function createEmbedder(
 ): Embedder {
   const { mode, model, apiKey } = config.embedding;
 
-  if (mode === 'fake') return fakeEmbedder(model);
+  if (mode === 'fake') return trackEmbedder(fakeEmbedder(model));
   if (mode === 'unconfigured' || !apiKey) return unconfiguredEmbedder(model);
-  return openAiEmbedder(model, apiKey, options);
+  return trackEmbedder(openAiEmbedder(model, apiKey, options));
 }
 
 /**
@@ -156,7 +158,8 @@ export function openAiEmbedder(
       if (!vectors) {
         return { status: 'failed', model, code: 'provider_invalid_response', retryable: false };
       }
-      return { status: 'ok', model, vectors };
+      const tokens = (payload as { usage?: { total_tokens?: unknown } }).usage?.total_tokens;
+      return { status: 'ok', model, vectors, ...(typeof tokens === 'number' && Number.isSafeInteger(tokens) && tokens >= 0 ? { inputTokens: tokens } : {}) };
     },
   };
 }

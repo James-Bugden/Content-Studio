@@ -2,6 +2,7 @@ import { serverConfig, type EnvSource } from '@/replies/lib/config/env';
 import { createFakeGenerator, type FakeBehaviour } from './providers/fake';
 import { createAnthropicGenerator } from './providers/anthropic';
 import type { ReplyGenerator } from './types';
+import { trackReplyGenerator } from '@/application/reply-ai-usage';
 
 export * from './types';
 export { generateIdeas, type GenerateOutcome } from './generator';
@@ -33,12 +34,12 @@ export function createGenerator(
 ): ReplyGenerator | null {
   const config = serverConfig(env).generation;
 
-  if (config.mode === 'fake') return createFakeGenerator(fakeBehaviour ?? {});
+  if (config.mode === 'fake') return trackReplyGenerator(createFakeGenerator(fakeBehaviour ?? {}));
   if (config.mode === 'unconfigured') return null;
 
   switch (config.provider) {
     case 'anthropic':
-      return createAnthropicGenerator({ apiKey: config.apiKey!, model: config.model });
+      return trackReplyGenerator(createAnthropicGenerator({ apiKey: config.apiKey!, model: config.model }));
     default:
       // A provider name nobody implemented is a configuration mistake, and running
       // as if it were absent is clearer than quietly using a different vendor.
