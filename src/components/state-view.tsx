@@ -42,7 +42,7 @@ export const STATE_LOOK: Record<StateKind, KindLook> = {
     label: 'Loading',
     frame: 'border border-line bg-card',
     mark: 'border-line text-ink-soft',
-    title: 'Loading',
+    title: 'Opening your content',
     detail: '',
   },
   empty: {
