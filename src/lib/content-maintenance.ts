@@ -10,6 +10,11 @@ import { mirrorHash } from '@/application/sheet-mirror';
  * no live adapter is available, and fake production startup is also refused. */
 export async function repairContentExport() {
   const services = getServices();
+  if (serverEnv().CS_CONTENT_STORE === 'db' && !services.contentCutover) {
+    // The retained cron endpoint repairs Drive only. Sheet export is retired.
+    await services.markdownExport?.run();
+    return { status: 'database_only' as const };
+  }
   if (serverEnv().CS_CONTENT_STORE !== 'db' || !services.contentCutover) throw new AppError('FORBIDDEN', { reason: 'export_store_mode' });
   // Both repairs get an attempt; a queue read failure must not skip Sheet repair.
   const [markdown, sheet] = await Promise.allSettled([services.markdownExport?.run(), services.contentCutover.exporter.run()]);

@@ -1,10 +1,18 @@
 # Content Studio master specification
 
-Status: implementation baseline, updated 2026-09-25 for the unified Content and Replies application.
+Status: implementation baseline, updated 2026-10-27 for the owner's DB-only Content decision (#234).
+
+Owner decision: Content Studio is a personal tool and the Google Sheet is no
+longer used. In `CS_CONTENT_STORE=db`, Supabase is the only Content store;
+no Sheet calls, activation epochs, parity, backup/rehearsal proofs or waivers
+are required for serving. Drive assets/Markdown and Typefully integrations
+retain their guarded behavior. The historical Sheet mapping and legacy-mode
+contracts below describe compatibility tooling, not DB-mode authority.
+See `docs/ops/cutover.md` for configuration and migration order.
 
 ## 1. Product contract
 
-Content Studio is an owner-only internal dashboard for two related workflows: outbound Content and manually posted social Replies. Content sits over the current Google Sheet, Drive Markdown/assets and Typefully. Replies uses Supabase for its private library, retrieval, resources and facts. Google Sheets remains the only writable authority for Content.
+Content Studio is an owner-only internal dashboard for two related workflows: outbound Content and manually posted social Replies. Content uses Supabase for its operational records, Drive Markdown/assets and Typefully. Replies uses Supabase for its private library, retrieval, resources and facts. Supabase is the only Content store in DB mode.
 
 Canonical flow:
 
@@ -21,7 +29,7 @@ Replies
   -> post manually on the social platform
   -> record exact final reply in Supabase
   -> reuse recorded replies prospectively
-  -> optionally save an explicit idea to Sheet Content Queue
+  -> optionally save an explicit idea to the database Content Queue
 ```
 
 Goals:
@@ -48,15 +56,21 @@ Non-goals for MVP:
 | Concern | Authority |
 | --- | --- |
 | Source/reference material and pre-approval master files | Google Drive `Content / Editing` and canonical workflow/reference files |
-| Operational review, gates, schedule and historical platform records | Google Sheet `Content Tracker / X, LinkedIn & Threads` |
-| Ready handoff | Sheet `Ready Queue`, derived from `Content Library`; never separately persisted by the app |
+| Operational review, gates, schedule and historical platform records | Supabase Content tables in DB mode |
+| Ready handoff | Database Ready Queue view derived from Library posts |
 | Final human edit and publishing | Typefully |
 | Exact final copy, published metadata and available analytics | Synced back to `Content Schedule` |
 | Reply sessions, recorded replies, retrieval, resources and facts | Isolated Supabase Reply tables |
-| Explicit Reply-to-Content idea | New row in existing Sheet `Content Queue`; never scheduled automatically |
+| Explicit Reply-to-Content idea | New database Queue row in DB mode; never scheduled automatically |
 | UI cache | Disposable only; never authoritative |
 
-The app may keep request-local data, encrypted session data and bounded cache entries. Supabase Reply records and optional `content_studio_*` snapshots are isolated: snapshots are disposable and never writable Content authority. Cache keys include source revision/fingerprint; Content writes always re-read and compare the authoritative Sheet record.
+The app may keep request-local data, encrypted session data and bounded cache entries.
+In DB mode, `content_studio_*` tables are the Content authority, separate from
+Reply records. Display caches are disposable and short lived; mutation point
+reads stay fresh and SQL compares `row_version` atomically with the patch,
+idempotency ledger and audit/history. Legacy Sheet/shadow/read modes retain
+their Sheet-first contracts; their snapshots do not become an additional
+writable authority.
 
 Canonical Drive references consulted for this baseline are `AI-WORKFLOWS-INDEX.md`, `CONTENT-WORKFLOW.md`, `STYLE-GUIDE.md`, `REPRODUCE.md`, `REVIEW.md`, `PLATFORM-PRODUCTION.md` and the workflow-folder `README.md`. The former Google Doc index is superseded; the Markdown index is canonical. Runtime code must discover configured Drive IDs rather than hard-code private file IDs in the public repository.
 

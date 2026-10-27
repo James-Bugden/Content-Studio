@@ -30,9 +30,9 @@ it('retains final import/parity and independent Replies authentication while Con
   session.sub=null;
   await expect(requireMutation(request('/api/ops/sheet-mirror'))).rejects.toMatchObject({code:'AUTH_REQUIRED'});
 });
-it('fails closed before provider-first work when DB writes were never explicitly enabled', async () => {
+it('admits owner mutations with DB enabled alone and no cutover service', async () => {
   vi.stubEnv('CS_CONTENT_STORE','db'); vi.stubEnv('CS_CONTENT_WRITE_ENABLED',undefined); resetEnvCache();
-  await expect(requireMutation(request('/api/schedule/SYN-001/typefully/create'))).rejects.toMatchObject({code:'FORBIDDEN',details:{reason:'rollback_read_only'}});
+  expect(await requireMutation(request('/api/schedule/SYN-001/typefully/create'))).toMatchObject({role:'owner'});
 });
 it.each(['sheet','db-shadow'])('honours the freeze in %s during flag round trips', async mode => {
   vi.stubEnv('CS_CONTENT_STORE',mode); resetEnvCache();

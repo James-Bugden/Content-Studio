@@ -11,12 +11,13 @@ import { timed } from '@/observability/events';
 import { ownerCutoverResult } from '@/application/cutover-result';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 /** Read-only, build-bound admission; no caller payload or operation identity. */
 export async function GET(request: Request) {
   try {
     const env = serverEnv();
     const actor = await requireCutoverActor(request, env.CRON_SECRET);
+    if (env.CS_CONTENT_STORE === 'db' && !getServices().liveCutover) throw new AppError('FORBIDDEN', { reason: 'database_only' });
     if (new URL(request.url).search || request.headers.has('Content-Type') || request.body !== null) throw new AppError('VALIDATION_FAILED');
     // Keep the runner's response and provider reads identical. Only the owner
     // panel needs an import countdown; failure is unknown, never a green age.
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
   try {
     const env = serverEnv();
     const actor = await requireCutoverActor(request, env.CRON_SECRET);
+    if (env.CS_CONTENT_STORE === 'db' && !getServices().liveCutover) throw new AppError('FORBIDDEN', { reason: 'database_only' });
     const body: unknown = await request.json();
     const parsed = operation.safeParse(body);
     if (!parsed.success) {

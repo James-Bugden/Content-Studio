@@ -176,13 +176,7 @@ function matches(card: ReviewCard, record: LibraryRecord, f: ReviewFilters): boo
 
 
 export async function loadReviewQueue(repo: ContentRepository, filters: ReviewFilters): Promise<ReviewQueue> {
-  const library = await repo.listLibrary();
-  let schedule: ScheduleRecord[] | null = null;
-  try {
-    schedule = await repo.listSchedule();
-  } catch {
-    schedule = null;
-  }
+  const [library, schedule] = await Promise.all([repo.listLibrary(), repo.listSchedule().catch(() => null)]);
   const all = library.map((r) => ({ record: r, card: toCard(r, library, schedule) }));
   const filtered = all.filter(({ card, record }) => matches(card, record, filters));
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));

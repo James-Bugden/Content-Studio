@@ -42,7 +42,8 @@ const env = { CS_DATA_MODE: 'live', CS_CONTENT_STORE: 'db-shadow', CS_COMMIT_SHA
 const query = (sql: string, values: unknown[] = []) => db.asService(q => q.query(sql, values));
 beforeAll(async () => {
   db = await createTestDatabase();
-  for (const file of readdirSync('supabase/migrations').filter(f => /^\d+_content_.*\.sql$/.test(f)).sort()) await db.raw.exec(readFileSync(`supabase/migrations/${file}`, 'utf8'));
+  // Historical rollout-component contract. Current serving/migration coverage lives in database-only.test.ts.
+  for (const file of readdirSync('supabase/migrations').filter(f => /^\d+_content_.*\.sql$/.test(f) && f < '20261027000000').sort()) await db.raw.exec(readFileSync(`supabase/migrations/${file}`, 'utf8'));
 }, 120_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => {
@@ -112,7 +113,7 @@ async function admitWrite(activate = true) {
   if (activate) await store.activate('db');
 }
 
-describe('DB-10 live composition / real SQL over mocked REST and Google boundaries', () => {
+describe('Legacy DB-10 components / real SQL over mocked REST and Google boundaries', () => {
   it('replays a legacy completed operation without an audit envelope byte-for-byte and without running it again', async () => {
     const result={status:'verified',manifestHash:hash,verifiedAt:123};
     await query('insert into content_studio_cutover_jobs(operation_id,request_hash,result) values($1,$2,$3)',
@@ -509,7 +510,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     await query("update content_studio_cutover_evidence set payload=jsonb_set(payload,'{privateEvidence}',$1) where name='phase-c'", [JSON.stringify(reference)]);
     await expect(services.liveCutover!['activate-db']()).resolves.toMatchObject({ mode: 'db' });
   });
-  it.each(['db', 'db-read'].flatMap(storeMode => ['draft', 'typefully'].map(action => [storeMode, action])))('R2 route: refreshes an initially green %s status and blocks %s before any provider call', async (storeMode, action) => {
+  it.each(['db-read'].flatMap(storeMode => ['draft', 'typefully'].map(action => [storeMode, action])))('R2 route: refreshes an initially green %s status and blocks %s before any provider call', async (storeMode, action) => {
     if (storeMode === 'db') await admitWrite();
     else { await admitRead(); await new ContentCutoverStore(options, build).activate('db-read'); }
     vi.stubEnv('CS_CONTENT_WRITE_ENABLED', 'true');
@@ -955,7 +956,7 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     await expect(services.liveCutover!.rollback()).rejects.toMatchObject({ code: 'CONFLICT', details: { reason: 'rollback_markdown_not_exact' } });
     expect((await query("select * from content_studio_cutover_evidence where name='rehearsal'")).rows).toHaveLength(0);
   });
-  it.each(['CS_CONTENT_BACKUP_FOLDER_ID', 'SUPABASE_READ_MODEL_URL', 'SUPABASE_READ_MODEL_SERVICE_KEY', 'SUPABASE_READ_MODEL_SOURCE_KEY'])('requires live DB configuration: %s', key => {
+  it.each(['SUPABASE_READ_MODEL_URL', 'SUPABASE_READ_MODEL_SERVICE_KEY'])('requires live DB configuration: %s', key => {
     vi.stubEnv('CS_CONTENT_STORE', 'db'); vi.stubEnv(key, undefined); resetEnvCache();
     expect(() => serverEnv()).toThrow(new RegExp(key));
   });
@@ -1395,4 +1396,10 @@ describe('DB-10 live composition / real SQL over mocked REST and Google boundari
     expect((await mode('sheet').repo.getLibrary('SYN-L001')).cells.pesto).toBe('Synthetic topic');
     expect((await mode('db').repo.getLibrary('SYN-L001')).cells.pesto).toBe('Synthetic topic');
   });
+});
+
+vi.mock('@/application/container', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/application/container')>();
+  const { legacyCutoverServices } = await import('../../support/legacy-cutover');
+  return { ...actual, getServices: () => legacyCutoverServices(actual.getServices()) };
 });

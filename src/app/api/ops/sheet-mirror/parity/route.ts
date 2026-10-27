@@ -14,6 +14,7 @@ export async function POST(request: Request) {
   try {
     await requireMutation(request);
     const env = serverEnv();
+    if (env.CS_CONTENT_STORE === 'db') throw new AppError('FORBIDDEN', { reason: 'parity_disabled_in_db_mode' });
     if (
       env.SUPABASE_READ_MODEL_MODE !== 'shadow' ||
       !env.SUPABASE_READ_MODEL_URL ||

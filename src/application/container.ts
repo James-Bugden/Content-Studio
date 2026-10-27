@@ -1,8 +1,11 @@
 import 'server-only';
 import { composeLiveCutover, type LiveCutoverOps } from './live-content-cutover';
-import { databaseBodyRepository, MarkdownExporter } from './markdown-export';
+import { MarkdownExporter } from './markdown-export';
+import { databaseOnlyRepository } from './database-only';
+import { SupabaseContentDb } from '@/integrations/supabase/content-db';
+import { ContentWorkerLease } from '@/integrations/supabase/content-worker-lease';
 import { ContentReadCutoverRepository } from './content-read-cutover';
-import { ContentExporter, ContentWriteCutover } from './content-export';
+import type { ContentWriteCutover } from './content-export';
 import { FakePrivateBackupFolder } from '@/integrations/supabase/fake-content-backup';
 import type { BackupJournal, ContentBackupSource, PrivateBackupFolder } from './content-backup';
 import { contentSheetCacheOptions } from './content-cache';
@@ -122,10 +125,7 @@ function build(): Services {
       },
     };
     if (env.CS_CONTENT_STORE === 'db') {
-      const exporter = new ContentExporter(db, sheet, { checkpoints: new Map(), issues: new Map(), reports: [] });
-      services.contentCutover = new ContentWriteCutover(services.repo, exporter, () => services.markdownExport!.verifyRollback());
-      if (env.CS_CONTENT_WRITE_ENABLED === 'false') void services.contentCutover.disableWrites();
-      services.repo = databaseBodyRepository(services.contentCutover.repo);
+      services.repo = databaseOnlyRepository(services.repo, env.CS_CONTENT_WRITE_ENABLED !== 'false');
       services.markdownExport = new MarkdownExporter(services.repo, drive, db);
       services.contentBackup = { source: { snapshot: () => db.backupSnapshot() }, folder: new FakePrivateBackupFolder(), journal: { lastVerified: null, failureSince: null } };
     }
@@ -149,6 +149,20 @@ function build(): Services {
       services.contentParity = contentParity;
     }
     return services;
+  }
+  // DB mode never constructs a Sheet repository, importer, exporter or gate.
+  if (env.CS_CONTENT_STORE === 'db') {
+    const db = new SupabaseContentDb({ url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY!,
+      authorizeWrite: async name => {
+        if (!['apply_patch', 'insert_queue_idea', 'restore_markdown_link', 'complete_markdown_export'].includes(name)
+          || env.CS_CONTENT_WRITE_ENABLED === 'false' && name !== 'complete_markdown_export') throw new AppError('FORBIDDEN');
+      } });
+    const tokens = new ServiceAccountTokens(env.GOOGLE_SERVICE_ACCOUNT_EMAIL ?? '', env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? '');
+    const repo = databaseOnlyRepository(new SupabaseContentRepository(db), env.CS_CONTENT_WRITE_ENABLED !== 'false');
+    const drive = new GoogleDriveGateway(tokens, env.GOOGLE_WRITE_ENABLED === 'true', fetch, env.CS_ASSET_FOLDER_ID);
+    const lease = new ContentWorkerLease({ url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY! });
+    return { mode: 'live', repo, drive, ai: createAiGateway(env), typefully: createTypefullyGateway(env),
+      markdownExport: new MarkdownExporter(repo, drive, db, run => lease.run(run), () => lease.fence()) };
   }
   if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || !env.CS_SHEET_ID) {
     throw new AppError('CONFIG_MISSING', { provider: 'sheet' });
@@ -189,15 +203,15 @@ function build(): Services {
       services.contentParity = parity;
     }
   }
-  if (env.CS_CONTENT_STORE === 'db-read' || env.CS_CONTENT_STORE === 'db') {
+  if (env.CS_CONTENT_STORE === 'db-read') {
     const options = { url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY! };
     const contentImport = new SupabaseContentImportStore(options);
     const parity = new SupabaseContentParityJournal(options);
     // Scheduled capture must not reuse a display cache warmed by an earlier
     // request. This read-only repository adds reads only during explicit import.
     services.importRepo = new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, false), { writable: false });
-    if (env.CS_CONTENT_STORE !== 'db') services.contentImport = contentImport;
-    if (env.CS_CONTENT_STORE !== 'db') services.contentParity = parity;
+    services.contentImport = contentImport;
+    services.contentParity = parity;
     composeLiveCutover(services, env, tokens);
   }
   return services;

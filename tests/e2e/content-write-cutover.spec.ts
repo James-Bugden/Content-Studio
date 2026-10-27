@@ -22,34 +22,38 @@ test('MIG-12: an edited no-link DB draft names Restore Drive link without an imp
   expect(errors).toEqual([]);
 });
 
-test('MIG-12: DB save exports, Sheet hand edit is preserved and shown as a blocking field conflict', async ({ page }) => {
+test('DB-only saves and all content pages ignore Sheet edits and outages', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   const control = async (data: object) => expect((await page.request.post('/api/test-control', { data })).status()).toBe(200);
   await control({ kind: 'reset' });
   expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
+  await control({ kind: 'fail', provider: 'sheet', op: 'read', code: 'PROVIDER_UNAVAILABLE', times: 10 });
+  await control({ kind: 'fail', provider: 'sheet', op: 'write', code: 'PROVIDER_UNAVAILABLE', times: 10 });
+  await control({ kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Draft Content', value: 'Synthetic obsolete Sheet copy' });
   await page.goto('/review/SYN-L001');
-  await page.getByLabel(/Post copy/).fill('Synthetic first DB export with exact spaces  ');
+  await page.getByLabel(/Post copy/).fill('Synthetic database-only saved copy  ');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText('Saved in the database. Drive export is queued.')).toBeVisible();
-  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic first DB export with exact spaces  ');
+  await page.reload();
+  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic database-only saved copy  ');
   await page.goto('/reconcile');
-  await expect(page.getByText('Store mode: db.', { exact: false })).toContainText('Database is authoritative');
-  await expect(page.getByText('Store mode: db.', { exact: false })).not.toContainText('Live cutover is pending');
-  await expect(page.locator('[data-reconcile-kind="export_parity"]')).toContainText('Sheet export matches the database');
-  await expect(page.locator('[data-reconcile-kind="backup_fresh"]')).toContainText('No verified backup');
+  await expect(page.getByText('Store mode: db. Database is the only content store.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Database switch' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Run content import' })).toHaveCount(0);
-  await control({ kind: 'sheet_edit', libraryId: 'SYN-L001', header: 'Draft Content', value: 'Synthetic preserved Sheet hand edit  ' });
-  await page.goto('/review/SYN-L001');
-  await page.getByLabel(/Post copy/).fill('Synthetic second DB save');
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByText('Saved in the database. Drive export is queued.')).toBeVisible();
-  await expect(page.getByLabel(/Post copy/)).toHaveValue('Synthetic second DB save');
-  await page.goto('/reconcile');
-  const conflict = page.locator('[data-reconcile-kind="export_mismatch"]');
-  await expect(conflict).toContainText('blocking'); await expect(conflict).toContainText('Draft Content');
-  await expect(conflict).toContainText('row preserved');
-  expect((await new AxeBuilder({ page }).include('[data-reconcile-kind="export_mismatch"]').analyze()).violations).toEqual([]);
+  await expect(page.locator('[data-reconcile-kind="export_parity"], [data-reconcile-kind="export_mismatch"]')).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: `test-results/write-cutover-${test.info().project.name}.png`, fullPage: true });
+  const timing: Record<string, number> = {};
+  for (const route of ['/backlog', '/', '/review', '/schedule', '/backlog?view=ideas', '/ready', '/published', '/replies']) {
+    expect((await page.request.get(route)).status()).toBe(200);
+    const start = performance.now();
+    expect((await page.request.get(route)).status()).toBe(200);
+    timing[route] = Math.round(performance.now() - start);
+  }
+  console.info('DB-only fake warm HTTP ms', JSON.stringify(timing));
+  for (const route of ['/backlog', '/', '/review', '/schedule']) expect(timing[route]).toBeLessThan(1000);
+  const stats = await page.request.post('/api/test-control', { data: { kind: 'store_stats' } });
+  expect(await stats.json()).toEqual({ sheetReads: 0, sheetWrites: 0 });
+  await page.screenshot({ path: `test-results/db-only-${test.info().project.name}.png`, fullPage: true });
   expect(errors).toEqual([]);
 });

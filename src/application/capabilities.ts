@@ -12,7 +12,7 @@ export function fakeContentDatabaseCapability(store: ReturnType<typeof serverEnv
 export function capabilities(): Capability[] {
   const env = serverEnv();
   const includeDb = env.CS_CONTENT_STORE === 'db' || env.CS_CONTENT_STORE === 'db-read';
-  const active = (caps: Capability[]) => caps.filter(c => c.provider !== 'db' || includeDb);
+  const active = (caps: Capability[]) => caps.filter(c => (c.provider !== 'db' || includeDb) && (c.provider !== 'sheet' || env.CS_CONTENT_STORE !== 'db'));
   if (env.CS_DATA_MODE === 'fake') {
     return active((['auth', 'sheet', 'db', 'drive', 'typefully', 'ai'] as const).map((provider) => provider === 'db'
       ? fakeContentDatabaseCapability(env.CS_CONTENT_STORE) : { provider, state: 'ready', mode: 'fake' }));
@@ -28,8 +28,9 @@ export function capabilities(): Capability[] {
     },
     { provider: 'sheet', mode: 'live', state: google(Boolean(env.CS_SHEET_ID)) },
     // Keep this authority label when live db-read is separately wired/enabled.
-    { provider: 'db', mode: 'live', state: 'not_configured', detail: env.CS_CONTENT_STORE === 'db-read'
-      ? 'Derived database copy; Sheet remains authoritative; cutover is not enabled' : 'Content database cutover is not enabled' },
+    { provider: 'db', mode: 'live', state: env.CS_CONTENT_STORE === 'db'
+      ? env.CS_CONTENT_WRITE_ENABLED === 'false' ? 'read_only' : 'ready' : 'not_configured', detail: env.CS_CONTENT_STORE === 'db'
+      ? 'Database is the only content store' : 'Derived database copy; Sheet remains authoritative; cutover is not enabled' },
     { provider: 'drive', mode: 'live', state: google(true) },
     { provider: 'typefully', mode: 'live', state: env.TYPEFULLY_API_KEY && env.TYPEFULLY_SOCIAL_SET_ID ? 'ready' : 'not_configured' },
     {
