@@ -7,6 +7,7 @@ import type { HookInput } from '@/application/hooks';
 import type { ZhInput } from '@/application/zh-tw';
 import { fakeEnglishQa, fakeHooks, fakeZhTw } from './fake-generators';
 import { AiCancelled, runTask, type ModelCaller } from './pipeline';
+import type { AiUsageService } from '@/application/ai-usage';
 
 /**
  * Deterministic AI gateway: no network, no key. Used in fake mode, unit tests and
@@ -21,6 +22,7 @@ import { AiCancelled, runTask, type ModelCaller } from './pipeline';
 export const FAKE_MODEL = 'fake-deterministic-v1';
 
 export class FakeAiGateway implements AiGateway {
+  constructor(private readonly usage?: AiUsageService) {}
   delayMs = 0;
   private failures: ErrorCode[] = [];
   private malformed = 0;
@@ -96,7 +98,7 @@ export class FakeAiGateway implements AiGateway {
       const text = this.malformed > 0 ? (this.malformed--, this.malformedOutput(task.name, input)) : JSON.stringify(this.generate(task.name, input));
       return { stopReason: 'end_turn', text, model: FAKE_MODEL, inputTokens: Math.ceil(req.messages.reduce((n, m) => n + m.content.length, 0) / 4), outputTokens: Math.ceil(text.length / 4) };
     };
-    return runTask({ provider: 'fake', model: FAKE_MODEL }, task, input, call, opts);
+    return runTask({ provider: 'fake', model: FAKE_MODEL }, task, input, call, opts, this.usage);
   }
 }
 

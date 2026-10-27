@@ -1,5 +1,5 @@
 import { GENERATION } from '@/replies/lib/contracts/limits';
-import { AppError, type ErrorCode } from '@/replies/lib/contracts/errors';
+import { AppError, isAppError, type ErrorCode } from '@/replies/lib/contracts/errors';
 import { assemblePrompt } from './prompts/assemble';
 import { parseProviderOutput, runGuards } from './guards';
 import { ProviderError, type GenerationContext, type ProviderIdea, type ReplyGenerator } from './types';
@@ -156,6 +156,7 @@ export async function generateIdeas(
       );
     } catch (error) {
       clearTimeout(timer);
+      if (isAppError(error)) throw error;
       if (!(error instanceof ProviderError)) {
         return {
           ...base,

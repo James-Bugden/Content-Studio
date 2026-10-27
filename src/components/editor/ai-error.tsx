@@ -13,6 +13,10 @@ export function asErrorCode(code: unknown): ErrorCode {
 }
 
 export function AiErrorView({ code, what, onRetry }: { code: ErrorCode; what: string; onRetry?: () => void }) {
+  if (code === 'AI_LIMIT_REACHED') return <StateView kind="blocked" title="Monthly AI limit reached"
+    detail="AI calls are paused. You can keep editing and saving."
+    nextStep="Wait for the 1st or change the monthly limit in AI usage."
+    action={<a href="/ai-usage" className={buttonClass()}>AI usage</a>} />;
   const retry = onRetry ? (
     <button type="button" className={buttonClass()} onClick={onRetry}>
       Try again

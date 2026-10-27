@@ -1,4 +1,6 @@
 import 'server-only';
+import { getAiUsage, resetAiUsage } from './ai-usage-container';
+import type { AiUsageService } from './ai-usage';
 import { composeLiveCutover, type LiveCutoverOps } from './live-content-cutover';
 import { MarkdownExporter } from './markdown-export';
 import { databaseOnlyRepository } from './database-only';
@@ -61,10 +63,10 @@ export type Services = {
  * not_configured and returns CONFIG_MISSING. Live data never silently runs on the
  * fake model, because its proposals would look real.
  */
-export function createAiGateway(env: ReturnType<typeof serverEnv>): AiGateway {
-  if (env.CS_DATA_MODE === 'fake') return new FakeAiGateway();
+export function createAiGateway(env: ReturnType<typeof serverEnv>, usage?: AiUsageService): AiGateway {
+  if (env.CS_DATA_MODE === 'fake') return new FakeAiGateway(usage);
   if (env.AI_PROVIDER === 'anthropic' && env.AI_API_KEY) {
-    return new AnthropicAiGateway({ apiKey: env.AI_API_KEY, ...(env.AI_MODEL ? { model: env.AI_MODEL } : {}) });
+    return new AnthropicAiGateway({ apiKey: env.AI_API_KEY, ...(env.AI_MODEL ? { model: env.AI_MODEL } : {}), ...(usage ? { usage } : {}) });
   }
   return new UnconfiguredAiGateway();
 }
@@ -105,7 +107,7 @@ function build(): Services {
   if (env.CS_DATA_MODE === 'fake') {
     const sheet = new FakeSheetTransport();
     const drive = new FakeDriveGateway();
-    const ai = createAiGateway(env);
+    const ai = createAiGateway(env, getAiUsage());
     const typefully = createTypefullyGateway(env);
     const db = new FakeContentDb();
     const sheetRepo = new SheetsContentRepository(sheet, { writable: env.CS_CONTENT_WRITE_ENABLED !== 'false', ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'fake') });
@@ -161,7 +163,7 @@ function build(): Services {
     const repo = databaseOnlyRepository(new SupabaseContentRepository(db), env.CS_CONTENT_WRITE_ENABLED !== 'false');
     const drive = new GoogleDriveGateway(tokens, env.GOOGLE_WRITE_ENABLED === 'true', fetch, env.CS_ASSET_FOLDER_ID);
     const lease = new ContentWorkerLease({ url: env.SUPABASE_READ_MODEL_URL!, serviceKey: env.SUPABASE_READ_MODEL_SERVICE_KEY! });
-    return { mode: 'live', repo, drive, ai: createAiGateway(env), typefully: createTypefullyGateway(env),
+    return { mode: 'live', repo, drive, ai: createAiGateway(env, getAiUsage()), typefully: createTypefullyGateway(env),
       markdownExport: new MarkdownExporter(repo, drive, db, run => lease.run(run), () => lease.fence()) };
   }
   if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || !env.CS_SHEET_ID) {
@@ -177,7 +179,7 @@ function build(): Services {
     // stale display can be refused but never written over.
     repo: new SheetsContentRepository(new GoogleSheetTransport(env.CS_SHEET_ID, tokens, writable), { writable, ...contentSheetCacheOptions(env.CS_CONTENT_STORE, 'live') }),
     drive: new GoogleDriveGateway(tokens, env.GOOGLE_WRITE_ENABLED === 'true', fetch, env.CS_ASSET_FOLDER_ID),
-    ai: createAiGateway(env),
+    ai: createAiGateway(env, getAiUsage()),
     typefully: createTypefullyGateway(env),
   };
   if (env.CS_CONTENT_STORE === 'db-shadow') {
@@ -220,4 +222,5 @@ function build(): Services {
 /** Tests and e2e reset only. */
 export function resetServices(): void {
   store[KEY] = null;
+  resetAiUsage();
 }

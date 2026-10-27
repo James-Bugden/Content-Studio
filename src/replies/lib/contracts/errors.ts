@@ -17,6 +17,7 @@ export const errorCodeSchema = z.enum([
   'idempotency_conflict',
   'payload_too_large',
   'rate_limited',
+  'monthly_ai_limit_reached',
   'provider_invalid_response',
   'provider_timeout',
   'provider_unavailable',
@@ -47,6 +48,7 @@ const STATUS: Readonly<Record<ErrorCode, number>> = Object.freeze({
   idempotency_conflict: 409,
   payload_too_large: 413,
   rate_limited: 429,
+  monthly_ai_limit_reached: 429,
   provider_invalid_response: 502,
   provider_timeout: 504,
   provider_unavailable: 503,
@@ -175,6 +177,7 @@ export function codeForSqlState(sqlState: string | undefined): ErrorCode {
 
 /** Generic messages. They never confirm or deny that some other record exists. */
 export const GENERIC_MESSAGE: Readonly<Record<ErrorCode, string>> = Object.freeze({
+  monthly_ai_limit_reached: 'Monthly AI limit reached',
   validation_failed: 'That request was not valid.',
   unauthenticated: 'Sign in to continue.',
   forbidden: 'That is not available.',
