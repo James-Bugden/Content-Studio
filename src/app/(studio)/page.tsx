@@ -23,11 +23,11 @@ export default async function NextUpPage() {
   } catch (error) {
     return (
       <>
-        <PageHeader title="Next up" description="Here is what needs you" />
+        <PageHeader title="Next up" />
         <StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
   }
-  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
+  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} slots={board.slots} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
 }

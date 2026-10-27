@@ -59,7 +59,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   } catch (error) {
     return (
       <>
-        <PageHeader title="Calendar" description="Your posts by day and platform, in Taipei time." />
+        <PageHeader title="Calendar" description="Taipei time" />
         <ErrorState code={isAppError(error) ? error.code : 'UNKNOWN'} />
       </>
     );
@@ -75,7 +75,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Calendar" description="Your posts by day and platform. All times are Taipei." />
+      <PageHeader title="Calendar" description="Taipei time" />
       <NeedsStrip
         heading={isThisWeek ? 'Needs you this week' : `Needs you in the week of ${formatDayLong(stripWeek)}`}
         emptyText={isThisWeek ? 'Nothing needs you this week.' : 'Nothing needs you that week.'}
@@ -87,8 +87,8 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
           <MonthGrid grid={grid} today={board.today} slots={board.slots} />
         ) : (
           <>
-            {view === 'week' ? <WeekGrid className="hidden md:grid" start={week} today={board.today} slots={board.slots} /> : null}
-            <DayList className={view === 'week' ? 'flex md:hidden' : 'flex'} start={week} today={board.today} slots={board.slots} />
+            {view === 'week' ? <WeekGrid className="hidden lg:grid" start={week} today={board.today} slots={board.slots} /> : null}
+            <DayList className={view === 'week' ? 'flex lg:hidden' : 'flex'} start={week} today={board.today} slots={board.slots} />
           </>
         )}
       </div>
