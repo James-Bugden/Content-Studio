@@ -21,7 +21,8 @@ it.each([
   expect(screen.getByRole('heading', { level: 1, name: title })).toBeTruthy();
   const status = screen.getByRole('status');
   expect(status.getAttribute('aria-busy')).toBe('true');
-  expect(status.textContent).toContain('Nothing is changed while this loads.');
+  expect(status.textContent).toContain('Loading');
+  expect(status.textContent).not.toMatch(/Sheet|Reading from/);
   const skeleton = container.querySelector('[aria-hidden="true"].motion-safe\\:animate-pulse');
   expect(skeleton?.children).toHaveLength(4);
   expect(screen.queryByRole('button')).toBeNull();

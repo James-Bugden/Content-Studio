@@ -271,14 +271,14 @@ export async function monkey(page: Page, route: string) {
   // Eight actions per route (well below 60). Rebuild the stable DOM-order safe
   // inventory after every action; never click save/approve/delete/sign-out/etc.
   for (let n = 0; n < 8; n++) {
-    const summaries = page.locator('summary').filter({ visible: true });
+    const summaries = page.locator('summary:not(.studio-avatar)').filter({ visible: true });
     const searches = page.locator('input[type="search"]').filter({ visible: true });
     const inventory = await page.evaluate((routes) => {
       const visible = (el: Element) => el.checkVisibility({ checkVisibilityCSS: true });
       document.querySelectorAll('[data-sweep-safe-link]').forEach((el) => el.removeAttribute('data-sweep-safe-link'));
       const links = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')].filter((el) => visible(el) && routes.includes(el.getAttribute('href') ?? ''));
       links.forEach((el, index) => el.setAttribute('data-sweep-safe-link', String(index)));
-      return { summaries: [...document.querySelectorAll('summary')].filter(visible).length,
+      return { summaries: [...document.querySelectorAll('summary:not(.studio-avatar)')].filter(visible).length,
         searches: [...document.querySelectorAll('input[type="search"]')].filter(visible).length,
         links: links.map((el, index) => ({ index, href: el.getAttribute('href')! })) };
     }, [...ROUTES].filter((r) => r !== '/login') as string[]);

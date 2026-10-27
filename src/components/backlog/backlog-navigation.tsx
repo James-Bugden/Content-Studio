@@ -1,12 +1,11 @@
 'use client';
 
 import { createContext, useCallback, useContext, useState } from 'react';
-import type { LibraryRecord } from '@/domain/records';
-import type { BacklogReadiness } from '@/domain/library-backlog';
+import type { BacklogListRow, BacklogReadiness } from '@/domain/library-backlog';
 
 export type BacklogResult = {
   ok: true;
-  rows: Pick<LibraryRecord, 'row' | 'value' | 'revision'>[];
+  rows: BacklogListRow[];
   statuses: Record<string, BacklogReadiness>;
   total: number;
   page: number;

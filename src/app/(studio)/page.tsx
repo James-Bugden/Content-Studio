@@ -15,8 +15,13 @@ export const dynamic = 'force-dynamic';
  * Next up (UX redesign): the home page. One board read; anonymous visitors are
  * sent to /login by the studio layout (SEC-05) and requireActor checks again.
  */
-export default async function NextUpPage() {
+export default async function NextUpPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
   await requireActor('viewer');
+  const params = await searchParams;
+  const page = (key: string) => {
+    const value = Number(params[key]);
+    return Number.isSafeInteger(value) && value > 0 ? value : 1;
+  };
   let board: Board;
   try {
     board = await loadBoard(getServices().repo, { requireSchedule: true });
@@ -29,5 +34,5 @@ export default async function NextUpPage() {
       </>
     );
   }
-  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
+  return <NextUpView today={board.today} counts={board.counts} tasks={board.tasks} posts={board.posts} nowPage={page('nowPage')} nextPage={page('nextPage')} integrationStatus={<StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities()} /></StatusBanner>} />;
 }
