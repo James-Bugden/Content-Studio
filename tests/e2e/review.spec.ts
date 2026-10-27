@@ -124,14 +124,14 @@ test('UX-01: the Posts table shows every step as words, and a row opens the pane
   await page.goto('/review');
   await expect(page.getByRole('navigation', { name: 'Post tabs' }).getByRole('link', { name: /Ready to schedule/ })).toBeVisible();
   const table = page.getByRole('region', { name: 'Posts table' });
-  const rows = page.locator('[data-library-id="SYN-L002"]:visible');
+  const rows = page.locator('[data-library-id="SYN-L003"]:visible');
   await expect(rows).toHaveCount(1);
-  await expect(rows.getByText('REWORK', { exact: true })).toBeVisible();
+  await expect(rows.getByText('Duplicate?', { exact: true })).toBeVisible();
   if (await table.isVisible()) await expect(table.getByRole('columnheader', { name: 'Next step' })).toBeVisible();
   // No Library IDs or source lines in the visible text.
   expect(await page.locator('main').innerText()).not.toContain('SYN-L0');
-  await rows.getByRole('link', { name: 'Quoted framework' }).click();
-  await expect(page).toHaveURL(/[?&]post=SYN-L002/);
+  await rows.getByRole('link', { name: 'Anchor high' }).click();
+  await expect(page).toHaveURL(/[?&]post=SYN-L003/);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });

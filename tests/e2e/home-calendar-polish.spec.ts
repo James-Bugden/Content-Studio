@@ -12,7 +12,7 @@ test('Next up groups every visible action with platform marks and phone-sized co
   await page.goto('/');
   const urgent = page.getByRole('region', { name: /Do these now/ });
   await expect(urgent.locator('[data-action-group="Chinese adaptation"]')).toContainText('Update Chinese');
-  await expect(urgent.locator('[data-action-group="Review & fix"]')).toContainText('Rework copy');
+  await expect(urgent.locator('[data-action-group="Review & fix"]')).toContainText('Decide duplicate');
   const tasks = page.locator('[data-task]');
   const keys = await tasks.evaluateAll(rows => rows.map(row => row.getAttribute('data-task')));
   expect(new Set(keys).size).toBe(keys.length);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { COPYRIGHT_QA, DUPLICATE_QA } from '@/domain/enums';
+import { DUPLICATE_QA } from '@/domain/enums';
 import type { EditorModel } from '@/domain/views';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { InlineResult } from '../inline-result';
@@ -11,7 +11,7 @@ export function ReviewChecks({ model, revision, disabled, onSaved }: { model: Ed
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef<{ key: string; id: string } | null>(null);
-  async function save(field: 'copyrightQa' | 'duplicateQa', value: string) {
+  async function save(field: 'duplicateQa', value: string) {
     setBusy(true); setError('');
     const key = JSON.stringify([revision, field, value]);
     const operationId = pending.current?.key === key ? pending.current.id : newOperationId('qa');
@@ -27,9 +27,6 @@ export function ReviewChecks({ model, revision, disabled, onSaved }: { model: Ed
     <h3 className="font-semibold">Approval checks</h3>
     {model.gates.blockers.filter(g => !/^(VISUAL_|SCREENSHOT_|REVIEW_PENDING|REVIEW_CHANGES_REQUESTED)/.test(g.code)).map((g, i) => <p key={`${g.code}-${i}`} className="text-base">{g.field}: {g.nextAction}</p>)}
     <div className="flex flex-wrap gap-3">
-      <label className="min-w-0 text-sm">Copyright QA<select className="mt-1 block min-h-11 rounded-md border border-line bg-card px-3 text-base" disabled={disabled || busy} value={model.qa?.copyright ?? ''} onChange={e => void save('copyrightQa', e.target.value)}>
-        <option value="" disabled>Choose a decision</option>{COPYRIGHT_QA.map(v => <option key={v} value={v}>{v === 'PASS' ? 'Cleared' : v === 'REWORK' ? 'Needs rework' : 'Unchecked'}</option>)}
-      </select></label>
       <label className="min-w-0 text-sm">Duplicate QA<select className="mt-1 block min-h-11 rounded-md border border-line bg-card px-3 text-base" disabled={disabled || busy} value={model.qa?.duplicate ?? ''} onChange={e => void save('duplicateQa', e.target.value)}>
         <option value="" disabled>Choose a decision</option>{DUPLICATE_QA.map(v => <option key={v} value={v}>{v === 'PASS' ? 'No duplicate' : v === 'CHECK' ? 'Needs checking' : v === 'DUPLICATE' ? 'Confirmed duplicate' : 'Unchecked'}</option>)}
       </select></label>
