@@ -18,6 +18,9 @@ import { PlatformLogo } from '../panel/platform-logo';
 import { SaveAs } from './save-as';
 import { DeletePost } from './delete-post';
 import { GuardedLink } from '../guarded-link';
+import { ReviewChecks } from './review-checks';
+import { PanelImage } from '../visuals/panel-image';
+import { isAnyDirty } from '../dirty-store';
 
 /**
  * Owns the editor's current text so the AI panels always bind to exactly what is
@@ -25,12 +28,13 @@ import { GuardedLink } from '../guarded-link';
  * conflict behaviour; after a hook choice the whole editor reloads from the
  * authoritative model so the hook and the draft stay in step.
  */
-export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = false, reviewActions = false, onSaved, onSaveFailed, onReviewed }: {
+export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = false, reviewActions = false, inlineImage = false, onSaved, onSaveFailed, onReviewed }: {
+  inlineImage?: boolean;
   model: EditorModel; canEdit: boolean; ns: string; focusMode?: boolean;
   /** Show Approve / Request changes under the editor (CS-049). Owners only. */
   reviewActions?: boolean;
   /** After a successful review transition; the editor itself reloads its model. */
-  onReviewed?: () => void;
+  onReviewed?: (message: string) => void;
   /** Focus mode only: replaces the default page refresh after a save (the Backlog defers it to close, CS-047). */
   onSaved?: () => void;
   onSaveFailed?: () => void;
@@ -39,8 +43,9 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
   const contentStore = initialModel.contentProvider === 'db' ? 'database' : 'Sheet';
   const [model, setModel] = useState(initialModel);
   const [text, setText] = useState(() => initialEditorText(initialModel));
+  const [reviewRevision, setReviewRevision] = useState<string>();
   const [editorKey, setEditorKey] = useState(0);
-  const [selection, setSelection] = useState<SaveSelection>(() => savedSelection(initialModel.versions, initialModel.targetPlatform));
+  const [selection, setSelection] = useState<SaveSelection>(() => savedSelection(initialModel.versions, initialModel.targetPlatform, initialEditorText(initialModel)));
   const [previewPlatform, setPreviewPlatform] = useState<SavePlatform>(SAVE_PLATFORMS.includes(initialModel.targetPlatform as SavePlatform) ? initialModel.targetPlatform as SavePlatform : 'LinkedIn');
   const [previewChinese, setPreviewChinese] = useState(false);
   const [aiOpen, setAiOpen] = useState(true);
@@ -55,7 +60,8 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
     mismatch: initialModel.mismatch,
   });
   const [reloadFailed, setReloadFailed] = useState(false);
-  const onSnapshot = useCallback((s: EditorSnapshot) => setSnapshot(s), []);
+  const snapshotRef = useRef(snapshot);
+  const onSnapshot = useCallback((s: EditorSnapshot) => { snapshotRef.current = s; setSnapshot(s); }, []);
 
   async function reload(refreshPage = true) {
     try {
@@ -63,14 +69,26 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       const body = (await res.json()) as { ok: boolean; model?: EditorModel };
       if (!res.ok || !body.ok || !body.model) throw new Error('reload');
       setModel(body.model);
-      setText(initialEditorText(body.model));
-      setPendingHook(null);
-      setSelection(savedSelection(body.model.versions, body.model.targetPlatform));
-      setEditorKey((k) => k + 1);
+      if (!snapshotRef.current.dirty) {
+        setText(initialEditorText(body.model));
+        setPendingHook(null);
+        setSelection(savedSelection(body.model.versions, body.model.targetPlatform, initialEditorText(body.model)));
+        setEditorKey((k) => k + 1);
+      }
       setReloadFailed(false);
       if (refreshPage) router.refresh();
     } catch {
       setReloadFailed(true);
+    }
+  }
+
+  async function refreshSavedMetadata() {
+    const res = await fetch(`/api/library/${encodeURIComponent(model.libraryId)}/editor`, { credentials: 'same-origin', cache: 'no-store' }).catch(() => null);
+    const body = await res?.json().catch(() => null) as { ok: boolean; model?: EditorModel } | null;
+    if (res?.ok && body?.ok && body.model && body.model.sheet.revision === snapshotRef.current.sheetRevision) {
+      // Keep the mounted editor and any typing after Save; refresh gates only.
+      const fresh = body.model;
+      setModel(m => ({ ...m, gates: fresh.gates, reviewStatus: fresh.reviewStatus }));
     }
   }
 
@@ -98,17 +116,17 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
         <span className="text-sm font-semibold">English master</span>
         <div className="flex items-center gap-3 text-sm">
-          <GuardedLink href={`/visuals/${encodeURIComponent(model.libraryId)}`} className="inline-flex min-h-11 items-center underline">Visuals</GuardedLink>
-          <button type="button" aria-expanded={aiOpen} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line px-3" onClick={() => { setAiOpen(v => !v); if (!aiOpen) requestAnimationFrame(() => aiRef.current?.scrollIntoView({ block: 'nearest' })); }}>Checks</button>
+          {inlineImage ? <a href="#panel-image" className="inline-flex min-h-11 items-center underline">Image</a> : <GuardedLink href={`/visuals/${encodeURIComponent(model.libraryId)}`} className="inline-flex min-h-11 items-center underline">Image</GuardedLink>}
+          <button type="button" aria-expanded={aiOpen} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-ink px-3 font-semibold" onClick={() => { setAiOpen(v => !v); if (!aiOpen) requestAnimationFrame(() => aiRef.current?.scrollIntoView({ block: 'nearest' })); }}><span aria-hidden="true">✧</span> AI</button>
         </div>
       </div>
       <div className="grid min-w-0 gap-5 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         <div className="min-w-0">
-          <PostEditor key={editorKey} handleRef={editorHandle} onPendingHookChange={setPendingHook} onHookSaved={(hook) => setModel((m) => ({ ...m, sheet: { ...m.sheet, hook } }))}
+          <PostEditor key={editorKey} externalRevision={reviewRevision} handleRef={editorHandle} onPendingHookChange={setPendingHook} onHookSaved={(hook) => setModel((m) => ({ ...m, sheet: { ...m.sheet, hook } }))}
             assist={<AiAssist libraryId={model.libraryId} text={text} canEdit={canEdit} decided={model.visual.trim() !== '' && model.visual !== 'Undecided'} dirty={snapshot.dirty} revision={snapshot.sheetRevision}
               onUseHook={(hook) => editorHandle.current?.applyHook(hook)}
               onDecided={(decision, revision) => { editorHandle.current?.setRevision(revision); setModel((m) => ({ ...m, visual: decision })); }} />}
-            model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? (onSaved ?? (() => router.refresh())) : undefined} onSaveFailed={onSaveFailed} autoFocus={focusMode}
+            model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={() => { void refreshSavedMetadata(); if (onSaved) onSaved(); else if (focusMode) router.refresh(); }} onSaveFailed={onSaveFailed} autoFocus={focusMode}
             selection={model.contentProvider === 'db' ? selection : undefined}
             onSelectionChange={setSelection}
             saveAsControl={model.contentProvider === 'db' ? <SaveAs libraryId={model.libraryId} text={text} value={selection} onChange={setSelection} canEdit={canEdit} /> : undefined} />
@@ -124,20 +142,36 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       </div>
       {reviewActions && canEdit ? (
         <ReviewActions
+          imageHref={inlineImage ? '#panel-image' : `/visuals/${encodeURIComponent(model.libraryId)}`}
+          onShowQa={() => {
+            setAiOpen(true);
+            requestAnimationFrame(() => {
+              aiRef.current?.querySelectorAll('details').forEach(el => { el.open = true; });
+              aiRef.current?.scrollIntoView({ block: 'start' });
+            });
+          }}
           libraryId={model.libraryId}
           reviewStatus={model.reviewStatus}
           blockers={model.gates.blockers}
           sheetRevision={snapshot.sheetRevision}
           dirty={snapshot.dirty}
-          onDone={() => {
-            // Reload so the editor saves against the new Sheet revision; the page refreshes too unless the host defers it.
-            void reload(!onReviewed);
-            onReviewed?.();
+          onDone={(card, message) => {
+            if (snapshotRef.current.dirty || isAnyDirty()) {
+              // Request changes changes review metadata only. Retain the local copy and
+              // advance the save precondition to the revision returned by the mutation.
+              setReviewRevision(card.revision);
+              setModel(m => ({ ...m, reviewStatus: card.reviewStatus, gates: card.gates }));
+            } else {
+              void reload(!onReviewed);
+              onReviewed?.(message);
+            }
           }}
         />
       ) : null}
       {reloadFailed ? <InlineResult tone="warning">The change was saved, but the editor could not reload it. Reload the page to see the latest version.</InlineResult> : null}
-      <div ref={aiRef} hidden={!aiOpen} className="space-y-4">
+      {inlineImage && model.visualItem ? <PanelImage key={model.visualItem.revision} initial={model.visualItem} imageBrief={model.imageBrief} canEdit={canEdit} copyDirty={snapshot.dirty} onChanged={() => { void reload(!onReviewed); onReviewed?.('Image saved.'); }} /> : null}
+      <div id={`qa-${model.libraryId}`} ref={aiRef} hidden={!aiOpen} className="space-y-4">
+      {canEdit ? <ReviewChecks model={model} revision={snapshot.sheetRevision} disabled={snapshot.dirty} onSaved={() => { void reload(!onReviewed); onReviewed?.('QA decision saved.'); }} /> : null}
       <HookChoice
         key={`hook:${model.sheet.revision}:${model.sheet.hook}`}
         pendingHook={pendingHook}

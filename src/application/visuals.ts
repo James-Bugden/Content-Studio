@@ -20,7 +20,7 @@ import {
   type VisualBrief,
 } from '@/domain/visual';
 import { renderBriefSvg, type RenderProblem } from '@/domain/visual-render';
-import { reuseCheck, serializeBrief, type DecisionKind, type ReuseCheck, type VisualItemView, type VisualList } from '@/domain/visual-studio';
+import { imageReason, reuseCheck, serializeBrief, type DecisionKind, type ReuseCheck, type VisualItemView, type VisualList } from '@/domain/visual-studio';
 import type { ContentRepository, DriveGateway } from './ports';
 import { screenshotUses } from './review';
 
@@ -117,6 +117,7 @@ export function toVisualView(record: LibraryRecord, library: LibraryRecord[], sc
   else canRender = { ok: true, nextVersion: formatVisualVersion({ system: 'SOAR-v1.1', revision: (version?.revision ?? 0) + 1, platform, language }) };
 
   return {
+    reason: imageReason(v.imageNextAction),
     libraryId: item.libraryId,
     revision: record.revision,
     slug: item.slug,
@@ -206,6 +207,7 @@ export const briefInputSchema = z.object({
 export const decisionSchema = z.union([z.literal('text_only'), z.literal('original_graphic'), z.object({ screenshotId: z.string().trim().min(3).max(120) })]);
 
 export const visualActionSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('reason'), ...base, reason: z.string().trim().min(1).max(300).regex(/^[^\r\n]+$/) }),
   z.object({ action: z.literal('decide'), ...base, decision: decisionSchema }),
   z.object({ action: z.literal('brief'), ...base, brief: briefInputSchema }),
   z.object({ action: z.literal('render'), ...base }),
@@ -264,6 +266,10 @@ function isOutcome(x: Loaded | VisualOutcome): x is VisualOutcome {
 }
 
 async function write(repo: ContentRepository, actor: Actor, input: Base, loaded: Loaded, patch: LibraryPatch, extra: { note?: string; reuse?: ReuseCheck; steps?: StepResult[] } = {}): Promise<VisualOutcome> {
+  // Keep the owner's image judgement when workflow actions replace the next-action note.
+  if (patch.imageNextAction !== undefined && !/(?:^|\n)Image reason: /.test(patch.imageNextAction) && loaded.view.reason) {
+    patch = { ...patch, imageNextAction: `${patch.imageNextAction}\nImage reason: ${encodeURIComponent(loaded.view.reason)}` };
+  }
   const result = await repo.updateLibrary({ operationId: input.operationId, actor, target: { libraryId: input.libraryId }, expectedRevision: input.expectedRevision, patch });
   if (!result.ok) {
     const steps = [...(extra.steps ?? []), ...result.steps];
@@ -515,6 +521,13 @@ export async function renderPreview(repo: ContentRepository, libraryId: string, 
 /** Route dispatcher, so the route stays a thin auth + parse shell. */
 export async function runVisualAction(repo: ContentRepository, drive: DriveGateway, actor: Actor, action: VisualAction): Promise<VisualOutcome> {
   switch (action.action) {
+    case 'reason': {
+      const loaded = await begin(repo, actor, action);
+      if (isOutcome(loaded)) return loaded;
+      if (loaded.record.formulaFields.includes('imageNextAction')) return blocked('Image Next Action contains a formula; its reason cannot be edited here.');
+      const note = loaded.record.value.visual.imageNextAction.replace(/(?:^|\n)Image reason: [^\n]*/g, '');
+      return write(repo, actor, action, loaded, { imageNextAction: `${note}\nImage reason: ${encodeURIComponent(action.reason)}` });
+    }
     case 'decide':
       return decideVisual(repo, actor, action);
     case 'brief':

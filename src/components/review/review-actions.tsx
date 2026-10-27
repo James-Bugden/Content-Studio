@@ -7,6 +7,7 @@ import { newOperationId, postJson } from '@/lib/client/api';
 import type { ReviewCard } from '@/domain/views';
 import { buttonClass } from '../button-styles';
 import { InlineResult } from '../inline-result';
+import { ApprovalHelp } from './approval-help';
 
 /**
  * Approve / request changes next to the editor (CS-049). The editor page used to
@@ -20,12 +21,14 @@ type Action = 'approve' | 'approve_and_queue' | 'request_changes';
 type Outcome = { ok: true; card: ReviewCard } | { ok: false; code: string; message?: string; blockers?: Gate[] };
 
 const DONE: Record<Action, string> = {
-  approve: 'Approved. The Sheet now holds this approval.',
+  approve: 'Approved.',
   approve_and_queue: 'Approved and queued for scheduling.',
   request_changes: 'Changes requested.',
 };
 
-export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision, dirty, onDone }: {
+export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision, dirty, onDone, imageHref, onShowQa }: {
+  imageHref?: string;
+  onShowQa?: () => void;
   libraryId: string;
   reviewStatus: string;
   blockers: readonly Gate[];
@@ -33,7 +36,7 @@ export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision
   sheetRevision: string;
   dirty: boolean;
   /** Called after any successful transition so the caller can reload its model. */
-  onDone: () => void;
+  onDone: (card: ReviewCard, message: string) => void;
 }) {
   const [busy, setBusy] = useState<Action | null>(null);
   const [result, setResult] = useState<{ tone: 'success' | 'warning' | 'error'; text: string } | null>(null);
@@ -48,13 +51,13 @@ export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision
     const body = res.body as Outcome;
     if (body.ok) {
       setResult({ tone: 'success', text: DONE[action] });
-      onDone();
+      onDone(body.card, DONE[action]);
       return;
     }
     const why = body.blockers?.map((b) => b.message).join(' ');
     setResult({
       tone: body.code === 'STALE_READ' ? 'warning' : 'error',
-      text: body.code === 'STALE_READ' ? 'This post changed in the Sheet. Reload it, check the latest version and try again.' : why || body.message || 'Not done. Nothing was written.',
+      text: body.code === 'STALE_READ' ? 'This post changed. Reload it, check the latest version and try again.' : why || body.message || 'Not done. Nothing was written.',
     });
   }
 
@@ -67,23 +70,21 @@ export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision
         <p className="text-sm">
           <span aria-hidden="true" className="font-semibold text-green">✓ </span>Approved.
         </p>
-      ) : (
+      ) : null}
         <div className="flex flex-wrap items-center gap-2">
+          {!approved ? <>
           <button type="button" className={buttonClass('approve', 'sm')} disabled={busy !== null || dirty || blocking.length > 0} onClick={() => void run('approve_and_queue')}>
             {busy === 'approve_and_queue' ? 'Approving…' : 'Approve and queue'}
           </button>
           <button type="button" className={buttonClass('secondary', 'sm')} disabled={busy !== null || dirty || blocking.length > 0} onClick={() => void run('approve')}>
             {busy === 'approve' ? 'Approving…' : 'Approve only'}
           </button>
-          <button type="button" className={buttonClass('secondary', 'sm')} disabled={busy !== null || dirty} onClick={() => void run('request_changes')}>
-            {busy === 'request_changes' ? 'Saving…' : 'Request changes'}
-          </button>
-        </div>
-      )}
-      {!approved && dirty ? <p className="text-xs text-ink-soft">Save the draft first.</p> : null}
-      {!approved && !dirty && blocking.length > 0 ? (
-        <p className="text-xs text-ink-soft">Approval opens once these are fixed: {blocking.map((b) => b.message).join(' ')}</p>
-      ) : null}
+          </> : null}
+        <button type="button" className={buttonClass('secondary', 'sm')} disabled={busy !== null} onClick={() => void run('request_changes')}>
+          {busy === 'request_changes' ? 'Saving…' : 'Request changes'}
+        </button>
+      </div>
+      {!approved ? <ApprovalHelp libraryId={libraryId} dirty={dirty} blockers={blocking} imageHref={imageHref} onShowQa={onShowQa} /> : null}
       {result ? <InlineResult tone={result.tone}>{result.text}</InlineResult> : null}
     </section>
   );

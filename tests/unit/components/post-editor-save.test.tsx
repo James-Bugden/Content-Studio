@@ -7,6 +7,7 @@ import type { SaveSelection } from '@/domain/post-versions';
 import { PostEditor } from '@/components/editor/post-editor';
 import { isAnyDirty, resetDirtyStoreForTests } from '@/components/dirty-store';
 import type { EditorModel } from '@/domain/views';
+import { fingerprint } from '@/domain/hash';
 
 const model: EditorModel = {
   libraryId: 'SYN-L001', slug: 'Synthetic post', source: 'Synthetic source',
@@ -49,7 +50,7 @@ describe('PostEditor save notification (CS-050)', () => {
     const currentText = 'Current synthetic English';
     const currentModel = { ...model, contentProvider: 'db' as const, sheet: { ...model.sheet, revision: 'current-rev', draft: currentText },
       markdown: { ...model.markdown, state: 'ok' as const, body: currentText, sectionHash: 'current-hash', fileRevision: '', modifiedTime: '', headingLine: '' },
-      versions: [{ platform: 'LinkedIn' as const, english: currentText, chinese: '目前的中文。', sourceHash: 'a'.repeat(16) }] };
+      versions: [{ platform: 'LinkedIn' as const, english: currentText, chinese: '目前的中文。', sourceHash: fingerprint(currentText) }] };
     vi.stubGlobal('fetch', vi.fn(async (url) => String(url).endsWith('/versions')
       ? Response.json({ ok: false, code: 'STALE_READ' }, { status: 409 })
       : Response.json({ ok: true, model: currentModel })));

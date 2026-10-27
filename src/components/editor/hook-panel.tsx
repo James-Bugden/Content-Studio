@@ -120,6 +120,7 @@ export function HookPanel(props: HookPanelProps) {
       expectedSheetRevision: sheetRevision,
       expectedSectionHash: sectionHash,
       generationDraftHash: proposal.draftHash,
+        sourceDraft: text,
       choice: choice === 'current' ? { kind: 'current' } : { kind: 'alternative', index: choice, alternative: proposal.alternatives[choice] },
       alternatives: proposal.alternatives,
     });

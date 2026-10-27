@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { cleanMarkdown, findMarkdown, isBold, platformLength, toBold, toggleBold, toggleBullets, toggleItalic, toggleNumbers, toPlain } from '@/domain/format';
+import { cleanMarkdown, fewerLineBreaks, findMarkdown, isBold, platformLength, toBold, toggleBold, toggleBullets, toggleItalic, toggleNumbers, toPlain } from '@/domain/format';
+
+describe('fewer line breaks', () => {
+  const samples = [
+    'Keep this hook.\n\nFirst point.\n\nSecond point.\n\nThird point.\n\nFourth point.',
+    'Hook\n\nNo punctuation\n\nAnother thought\n\nOne more thought\n\nLast thought',
+    '先保留開場。\n\n第一個想法。\n\n第二個想法。\n\n第三個想法。\n\n最後一個想法。',
+    'Hook\r\n\r\n\r\nA hard\r\nwrapped sentence.\r\n\r\n• item one\r\n• item two\r\n\r\nLast.',
+    `Hook.\n\n${'Long paragraph. '.repeat(20)}\n\nShort.\n\nNext.`,
+  ];
+  it.each(samples)('is idempotent and never changes or reorders words: %s', text => {
+    const compact = fewerLineBreaks(text);
+    expect(fewerLineBreaks(compact)).toBe(compact);
+    expect(compact.split(/\s+/)).toEqual(text.split(/\s+/));
+  });
+  it('keeps the hook separate and merges up to three body sentences', () => {
+    expect(fewerLineBreaks(samples[0]!)).toBe('Keep this hook.\n\nFirst point. Second point. Third point.\n\nFourth point.');
+  });
+  it('collapses excessive spacing and joins hard wraps without merging any list items', () => {
+    const lists = '• one\n• two\n\n- three\n- four\n\n1. five\n2. six';
+    expect(fewerLineBreaks(`Hook\n\n\n\nHard\nwrap.\n\n${lists}`)).toBe(`Hook\n\nHard wrap.\n\n${lists}`);
+  });
+});
 
 describe('Unicode styling for platforms that do not render Markdown', () => {
   it('bold round-trips and leaves Chinese, emoji and punctuation alone', () => {

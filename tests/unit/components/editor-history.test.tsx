@@ -35,7 +35,7 @@ describe('editor undo and redo history (#242)', () => {
     render(<PostEditor model={model} canEdit ns="synthetic" />);
     fireEvent.change(box(), { target: { value: `${original}\nextra` } });
     click('Fewer line breaks');
-    expect(box().value).toBe('Old hook\n\nFirst line second line third line\n\nClosing line extra');
+    expect(box().value).toBe('Old hook\n\nFirst line second line third line Closing line extra');
     press({ key: 'z', ctrlKey: true });
     expect(box().value).toBe(`${original}\nextra`);
     press({ key: 'z', metaKey: true });
@@ -43,7 +43,7 @@ describe('editor undo and redo history (#242)', () => {
     press({ key: 'z', shiftKey: true, ctrlKey: true });
     expect(box().value).toBe(`${original}\nextra`);
     press({ key: 'y', ctrlKey: true });
-    expect(box().value).toBe('Old hook\n\nFirst line second line third line\n\nClosing line extra');
+    expect(box().value).toBe('Old hook\n\nFirst line second line third line Closing line extra');
   });
 
   it('leaves Ctrl+Z to the browser when there is nothing to undo', () => {
@@ -140,7 +140,7 @@ describe('editor edits keep the caret and scroll (#242)', () => {
     box().scrollTop = 80;
     click('Fewer line breaks');
     const next = box().value;
-    expect(next.slice(box().selectionStart)).toBe('ird line\n\nClosing line');
+    expect(next.slice(box().selectionStart)).toBe('ird line Closing line');
     expect(box().selectionEnd).toBe(box().selectionStart);
     expect(box().scrollTop).toBe(80);
   });

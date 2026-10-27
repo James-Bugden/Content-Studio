@@ -1,4 +1,5 @@
 import 'server-only';
+import { fewerLineBreaks } from '@/domain/format';
 import { CONTENT_STAGES } from '@/domain/enums';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
@@ -144,6 +145,7 @@ export async function generateAdaptation(args: {
     ok: true,
     proposal: {
       ...result.value,
+      content: fewerLineBreaks(result.value.content),
       id: `zh_${fingerprint(JSON.stringify([x.contentId, stamp, ZH_TW_TASK.promptVersion, result.value.hook, result.value.content]))}`,
       sourceContentId: x.contentId,
       sourceRevision: found.x.revision,

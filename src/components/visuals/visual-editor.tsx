@@ -103,7 +103,7 @@ const APPROVAL_TEXT: Record<VisualItemView['approval'], string> = {
 
 const input = 'min-h-11 w-full rounded-md border border-line bg-card px-3 py-2 text-base';
 
-export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; canEdit: boolean }) {
+export function VisualEditor({ initial, canEdit, onChanged }: { initial: VisualItemView; canEdit: boolean; onChanged?: () => void }) {
   const [item, setItem] = useState(initial);
   const [baseline, setBaseline] = useState(() => formFrom(initial));
   const [form, setForm] = useState(() => formFrom(initial));
@@ -156,6 +156,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
       adopt(body.item, section === 'brief' || section === 'decision');
       if (body.reuse) setReuse(body.reuse);
       if (opts.write) setResult({ section, tone: 'success', text: body.note ?? 'Saved.' });
+      if (opts.write) onChanged?.();
       return body;
     }
     if (body.reuse) setReuse(body.reuse);

@@ -11,6 +11,7 @@ import { SupabaseContentRepository } from '@/integrations/supabase/content-repos
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 import { findSection, safeReplaceSectionBody } from '@/domain/markdown';
 import { fingerprint } from '@/domain/hash';
+import { fewerLineBreaks } from '@/domain/format';
 import { SYNTH_MASTER_FILE_ID } from '@/fixtures/synthetic';
 
 const owner = { sub: 'synthetic-owner', role: 'owner' as const };
@@ -147,7 +148,7 @@ describe('DB-7 atomic body and export', () => {
     expect(db.history.at(-1)?.changed_fields).toContain('draft_content');
     const after = await repo.getLibrary('SYN-L001');
     expect(after.value.currentHook).toBe(alternative.text);
-    expect(after.value.draftContent).toBe(alternative.text + body.slice(row.value.currentHook.length));
+    expect(after.value.draftContent).toBe(fewerLineBreaks(alternative.text + body.slice(row.value.currentHook.length)));
     expect(drive.writes).toHaveLength(0);
     expect(await selectHook(repo, drive, owner, input)).toMatchObject({ ok: true, replayed: true });
     expect(db.history.length - before).toBe(1);

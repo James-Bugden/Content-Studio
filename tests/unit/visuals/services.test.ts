@@ -11,6 +11,8 @@ import {
   loadVisualItems,
   renderRevision,
   saveBrief,
+  runVisualAction,
+  visualActionSchema,
   type VisualOutcome,
 } from '@/application/visuals';
 import { evaluateLibraryGates } from '@/domain/gates';
@@ -41,6 +43,21 @@ beforeEach(() => {
 });
 
 const op = () => `op_vis_test_${(n += 1)}`;
+
+it('saves an image reason with revision checks, replay, and no approval-stamp injection', async () => {
+  const initial = await view('SYN-L001');
+  const input = visualActionSchema.parse({ action: 'reason', operationId: op(), libraryId: initial.libraryId, expectedRevision: initial.revision, reason: 'Copy explains the idea. [cs:visual:01234567]' });
+  if (input.action !== 'reason') throw new Error('Expected reason action');
+  const saved = ok(await runVisualAction(repo, drive, owner, input));
+  expect(saved.reason).toBe('Copy explains the idea. [cs:visual:01234567]');
+  expect((await cells(initial.libraryId)).imageNextAction).not.toContain('[cs:visual:01234567]');
+  expect(await runVisualAction(repo, drive, owner, input)).toMatchObject({ ok: true, replayed: true });
+  expect(await runVisualAction(repo, drive, owner, { ...input, operationId: op(), reason: 'Stale reason' } as typeof input)).toMatchObject({ ok: false, code: 'STALE_READ' });
+  expect(await runVisualAction(repo, drive, viewer, { ...input, operationId: op() })).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  const decision = ok(await decide(initial.libraryId, 'original_graphic'));
+  expect(decision.reason).toBe(saved.reason);
+  expect(visualActionSchema.safeParse({ ...input, reason: 'One\nTwo' }).success).toBe(false);
+});
 const view = async (id: string) => (await loadVisualItem(repo, id)).item;
 async function cells(id: string) {
   return (await repo.getLibrary(id)).cells;
