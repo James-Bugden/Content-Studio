@@ -1,3 +1,4 @@
+import { StatusBanner } from '@/components/shell-status';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
@@ -123,7 +124,7 @@ export default async function StatesGalleryPage() {
       <PageHeader title={`A long page title that wraps: ${CJK}`} description={LONG_EN} actions={<button type="button" className={buttonClass('secondary')}>Action stays visible</button>} />
 
       <Section id="g-capability" title="Capability banner">
-        <CapabilityBanner capabilities={capabilities} />
+        <StatusBanner kind="capability"><CapabilityBanner capabilities={capabilities} /></StatusBanner>
         <StaleBacklogBanner readAt={Date.UTC(2026, 9, 24, 4, 30)} retryHref="/backlog?platform=X&amp;sort=source" />
         <p className="text-sm text-ink-soft">When every provider is ready the banner renders nothing.</p>
       </Section>

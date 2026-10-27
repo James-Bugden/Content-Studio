@@ -88,6 +88,7 @@ test('SEC-09: sign out clears cs: tab-local recovery and returns to /login', asy
     sessionStorage.setItem('cs:recovery', '{}');
     sessionStorage.setItem('unrelated', 'kept');
   });
+  await page.getByRole('group').getByLabel('Account menu').or(page.getByLabel('Account menu')).first().click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login\?signed_out=1$/);
   await expect(page.getByRole('status')).toContainText('You are signed out');

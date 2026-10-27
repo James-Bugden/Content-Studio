@@ -15,7 +15,7 @@ test('CS-044: cached Next up and blocking Fix issues badges in desktop and phone
   await expect(nav.locator('[data-nav-count="/"]')).toBeInViewport();
 
   await page.goto('/reconcile');
-  const phone = (page.viewportSize()?.width ?? 1280) < 768;
+  const phone = (page.viewportSize()?.width ?? 1280) <= 800;
   if (phone) await nav.getByText('More', { exact: true }).click();
   const fixBadge = nav.locator('[data-nav-count="/reconcile"]:visible');
   await expect(fixBadge).toHaveText('2'); // two blocking groups; attention items are excluded
@@ -57,6 +57,6 @@ test('CS-044: 1,100 items display as 999+ and fit the phone tab bar', async ({ p
   })).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('navigation-999-plus.png') });
-  if ((page.viewportSize()?.width ?? 1280) < 768) await nav.getByText('More', { exact: true }).click();
+  if ((page.viewportSize()?.width ?? 1280) <= 800) await nav.getByText('More', { exact: true }).click();
   await expect(nav.locator('[data-nav-count="/reconcile"]:visible')).toHaveText('999+');
 });

@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { NavLink } from './nav-link';
+import { ShellIcon } from './shell-icon';
 
 /**
  * Phone-only "More" cell for the bottom tab bar (CS-046). The tab bar shows the
@@ -34,15 +35,14 @@ export function NavMore({ items }: { items: readonly { href: string; label: stri
       }}
     >
       <summary
-        className={`flex min-h-14 cursor-pointer list-none items-center justify-center px-2 text-xs whitespace-nowrap marker:hidden [&::-webkit-details-marker]:hidden ${
-          active ? 'font-semibold text-ink shadow-[inset_0_2px_0_var(--color-primary)]' : 'font-medium text-ink-soft'
-        }`}
+        className="studio-more-toggle"
+        data-active={active}
       >
-        More
+        <ShellIcon name="more" /><span>More</span>
       </summary>
-      <ul className="absolute right-2 bottom-full mb-2 flex w-44 flex-col gap-0.5 rounded-lg border border-line bg-card p-1 shadow-[0_8px_24px_rgba(24,25,27,.12)]">
+      <ul className="studio-more-menu">
         {items.map((item) => (
-          <li key={item.href} className="[&>a]:min-h-11 [&>a]:justify-start [&>a]:rounded-md [&>a]:px-3 [&>a]:text-sm">
+          <li key={item.href}>
             <NavLink href={item.href}>{item.label}</NavLink>
           </li>
         ))}

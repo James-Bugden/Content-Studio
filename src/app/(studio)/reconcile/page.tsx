@@ -1,3 +1,4 @@
+import { StatusBanner } from '@/components/shell-status';
 import { MarkdownImport } from '@/components/reconcile/markdown-import';
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
@@ -44,7 +45,7 @@ export default async function ReconcilePage() {
     <>
       <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
-        <CapabilityBanner capabilities={report.capabilities} />
+        <StatusBanner kind="capability"><CapabilityBanner capabilities={report.capabilities} /></StatusBanner>
         {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
         {databaseOnly ? <p>Store mode: db. Database is the only content store.</p> : <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
