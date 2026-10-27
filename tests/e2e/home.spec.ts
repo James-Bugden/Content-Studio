@@ -21,17 +21,17 @@ test('UX-01: signed-in / shows Next up with tiles, counts and the urgent tasks',
   await expect(page.getByText('Wednesday 30 September 2026')).toBeVisible();
 
   const summary = page.getByRole('region', { name: 'Summary' });
-  await expect(summary.getByRole('link', { name: /To review/ })).toContainText('3');
+  await expect(summary.getByRole('link', { name: /To review/ })).toContainText('4');
   await expect(summary.getByRole('link', { name: /Images to finish/ })).toContainText('3');
   await expect(summary.getByRole('link', { name: /Ready to schedule/ })).toContainText('3');
   await expect(summary.getByRole('link', { name: /Open slots this week/ })).toContainText('5');
   await expect(summary.getByRole('link', { name: /To review/ })).toHaveAttribute('href', '/review?lane=review');
 
   const now = page.getByRole('region', { name: /Do these now/ });
-  for (const action of ['Update Chinese', 'Rework copy', 'Decide duplicate']) {
+  for (const action of ['Update Chinese', 'Decide duplicate']) {
     await expect(now.getByRole('link', { name: new RegExp(`^${action}`) }).first()).toBeVisible();
   }
-  await expect(now.getByText('Quoted framework')).toBeVisible();
+  await expect(now.getByText('Anchor high')).toBeVisible();
   await expect(now.getByText('X, Fri 2 Oct, 08:00')).toBeVisible();
   // Titles, never ids.
   expect(await page.locator('main').innerText()).not.toMatch(/SYN-L0|2026-10-0\d-MAIN/);
@@ -48,8 +48,8 @@ test('UX-01: a task button opens the panel on the post or the slot', async ({ pa
   await signInAs(page.request, 'owner');
   await page.goto('/');
   const now = page.getByRole('region', { name: /Do these now/ });
-  await now.getByRole('link', { name: /^Rework copy/ }).click();
-  await expect(page).toHaveURL(/\/\?post=SYN-L002$/);
+  await now.getByRole('link', { name: /^Decide duplicate/ }).click();
+  await expect(page).toHaveURL(/\/\?post=SYN-L003$/);
   await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
   await expect(page).not.toHaveURL(/post=/);
   await now.getByRole('link', { name: /^Update Chinese/ }).first().click();

@@ -457,7 +457,7 @@ test('Backlog headers sort the whole inventory and a second click reverses it (C
   const table = page.getByRole('region', { name: 'Content Library posts' });
   const rows = table.locator('[data-backlog-id]:visible');
   if (page.viewportSize()!.width >= 768) {
-    const cellText = async (column: number) => (await rows.first().locator('td').nth(column).textContent()) ?? '';
+    const cellText = async (column: number) => (await rows.first().locator('td:not(:has(input[type=checkbox]))').nth(column).textContent()) ?? '';
     const number = table.getByRole('columnheader', { name: '#', exact: true });
     await expect(number).toHaveAttribute('aria-sort', 'ascending');
     const firstRow = Number(await cellText(0));

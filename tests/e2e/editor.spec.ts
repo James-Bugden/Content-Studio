@@ -153,5 +153,5 @@ test('CS-049: the editor page can approve, waits for unsaved edits, and blocks u
   await page.goto('/review/SYN-L003');
   const blocked = page.getByRole('region', { name: 'Review' });
   await expect(blocked.getByRole('button', { name: 'Approve only' })).toBeDisabled();
-  await expect(blocked.getByText('Copyright QA says this needs rework.', { exact: false })).toBeVisible();
+  await expect(blocked.getByText('A possible duplicate needs a decision.', { exact: false })).toBeVisible();
 });

@@ -55,7 +55,7 @@ export function ImageSection({ libraryId, canEdit, dirty = false }: { libraryId:
     } finally { setBusy(false); }
   }
   return <section aria-labelledby="image-section-heading" className="min-w-0 space-y-3 rounded-lg border border-line bg-card p-3">
-    <h3 id="image-section-heading" className="font-semibold">Image sketch and check</h3>
+    <h3 id="image-section-heading" className="font-semibold">Image check</h3>
     {image ? <>
       <p className="text-sm text-ink-soft">{image.reason || 'No image decision yet.'}</p>
       {image.sketch ? <><pre aria-label="Image sketch" className="max-w-full overflow-x-auto rounded bg-paper p-3 font-mono text-xs">{image.sketch}</pre>
@@ -72,6 +72,6 @@ export function ImageSection({ libraryId, canEdit, dirty = false }: { libraryId:
       {image.hasImage ? <GuardedLink href={`/visuals/${encodeURIComponent(libraryId)}`} className="inline-flex min-h-11 items-center text-sm underline">Review image</GuardedLink> : null}
     </> : <p className="text-sm">Loading image decision...</p>}
     {dirty ? <p className="text-sm">Save or undo the draft before changing the image.</p> : null}
-    <p role="status" className="text-sm">{busy ? message || 'Working...' : message}</p>
+    <p aria-live="polite" className="text-sm">{busy ? message || 'Working...' : message}</p>
   </section>;
 }
