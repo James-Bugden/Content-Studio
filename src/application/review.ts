@@ -1,7 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
 import {
-  COPYRIGHT_QA,
   DUPLICATE_QA,
   PLATFORMS,
   REVIEW_STATUSES,
@@ -50,7 +49,6 @@ export const reviewFilterSchema = z.object({
   target: optionalEnum(PLATFORMS),
   from: optionalEnum(PLATFORMS),
   review: optionalEnum(REVIEW_STATUSES),
-  copyright: optionalEnum(COPYRIGHT_QA),
   duplicate: optionalEnum(DUPLICATE_QA),
   queue: optionalEnum(['queued', 'not_queued'] as const),
   page: z
@@ -80,7 +78,6 @@ function enumLabel(p: { ok: true; value: string } | { ok: false; raw: string }):
 
 function laneOf(item: LibraryItem, gates: GateResult): ReviewCard['lane'] {
   const codes = new Set(gates.blockers.map((g) => g.code));
-  if (codes.has('COPYRIGHT_REWORK')) return 'copyright';
   if (codes.has('DUPLICATE_CHECK') || codes.has('DUPLICATE_CONFIRMED')) return 'duplicate';
   if (item.reviewStatus.ok && item.reviewStatus.value === 'Approved') return 'approved';
   if (gates.status === 'blocked') return 'blocked';
@@ -136,7 +133,6 @@ export function toCard(record: LibraryRecord, library: LibraryRecord[], schedule
     hook: item.currentHook,
     preview: text.length > 280 ? `${text.slice(0, 279)}…` : text,
     reviewStatus: enumLabel(item.reviewStatus),
-    copyrightQa: enumLabel(item.copyrightQa),
     duplicateQa: enumLabel(item.duplicateQa),
     queued: item.queueForSchedule,
     visual: formatVisualSource(item.visual.source) || (item.visual.source.kind === 'invalid' ? 'Unrecognised' : 'Undecided'),
@@ -167,7 +163,6 @@ function matches(card: ReviewCard, record: LibraryRecord, f: ReviewFilters): boo
   if (f.target && !(item.targetPlatform.ok && item.targetPlatform.value === f.target)) return false;
   if (f.from && !(item.sourcePlatform?.ok && item.sourcePlatform.value === f.from)) return false;
   if (f.review && !(item.reviewStatus.ok && item.reviewStatus.value === f.review)) return false;
-  if (f.copyright && !(item.copyrightQa.ok && item.copyrightQa.value === f.copyright)) return false;
   if (f.duplicate && !(item.duplicateQa.ok && item.duplicateQa.value === f.duplicate)) return false;
   if (f.queue === 'queued' && item.queueForSchedule !== true) return false;
   if (f.queue === 'not_queued' && item.queueForSchedule === true) return false;

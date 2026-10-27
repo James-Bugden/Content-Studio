@@ -58,17 +58,18 @@ test('image judgement and reason can be changed inline, including at phone width
 });
 
 test('approval blocker links lead to editable QA decisions', async ({ page }) => {
-  await page.goto('/backlog?post=SYN-L002');
+  await page.goto('/backlog?post=SYN-L003');
   const panel = page.getByRole('dialog');
   await expect(panel.getByRole('button', { name: 'Approve only', exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'Request changes', exact: true })).toBeEnabled();
   await panel.getByRole('button', { name: 'AI', exact: true }).click();
-  await panel.getByRole('link', { name: 'Rework the copy, then re-run copyright QA', exact: true }).click();
-  const copyright = panel.getByRole('combobox', { name: 'Copyright QA', exact: true });
-  await expect(copyright).toBeVisible();
-  await copyright.selectOption('PASS');
-  await expect(copyright).toHaveValue('PASS');
-  await expect(panel.getByRole('link', { name: 'Rework the copy, then re-run copyright QA', exact: true })).toHaveCount(0);
+  const link = panel.getByRole('link', { name: 'Decide whether this duplicates earlier content', exact: true });
+  await link.click();
+  const duplicate = panel.getByRole('combobox', { name: 'Duplicate QA', exact: true });
+  await expect(duplicate).toBeVisible();
+  await duplicate.selectOption('PASS');
+  await expect(duplicate).toHaveValue('PASS');
+  await expect(panel.getByRole('link', { name: 'Decide whether this duplicates earlier content', exact: true })).toHaveCount(0);
 });
 
 test('collapsing image controls preserves an unsaved brief and blocks conflicting image changes', async ({ page }) => {

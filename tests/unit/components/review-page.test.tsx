@@ -36,7 +36,7 @@ it('CS-059j: an empty Library retains a clear action', async () => {
 });
 it('CS-059j: no-match clear removes every defined filter including queue', async () => {
   mocks.load.mockResolvedValue({ total: 0, totalUnfiltered: 5, page: 1, pages: 1, cards: [], sources: [], laneCounts: {} });
-  render(await ReviewPage({ searchParams: Promise.resolve({ lane: 'review', target: 'Threads', review: 'Pending', src: 'synthetic', from: 'X', copyright: 'PASS', duplicate: 'PASS', queue: 'queued', page: '2', layout: 'cards' }) }));
+  render(await ReviewPage({ searchParams: Promise.resolve({ lane: 'review', target: 'Threads', review: 'Pending', src: 'synthetic', from: 'X', duplicate: 'PASS', queue: 'queued', page: '2', layout: 'cards' }) }));
   expect(screen.getByRole('link', { name: 'Clear all filters' }).getAttribute('href')).toBe('/review?layout=cards');
 });
 

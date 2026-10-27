@@ -165,7 +165,7 @@ Values observed in the live workbook, mapped to the canonical enums in `src/doma
 | Column | Live values | Canonical |
 | --- | --- | --- |
 | Library `State` | `Editing` | Display only; the canonical stage lives in Schedule `Content Stage` |
-| `Copyright QA` | `Cleared`, `REWORK` | `PASS`, `REWORK`; blank = `Unchecked` (blocks) |
+| `Copyright QA` | `Cleared`, `REWORK` | `PASS`, `REWORK`; blank = `Unchecked` (import only, ignored) |
 | `Duplicate QA` | `No flag`, `CHECK` | `PASS`, `CHECK`; `DUPLICATE` confirmed; blank = `Unchecked` (blocks) |
 | `Review Status` | `Not Reviewed` | `Pending`; plus `Approved`, `Changes Requested`, `Skipped` |
 | `Source Platform` | `LinkedIn`, `Threads (legacy)` | Platform enum with alias |
@@ -194,7 +194,7 @@ Header discovery is by exact name, not fixed column index. Startup fails safely 
 
 ### Review Queue
 
-Filter by source, target platform, state, QA flags, review status and next action. Cards show source, current hook, short copy preview, hard/soft gates and the single next action. Clean review, copyright rework and duplicate decision are visibly distinct. No destructive bulk approval in MVP.
+Filter by source, target platform, state, QA flags, review status and next action. Cards show source, current hook, short copy preview, hard/soft gates and the single next action. Clean review and duplicate decisions are visibly distinct. Copyright data is retained only for import compatibility and is never a gate. No destructive bulk approval in MVP.
 
 ### Post Editor and English QA
 
@@ -210,7 +210,9 @@ Only final `EN Approved` X copy is eligible. Generate a Taiwan Traditional Chine
 
 ### Visual Studio
 
-Visual decisions are `Text only`, `Original graphic` or an exact screenshot identifier. Original graphics follow SOAR v1.1 Analysis output 3 / C-light Notebook: ASCII structure first; simplest useful grammar; 2–4 main ideas; large text and generous whitespace; one yellow `#FFE76B` focal highlight; near-white `#FAFBFC`; ink `#172023`; green `#0A3D26` sparingly; minimal truthful hand-drawn connectors/annotation; default 50–70% of the lesson; deterministic rendering where possible. English and zh-TW are separately composed/reflowed.
+Visual decisions are `Text only`, `Original graphic` or an exact screenshot identifier. The owner's #243 image pipeline uses the bundled SOAR clean editorial Python tool and its authored fonts, presets and layouts. Backlog checks run on at most 25 selected posts with three concurrent requests. An image-required decision saves an ASCII sketch; the owner approves or revises it before the original tool creates a PNG. The PNG then needs its own exact-asset visual approval. Image checks, sketches and render-brief mapping use the shared monthly AI cap. Copyright data is import compatibility only and is never evaluated.
+
+Historical Visual Studio SVG briefs retain SOAR v1.1 Analysis output 3 / C-light Notebook: ASCII structure first; simplest useful grammar; 2–4 main ideas; large text and generous whitespace; one yellow `#FFE76B` focal highlight; near-white `#FAFBFC`; ink `#172023`; green `#0A3D26` sparingly; minimal truthful hand-drawn connectors/annotation; default 50–70% of the lesson; deterministic rendering where possible. English and zh-TW are separately composed/reflowed. Pipeline sketches use the original Python renderer, with English-only glyph/copy validation; they cannot render through the historical SVG path.
 
 Required brief data: lesson, grammar, exact line-broken copy, focal phrase, optional caveat, platform, language, placement, alt text and source version. Approval belongs to the exact asset revision `SOAR-v1.1 / rNN / <platform> / <language>`. Review at full size and 360/390 px. A material change invalidates approval.
 
@@ -218,7 +220,7 @@ Screenshot rule: one source screenshot may be used at most once per platform. Ch
 
 ### Ready Queue and schedule
 
-Ready Queue is a live derived handoff. Hard blockers include copyright `REWORK`, unresolved duplicate `CHECK`, non-approved review, missing platform copy, stale Threads adaptation, missing hook decision when required, or an image decision/revision that fails its gate. Promotion creates/updates an available Content Schedule row only after a preview and explicit confirmation. New content never jumps directly into Content Schedule.
+Ready Queue is a live derived handoff. Hard blockers include unresolved duplicate `CHECK`, non-approved review, missing platform copy, stale Threads adaptation, missing hook decision when required, or an image decision/revision that fails its gate. Promotion creates/updates an available Content Schedule row only after a preview and explicit confirmation. New content never jumps directly into Content Schedule.
 
 Active Taipei slots come from Workflow Settings: X 08:00/20:00; Threads 08:15/20:15; LinkedIn 21:00. X/Threads 3rd rows are deprecated legacy compatibility only: blank legacy rows are hidden from the active calendar and can never be promotion targets; already-filled/scheduled/published legacy rows remain visible and reconcilable.
 

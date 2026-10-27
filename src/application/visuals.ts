@@ -1,4 +1,7 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
+import { editorialSidecar } from '@/integrations/image-renderer/port';
+import { hasImageSketch } from '@/domain/image-pipeline';
 import { z } from 'zod';
 import { languageFor, type Platform } from '@/domain/enums';
 import { AppError, isAppError, type ErrorCode } from '@/domain/errors';
@@ -67,7 +70,7 @@ export function toVisualView(record: LibraryRecord, library: LibraryRecord[], sc
   const item = record.value;
   const v = item.visual;
   const platform = platformOf(item);
-  const language = platform ? languageFor(platform) : null;
+  const language = editorialSidecar(v.brief) ? 'en' : platform ? languageFor(platform) : null;
   const kind = decisionKind(item);
   const uses = usesFor(item, library, schedule);
   const reuse: ReuseCheck = kind === 'screenshot' ? reuseCheck(platform, uses) : { state: 'not_applicable', uses: [], message: '' };
@@ -78,7 +81,7 @@ export function toVisualView(record: LibraryRecord, library: LibraryRecord[], sc
   const briefUnreadable = v.brief.trim() !== '' && brief === null;
   const briefProblems: BriefProblem[] = kind === 'original_graphic' ? validateBrief(brief) : [];
   const complete = kind === 'original_graphic' && briefProblems.length === 0 ? (brief as VisualBrief) : null;
-  const renderProblems: RenderProblem[] = complete && platform && language ? renderBriefSvg(complete, { language, platform, revision: 0 }).problems : [];
+  const renderProblems: RenderProblem[] = complete && platform && language && !editorialSidecar(v.brief) ? renderBriefSvg(complete, { language, platform, revision: 0 }).problems : [];
   const approval = visualApprovalState(v);
   const status = v.imageStatus.ok ? v.imageStatus.value : `Unrecognised: ${v.imageStatus.raw}`;
   const version = parseVisualVersion(v.version);
@@ -108,6 +111,7 @@ export function toVisualView(record: LibraryRecord, library: LibraryRecord[], sc
 
   let canRender: VisualItemView['canRender'];
   if (kind !== 'original_graphic') canRender = { ok: false, reason: 'Only original graphics are rendered here.' };
+  else if (editorialSidecar(v.brief) || hasImageSketch(v)) canRender = { ok: false, reason: 'Approve the sketch and use Create image in the post panel.' };
   else if (!platform || !language) canRender = { ok: false, reason: 'The target platform is not recognised.' };
   else if (briefProblems.length > 0) canRender = { ok: false, reason: 'Complete the brief first: 2 to 4 main ideas and every required field.' };
   else if (renderProblems.length > 0) canRender = { ok: false, reason: 'Fix the layout problems first.' };
@@ -135,6 +139,7 @@ export function toVisualView(record: LibraryRecord, library: LibraryRecord[], sc
     altText: v.altText,
     version: v.version,
     hasFile: v.imageFile.trim() !== '',
+    editorialPng: editorialSidecar(v.brief) !== null,
     fileHash: v.imageFile.trim() === '' ? '' : shortHash(`file:${v.imageFile}`),
     approval,
     preview,
@@ -173,7 +178,7 @@ async function load(repo: ContentRepository, libraryId: string): Promise<Loaded>
   if (found.length === 0) throw new AppError('NOT_FOUND');
   if (found.length > 1) throw new AppError('CONFLICT', { reason: 'duplicate_id' });
   const schedule = await readSchedule(repo);
-  const record = found[0]!;
+  const record = repo.mutationProvider?.() === 'db' || repo.capability().provider === 'db' ? await repo.getLibrary(libraryId, true) : found[0]!;
   return { library, schedule, record, view: toVisualView(record, library, schedule) };
 }
 
@@ -487,6 +492,13 @@ export async function approveRevision(
     let text: string;
     try {
       const { bytes, meta } = await drive.readBytes(fileId, 2 * 1024 * 1024);
+      const sidecar = editorialSidecar(v.brief);
+      if (sidecar) {
+        if (meta.mimeType !== 'image/png' || createHash('sha256').update(bytes).digest('hex') !== sidecar.sha256) return blocked('The PNG in Drive changed. Create and review a new image.', { current: view });
+        const sketchStamps = v.imageNextAction.match(/\[cs:sketch(?:-source)?:[a-f0-9]{8}\]/g)?.join(' ') ?? '';
+        const patch: LibraryPatch = { imageStatus: 'Approved', imageNextAction: `${formatVisualApprovalNote(v)} ${sketchStamps}` };
+        return write(repo, actor, input, loaded, patch, { note: 'Approved this exact PNG revision.' });
+      }
       if (meta.mimeType !== 'image/svg+xml') return blocked('This file was not rendered by Content Studio. Render a new revision to review it here.', { current: view });
       text = new TextDecoder().decode(bytes);
     } catch (error) {
@@ -504,6 +516,7 @@ export async function approveRevision(
 export async function renderPreview(repo: ContentRepository, libraryId: string, rev: 'current' | 'draft'): Promise<{ svg: string; version: string }> {
   const { record, view } = await load(repo, libraryId);
   const item = record.value;
+  if (editorialSidecar(item.visual.brief) || hasImageSketch(item.visual)) throw new AppError('GATE_BLOCKED', { reason: 'use_image_pipeline' });
   if (view.decision !== 'original_graphic') throw new AppError('NOT_FOUND', { reason: 'not_original_graphic' });
   const brief = completeBrief(item);
   if (!brief) throw new AppError('GATE_BLOCKED', { reason: 'brief_incomplete' });

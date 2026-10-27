@@ -386,6 +386,19 @@
       "field": "password"
     },
     {
+      "name": "IMAGE_RENDERER_SECRET",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "ai"
+      ],
+      "lastpass": "content-studio/IMAGE_RENDERER_SECRET",
+      "field": "password"
+    },
+    {
       "name": "AI_PROVIDER",
       "required": false,
       "schemaRequired": false,

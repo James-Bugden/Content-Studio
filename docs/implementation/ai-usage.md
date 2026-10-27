@@ -10,6 +10,9 @@ Acceptance:
 - AI-USE-1: timestamp, feature, provider model, input/output tokens and estimated
   USD cost for each Content attempt, including repair, refusal and invalid output.
   Replies ideas/rewrite/translation and embeddings use the same budget.
+  Image checks, ASCII sketch proposals and render-brief mapping also use this
+  path (`image_check`, `ascii_sketch`, `image_render`, #243). The deterministic
+  Python PNG render does not call a model or incur provider token usage.
 - AI-USE-2: atomic admission refuses at/above the cap before provider invocation;
   the 80% threshold warns. Months reset at midnight on the 1st in Asia/Taipei.
 - AI-USE-3: owner-only private read/edit routes; cap edits use operation identity,

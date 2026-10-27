@@ -83,7 +83,7 @@ describe('MIG-09 actual DB-1 import RPC with DB-4 envelopes', () => {
     const expectedSummary = await sheet.queueSummary(), actualSummary = await repo.queueSummary();
     expect(expectedSummary).toEqual(actualSummary);
     expect(expectedSummary.find(r => r.source === 'Mixed')).toEqual({ source: 'Mixed', masterLink: 'https://synthetic.example/\uE000',
-      counts: { Total: 8, 'Not Reviewed': 3, Approved: 1, Queued: 4, 'Needs Fix': 4 } });
+      counts: { Total: 8, 'Not Reviewed': 3, Approved: 1, Queued: 4, 'Needs Fix': 3 } });
     expect(expectedSummary.some(r => r.source === 'Excluded')).toBe(false);
     expect(expectedSummary.find(r => r.source === 'Fallback')?.masterLink).toBe('https://synthetic.example/md-1');
     expect(expectedSummary.find(r => r.source === 'Blank links')?.masterLink).toBe('');

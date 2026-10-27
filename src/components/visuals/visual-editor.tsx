@@ -186,7 +186,7 @@ export function VisualEditor({ initial, canEdit, onChanged }: { initial: VisualI
     });
 
   const canvas = canvasFor((item.brief?.placement as VisualBrief['placement'] | undefined) ?? 'feed-square');
-  const previewSrc = `/api/library/${encodeURIComponent(item.libraryId)}/render?rev=current&m=${item.material}`;
+  const previewSrc = item.editorialPng ? `/api/library/${encodeURIComponent(item.libraryId)}/asset?m=${item.material}` : `/api/library/${encodeURIComponent(item.libraryId)}/render?rev=current&m=${item.material}`;
   const liveSrc = live ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(live.svg)}` : null;
   const languageText = item.language === 'zh-TW' ? 'zh-TW (Traditional Chinese, composed for Threads)' : item.language === 'en' ? 'English' : 'Unknown';
   const renderBlocked = !item.canRender.ok ? item.canRender.reason : dirty ? 'Save the brief first.' : null;

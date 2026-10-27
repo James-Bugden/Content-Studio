@@ -1,3 +1,4 @@
+import { editorialSidecar } from './image-renderer';
 import type { Platform } from './enums';
 import type { LibraryItem } from './records';
 import { approvalState, requiresTranslation, visualApprovalState } from './stage';
@@ -14,8 +15,6 @@ import { languageFor } from './enums';
 export const GATE_CODES = [
   'UNRECOGNISED_VALUE',
   'MISSING_IDENTITY',
-  'COPYRIGHT_REWORK',
-  'COPYRIGHT_UNCHECKED',
   'DUPLICATE_CHECK',
   'DUPLICATE_CONFIRMED',
   'DUPLICATE_UNCHECKED',
@@ -93,7 +92,6 @@ export function evaluateLibraryGates(item: LibraryItem, ctx: GateContext): GateR
   // Unrecognised enum values block: an untrusted cell must not choose a code path.
   const enums: [string, { ok: boolean }][] = [
     ['Target Platform', item.targetPlatform],
-    ['Copyright QA', item.copyrightQa],
     ['Duplicate QA', item.duplicateQa],
     ['Review Status', item.reviewStatus],
     ['Image Status', item.visual.imageStatus],
@@ -110,13 +108,6 @@ export function evaluateLibraryGates(item: LibraryItem, ctx: GateContext): GateR
   if (item.libraryId === '') gates.push(hard('MISSING_IDENTITY', 'Library ID', 'This row has no Library ID.', 'Add a Library ID in the Sheet'));
 
   // Risk.
-  if (item.copyrightQa.ok) {
-    if (item.copyrightQa.value === 'REWORK') {
-      gates.push(hard('COPYRIGHT_REWORK', 'Copyright QA', 'Copyright QA says this needs rework.', 'Rework the copy, then re-run copyright QA'));
-    } else if (item.copyrightQa.value === 'Unchecked') {
-      gates.push(hard('COPYRIGHT_UNCHECKED', 'Copyright QA', 'Copyright QA has not been run.', 'Run copyright QA'));
-    }
-  }
   if (item.duplicateQa.ok) {
     if (item.duplicateQa.value === 'CHECK') {
       gates.push(hard('DUPLICATE_CHECK', 'Duplicate QA', 'A possible duplicate needs a decision.', 'Decide whether this duplicates earlier content'));
@@ -199,7 +190,6 @@ export function evaluateLibraryGates(item: LibraryItem, ctx: GateContext): GateR
 const HARD_STOPS: ReadonlySet<GateCode> = new Set<GateCode>([
   'UNRECOGNISED_VALUE',
   'MISSING_IDENTITY',
-  'COPYRIGHT_REWORK',
   'DUPLICATE_CHECK',
   'DUPLICATE_CONFIRMED',
   'MARKDOWN_MISMATCH',
@@ -255,7 +245,7 @@ function visualGates(item: LibraryItem, ctx: GateContext, platform: Platform | n
     const version = parseVisualVersion(v.version);
     if (v.version.trim() !== '' && !version) {
       out.push(hard('VISUAL_VERSION_INVALID', 'Visual Version', 'Visual Version is not SOAR-v1.1 / rNN / platform / language.', 'Fix the Visual Version'));
-    } else if (version && platform && (version.platform !== platform || version.language !== languageFor(platform))) {
+    } else if (version && platform && (version.platform !== platform || version.language !== (editorialSidecar(v.brief) ? 'en' : languageFor(platform)))) {
       out.push(hard('VISUAL_STALE', 'Visual Version', 'The approved asset is for a different platform or language.', 'Render and approve an asset for this platform'));
     }
   }

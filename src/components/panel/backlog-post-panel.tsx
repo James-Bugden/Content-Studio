@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { readableTitle } from '@/domain/display';
 import { EditorWorkspace } from '../editor/editor-workspace';
 import { StateView } from '../state-view';
 import { buttonClass } from '../button-styles';
 import { fetchEditor, prefetchEditor, takePrefetchedEditor, type EditorLoad } from './editor-cache';
+import { ImageSection } from './image-section';
+import { isAnyDirty, subscribeDirty, serverSnapshot } from '../dirty-store';
 
 type Load = { kind: 'loading' } | { kind: 'error'; message: string; rateLimited: boolean } | ({ kind: 'ready' } & EditorLoad);
 
@@ -26,6 +28,7 @@ export function BacklogPostPanel({ libraryId, nextId, position, onSaved, onSaveF
   onSaved?: () => void;
   onSaveFailed?: () => void;
 }) {
+  const dirty = useSyncExternalStore(subscribeDirty, isAnyDirty, serverSnapshot);
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -63,5 +66,6 @@ export function BacklogPostPanel({ libraryId, nextId, position, onSaved, onSaveF
       <p className="text-sm text-ink-soft">{position ? <span className="tabular-nums">{position} · </span> : null}{load.model.source} · {load.model.targetPlatform} · Review: {load.model.reviewStatus}</p>
     </header>
     <EditorWorkspace model={load.model} canEdit={load.canEdit} ns={load.ns} focusMode reviewActions inlineImage onSaved={onSaved} onSaveFailed={onSaveFailed} onReviewed={onSaved} />
+    <ImageSection libraryId={libraryId} canEdit={load.canEdit} dirty={dirty} />
   </div>;
 }

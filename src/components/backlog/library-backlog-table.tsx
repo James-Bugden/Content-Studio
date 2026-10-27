@@ -69,7 +69,9 @@ function GroupCount({ label, shown, total }: { label: string; shown: number; tot
 }
 
 /** Bounded rows, keeping the page light even when the Sheet holds thousands of posts. */
-export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showHooks = true, sort = 'sheet', dir = 'asc', group, groupTotals = {}, onSort, canEdit = false, pestoOptions = [], readOnly = false }: {
+export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showHooks = true, sort = 'sheet', dir = 'asc', group, groupTotals = {}, onSort, canEdit = false, pestoOptions = [], readOnly = false, selection, imageProgress = {} }: {
+  selection?: { ids: Set<string>; busy: boolean; toggle: (id: string) => void };
+  imageProgress?: Record<string, string>;
   readOnly?: boolean;
   rows: Row[]; statuses?: Record<string, BacklogReadiness>; compact?: boolean; showHooks?: boolean;
   /** Owner edits PESTO in place (CS-054); needs each row's revision. */
@@ -91,14 +93,14 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
       {/* CS-054 widths: # fits four digits, Source and Hook Template read without
           clipping, and Hook Alternatives gets room for its formatted list. */}
       <table className={`hidden w-full table-fixed border-collapse text-left text-sm md:table ${showHooks ? 'min-w-[76rem]' : 'min-w-[60rem]'}`}>
-        <colgroup>
+        <colgroup>{selection ? <col className="w-14" /> : null}
           <col className="w-12" /><col className="w-32" /><col className="w-28" />
           <col className="w-28" />{showHooks ? <><col className="w-32" /><col className="w-44" /></> : null}
           {/* Content takes whatever is left; the table's minimum keeps it at least ~24rem. */}
           <col /><col className="w-36" /><col className="w-24" />
         </colgroup>
         <thead className="sticky top-0 bg-paper text-xs text-ink-soft">
-          <tr className="border-b border-line">
+          <tr className="border-b border-line">{selection ? <th scope="col" className={cell}><span className="sr-only">Select post</span></th> : null}
             {columns.map((column) => {
               const active = column.sort !== undefined && column.sort === sort;
               const sortKey = column.sort;
@@ -114,7 +116,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
         <tbody>
           {groups.map((run) => <Fragment key={`group-${run.key}`}>
             {group ? <tr data-backlog-group={run.key} className="border-b border-line bg-paper">
-              <th scope="colgroup" colSpan={columns.length} className={`${cell} text-left text-sm font-normal`}><GroupCount label={run.label} shown={run.rows.length} total={groupTotals[run.key]} /></th>
+              <th scope="colgroup" colSpan={columns.length + (selection ? 1 : 0)} className={`${cell} text-left text-sm font-normal`}><GroupCount label={run.label} shown={run.rows.length} total={groupTotals[run.key]} /></th>
             </tr> : null}
             {run.rows.map((record) => {
               const item = record.value;
@@ -122,6 +124,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
               const title = readableTitle(item.slug) || item.currentHook || item.libraryId;
               return (
                 <tr key={item.libraryId} data-backlog-id={item.libraryId} className="border-b border-line align-top last:border-0 hover:bg-paper">
+                  {selection ? <td className={cell}><label className="inline-flex min-h-11 min-w-11 items-center justify-center"><input type="checkbox" aria-label={`Select ${title}`} checked={selection.ids.has(item.libraryId)} disabled={selection.busy} onChange={() => selection.toggle(item.libraryId)} /></label></td> : null}
                   <td className={`${cell} tabular-nums text-ink-soft`}>{record.row}</td>
                   <td className={`${cell} font-medium`}><span title={item.contentSource || 'Uncategorised'} className="line-clamp-2 break-words">{item.contentSource || 'Uncategorised'}</span></td>
                   <td className={cell}><span className="inline-flex items-center gap-2">{item.targetPlatform.ok ? <><PlatformLogo platform={item.targetPlatform.value} />{item.targetPlatform.value}</> : '—'}</span></td>
@@ -134,7 +137,7 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
                     <p className="line-clamp-2 break-words font-semibold text-ink">{title}</p>
                     <PostContent text={item.draftContent} libraryId={item.libraryId} readOnly={readOnly} />
                   </td>
-                  <td className={`sticky right-20 z-10 border-l border-line bg-card ${cell}`}><ReadinessExplanation status={status} /></td>
+                  <td className={`sticky right-20 z-10 border-l border-line bg-card ${cell}`}><ReadinessExplanation status={status} />{imageProgress[item.libraryId] ? <p role="status" className="mt-1 text-xs">{imageProgress[item.libraryId]}</p> : null}</td>
                   <td className={`sticky right-0 z-10 border-l border-line bg-card ${cell}`}>{readOnly ? <button disabled aria-label={`Edit ${title}`} className="min-h-11 text-ink-soft">Edit post</button> : <OpenPanelLink target={{ post: item.libraryId }} label={`Edit ${title}`} className="inline-flex min-h-11 items-center whitespace-nowrap font-semibold text-primary underline underline-offset-2">Edit post</OpenPanelLink>}</td>
                 </tr>
               );
@@ -151,7 +154,8 @@ export function LibraryBacklogTable({ rows, statuses = {}, compact = true, showH
             const status = statusOf(record);
             return <li key={item.libraryId} data-backlog-id={item.libraryId} className="space-y-2 p-4">
               <div className="flex items-start justify-between gap-2 text-xs"><span className="font-semibold text-ink-soft">{item.contentSource || 'Uncategorised'}</span><ReadinessExplanation status={status} /></div>
-              <p className="text-base font-semibold">{title}</p>
+              <div className="flex items-start gap-2">{selection ? <label className="inline-flex min-h-11 min-w-11 items-center justify-center"><input type="checkbox" aria-label={`Select ${title}`} checked={selection.ids.has(item.libraryId)} disabled={selection.busy} onChange={() => selection.toggle(item.libraryId)} /></label> : null}<p className="py-2 text-base font-semibold">{title}</p></div>
+              {imageProgress[item.libraryId] ? <p role="status" className="text-sm">{imageProgress[item.libraryId]}</p> : null}
               <div className="text-sm"><PostContent text={item.draftContent} libraryId={item.libraryId} readOnly={readOnly} /></div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft"><span>{item.targetPlatform.ok ? item.targetPlatform.value : '—'}</span>
                 {canEdit && !readOnly && record.revision ? <LibraryPestoField libraryId={item.libraryId} value={item.pesto} revision={record.revision} canEdit suggestions={pestoOptions} /> : <PillarTag value={item.pesto} />}

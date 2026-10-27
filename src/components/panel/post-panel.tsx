@@ -16,6 +16,7 @@ import { PromoteConfirm } from '../schedule/promote-confirm';
 import { StateView } from '../state-view';
 import { GateChip } from '../status';
 import { PlatformPreview } from './platform-preview';
+import { ImageSection } from './image-section';
 import { PostThumb } from './post-thumb';
 
 /**
@@ -250,6 +251,7 @@ export function PostPanel({ libraryId }: { libraryId: string }) {
         </div>
       ) : null}
 
+      <ImageSection key={`${libraryId}-${model.sheet.revision}`} libraryId={libraryId} canEdit={canEdit} dirty={dirty} />
 
       {tab === 'details' ? (
         <div role="tabpanel" aria-label="Details" className="flex flex-col gap-3 text-sm">
