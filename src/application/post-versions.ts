@@ -7,6 +7,7 @@ import { SAVE_PLATFORMS } from '@/domain/post-versions';
 import type { ContentRepository, AiGateway } from './ports';
 import { ZH_TW_TASK } from './zh-tw';
 import { sectionBodyProblems } from '@/domain/markdown';
+import { fewerLineBreaks } from '@/domain/format';
 
 export const versionSaveSchema = z.object({
   operationId: operationIdSchema, expectedRevision: revisionSchema,
@@ -24,8 +25,8 @@ export async function savePostVersions(repo: ContentRepository, actor: Actor, li
   if (sectionBodyProblems(data.proposed, 2).length) throw new AppError('VALIDATION_FAILED', { reason: 'unsafe_markdown_structure' });
   if (data.chinese && data.chinese.source !== data.proposed) throw new AppError('STALE_READ');
   return repo.updatePostProperties({ operationId: data.operationId, actor, target: { libraryId }, expectedRevision: data.expectedRevision,
-    patch: { draft: data.proposed, versions: data.platforms.map(platform => ({ platform, english: data.proposed,
-      sourceHash: fingerprint(data.proposed), ...(data.chinese ? { chinese: data.chinese.content } : {}) })) } });
+    patch: { draft: data.proposed, versions: data.platforms.map(platform => ({ platform, english: fewerLineBreaks(data.proposed),
+      sourceHash: fingerprint(data.proposed), ...(data.chinese ? { chinese: fewerLineBreaks(data.chinese.content) } : {}) })) } });
 }
 
 /** Draft proposals reuse the existing zh-TW task. Publication approval still uses the scheduled adaptation gates. */
@@ -34,7 +35,7 @@ export async function proposePostChinese(repo: ContentRepository, ai: AiGateway,
   if (!source.trim() || source.length > 30_000) throw new AppError('VALIDATION_FAILED');
   const hook = source.split('\n').find(line => line.trim())?.slice(0, 2000) ?? '';
   const result = await ai.run(ZH_TW_TASK, { hook, content: source }, { signal });
-  return result.ok ? { ok: true as const, source, content: result.value.content, qa: result.value.qa } : result;
+  return result.ok ? { ok: true as const, source, content: fewerLineBreaks(result.value.content), qa: result.value.qa } : result;
 }
 
 export const postLifecycleSchema = z.object({ operationId: operationIdSchema, expectedRevision: revisionSchema,

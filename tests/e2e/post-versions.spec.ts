@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { scanAxe } from './support/axe';
+import { fewerLineBreaks } from '../../src/domain/format';
 
 test.skip(process.env.CS_E2E_CONTENT_STORE !== 'db', 'Platform drafts and deletion use the database authority.');
 test.beforeEach(async ({ page }) => {
@@ -26,7 +27,7 @@ test('English edits update all previews immediately and selected versions surviv
   await expect(panel.getByText('Saved in the database. Drive export is queued.')).toBeVisible();
   const saved = await (await page.request.get('/api/library/SYN-L001/editor')).json();
   expect(saved.model.versions.map((v: { platform: string }) => v.platform).sort()).toEqual(['LinkedIn', 'Threads', 'X']);
-  expect(saved.model.versions.every((v: { english: string }) => v.english === text)).toBe(true);
+  expect(saved.model.versions.every((v: { english: string }) => v.english === fewerLineBreaks(text))).toBe(true);
   await panel.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Content Library posts' })).toBeVisible();
   await page.screenshot({ path: `artifacts/237/backlog-${test.info().project.name}.png`, fullPage: true });

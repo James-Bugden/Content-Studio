@@ -141,11 +141,11 @@ test('CS-049: the editor page can approve, waits for unsaved edits, and blocks u
   // Unsaved text: approval waits, because the stamp covers the saved copy.
   await editor(page).fill('A synthetic unsaved change');
   await expect(approveOnly).toBeDisabled();
-  await expect(review.getByText('Save the draft first')).toBeVisible();
+  await expect(review.getByText('Save the draft before approving.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Undo changes' }).click();
 
   await approveOnly.click();
-  await expect(review.getByText('Approved. The Sheet now holds this approval.')).toBeVisible();
+  await expect(review.getByRole('status').filter({ hasText: 'Approved.' })).toBeVisible();
   await expect(review.getByText(/^✓\s*Approved\.$/)).toBeVisible();
   await expect(review.getByRole('button', { name: 'Approve only' })).toHaveCount(0);
 
@@ -153,5 +153,5 @@ test('CS-049: the editor page can approve, waits for unsaved edits, and blocks u
   await page.goto('/review/SYN-L002');
   const blocked = page.getByRole('region', { name: 'Review' });
   await expect(blocked.getByRole('button', { name: 'Approve only' })).toBeDisabled();
-  await expect(blocked.getByText(/Approval opens once these are fixed/)).toBeVisible();
+  await expect(blocked.getByText('Copyright QA says this needs rework.', { exact: false })).toBeVisible();
 });

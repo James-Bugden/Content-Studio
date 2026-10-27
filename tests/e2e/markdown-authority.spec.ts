@@ -22,7 +22,7 @@ test('DB-7 body authority, failed Drive save and explicit Markdown import; Sheet
     expect(refused.status()).toBe(403);
     return;
   }
-  await expect(page.getByText('The database holds your saved draft.', { exact: false })).toBeVisible();
+  await expect(page.getByText('The database holds your saved draft.', { exact: false })).toHaveCount(0);
   await expect(page.getByText('Database; Drive is an export', { exact: true })).toBeVisible();
   await expect(page.getByText(/Invalid Date/)).toHaveCount(0);
   await page.getByLabel(/Post copy/).fill('## Unsafe section\n\nSynthetic body');

@@ -63,6 +63,7 @@ function markdownFailure(model: Extract<EditorModel['markdown'], { state: 'unava
 }
 
 export type PostEditorProps = {
+  externalRevision?: string;
   selection?: SaveSelection;
   onSelectionChange?: (value: SaveSelection) => void;
   saveAsControl?: React.ReactNode;
@@ -84,7 +85,7 @@ const subscribeHydration = () => () => {};
 const clientHydrated = () => true;
 const serverHydrated = () => false;
 
-export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false, selection, saveAsControl, onSelectionChange }: PostEditorProps) {
+export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapshot, onSaved, onSaveFailed, autoFocus = false, selection, saveAsControl, onSelectionChange, externalRevision }: PostEditorProps) {
   // SSR copy is readable immediately, but input must wait until React owns the
   // textarea. Otherwise hydration can reset a selection during a fill/keystroke.
   const contentStore = model.contentProvider === 'db' ? 'database' : 'Sheet';
@@ -99,7 +100,9 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
     if (onValueChange) onValueChange(next);
     else setInnerText(next);
   };
-  const [sheetRevision, setSheetRevision] = useState(model.sheet.revision);
+  const [revisionState, setRevisionState] = useState({ value: model.sheet.revision, external: externalRevision });
+  const sheetRevision = externalRevision && externalRevision !== revisionState.external ? externalRevision : revisionState.value;
+  const setSheetRevision = (value: string) => setRevisionState({ value, external: externalRevision });
   const [sectionHash, setSectionHash] = useState(model.markdown.state === 'ok' ? model.markdown.sectionHash : '');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const notifySaved = useRef(false);
@@ -248,7 +251,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
     setBase(fresh.markdown.body);
     setText(fresh.markdown.body);
     if (selection) {
-      const currentSelection = selectionFromSaved(fresh.versions, fresh.targetPlatform);
+      const currentSelection = selectionFromSaved(fresh.versions, fresh.targetPlatform, initialEditorText(fresh));
       onSelectionChange?.(currentSelection);
       setSavedSelection(JSON.stringify(currentSelection));
       setVersionsSaved(Boolean(fresh.versions?.length));
@@ -306,7 +309,6 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
         </InlineResult>
       ) : null}
 
-      {model.contentProvider === 'db' ? <p className="text-sm text-ink-soft">The database holds your saved draft. Drive receives a separate export; export delays appear in Fix issues.</p> : null}
       {model.markdown.state !== 'ok' ? (
         <InlineResult tone="warning">
           {markdownFailure(model.markdown)} Saving is disabled so the {contentStore} and Markdown cannot drift apart. Any saved draft shown below can still be copied.
@@ -357,7 +359,7 @@ export function PostEditor({ model, canEdit, ns, value, onValueChange, onSnapsho
 
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
-          <button type="button" data-shortcut="save-draft" aria-keyshortcuts="Control+S Meta+S" className={buttonClass('primary')} disabled={!markdownOk || Boolean(invalidSelection) || (!dirty && !mismatch && !(selection && !versionsSaved)) || status.kind === 'saving'} onClick={() => void save()}>
+          <button id={`save-draft-${model.libraryId}`} type="button" data-shortcut="save-draft" aria-keyshortcuts="Control+S Meta+S" className={buttonClass('primary')} disabled={!markdownOk || Boolean(invalidSelection) || (!dirty && !mismatch && !(selection && !versionsSaved)) || status.kind === 'saving'} onClick={() => void save()}>
             {status.kind === 'saving' ? 'Saving…' : !dirty && mismatch ? `Make the ${contentStore} match the Markdown` : 'Save draft'}
           </button>
           <button type="button" className={buttonClass()} disabled={!dirty || status.kind === 'saving'} onClick={() => { setText(base); clearRecovery(ns, model.libraryId); if (savedSelection) onSelectionChange?.(JSON.parse(savedSelection) as SaveSelection); }}>

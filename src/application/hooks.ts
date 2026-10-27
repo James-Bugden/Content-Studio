@@ -1,4 +1,5 @@
 import 'server-only';
+import { fewerLineBreaks } from '@/domain/format';
 import type { Platform } from '@/domain/enums';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
@@ -127,6 +128,8 @@ export type SelectHookInput = {
   expectedSectionHash: string;
   /** `draftHash` of the proposal the choice came from. */
   generationDraftHash: string;
+  /** Exact generation source, hash-checked before use in partial-save recovery. */
+  sourceDraft?: string;
   choice: HookChoice;
   alternatives: HookAlternative[];
 };
@@ -156,6 +159,7 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
     finish({ ok: false, operationId: op, code, steps: [...steps], ...(details ? { details } : {}) });
 
   if (actor.role !== 'owner') return fail('FORBIDDEN');
+  if (input.sourceDraft !== undefined && (input.sourceDraft.length > 40_000 || fingerprint(input.sourceDraft) !== input.generationDraftHash)) return fail('STALE_READ');
   if (
     !operationIdSchema.safeParse(op).success ||
     !libraryIdSchema.safeParse(input.libraryId).success ||
@@ -224,7 +228,7 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
       const already = body.startsWith(chosen.text) && record.cells.currentHook === chosen.text;
       if (!already && (fingerprint(body) !== input.generationDraftHash || read.section.bodyHash !== input.expectedSectionHash)) return fail('STALE_READ');
       if (!already && (!current.trim() || !body.startsWith(current) || !(rest === '' || rest.startsWith('\n') || rest.startsWith('\r\n')))) return fail('CONFLICT', { reason: 'opening_mismatch' });
-      patch.draftContent = already ? body : chosen.text + rest;
+      patch.draftContent = already ? body : fewerLineBreaks(chosen.text + rest);
     } else if (fingerprint(body) !== input.generationDraftHash || read.section.bodyHash !== input.expectedSectionHash) return fail('STALE_READ');
     const result = await repo.updateLibrary({ operationId: op, actor, target: { libraryId: input.libraryId }, expectedRevision: input.expectedSheetRevision, patch });
     return finish(result.ok ? { ...result, value: { record: result.value } } : result);
@@ -243,7 +247,9 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
     }
     // Otherwise resume only from the exact state the partial run left: the Sheet
     // still holds the original hook the generation was made against.
-    if (fingerprint(record.cells.currentHook + body.slice(chosen.text.length)) !== input.generationDraftHash) {
+    const original = input.sourceDraft ?? record.cells.currentHook + body.slice(chosen.text.length);
+    if (fingerprint(original) !== input.generationDraftHash || !original.startsWith(record.cells.currentHook) ||
+      (input.sourceDraft !== undefined && fewerLineBreaks(chosen.text + original.slice(record.cells.currentHook.length)) !== body)) {
       return fail('STALE_READ', { provider: 'sheet', currentRevision: record.revision });
     }
     return writeHookFields(hookPatch(chosen), record.revision, true);
@@ -273,7 +279,7 @@ export async function selectHook(repo: ContentRepository, drive: DriveGateway, a
     libraryId: input.libraryId,
     expectedSheetRevision: record.revision,
     expectedSectionHash: read.section.bodyHash,
-    proposed: chosen.text + rest,
+    proposed: fewerLineBreaks(chosen.text + rest),
   });
   steps.push(...saved.steps);
   if (!saved.ok) return fail(saved.code, saved.details);

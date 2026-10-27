@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { PLATFORMS, SHEET_WRITE_VALUE, type Platform } from '@/domain/enums';
+import { COPYRIGHT_QA, DUPLICATE_QA, PLATFORMS, SHEET_WRITE_VALUE, type Platform } from '@/domain/enums';
 import type { ErrorCode } from '@/domain/errors';
 import { thumbFor } from '@/domain/next-steps';
 import type { LibraryPatch } from '@/domain/mapping';
@@ -233,9 +233,9 @@ export async function applyBacklogEdit(repo: ContentRepository, actor: Actor, t:
 
 /**
  * Field edits on a Content Library post from the Posts table and the post editor:
- * PESTO (CS-054) and the chosen hook, `Current Hook` (CS-056). Same envelope as
+ * PESTO, the chosen hook and explicit human copyright/duplicate QA decisions. Same envelope as
  * every other guarded write: owner only, operation id, expected revision. Only
- * the named cells are written; both are existing Sheet columns.
+ * the named fields are written through the active Content repository.
  */
 export const libraryFieldEditSchema = z.object({
   operationId: operationIdSchema,
@@ -244,6 +244,8 @@ export const libraryFieldEditSchema = z.object({
   patch: z.object({
     pesto: z.string().max(200).optional(),
     currentHook: z.string().max(500).optional(),
+    copyrightQa: z.enum(COPYRIGHT_QA).optional(),
+    duplicateQa: z.enum(DUPLICATE_QA).optional(),
   }).strict().refine((p) => Object.keys(p).length > 0, 'patch must set at least one field'),
 }).strict();
 export type LibraryFieldEdit = z.infer<typeof libraryFieldEditSchema>;
@@ -257,6 +259,8 @@ export async function applyLibraryFieldEdit(repo: ContentRepository, actor: Acto
   const patch: LibraryPatch = {};
   if (t.patch.pesto !== undefined) patch.pesto = t.patch.pesto.trim();
   if (t.patch.currentHook !== undefined) patch.currentHook = t.patch.currentHook.trim();
+  if (t.patch.copyrightQa !== undefined) patch.copyrightQa = SHEET_WRITE_VALUE.copyright[t.patch.copyrightQa];
+  if (t.patch.duplicateQa !== undefined) patch.duplicateQa = SHEET_WRITE_VALUE.duplicate[t.patch.duplicateQa];
   const result = await repo.updateLibrary({
     operationId: t.operationId,
     actor,

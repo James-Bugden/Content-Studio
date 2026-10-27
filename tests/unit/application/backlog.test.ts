@@ -3,6 +3,8 @@ import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
 import {
   applyBacklogEdit,
+  applyLibraryFieldEdit,
+  libraryFieldEditSchema,
   backlogEditSchema,
   loadBacklogGroups,
   loadBacklogOptions,
@@ -29,6 +31,19 @@ beforeEach(() => {
 });
 
 const op = (n: string) => `op_backlog_${n}_00000`;
+
+it('persists only explicit human QA decisions with validation, owner checks and stale-write protection', async () => {
+  const record = await repo.getLibrary('SYN-L002');
+  const input = libraryFieldEditSchema.parse({ operationId: op('qa'), libraryId: 'SYN-L002', expectedRevision: record.revision, patch: { copyrightQa: 'PASS', duplicateQa: 'PASS' } });
+  expect(await applyLibraryFieldEdit(repo, viewer, input)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
+  expect(await applyLibraryFieldEdit(repo, owner, input)).toMatchObject({ ok: true });
+  const saved = await repo.getLibrary('SYN-L002');
+  expect(saved.value.copyrightQa).toMatchObject({ ok: true, value: 'PASS' });
+  expect(saved.value.duplicateQa).toMatchObject({ ok: true, value: 'PASS' });
+  expect(saved.value.draftContent).toBe(record.value.draftContent);
+  expect(await applyLibraryFieldEdit(repo, owner, { ...input, operationId: op('qa_stale'), patch: { copyrightQa: 'REWORK' } })).toMatchObject({ ok: false, code: 'STALE_READ' });
+  expect(libraryFieldEditSchema.safeParse({ ...input, patch: { copyrightQa: 'Anything' } }).success).toBe(false);
+});
 
 describe('loadBacklogGroups', () => {
   it('groups the 5 synthetic rows into 2 sources, sorted by source name, items sorted by libraryId', async () => {

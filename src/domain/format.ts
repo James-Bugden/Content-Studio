@@ -145,10 +145,27 @@ export function platformLength(text: string): number {
 
 export const PLATFORM_LIMIT: Record<string, number> = { X: 25_000, LinkedIn: 3_000, Threads: 500 };
 
-/** Explicit compacting action only: keep paragraphs and list boundaries. */
+/** Compact copy without changing words, the opening paragraph or list boundaries. */
 export function fewerLineBreaks(text: string): string {
-  return text.replace(/\r\n/g, '\n').split(/\n{2,}/).map(paragraph => paragraph.split('\n').reduce((out, line, i, lines) => {
-    const list = (s: string) => /^\s*(?:[-*+•]|\d+[.)])\s/.test(s);
-    return out + (i ? list(line) || list(lines[i - 1]!) ? '\n' : ' ' : '') + line;
-  }, '')).join('\n\n');
+  const list = (s: string) => /^[\t ]*(?:[-*+•–—]|\d+[.)])\s/m.test(s);
+  const paragraphs = text.replace(/\r\n?/g, '\n').split(/\n[\t ]*\n(?:[\t ]*\n)*/).map(paragraph =>
+    paragraph.split('\n').reduce((out, line, i, lines) =>
+      out + (i ? list(line) || list(lines[i - 1]!) ? '\n' : ' ' : '') + line, ''));
+  const sentences = (s: string) => (s.match(/[.!?。！？]+(?:[”’"']*(?:\s|$)|(?=[^\x00-\x7f]))/g)?.length ?? 0) + (/[.!?。！？][”’"']*\s*$/.test(s) ? 0 : 1);
+  const out: string[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    let group = paragraphs[i]!;
+    // The first non-empty paragraph is the hook. Lists and long paragraphs stand alone.
+    if (out.some(p => p.trim()) && group.trim() && group.length < 140 && !list(group)) {
+      while (i + 1 < paragraphs.length) {
+        const next = paragraphs[i + 1]!;
+        const joined = `${group} ${next}`;
+        if (!next.trim() || next.length >= 140 || list(next) || joined.length > 420 || sentences(joined) > 3) break;
+        group = joined;
+        i++;
+      }
+    }
+    out.push(group);
+  }
+  return out.join('\n\n');
 }

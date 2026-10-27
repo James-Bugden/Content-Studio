@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fingerprint } from './hash';
 
 export const SAVE_PLATFORMS = ['LinkedIn', 'Threads', 'X'] as const;
 export type SavePlatform = (typeof SAVE_PLATFORMS)[number];
@@ -16,8 +17,8 @@ export type SaveSelection = { platforms: SavePlatform[]; includeChinese?: boolea
 export const saveSelectionSchema = z.object({ platforms: z.array(z.enum(SAVE_PLATFORMS)).max(3), includeChinese: z.boolean().optional(),
   chinese: z.object({ source: z.string().max(40_000), content: z.string().max(40_000) }).optional() });
 
-export function savedSelection(versions: PostVersion[] | undefined, targetPlatform: string): SaveSelection {
+export function savedSelection(versions: PostVersion[] | undefined, targetPlatform: string, source?: string): SaveSelection {
   const chinese = versions?.find(v => v.chinese);
   return { platforms: versions?.length ? versions.map(v => v.platform) : [SAVE_PLATFORMS.includes(targetPlatform as SavePlatform) ? targetPlatform as SavePlatform : 'LinkedIn'],
-    ...(chinese ? { chinese: { source: chinese.english, content: chinese.chinese! } } : {}) };
+    ...(chinese ? { chinese: { source: source === undefined ? chinese.english : fingerprint(source) === chinese.sourceHash ? source : '', content: chinese.chinese! } } : {}) };
 }
