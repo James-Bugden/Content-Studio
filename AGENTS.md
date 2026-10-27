@@ -23,7 +23,7 @@ server-only database credentials. `CS_CONTENT_WRITE_ENABLED=false` explicitly
 freezes writes; omitted/true permits guarded writes. No activation epoch,
 parity freshness, backup/rehearsal evidence or waiver is required for serving.
 Legacy Sheet/shadow/read modes retain their historical migration tooling.
-No production flip is attested by this local implementation change.
+Cut over on 2026-10-27: production runs `CS_CONTENT_STORE=db` on the database-only build (#234); the Sheet is no longer read or written.
 
 Do not create a parallel source of truth.
 
