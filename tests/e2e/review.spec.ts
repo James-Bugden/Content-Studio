@@ -27,12 +27,12 @@ test('REV-03: lanes and filters are URL enums and compose', async ({ page }) => 
   await page.getByRole('navigation', { name: 'Post tabs' }).getByRole('link', { name: /Blocked/ }).click();
   await expect(page).toHaveURL(/lane=blocked/);
   await expect(page).toHaveURL(/layout=cards/);
-  await expect(card(page, 'Quoted framework')).toBeVisible();
+  await expect(card(page, 'Anchor high')).toBeVisible();
   await expect(card(page, 'Negotiate scope first')).toHaveCount(0);
   // The earlier lane values still work as aliases.
-  await page.goto('/review?layout=cards&lane=copyright');
-  await expect(card(page, 'Quoted framework')).toBeVisible();
-  await expect(card(page, 'Anchor high')).toHaveCount(0);
+  await page.goto('/review?layout=cards&lane=duplicate');
+  await expect(card(page, 'Anchor high')).toBeVisible();
+  await expect(card(page, 'Quoted framework')).toHaveCount(0);
   await page.goto('/review?layout=cards&target=LinkedIn&review=Pending&lane=<script>');
   await expect(card(page, 'Negotiate scope first')).toBeVisible();
   expect(page.url()).not.toContain('Most people');
@@ -48,16 +48,16 @@ test('REV-05: no match and provider failure are distinct screens', async ({ page
   await expect(page.locator('[data-state="no_match"], [data-state="empty"]')).toHaveCount(0);
 });
 
-test('REV-04: REWORK and CHECK cannot be approved, with the exact blocker shown', async ({ page }) => {
+test('REV-04: CHECK cannot be approved, with the exact blocker shown', async ({ page }) => {
   await signInAs(page.request, 'owner');
   await page.goto(CARDS);
-  const rework = card(page, 'Quoted framework');
-  await expect(rework.getByText('Copyright QA says this needs rework.')).toBeVisible();
+  const rework = card(page, 'Anchor high');
+  await expect(rework.getByText('A possible duplicate needs a decision.')).toBeVisible();
   await expect(rework.getByRole('button', { name: 'Approve and queue' })).toBeDisabled();
   // A direct API call is refused too, not just the disabled button.
   const res = await page.request.post('/api/review/transition', {
     headers: { origin: new URL(page.url()).origin },
-    data: { operationId: 'op_e2e_bypass_01', libraryId: 'SYN-L002', expectedRevision: '0000000000000000', action: 'approve' },
+    data: { operationId: 'op_e2e_bypass_01', libraryId: 'SYN-L003', expectedRevision: '0000000000000000', action: 'approve' },
   });
   expect([409, 422]).toContain(res.status());
 });

@@ -20,7 +20,7 @@ export function deriveQueueSummary(queue: readonly LibraryRecord[]): QueueSummar
       'Not Reviewed': rows.filter(r => ['', 'Not Reviewed', 'Pending'].includes(r.cells.reviewStatus)).length,
       Approved: rows.filter(r => r.cells.reviewStatus === 'Approved').length,
       Queued: rows.filter(r => parseBoolean(r.cells.queueForSchedule) === true).length,
-      'Needs Fix': rows.filter(r => r.cells.reviewStatus === 'Changes Requested' || r.cells.copyrightQa === 'REWORK' || ['CHECK', 'DUPLICATE'].includes(r.cells.duplicateQa)).length,
+      'Needs Fix': rows.filter(r => r.cells.reviewStatus === 'Changes Requested' || ['CHECK', 'DUPLICATE'].includes(r.cells.duplicateQa)).length,
     } };
   });
 }

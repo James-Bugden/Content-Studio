@@ -1,0 +1,8140 @@
+[
+  {
+    "id": "E01",
+    "slug": "side-by-side",
+    "layout_family": "side-by-side comparison",
+    "title": "Compare offers on the same terms",
+    "alt_text": "Two example offers are compared on pay, work and growth. Each has different trade-offs.",
+    "labels": [
+      "Example offers",
+      "Offer A",
+      "Offer B",
+      "Pay",
+      "Higher base",
+      "Lower base",
+      "Work",
+      "Office daily",
+      "Hybrid",
+      "Growth",
+      "Build a skill",
+      "Try new work"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example offers",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Offer A",
+        "x": 360,
+        "y": 515,
+        "w": 270,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          339.0,
+          491,
+          685.0,
+          595
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Offer B",
+        "x": 720,
+        "y": 515,
+        "w": 270,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          685.0,
+          491,
+          1016,
+          595
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 602,
+        "w": 952,
+        "h": 125,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Pay",
+        "x": 88,
+        "y": 620,
+        "w": 230,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          602,
+          339.0,
+          727
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Higher base",
+        "x": 360,
+        "y": 620,
+        "w": 290,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          339.0,
+          602,
+          685.0,
+          727
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Lower base",
+        "x": 720,
+        "y": 620,
+        "w": 270,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          685.0,
+          602,
+          1016,
+          727
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 757,
+        "w": 952,
+        "h": 125,
+        "fill": "#FFFDFC",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Work",
+        "x": 88,
+        "y": 775,
+        "w": 230,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          757,
+          339.0,
+          882
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Office daily",
+        "x": 360,
+        "y": 775,
+        "w": 290,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          339.0,
+          757,
+          685.0,
+          882
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Hybrid",
+        "x": 720,
+        "y": 775,
+        "w": 270,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          685.0,
+          757,
+          1016,
+          882
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 912,
+        "w": 952,
+        "h": 125,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Growth",
+        "x": 88,
+        "y": 930,
+        "w": 230,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          912,
+          339.0,
+          1037
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Build a skill",
+        "x": 360,
+        "y": 930,
+        "w": 290,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          339.0,
+          912,
+          685.0,
+          1037
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Try new work",
+        "x": 720,
+        "y": 930,
+        "w": 270,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          685.0,
+          912,
+          1016,
+          1037
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Compare offers on the same terms",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Same three dimensions on both sides. Examples labelled. No universal winner.",
+    "uncertain": "None",
+    "pass_2_changes": "Centred offer headers over the same columns. Enlarged row labels and cells. Removed the bottom advice line.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E02",
+    "slug": "before-after",
+    "layout_family": "before and after",
+    "title": "Show what you did and why it mattered",
+    "alt_text": "An illustrative resume bullet changes from helped with reports to a clear task and purpose.",
+    "labels": [
+      "Illustrative example",
+      "Before",
+      "Helped with reports",
+      "After",
+      "Built a weekly sales report so the team could spot late orders"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Illustrative example",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Before",
+        "x": 64,
+        "y": 515,
+        "w": 400,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 575,
+        "w": 952,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Helped with reports",
+        "x": 92,
+        "y": 608.5,
+        "w": 896,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          575,
+          1016,
+          705
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            735
+          ],
+          [
+            540,
+            795
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "After",
+        "x": 64,
+        "y": 835,
+        "w": 400,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 900,
+        "w": 952,
+        "h": 215,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Built a weekly sales report so the team could spot late orders",
+        "x": 92,
+        "y": 944.5,
+        "w": 896,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          900,
+          1016,
+          1115
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Show what you did and why it mattered",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Illustrative example. Specific task and purpose. No invented metric.",
+    "uncertain": "None",
+    "pass_2_changes": "Centred both example bullets in taller blocks. Enlarged Before and After labels.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E03",
+    "slug": "short-sequence",
+    "layout_family": "short sequence",
+    "title": "Make a referral easy to consider",
+    "alt_text": "Three ordered steps: choose someone who knows your work, share the role and fit, then ask for a referral.",
+    "labels": [
+      "Choose someone who knows your work",
+      "Share the role and why it fits",
+      "Ask if they feel able to refer you"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 170,
+        "y": 450,
+        "w": 740,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Choose someone who knows your work",
+        "x": 198,
+        "y": 475.0,
+        "w": 684,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          170,
+          450,
+          910,
+          620
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 170,
+        "y": 700,
+        "w": 740,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Share the role and why it fits",
+        "x": 198,
+        "y": 755.0,
+        "w": 684,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          170,
+          700,
+          910,
+          870
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 170,
+        "y": 950,
+        "w": 740,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Ask if they feel able to refer you",
+        "x": 198,
+        "y": 1005.0,
+        "w": 684,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          170,
+          950,
+          910,
+          1120
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            650
+          ],
+          [
+            540,
+            670
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            900
+          ],
+          [
+            540,
+            920
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Make a referral easy to consider",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three steps. Arrows follow a real order.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged the three steps and spread them through the free height. Centred multiline labels.",
+    "smallest_text_px": 44,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E04",
+    "slug": "branching-decision",
+    "layout_family": "branching decision",
+    "title": "Only half a match? Check the core tasks",
+    "alt_text": "The decision splits into applying with proof or building proof and trying a closer role. Check essential legal requirements first.",
+    "labels": [
+      "Can you do the core tasks?",
+      "Yes",
+      "Not yet",
+      "Apply with\nproof",
+      "Build proof or\ntry a closer role",
+      "Check required licences and work permits first"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 200,
+        "y": 445,
+        "w": 680,
+        "h": 140,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Can you do the core tasks?",
+        "x": 228,
+        "y": 483.5,
+        "w": 624,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          200,
+          445,
+          880,
+          585
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            350,
+            615
+          ],
+          [
+            350,
+            685
+          ],
+          [
+            285,
+            685
+          ],
+          [
+            285,
+            725
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            730,
+            615
+          ],
+          [
+            730,
+            685
+          ],
+          [
+            795,
+            685
+          ],
+          [
+            795,
+            725
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Yes",
+        "x": 200,
+        "y": 635,
+        "w": 110,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Not yet",
+        "x": 830,
+        "y": 620,
+        "w": 180,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 775,
+        "w": 440,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Apply with\nproof",
+        "x": 92,
+        "y": 803.0,
+        "w": 384,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          775,
+          504,
+          945
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 576,
+        "y": 775,
+        "w": 440,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Build proof or\ntry a closer role",
+        "x": 604,
+        "y": 803.0,
+        "w": 384,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          576,
+          775,
+          1016,
+          945
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Check required licences and work permits first",
+        "x": 64,
+        "y": 1050,
+        "w": 920,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Only half a match? Check the core tasks",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Distinct branch actions. Essential requirements caveat.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened both actions and the legal caveat. Enlarged the decision and branch labels.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E05",
+    "slug": "annotated-anatomy",
+    "layout_family": "annotated anatomy",
+    "title": "Give your headline a clear job",
+    "alt_text": "An example LinkedIn headline names a role, names the tools and shows useful work. Three callouts explain it.",
+    "labels": [
+      "Example headline",
+      "Data analyst",
+      "SQL and Tableau",
+      "Turning sales data into clear weekly reports",
+      "Names the role",
+      "Names the tools",
+      "Shows useful work"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example headline",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 525,
+        "w": 390,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Data analyst",
+        "x": 92,
+        "y": 557.0,
+        "w": 334,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          525,
+          454,
+          655
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 510,
+        "y": 525,
+        "w": 506,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "SQL and Tableau",
+        "x": 538,
+        "y": 557.0,
+        "w": 450,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          510,
+          525,
+          1016,
+          655
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 830,
+        "w": 952,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Turning sales data into clear weekly reports",
+        "x": 92,
+        "y": 883.5,
+        "w": 896,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          830,
+          1016,
+          1000
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            260,
+            685
+          ],
+          [
+            260,
+            725
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Names the role",
+        "x": 64,
+        "y": 755,
+        "w": 390,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            760,
+            685
+          ],
+          [
+            760,
+            725
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Names the tools",
+        "x": 510,
+        "y": 755,
+        "w": 506,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            1030
+          ],
+          [
+            540,
+            1070
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Shows useful work",
+        "x": 64,
+        "y": 1100,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Give your headline a clear job",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three callouts. Leaders stop before text. Example labelled.",
+    "uncertain": "None",
+    "pass_2_changes": "Centred headline parts and all three callouts on their leaders. Enlarged the example label.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E06",
+    "slug": "converging-inputs",
+    "layout_family": "converging inputs",
+    "title": "Build a fuller view of the role",
+    "alt_text": "A job post, the company website and people in the role all help define what the role needs.",
+    "labels": [
+      "Job post",
+      "Company\nwebsite",
+      "People in\nthe role",
+      "What the role needs"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 460,
+        "w": 284,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Job post",
+        "x": 92,
+        "y": 513.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          460,
+          348,
+          620
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 398,
+        "y": 460,
+        "w": 284,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Company\nwebsite",
+        "x": 426,
+        "y": 486.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          398,
+          460,
+          682,
+          620
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 732,
+        "y": 460,
+        "w": 284,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "People in\nthe role",
+        "x": 760,
+        "y": 486.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          732,
+          460,
+          1016,
+          620
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            206,
+            650
+          ],
+          [
+            206,
+            770
+          ],
+          [
+            460,
+            900
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            650
+          ],
+          [
+            540,
+            900
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            874,
+            650
+          ],
+          [
+            874,
+            770
+          ],
+          [
+            620,
+            900
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 200,
+        "y": 950,
+        "w": 680,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "What the role needs",
+        "x": 228,
+        "y": 997.0,
+        "w": 624,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          200,
+          950,
+          880,
+          1110
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Build a fuller view of the role",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "All three arrows converge. Relationship named.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged all three inputs and the result. Removed the repeated bottom explanation.",
+    "smallest_text_px": 44,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E07",
+    "slug": "fill-in-worksheet",
+    "layout_family": "fill-in worksheet",
+    "title": "Build a short answer about yourself",
+    "alt_text": "Three fields help build an introduction: your work now, one piece of proof and why this role is next.",
+    "labels": [
+      "Now",
+      "I work on…",
+      "Proof",
+      "One thing I have done is…",
+      "Next",
+      "I want this role because…"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Now",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 510,
+        "w": 952,
+        "h": 125,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I work on…",
+        "x": 92,
+        "y": 544,
+        "w": 890,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          510,
+          1016,
+          635
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Proof",
+        "x": 64,
+        "y": 690,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 760,
+        "w": 952,
+        "h": 125,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "One thing I have done is…",
+        "x": 92,
+        "y": 794,
+        "w": 890,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          760,
+          1016,
+          885
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Next",
+        "x": 64,
+        "y": 940,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 1010,
+        "w": 952,
+        "h": 125,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I want this role because…",
+        "x": 92,
+        "y": 1044,
+        "w": 890,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          1010,
+          1016,
+          1135
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Build a short answer about yourself",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three useful fields. Room to fill in each answer.",
+    "uncertain": "None",
+    "pass_2_changes": "Centred each prompt in its field. Enlarged prompts and field headings.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E08",
+    "slug": "screenshot-annotation",
+    "layout_family": "sparse schematic annotation",
+    "title": "Set who sees you are open to work",
+    "alt_text": "A labelled LinkedIn schematic shows Open to, Finding a new job, then Recruiters only. Employer privacy is not guaranteed.",
+    "labels": [
+      "Schematic, not a screenshot",
+      "Your profile",
+      "Open to\nFinding a new job",
+      "Start\nhere",
+      "Choose visibility",
+      "Recruiters only",
+      "Employer privacy is not guaranteed."
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Schematic, not a screenshot",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 530,
+        "w": 630,
+        "h": 585,
+        "fill": "#E7EFE9",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Your profile",
+        "x": 100,
+        "y": 575,
+        "w": 550,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          530,
+          694,
+          675
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 100,
+        "y": 675,
+        "w": 558,
+        "h": 150,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Open to\nFinding a new job",
+        "x": 130,
+        "y": 705,
+        "w": 500,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          100,
+          675,
+          658,
+          825
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            690,
+            748
+          ],
+          [
+            745,
+            748
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Start\nhere",
+        "x": 780,
+        "y": 725,
+        "w": 230,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Choose visibility",
+        "x": 100,
+        "y": 865,
+        "w": 550,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          100,
+          825,
+          658,
+          950
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 100,
+        "y": 950,
+        "w": 558,
+        "h": 110,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Recruiters only",
+        "x": 130,
+        "y": 984,
+        "w": 500,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          100,
+          950,
+          658,
+          1060
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Employer privacy is not guaranteed.",
+        "x": 64,
+        "y": 1155,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Set who sees you are open to work",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Explicit schematic label. One sparse leader. Privacy caveat.",
+    "uncertain": "LinkedIn labels and menu position can change. Offline task, current live UI not verified.",
+    "pass_2_changes": "Enlarged all menu labels and the caveat. Centred the profile and visibility bands. Shortened the schematic label and caveat.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E09",
+    "slug": "requirement-proof",
+    "layout_family": "requirement-to-proof pairs",
+    "title": "Match each need to a piece of proof",
+    "alt_text": "Three example needs link to separate proof: SQL to a SQL report, teamwork to a launch plan with sales, and clear results to a weekly summary.",
+    "labels": [
+      "Example need",
+      "Resume proof",
+      "Use SQL",
+      "SQL report",
+      "Teamwork",
+      "Launch plan\nwith sales",
+      "Explain results",
+      "Weekly\nsummary"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example need",
+        "x": 64,
+        "y": 440,
+        "w": 420,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          64,
+          416,
+          429,
+          512
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Resume proof",
+        "x": 640,
+        "y": 440,
+        "w": 376,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          624,
+          416,
+          1016,
+          512
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 570,
+        "w": 365,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Use SQL",
+        "x": 92,
+        "y": 617.0,
+        "w": 309,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          570,
+          429,
+          715
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            459,
+            642
+          ],
+          [
+            594,
+            642
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 624,
+        "y": 570,
+        "w": 392,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "SQL report",
+        "x": 652,
+        "y": 617.0,
+        "w": 336,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          624,
+          570,
+          1016,
+          715
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 790,
+        "w": 365,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Teamwork",
+        "x": 92,
+        "y": 837.0,
+        "w": 309,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          790,
+          429,
+          935
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            459,
+            862
+          ],
+          [
+            594,
+            862
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 624,
+        "y": 790,
+        "w": 392,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Launch plan\nwith sales",
+        "x": 652,
+        "y": 811.5,
+        "w": 336,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          624,
+          790,
+          1016,
+          935
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 1010,
+        "w": 365,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Explain results",
+        "x": 92,
+        "y": 1057.0,
+        "w": 309,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          1010,
+          429,
+          1155
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            459,
+            1082
+          ],
+          [
+            594,
+            1082
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 624,
+        "y": 1010,
+        "w": 392,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Weekly\nsummary",
+        "x": 652,
+        "y": 1031.5,
+        "w": 336,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          624,
+          1010,
+          1016,
+          1155
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Match each need to a piece of proof",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three aligned pairs. Straight connectors do not cross. Example labelled.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened proof labels to fit larger type. Centred column headers and all six nodes.",
+    "smallest_text_px": 44,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "E10",
+    "slug": "example-dialogue",
+    "layout_family": "example dialogue",
+    "title": "Explain the move you want to make",
+    "alt_text": "An example interview exchange focuses on wanting more data analysis and why the new role fits.",
+    "labels": [
+      "Example wording",
+      "Interviewer",
+      "Why are you leaving?",
+      "You",
+      "I want to do more data analysis. This role lets me use SQL to answer business questions."
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example wording",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Interviewer",
+        "x": 64,
+        "y": 525,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 590,
+        "w": 780,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Why are you leaving?",
+        "x": 92,
+        "y": 622.0,
+        "w": 724,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          590,
+          844,
+          720
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "You",
+        "x": 200,
+        "y": 795,
+        "w": 816,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 200,
+        "y": 865,
+        "w": 816,
+        "h": 280,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I want to do more data analysis. This role lets me use SQL to answer business questions.",
+        "x": 228,
+        "y": 915.0,
+        "w": 760,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          200,
+          865,
+          1016,
+          1145
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Explain the move you want to make",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Example wording. Clear speaker labels. No personal claim presented as fact.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the example answer. Enlarged speaker labels and centred both dialogue blocks.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N01",
+    "slug": "two-axis-matrix",
+    "layout_family": "two-axis matrix",
+    "title": "Choose which roles to try first",
+    "alt_text": "A judgement matrix compares interest and fit. High interest and strong fit is the first priority. High interest with low fit calls for more proof.",
+    "labels": [
+      "Use your judgement, not a score",
+      "More interest",
+      "More fit",
+      "Strong fit\nLow interest",
+      "Apply first",
+      "Low fit\nLow interest",
+      "Build proof\nthen review"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 584,
+        "y": 560,
+        "w": 400,
+        "h": 216,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Use your judgement, not a score",
+        "x": 64,
+        "y": 410,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            150,
+            1080
+          ],
+          [
+            970,
+            1080
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            150,
+            1080
+          ],
+          [
+            150,
+            540
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "More interest",
+        "x": 590,
+        "y": 1130,
+        "w": 420,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "More fit",
+        "x": 64,
+        "y": 470,
+        "w": 350,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            560,
+            560
+          ],
+          [
+            560,
+            1045
+          ]
+        ],
+        "arrow": false,
+        "colour": "#E7EFE9",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            190,
+            800
+          ],
+          [
+            965,
+            800
+          ]
+        ],
+        "arrow": false,
+        "colour": "#E7EFE9",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Strong fit\nLow interest",
+        "x": 215,
+        "y": 620,
+        "w": 290,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Apply first",
+        "x": 635,
+        "y": 650,
+        "w": 300,
+        "size": 48,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          584,
+          560,
+          984,
+          776
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Low fit\nLow interest",
+        "x": 215,
+        "y": 900,
+        "w": 290,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Build proof\nthen review",
+        "x": 635,
+        "y": 900,
+        "w": 300,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Choose which roles to try first",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Axes and direction labelled. Judgement caveat.",
+    "uncertain": "Fit and interest are personal judgements, not measured data.",
+    "pass_2_changes": "Enlarged the axes and quadrant copy. Added a pale priority block and a 48 px Apply first focal phrase.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N02",
+    "slug": "spectrum",
+    "layout_family": "spectrum",
+    "title": "Make your answer more specific",
+    "alt_text": "Example answers move from helped the team to built a report to flag late orders. The spectrum uses no scores.",
+    "labels": [
+      "Example answers",
+      "Vague",
+      "Specific",
+      "I helped\nthe team",
+      "I built\na report",
+      "I built a report\nto flag late\norders"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example answers",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            110,
+            610
+          ],
+          [
+            970,
+            610
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Vague",
+        "x": 64,
+        "y": 500,
+        "w": 300,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Specific",
+        "x": 740,
+        "y": 500,
+        "w": 276,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 720,
+        "w": 284,
+        "h": 290,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I helped\nthe team",
+        "x": 92,
+        "y": 811.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          720,
+          348,
+          1010
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 398,
+        "y": 720,
+        "w": 284,
+        "h": 290,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I built\na report",
+        "x": 426,
+        "y": 811.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          398,
+          720,
+          682,
+          1010
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 732,
+        "y": 720,
+        "w": 284,
+        "h": 290,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I built a report\nto flag late\norders",
+        "x": 760,
+        "y": 757.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          732,
+          720,
+          1016,
+          1010
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Make your answer more specific",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Example labelled. No fake scale values.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged all three example answers. Centred their glyph bounds in the spectrum blocks.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N03",
+    "slug": "filter-funnel",
+    "layout_family": "filter funnel",
+    "title": "Cut a long job list to your best ten",
+    "alt_text": "Three narrowing stages go from a long list to roles that fit core needs to the best ten to research. Widths are not measured conversion.",
+    "labels": [
+      "Widths show stages, not measured drops.",
+      "Long list: worth a look",
+      "Shortlist: fit your needs",
+      "Best ten:\nresearch first"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Widths show stages, not measured drops.",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 530,
+        "w": 952,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Long list: worth a look",
+        "x": 92,
+        "y": 581.5,
+        "w": 896,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          530,
+          1016,
+          690
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 170,
+        "y": 750,
+        "w": 740,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Shortlist: fit your needs",
+        "x": 198,
+        "y": 801.5,
+        "w": 684,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          170,
+          750,
+          910,
+          910
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 290,
+        "y": 970,
+        "w": 500,
+        "h": 160,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Best ten:\nresearch first",
+        "x": 318,
+        "y": 1021.5,
+        "w": 444,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          290,
+          970,
+          790,
+          1130
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            705
+          ],
+          [
+            540,
+            735
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            925
+          ],
+          [
+            540,
+            955
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Cut a long job list to your best ten",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Widths explicitly schematic. Best ten is a target, not a result.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened stage copy and the width caveat. Enlarged and centred all three funnel stages.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N04",
+    "slug": "feedback-loop",
+    "layout_family": "feedback loop",
+    "title": "Use each round to improve the next",
+    "alt_text": "Apply, check replies, adjust the resume, then return to applying. Repeat after a small batch.",
+    "labels": [
+      "Apply",
+      "Check replies",
+      "Adjust resume",
+      "Repeat after a small batch"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 330,
+        "y": 445,
+        "w": 420,
+        "h": 120,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Apply",
+        "x": 358,
+        "y": 472.0,
+        "w": 364,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          330,
+          445,
+          750,
+          565
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 635,
+        "y": 745,
+        "w": 381,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Check replies",
+        "x": 663,
+        "y": 791.5,
+        "w": 325,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          635,
+          745,
+          1016,
+          895
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 745,
+        "w": 400,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Adjust resume",
+        "x": 92,
+        "y": 791.5,
+        "w": 344,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          745,
+          464,
+          895
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            780,
+            505
+          ],
+          [
+            910,
+            505
+          ],
+          [
+            910,
+            715
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            605,
+            820
+          ],
+          [
+            494,
+            820
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            180,
+            715
+          ],
+          [
+            180,
+            505
+          ],
+          [
+            300,
+            505
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Repeat after a small batch",
+        "x": 170,
+        "y": 1050,
+        "w": 740,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Use each round to improve the next",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Closed directional loop. No one-way dead end.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged the loop nodes and repeat condition. Spread the loop through the available height.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N05",
+    "slug": "timeline",
+    "layout_family": "timeline",
+    "title": "Use the week before your interview",
+    "alt_text": "An equally spaced timeline marks day minus seven, minus five, minus three and minus one with preparation tasks.",
+    "labels": [
+      "Day −7",
+      "Read the role",
+      "Day −5",
+      "Choose your examples",
+      "Day −3",
+      "Practise out loud",
+      "Day −1",
+      "Check time and link"
+    ],
+    "layout": [
+      {
+        "kind": "line",
+        "points": [
+          [
+            135,
+            490
+          ],
+          [
+            135,
+            1120
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "circle",
+        "x": 135,
+        "y": 525,
+        "r": 10,
+        "fill": "#111315",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Day −7",
+        "x": 200,
+        "y": 500,
+        "w": 220,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          192,
+          484,
+          424,
+          572
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Read the role",
+        "x": 450,
+        "y": 500,
+        "w": 566,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "centre_box": [
+          424,
+          484,
+          1016,
+          572
+        ]
+      },
+      {
+        "kind": "circle",
+        "x": 135,
+        "y": 705,
+        "r": 10,
+        "fill": "#111315",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Day −5",
+        "x": 200,
+        "y": 680,
+        "w": 220,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          192,
+          664,
+          424,
+          752
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Choose your examples",
+        "x": 450,
+        "y": 680,
+        "w": 566,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "centre_box": [
+          424,
+          664,
+          1016,
+          752
+        ]
+      },
+      {
+        "kind": "circle",
+        "x": 135,
+        "y": 885,
+        "r": 10,
+        "fill": "#111315",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Day −3",
+        "x": 200,
+        "y": 860,
+        "w": 220,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          192,
+          844,
+          424,
+          932
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Practise out loud",
+        "x": 450,
+        "y": 860,
+        "w": 566,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "centre_box": [
+          424,
+          844,
+          1016,
+          932
+        ]
+      },
+      {
+        "kind": "circle",
+        "x": 135,
+        "y": 1065,
+        "r": 10,
+        "fill": "#111315",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Day −1",
+        "x": 200,
+        "y": 1040,
+        "w": 220,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          192,
+          1024,
+          424,
+          1112
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Check time and link",
+        "x": 450,
+        "y": 1040,
+        "w": 566,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "centre_box": [
+          424,
+          1024,
+          1016,
+          1112
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Use the week before your interview",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Real day labels. Each interval is two days. No unequal duration implied.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged all days and tasks. Aligned their visible centres with the equally spaced timeline points.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N06",
+    "slug": "ownership-ladder",
+    "layout_family": "ownership ladder",
+    "title": "Name the scope you really held",
+    "alt_text": "Four steps distinguish helping with a task, contributing part of the work, leading the work and owning final calls. Use the scope you held.",
+    "labels": [
+      "Helped: took on a task",
+      "Contributed: did part",
+      "Led: guided the work",
+      "Owned:\nmade final calls",
+      "Match the scope to what you did"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 980,
+        "w": 952,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Helped: took on a task",
+        "x": 92,
+        "y": 1028.0,
+        "w": 896,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          980,
+          1016,
+          1130
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 810,
+        "w": 770,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Contributed: did part",
+        "x": 92,
+        "y": 858.0,
+        "w": 714,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          810,
+          834,
+          960
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 640,
+        "w": 600,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Led: guided the work",
+        "x": 92,
+        "y": 688.0,
+        "w": 544,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          640,
+          664,
+          790
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 470,
+        "w": 430,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Owned:\nmade final calls",
+        "x": 92,
+        "y": 491.0,
+        "w": 374,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          470,
+          494,
+          620
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Match the scope to what you did",
+        "x": 64,
+        "y": 1170,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Name the scope you really held",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Distinct scope labels. No promise of promotion.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged ladder labels and centred each one. Shortened scope copy and the accuracy caveat.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N07",
+    "slug": "visible-hidden",
+    "layout_family": "visible and hidden",
+    "title": "Read the post, then ask what is missing",
+    "alt_text": "Visible job post phrases sit above a line. Below are questions about decisions, daily work and how work is judged.",
+    "labels": [
+      "Example job post",
+      "Work with teams\nManage key projects",
+      "Ask to find out",
+      "Who makes the final call?\nWhat is a normal week like?\nHow is good work judged?"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example job post",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 510,
+        "w": 952,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Work with teams\nManage key projects",
+        "x": 92,
+        "y": 540.0,
+        "w": 896,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          510,
+          1016,
+          690
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            64,
+            760
+          ],
+          [
+            1016,
+            760
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Ask to find out",
+        "x": 64,
+        "y": 815,
+        "w": 952,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Who makes the final call?\nWhat is a normal week like?\nHow is good work judged?",
+        "x": 64,
+        "y": 905,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Read the post, then ask what is missing",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "No hidden percentage. Questions remain questions.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the three questions. Enlarged post phrases, the question heading and body copy.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N08",
+    "slug": "overlap",
+    "layout_family": "overlap diagram",
+    "title": "Look for a fit in all three areas",
+    "alt_text": "Three circles show role need, your proof and your needs. Their shared area is filled pale green and labelled Fit.",
+    "labels": [
+      "Role\nneed",
+      "Your\nproof",
+      "Your\nneeds",
+      "Fit"
+    ],
+    "layout": [
+      {
+        "kind": "circle",
+        "x": 410,
+        "y": 725,
+        "r": 245,
+        "fill": null,
+        "outline": "#111315"
+      },
+      {
+        "kind": "circle",
+        "x": 670,
+        "y": 725,
+        "r": 245,
+        "fill": null,
+        "outline": "#111315"
+      },
+      {
+        "kind": "circle",
+        "x": 540,
+        "y": 925,
+        "r": 245,
+        "fill": null,
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Role\nneed",
+        "x": 240,
+        "y": 650,
+        "w": 170,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "text",
+        "text": "Your\nproof",
+        "x": 710,
+        "y": 650,
+        "w": 170,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "text",
+        "text": "Your\nneeds",
+        "x": 450,
+        "y": 1000,
+        "w": 180,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "text",
+        "text": "Fit",
+        "x": 480,
+        "y": 800,
+        "w": 120,
+        "size": 48,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "center"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Look for a fit in all three areas",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three meaningful sets. Shared centre labelled. No quantified areas.",
+    "uncertain": "None",
+    "pass_2_changes": "Moved enlarged labels clear of every circle. Filled the true shared overlap pale green and enlarged Fit to 48 px.",
+    "smallest_text_px": 40,
+    "fill_shared_overlap": true,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N09",
+    "slug": "evidence-layers",
+    "layout_family": "evidence layers",
+    "title": "Support a claim with an example and result",
+    "alt_text": "Three illustrative layers state a claim, a handover guide example and its practical result.",
+    "labels": [
+      "Claim",
+      "I can improve a process",
+      "Example",
+      "I made a handover guide",
+      "Result",
+      "The next owner could use it",
+      "Illustrative example"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 450,
+        "w": 600,
+        "h": 190,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Claim",
+        "x": 92,
+        "y": 475,
+        "w": 544,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          450,
+          664,
+          538
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "I can improve a process",
+        "x": 92,
+        "y": 545,
+        "w": 544,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          538,
+          664,
+          640
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 700,
+        "w": 780,
+        "h": 190,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Example",
+        "x": 92,
+        "y": 725,
+        "w": 724,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          700,
+          844,
+          788
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "I made a handover guide",
+        "x": 92,
+        "y": 795,
+        "w": 724,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          788,
+          844,
+          890
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 950,
+        "w": 952,
+        "h": 190,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Result",
+        "x": 92,
+        "y": 975,
+        "w": 896,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          950,
+          1016,
+          1038
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "The next owner could use it",
+        "x": 92,
+        "y": 1045,
+        "w": 896,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          1038,
+          1016,
+          1140
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Illustrative example",
+        "x": 64,
+        "y": 1170,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Support a claim with an example and result",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three layers only. Illustrative example. No measured claim.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the handover example. Centred headings and evidence in separate bands within each layer.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "N10",
+    "slug": "evidence-tree",
+    "layout_family": "evidence tree",
+    "title": "Show three kinds of teamwork proof",
+    "alt_text": "An example teamwork claim branches to planning with sales, sharing risks with support and resolving a handover gap with finance.",
+    "labels": [
+      "Example claim",
+      "I work well with other teams",
+      "Agreed a plan\nwith sales",
+      "Shared risks\nwith support",
+      "Fixed a\nhandover with\nfinance"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example claim",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 150,
+        "y": 500,
+        "w": 780,
+        "h": 140,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I work well with other teams",
+        "x": 178,
+        "y": 538.5,
+        "w": 724,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          150,
+          500,
+          930,
+          640
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            670
+          ],
+          [
+            540,
+            730
+          ],
+          [
+            206,
+            730
+          ],
+          [
+            206,
+            820
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            730
+          ],
+          [
+            540,
+            820
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            730
+          ],
+          [
+            874,
+            730
+          ],
+          [
+            874,
+            820
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 860,
+        "w": 284,
+        "h": 240,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Agreed a plan\nwith sales",
+        "x": 92,
+        "y": 929.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          860,
+          348,
+          1100
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 398,
+        "y": 860,
+        "w": 284,
+        "h": 240,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Shared risks\nwith support",
+        "x": 426,
+        "y": 929.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          398,
+          860,
+          682,
+          1100
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 732,
+        "y": 860,
+        "w": 284,
+        "h": 240,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Fixed a\nhandover with\nfinance",
+        "x": 760,
+        "y": 903.5,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          732,
+          860,
+          1016,
+          1100
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Show three kinds of teamwork proof",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three distinct proof points. Branch lines do not touch text.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged the three proof nodes. Shortened the finance example and centred all node copy.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X02",
+    "slug": "evidence-coverage-grid",
+    "layout_family": "evidence coverage grid",
+    "title": "Find the gaps in your evidence",
+    "alt_text": "An example grid checks SQL, teamwork and forecasts. SQL and teamwork have proof ready. Forecasts has a gap and needs a case.",
+    "labels": [
+      "Example evidence check",
+      "Need",
+      "Ready?",
+      "Next step",
+      "SQL",
+      "Yes",
+      "Choose a query",
+      "Teamwork",
+      "Yes",
+      "Choose a story",
+      "Forecasts",
+      "Gap",
+      "Build a case"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example evidence check",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Need",
+        "x": 64,
+        "y": 510,
+        "w": 360,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          64,
+          486,
+          419.0,
+          590
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Ready?",
+        "x": 450,
+        "y": 510,
+        "w": 290,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          419.0,
+          486,
+          755.0,
+          590
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Next step",
+        "x": 790,
+        "y": 510,
+        "w": 226,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          755.0,
+          486,
+          1016,
+          590
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 590,
+        "w": 952,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "SQL",
+        "x": 88,
+        "y": 625,
+        "w": 300,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          590,
+          419.0,
+          735
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Yes",
+        "x": 450,
+        "y": 625,
+        "w": 270,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          419.0,
+          590,
+          755.0,
+          735
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Choose a query",
+        "x": 790,
+        "y": 625,
+        "w": 205,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          755.0,
+          590,
+          1016,
+          735
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 770,
+        "w": 952,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Teamwork",
+        "x": 88,
+        "y": 805,
+        "w": 300,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          770,
+          419.0,
+          915
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Yes",
+        "x": 450,
+        "y": 805,
+        "w": 270,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          419.0,
+          770,
+          755.0,
+          915
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Choose a story",
+        "x": 790,
+        "y": 805,
+        "w": 205,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          755.0,
+          770,
+          1016,
+          915
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 950,
+        "w": 952,
+        "h": 145,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Forecasts",
+        "x": 88,
+        "y": 985,
+        "w": 300,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          950,
+          419.0,
+          1095
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Gap",
+        "x": 450,
+        "y": 985,
+        "w": 270,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          419.0,
+          950,
+          755.0,
+          1095
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Build a case",
+        "x": 790,
+        "y": 985,
+        "w": 205,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          755.0,
+          950,
+          1016,
+          1095
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Find the gaps in your evidence",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Example labelled. Gaps shown with words, not colour alone.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened column and row copy. Centred all three headers and every cell. Enlarged the Gap focal label.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X03",
+    "slug": "bottleneck-repair",
+    "layout_family": "bottleneck and repair",
+    "title": "Fix the weak link before applying",
+    "alt_text": "A role needs SQL but an example resume only says good with data. The repair is to add a SQL task and its use.",
+    "labels": [
+      "Illustrative example",
+      "Role needs SQL",
+      "Resume says\n“good with data”",
+      "Too vague to check",
+      "Add a SQL task and how it helped"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Illustrative example",
+        "x": 64,
+        "y": 410,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 470,
+        "w": 400,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Role needs SQL",
+        "x": 92,
+        "y": 516.5,
+        "w": 344,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          470,
+          464,
+          620
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 616,
+        "y": 470,
+        "w": 400,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Resume says\n“good with data”",
+        "x": 644,
+        "y": 488.0,
+        "w": 344,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          616,
+          470,
+          1016,
+          620
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            494,
+            545
+          ],
+          [
+            586,
+            545
+          ]
+        ],
+        "arrow": false,
+        "colour": "#A13D32",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Too vague to check",
+        "x": 230,
+        "y": 720,
+        "w": 680,
+        "size": 40,
+        "colour": "#A13D32",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            820
+          ],
+          [
+            540,
+            890
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 130,
+        "y": 940,
+        "w": 820,
+        "h": 190,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Add a SQL task and how it helped",
+        "x": 158,
+        "y": 975.0,
+        "w": 764,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          130,
+          940,
+          950,
+          1130
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Fix the weak link before applying",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "True correction uses red. Example labelled. Concrete repair.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the repair. Enlarged and centred both inputs and the repair block. Retained red for the true correction.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X04",
+    "slug": "dependency-map",
+    "layout_family": "dependency map",
+    "title": "Prepare a referral request they can forward",
+    "alt_text": "A role link, why you fit and a short resume feed one clear request that can be forwarded.",
+    "labels": [
+      "Role link",
+      "Why you fit",
+      "Short resume",
+      "A request\nto forward"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 450,
+        "w": 350,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Role link",
+        "x": 92,
+        "y": 486.5,
+        "w": 294,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          450,
+          414,
+          580
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 720,
+        "w": 350,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Why you fit",
+        "x": 92,
+        "y": 756.5,
+        "w": 294,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          720,
+          414,
+          850
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 990,
+        "w": 350,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Short resume",
+        "x": 92,
+        "y": 1026.5,
+        "w": 294,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          990,
+          414,
+          1120
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            444,
+            515
+          ],
+          [
+            550,
+            515
+          ],
+          [
+            550,
+            785
+          ],
+          [
+            660,
+            785
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            444,
+            785
+          ],
+          [
+            660,
+            785
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            444,
+            1055
+          ],
+          [
+            550,
+            1055
+          ],
+          [
+            550,
+            785
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 690,
+        "y": 645,
+        "w": 326,
+        "h": 280,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "A request\nto forward",
+        "x": 718,
+        "y": 677.0,
+        "w": 270,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          690,
+          645,
+          1016,
+          925
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Prepare a referral request they can forward",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three required inputs feed one request. No implied step order.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the output to A request to forward. Enlarged and centred all four nodes.",
+    "smallest_text_px": 44,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X05",
+    "slug": "alternative-route-map",
+    "layout_family": "alternative route map",
+    "title": "Explore more than one route into product operations",
+    "alt_text": "Three example routes lead from your current role through an internal project, applying directly or a related operations role into product operations.",
+    "labels": [
+      "Example routes",
+      "Your current role",
+      "Internal\nproject",
+      "Apply\ndirectly",
+      "Related\nops role",
+      "Product\noperations"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example routes",
+        "x": 64,
+        "y": 420,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Your current role",
+        "x": 64,
+        "y": 495,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            206,
+            570
+          ],
+          [
+            206,
+            660
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            570
+          ],
+          [
+            540,
+            660
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            874,
+            570
+          ],
+          [
+            874,
+            660
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 690,
+        "w": 285,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Internal\nproject",
+        "x": 92,
+        "y": 726.0,
+        "w": 229,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          690,
+          349,
+          870
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 398,
+        "y": 690,
+        "w": 284,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Apply\ndirectly",
+        "x": 426,
+        "y": 726.0,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          398,
+          690,
+          682,
+          870
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 732,
+        "y": 690,
+        "w": 284,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Related\nops role",
+        "x": 760,
+        "y": 718.5,
+        "w": 228,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          732,
+          690,
+          1016,
+          870
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            206,
+            900
+          ],
+          [
+            206,
+            1090
+          ],
+          [
+            355,
+            1090
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            900
+          ],
+          [
+            540,
+            980
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            874,
+            900
+          ],
+          [
+            874,
+            1090
+          ],
+          [
+            725,
+            1090
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 385,
+        "y": 1020,
+        "w": 310,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Product\noperations",
+        "x": 413,
+        "y": 1041.0,
+        "w": 254,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          385,
+          1020,
+          695,
+          1170
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Explore more than one route into product operations",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Example routes. Different possible paths, not guaranteed outcomes.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened route names and enlarged them. Equalised route block heights and centred the starting role and result.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X06",
+    "slug": "backcasting",
+    "layout_family": "backcasting",
+    "title": "Work backwards from the role you want",
+    "alt_text": "Start with a target role, work backwards to the proof it needs, then choose one task to try now.",
+    "labels": [
+      "Target role",
+      "Proof it asks for",
+      "One task to try now",
+      "Start here",
+      "Then work back"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 650,
+        "y": 450,
+        "w": 366,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Target role",
+        "x": 678,
+        "y": 485.0,
+        "w": 310,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          650,
+          450,
+          1016,
+          580
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 398,
+        "y": 730,
+        "w": 500,
+        "h": 140,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Proof it asks for",
+        "x": 426,
+        "y": 771.5,
+        "w": 444,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          398,
+          730,
+          898,
+          870
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 1020,
+        "w": 550,
+        "h": 140,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "One task to try now",
+        "x": 92,
+        "y": 1061.5,
+        "w": 494,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          1020,
+          614,
+          1160
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            833,
+            610
+          ],
+          [
+            833,
+            665
+          ],
+          [
+            650,
+            665
+          ],
+          [
+            650,
+            700
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            490,
+            900
+          ],
+          [
+            490,
+            945
+          ],
+          [
+            340,
+            945
+          ],
+          [
+            340,
+            990
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Start here",
+        "x": 64,
+        "y": 470,
+        "w": 440,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Then work back",
+        "x": 64,
+        "y": 650,
+        "w": 400,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Work backwards from the role you want",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Backward planning direction explicit. Arrows go from goal to present task.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged the planning nodes and direction labels. Centred each node and expanded the staircase silhouette.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X08",
+    "slug": "progressive-zoom",
+    "layout_family": "progressive zoom-in",
+    "title": "Turn a broad claim into a specific answer",
+    "alt_text": "Nested areas zoom from solving problems to a late handover to a checklist that helped support know the next step.",
+    "labels": [
+      "Illustrative example",
+      "I solve problems",
+      "A late handover",
+      "I made a checklist so support knew what to do next"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Illustrative example",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 510,
+        "w": 952,
+        "h": 640,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I solve problems",
+        "x": 100,
+        "y": 545,
+        "w": 880,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          510,
+          1016,
+          665
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 170,
+        "y": 665,
+        "w": 810,
+        "h": 450,
+        "fill": "#FFFDFC",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "A late handover",
+        "x": 205,
+        "y": 700,
+        "w": 740,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          170,
+          665,
+          980,
+          825
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 290,
+        "y": 825,
+        "w": 650,
+        "h": 250,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "I made a checklist so support knew what to do next",
+        "x": 325,
+        "y": 865,
+        "w": 580,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          290,
+          825,
+          940,
+          1075
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Turn a broad claim into a specific answer",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Nested focus, no decorative connectors. Illustrative example.",
+    "uncertain": "None",
+    "pass_2_changes": "Centred each claim within its own visible nested band. Enlarged the example label and final answer.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X10",
+    "slug": "fishbone",
+    "layout_family": "fishbone diagnosis",
+    "title": "Investigate why applications get little response",
+    "alt_text": "A fishbone groups possible causes of few replies under role fit, resume proof, timing and route. These are questions to investigate.",
+    "labels": [
+      "Possible causes to check",
+      "Role fit",
+      "Core tasks missing?",
+      "Resume proof",
+      "Claims too vague?",
+      "Timing",
+      "Role still open?",
+      "Route",
+      "Right contact?",
+      "Few\nreplies"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Possible causes to check",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            110,
+            830
+          ],
+          [
+            850,
+            830
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            270,
+            650
+          ],
+          [
+            430,
+            830
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            660,
+            650
+          ],
+          [
+            760,
+            830
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            270,
+            1040
+          ],
+          [
+            430,
+            830
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            660,
+            1040
+          ],
+          [
+            760,
+            830
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "Role fit",
+        "x": 100,
+        "y": 520,
+        "w": 350,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Core tasks missing?",
+        "x": 64,
+        "y": 575,
+        "w": 450,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Resume proof",
+        "x": 580,
+        "y": 520,
+        "w": 436,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Claims too vague?",
+        "x": 580,
+        "y": 575,
+        "w": 436,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Timing",
+        "x": 100,
+        "y": 1080,
+        "w": 350,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Role still open?",
+        "x": 64,
+        "y": 1140,
+        "w": 450,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Route",
+        "x": 580,
+        "y": 1080,
+        "w": 436,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Right contact?",
+        "x": 580,
+        "y": 1140,
+        "w": 436,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Few\nreplies",
+        "x": 880,
+        "y": 780,
+        "w": 136,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Investigate why applications get little response",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Possible causes labelled. No asserted diagnosis. Fishbone branches clear.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the qualifier and contact question. Enlarged every cause label and question. Removed red from Few replies.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X11",
+    "slug": "stakeholder-network",
+    "layout_family": "stakeholder network",
+    "title": "Ask different people different questions",
+    "alt_text": "A central you links to a recruiter for process, a hiring manager for priorities, a person in the role for daily work and a past colleague for proof.",
+    "labels": [
+      "You",
+      "Recruiter\nWhat are the steps?",
+      "Hiring manager\nWhat matters most?",
+      "Person in the role\nWhat is a day like?",
+      "Past colleague\nWhat proof can I use?"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 380,
+        "y": 745,
+        "w": 320,
+        "h": 130,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "You",
+        "x": 408,
+        "y": 777.0,
+        "w": 264,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          380,
+          745,
+          700,
+          875
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 450,
+        "w": 426,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Recruiter\nWhat are the steps?",
+        "x": 92,
+        "y": 487.0,
+        "w": 370,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          450,
+          490,
+          620
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 590,
+        "y": 450,
+        "w": 426,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Hiring manager\nWhat matters most?",
+        "x": 618,
+        "y": 487.0,
+        "w": 370,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          590,
+          450,
+          1016,
+          620
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 995,
+        "w": 426,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Person in the role\nWhat is a day like?",
+        "x": 92,
+        "y": 1032.0,
+        "w": 370,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          995,
+          490,
+          1165
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 590,
+        "y": 995,
+        "w": 426,
+        "h": 170,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Past colleague\nWhat proof can I use?",
+        "x": 618,
+        "y": 1032.0,
+        "w": 370,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          590,
+          995,
+          1016,
+          1165
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            277,
+            650
+          ],
+          [
+            380,
+            715
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            803,
+            650
+          ],
+          [
+            700,
+            715
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            277,
+            965
+          ],
+          [
+            380,
+            905
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            803,
+            965
+          ],
+          [
+            700,
+            905
+          ]
+        ],
+        "arrow": false,
+        "colour": "#111315",
+        "width": 3
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Ask different people different questions",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Four distinct sources and questions. Undirected links mean conversations.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the four questions. Enlarged and centred all network nodes while keeping four distinct sources.",
+    "smallest_text_px": 44,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X12",
+    "slug": "experiment-board",
+    "layout_family": "experiment board",
+    "title": "Turn career uncertainty into a small test",
+    "alt_text": "An example board asks if product operations fits, tries mapping a handover, looks for enjoyment and usefulness, then chooses a next step.",
+    "labels": [
+      "Example: is product operations a fit?",
+      "Question",
+      "Do I like fixing handovers?",
+      "Small test",
+      "Map a handover with a colleague",
+      "Look for",
+      "Did I enjoy it? Did it help?",
+      "Decide",
+      "Try more or explore another role"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example: is product operations a fit?",
+        "x": 64,
+        "y": 430,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 525,
+        "w": 441,
+        "h": 270,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Question",
+        "x": 92,
+        "y": 552,
+        "w": 385,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          525,
+          505,
+          613
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Do I like fixing handovers?",
+        "x": 92,
+        "y": 620,
+        "w": 385,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          613,
+          505,
+          795
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 575,
+        "y": 525,
+        "w": 441,
+        "h": 270,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Small test",
+        "x": 603,
+        "y": 552,
+        "w": 385,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          575,
+          525,
+          1016,
+          613
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Map a handover with a colleague",
+        "x": 603,
+        "y": 620,
+        "w": 385,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          575,
+          613,
+          1016,
+          795
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 850,
+        "w": 441,
+        "h": 270,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Look for",
+        "x": 92,
+        "y": 877,
+        "w": 385,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          64,
+          850,
+          505,
+          938
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Did I enjoy it? Did it help?",
+        "x": 92,
+        "y": 945,
+        "w": 385,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          938,
+          505,
+          1120
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 575,
+        "y": 850,
+        "w": 441,
+        "h": 270,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Decide",
+        "x": 603,
+        "y": 877,
+        "w": 385,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          575,
+          850,
+          1016,
+          938
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Try more or explore another role",
+        "x": 603,
+        "y": 945,
+        "w": 385,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          575,
+          938,
+          1016,
+          1120
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Turn career uncertainty into a small test",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Example labelled. Small test and a decision. No promised outcome.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened all four prompts and the example label. Enlarged headings and body copy and centred each band.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X14",
+    "slug": "remove-keep-add",
+    "layout_family": "remove keep add",
+    "title": "Edit your LinkedIn profile with a clear plan",
+    "alt_text": "Three editing actions remove unsupported claims, keep work examples and useful skills, and add a target role with fitting proof.",
+    "labels": [
+      "Remove",
+      "Claims you cannot back up",
+      "Keep",
+      "Clear work examples and useful skills",
+      "Add",
+      "The role you want and proof that fits"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Remove",
+        "x": 64,
+        "y": 485,
+        "w": 270,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          64,
+          450,
+          336,
+          630
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 390,
+        "y": 450,
+        "w": 626,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Claims you cannot back up",
+        "x": 420,
+        "y": 490,
+        "w": 566,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          390,
+          450,
+          1016,
+          630
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Keep",
+        "x": 64,
+        "y": 735,
+        "w": 270,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          64,
+          700,
+          336,
+          880
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 390,
+        "y": 700,
+        "w": 626,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Clear work examples and useful skills",
+        "x": 420,
+        "y": 740,
+        "w": 566,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          390,
+          700,
+          1016,
+          880
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Add",
+        "x": 64,
+        "y": 985,
+        "w": 270,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          64,
+          950,
+          336,
+          1130
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 390,
+        "y": 950,
+        "w": 626,
+        "h": 180,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "The role you want and proof that fits",
+        "x": 420,
+        "y": 990,
+        "w": 566,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          390,
+          950,
+          1016,
+          1130
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Edit your LinkedIn profile with a clear plan",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Three distinct editing actions. No decorative symbols.",
+    "uncertain": "None",
+    "pass_2_changes": "Centred the action headings vertically against their rows. Enlarged and centred row copy.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X15",
+    "slug": "hypothesis-evidence-test",
+    "layout_family": "hypothesis to evidence to test",
+    "title": "Find out where your free tool loses people",
+    "alt_text": "An example hypothesis about an unclear first step leads to seeking evidence by watching users, then testing a simpler first screen.",
+    "labels": [
+      "Example investigation",
+      "Hypothesis",
+      "The first step may be unclear",
+      "Evidence to seek",
+      "Watch where new users stop",
+      "Small test",
+      "Try a simpler first screen\nwith a few users"
+    ],
+    "layout": [
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 936,
+        "w": 952,
+        "h": 240,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Example investigation",
+        "x": 64,
+        "y": 385,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Hypothesis",
+        "x": 64,
+        "y": 440,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "The first step may be unclear",
+        "x": 64,
+        "y": 515,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Evidence to seek",
+        "x": 64,
+        "y": 700,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Watch where new users stop",
+        "x": 64,
+        "y": 775,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Small test",
+        "x": 64,
+        "y": 960,
+        "w": 952,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "medium",
+        "align": "left",
+        "centre_box": [
+          64,
+          944,
+          1016,
+          1024
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Try a simpler first screen\nwith a few users",
+        "x": 64,
+        "y": 1035,
+        "w": 952,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          1024,
+          1016,
+          1176
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            625
+          ],
+          [
+            540,
+            660
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            540,
+            885
+          ],
+          [
+            540,
+            920
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Find out where your free tool loses people",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Hypothesis stays tentative. Evidence is to seek, not a fabricated finding.",
+    "uncertain": "None",
+    "pass_2_changes": "Enlarged the hypothesis and evidence copy. Added one pale test band with centred 44 px copy.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "X16",
+    "slug": "strategy-house",
+    "layout_family": "strategy house",
+    "title": "Build a career move on evidence",
+    "alt_text": "A strategy house has research and small tests as its foundation, role needs, your proof and your needs as pillars, and a role worth moving for as the roof.",
+    "labels": [
+      "A role worth\nthe move",
+      "Role needs",
+      "Your proof",
+      "Your needs",
+      "Research and small tests"
+    ],
+    "layout": [
+      {
+        "kind": "polygon",
+        "points": [
+          [
+            100,
+            650
+          ],
+          [
+            540,
+            445
+          ],
+          [
+            980,
+            650
+          ]
+        ],
+        "fill": "#E7EFE9",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "A role worth\nthe move",
+        "x": 340,
+        "y": 535,
+        "w": 400,
+        "size": 44,
+        "colour": "#0A3D26",
+        "weight": "body",
+        "align": "center"
+      },
+      {
+        "kind": "rect",
+        "x": 100,
+        "y": 720,
+        "w": 260,
+        "h": 210,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Role needs",
+        "x": 128,
+        "y": 799.5,
+        "w": 204,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          100,
+          720,
+          360,
+          930
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 410,
+        "y": 720,
+        "w": 260,
+        "h": 210,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Your proof",
+        "x": 438,
+        "y": 799.5,
+        "w": 204,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          410,
+          720,
+          670,
+          930
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 720,
+        "y": 720,
+        "w": 260,
+        "h": 210,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Your needs",
+        "x": 748,
+        "y": 799.5,
+        "w": 204,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left",
+        "container": [
+          720,
+          720,
+          980,
+          930
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 1020,
+        "w": 952,
+        "h": 150,
+        "fill": "#E7EFE9",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Research and small tests",
+        "x": 100,
+        "y": 1068,
+        "w": 880,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left",
+        "container": [
+          64,
+          1020,
+          1016,
+          1170
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Build a career move on evidence",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "checked": "Foundation, three pillars and goal each explain part of the strategy.",
+    "uncertain": "None",
+    "pass_2_changes": "Shortened the roof and foundation copy. Enlarged and centred all three pillars and the foundation.",
+    "smallest_text_px": 40,
+    "visual_review": {
+      "full_size": "pass",
+      "390_px": "pass",
+      "centred_labels": "pass",
+      "stroke_clearance": "pass",
+      "canvas_balance": "pass"
+    }
+  },
+  {
+    "id": "NEW-01",
+    "slug": "decision-swimlane",
+    "layout_family": "decision swimlane",
+    "title": "How a hiring decision\nis made",
+    "alt_text": "Example process. Teams differ. Four horizontal actor bands contain staggered steps. The recruiter shares a shortlist, the panel checks proof and can block, the hiring manager recommends a hire, and the approver approves it. Three arrows cross lanes in this order.",
+    "labels": [
+      "Example process. Teams differ.",
+      "Recruiter",
+      "Shares a\nshortlist",
+      "Interview\npanel",
+      "Checks proof\nCan block",
+      "Hiring\nmanager",
+      "Recommends\na hire",
+      "Approver",
+      "Approves\nthe hire"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example process. Teams differ.",
+        "x": 64,
+        "y": 280,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 368,
+        "w": 952,
+        "h": 176,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Recruiter",
+        "x": 88,
+        "y": 441.0,
+        "w": 208,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          368,
+          320,
+          544
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 320,
+        "y": 384,
+        "w": 360,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Shares a\nshortlist",
+        "x": 344,
+        "y": 415.0,
+        "w": 312,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          320,
+          384,
+          680,
+          528
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            496,
+            544
+          ],
+          [
+            496,
+            560
+          ],
+          [
+            608,
+            560
+          ],
+          [
+            608,
+            576
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 576,
+        "w": 952,
+        "h": 176,
+        "fill": "#F2F6F3",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Interview\npanel",
+        "x": 88,
+        "y": 618.5,
+        "w": 208,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          576,
+          320,
+          752
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 432,
+        "y": 592,
+        "w": 360,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Checks proof\nCan block",
+        "x": 456,
+        "y": 622.5,
+        "w": 312,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          432,
+          592,
+          792,
+          736
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            608,
+            752
+          ],
+          [
+            608,
+            768
+          ],
+          [
+            720,
+            768
+          ],
+          [
+            720,
+            784
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 784,
+        "w": 952,
+        "h": 176,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Hiring\nmanager",
+        "x": 88,
+        "y": 830.0,
+        "w": 208,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          784,
+          320,
+          960
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 536,
+        "y": 800,
+        "w": 360,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Recommends\na hire",
+        "x": 560,
+        "y": 831.0,
+        "w": 312,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          536,
+          800,
+          896,
+          944
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            720,
+            960
+          ],
+          [
+            720,
+            976
+          ],
+          [
+            816,
+            976
+          ],
+          [
+            816,
+            992
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 992,
+        "w": 952,
+        "h": 176,
+        "fill": "#F2F6F3",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Approver",
+        "x": 88,
+        "y": 1060.5,
+        "w": 208,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          992,
+          320,
+          1168
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 640,
+        "y": 1008,
+        "w": 352,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#0A3D26"
+      },
+      {
+        "kind": "text",
+        "text": "Approves\nthe hire",
+        "x": 664,
+        "y": 1039.0,
+        "w": 304,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          640,
+          1008,
+          992,
+          1152
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "How a hiring decision\nis made",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "fixed_geometry": true,
+    "checked": "True actor bands. Staggered tasks. Ordered cross-lane arrows. Panel block point. Recommendation separate from approval.",
+    "uncertain": "Illustrative placeholders only. No measured results."
+  },
+  {
+    "id": "NEW-02",
+    "slug": "human-ai-verification",
+    "layout_family": "human and AI verification lanes",
+    "title": "Use AI, then check\nwhat it writes",
+    "alt_text": "Example workflow. The You band contains supplying real facts, checking facts and wording, and approving for use. The AI band contains drafting from real facts. Arrows cross between the two actors. If wrong, one return arrow sends the draft back to AI. If right, the person approves it.",
+    "labels": [
+      "Example workflow",
+      "You",
+      "AI",
+      "Supply\nreal facts",
+      "If right:\napprove",
+      "Facts right?\nWords clear?",
+      "Draft from\nreal facts",
+      "If wrong:\nrevise"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example workflow",
+        "x": 64,
+        "y": 280,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 376,
+        "w": 952,
+        "h": 416,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "You",
+        "x": 88,
+        "y": 567.5,
+        "w": 152,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          376,
+          264,
+          792
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 872,
+        "w": 952,
+        "h": 280,
+        "fill": "#F2F6F3",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "AI",
+        "x": 88,
+        "y": 996.0,
+        "w": 152,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          872,
+          264,
+          1152
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 288,
+        "y": 408,
+        "w": 312,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Supply\nreal facts",
+        "x": 312,
+        "y": 434.5,
+        "w": 264,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          288,
+          408,
+          600,
+          552
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 656,
+        "y": 408,
+        "w": 336,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#0A3D26"
+      },
+      {
+        "kind": "text",
+        "text": "If right:\napprove",
+        "x": 680,
+        "y": 433.5,
+        "w": 288,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          656,
+          408,
+          992,
+          552
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 656,
+        "y": 608,
+        "w": 336,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Facts right?\nWords clear?",
+        "x": 680,
+        "y": 638.5,
+        "w": 288,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          656,
+          608,
+          992,
+          752
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 432,
+        "y": 960,
+        "w": 376,
+        "h": 144,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Draft from\nreal facts",
+        "x": 456,
+        "y": 986.5,
+        "w": 328,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          432,
+          960,
+          808,
+          1104
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            448,
+            568
+          ],
+          [
+            448,
+            824
+          ],
+          [
+            480,
+            824
+          ],
+          [
+            480,
+            944
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            824,
+            1032
+          ],
+          [
+            960,
+            1032
+          ],
+          [
+            960,
+            816
+          ],
+          [
+            824,
+            816
+          ],
+          [
+            824,
+            768
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            824,
+            592
+          ],
+          [
+            824,
+            568
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            640,
+            680
+          ],
+          [
+            624,
+            680
+          ],
+          [
+            624,
+            944
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "text",
+        "text": "If wrong:\nrevise",
+        "x": 656,
+        "y": 840,
+        "w": 288,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "center"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Use AI, then check\nwhat it writes",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "fixed_geometry": true,
+    "checked": "Two real actor bands. Cross-lane hand-offs. Labelled facts decision. One return arrow for revision. Person approves.",
+    "uncertain": "Illustrative placeholders only. No measured results."
+  },
+  {
+    "id": "NEW-03",
+    "slug": "wait-work-strip",
+    "layout_family": "work and wait strip",
+    "title": "Why hiring takes\nso long",
+    "alt_text": "Not to scale. Example. A strip reads left to right, then down and back to the left. Review CVs is work. Finding a shared time is a wait. Meeting the panel is work. Waiting for feedback is a wait. Reviewing evidence is work. Waiting for sign-off is a wait. Box sizes do not show time.",
+    "labels": [
+      "Not to scale. Example.",
+      "Work",
+      "Review\nCVs",
+      "Wait",
+      "Find a\nshared time",
+      "Work",
+      "Meet the\npanel",
+      "Wait",
+      "Wait for\nfeedback",
+      "Work",
+      "Review\nevidence",
+      "Wait",
+      "Wait for\nsign-off"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Not to scale. Example.",
+        "x": 64,
+        "y": 280,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 384,
+        "w": 280,
+        "h": 320,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Work",
+        "x": 88,
+        "y": 417.0,
+        "w": 232,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          384,
+          344,
+          480
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Review\nCVs",
+        "x": 88,
+        "y": 546.5,
+        "w": 232,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          480,
+          344,
+          704
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 400,
+        "y": 384,
+        "w": 280,
+        "h": 320,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Wait",
+        "x": 424,
+        "y": 417.0,
+        "w": 232,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          400,
+          384,
+          680,
+          480
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Find a\nshared time",
+        "x": 424,
+        "y": 518.5,
+        "w": 232,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          400,
+          480,
+          680,
+          704
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 736,
+        "y": 384,
+        "w": 280,
+        "h": 320,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Work",
+        "x": 760,
+        "y": 417.0,
+        "w": 232,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          736,
+          384,
+          1016,
+          480
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Meet the\npanel",
+        "x": 760,
+        "y": 541.5,
+        "w": 232,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          736,
+          480,
+          1016,
+          704
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 736,
+        "y": 872,
+        "w": 280,
+        "h": 320,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Wait",
+        "x": 760,
+        "y": 905.0,
+        "w": 232,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          736,
+          872,
+          1016,
+          968
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Wait for\nfeedback",
+        "x": 760,
+        "y": 1034.5,
+        "w": 232,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          736,
+          968,
+          1016,
+          1192
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 400,
+        "y": 872,
+        "w": 280,
+        "h": 320,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "Work",
+        "x": 424,
+        "y": 905.0,
+        "w": 232,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          400,
+          872,
+          680,
+          968
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Review\nevidence",
+        "x": 424,
+        "y": 1035.0,
+        "w": 232,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          400,
+          968,
+          680,
+          1192
+        ]
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 872,
+        "w": 280,
+        "h": 320,
+        "fill": "#FFFDFC",
+        "outline": "#111315"
+      },
+      {
+        "kind": "text",
+        "text": "Wait",
+        "x": 88,
+        "y": 905.0,
+        "w": 232,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          872,
+          344,
+          968
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Wait for\nsign-off",
+        "x": 88,
+        "y": 1029.5,
+        "w": 232,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          64,
+          968,
+          344,
+          1192
+        ]
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            344,
+            544
+          ],
+          [
+            400,
+            544
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            680,
+            544
+          ],
+          [
+            736,
+            544
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            872,
+            704
+          ],
+          [
+            872,
+            872
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            736,
+            1032
+          ],
+          [
+            680,
+            1032
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      },
+      {
+        "kind": "line",
+        "points": [
+          [
+            400,
+            1032
+          ],
+          [
+            344,
+            1032
+          ]
+        ],
+        "arrow": true,
+        "colour": "#111315",
+        "width": 3
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Why hiring takes\nso long",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "fixed_geometry": true,
+    "checked": "Equal-size steps show order only. Work has pale fill. Waiting has an outline and a word label. No duration claims.",
+    "uncertain": "Illustrative placeholders only. No measured results."
+  },
+  {
+    "id": "NEW-04",
+    "slug": "contextual-data-chart",
+    "layout_family": "contextual data chart",
+    "title": "Show the number\nand its base",
+    "alt_text": "Example data. Replace with a sourced number. A common scale from zero to 100 per cent compares people who heard back. This group has 30 of 100 people. The benchmark has 50 of 100 people. Both use a base of 100 people. All values are fake placeholders.",
+    "labels": [
+      "Example data. Replace with\na sourced number.",
+      "People who heard back",
+      "This group",
+      "30%",
+      "Benchmark",
+      "50%",
+      "Common scale: 0 to 100%",
+      "Base: 100 people in each group"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example data. Replace with\na sourced number.",
+        "x": 64,
+        "y": 280,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "People who heard back",
+        "x": 64,
+        "y": 456,
+        "w": 952,
+        "size": 48,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "This group",
+        "x": 64,
+        "y": 560,
+        "w": 800,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 632,
+        "w": 800,
+        "h": 80,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 632,
+        "w": 240.0,
+        "h": 80,
+        "fill": "#0A3D26",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "30%",
+        "x": 904,
+        "y": 655.0,
+        "w": 112,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          880,
+          616,
+          1040,
+          728
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Benchmark",
+        "x": 64,
+        "y": 832,
+        "w": 800,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 904,
+        "w": 800,
+        "h": 80,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 904,
+        "w": 400.0,
+        "h": 80,
+        "fill": "#0A3D26",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "50%",
+        "x": 904,
+        "y": 927.0,
+        "w": 112,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          880,
+          888,
+          1040,
+          1000
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Common scale: 0 to 100%",
+        "x": 64,
+        "y": 1048,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Base: 100 people in each group",
+        "x": 64,
+        "y": 1152,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Show the number\nand its base",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "fixed_geometry": true,
+    "checked": "Same zero-based scale and base for both bars. Bar lengths are 30 and 50 per cent of a 100 per cent track. Denominator always visible.",
+    "uncertain": "Illustrative placeholders only. No measured results."
+  },
+  {
+    "id": "NEW-05",
+    "slug": "stage-conversion-bars",
+    "layout_family": "stage conversion bars",
+    "title": "Where a free tool\nloses users",
+    "alt_text": "Example numbers. Placeholder cohort: new users. Placeholder window: start date to end date. Base: 100 users who opened the tool. Ordered bars show 100 opened it, 60 started a draft, 25 finished a draft and 10 saved a file. Counts use the same zero-based scale. These are fake values, not measured results.",
+    "labels": [
+      "Example numbers",
+      "Cohort: [new users]",
+      "Window: [start date to end date]",
+      "Base: [100 users who opened it]",
+      "Opened the tool",
+      "100",
+      "Started a draft",
+      "60",
+      "Finished a draft",
+      "25",
+      "Saved a file",
+      "10"
+    ],
+    "layout": [
+      {
+        "kind": "text",
+        "text": "Example numbers",
+        "x": 64,
+        "y": 280,
+        "w": 952,
+        "size": 48,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Cohort: [new users]",
+        "x": 64,
+        "y": 360,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Window: [start date to end date]",
+        "x": 64,
+        "y": 424,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Base: [100 users who opened it]",
+        "x": 64,
+        "y": 488,
+        "w": 952,
+        "size": 40,
+        "colour": "#111315",
+        "weight": "body",
+        "align": "left"
+      },
+      {
+        "kind": "text",
+        "text": "Opened the tool",
+        "x": 64,
+        "y": 584,
+        "w": 800,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 656,
+        "w": 800,
+        "h": 56,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 656,
+        "w": 800.0,
+        "h": 56,
+        "fill": "#0A3D26",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "100",
+        "x": 904,
+        "y": 667.0,
+        "w": 112,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          880,
+          632,
+          1040,
+          736
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Started a draft",
+        "x": 64,
+        "y": 744,
+        "w": 800,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 816,
+        "w": 800,
+        "h": 56,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 816,
+        "w": 480.0,
+        "h": 56,
+        "fill": "#0A3D26",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "60",
+        "x": 904,
+        "y": 827.0,
+        "w": 112,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          880,
+          792,
+          1040,
+          896
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Finished a draft",
+        "x": 64,
+        "y": 904,
+        "w": 800,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 976,
+        "w": 800,
+        "h": 56,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 976,
+        "w": 200.0,
+        "h": 56,
+        "fill": "#0A3D26",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "25",
+        "x": 904,
+        "y": 987.0,
+        "w": 112,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          880,
+          952,
+          1040,
+          1056
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Saved a file",
+        "x": 64,
+        "y": 1064,
+        "w": 800,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "left"
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 1136,
+        "w": 800,
+        "h": 56,
+        "fill": "#E7EFE9",
+        "outline": null
+      },
+      {
+        "kind": "rect",
+        "x": 64,
+        "y": 1136,
+        "w": 80.0,
+        "h": 56,
+        "fill": "#0A3D26",
+        "outline": null
+      },
+      {
+        "kind": "text",
+        "text": "10",
+        "x": 904,
+        "y": 1147.0,
+        "w": 112,
+        "size": 44,
+        "colour": "#111315",
+        "weight": "medium",
+        "align": "center",
+        "container": [
+          880,
+          1112,
+          1040,
+          1216
+        ]
+      }
+    ],
+    "canvas": {
+      "width": 1080,
+      "height": 1350,
+      "mode": "RGB",
+      "background": "#FFFDFC",
+      "safe_margin": 64
+    },
+    "title_layout": {
+      "kind": "text",
+      "text": "Where a free tool\nloses users",
+      "x": 64,
+      "y": 64,
+      "w": 952,
+      "size": 72,
+      "colour": "#111315",
+      "weight": "title",
+      "align": "left"
+    },
+    "footer": {
+      "kind": "text",
+      "text": "SOAR",
+      "x": 64,
+      "y": 1252,
+      "w": 200,
+      "size": 28,
+      "colour": "#111315",
+      "weight": "medium",
+      "align": "left"
+    },
+    "fixed_geometry": true,
+    "checked": "Ordered stages and raw user counts. Common zero baseline, same cohort and window. All bars use the original base, not the previous stage.",
+    "uncertain": "Illustrative placeholders only. No measured results."
+  }
+]

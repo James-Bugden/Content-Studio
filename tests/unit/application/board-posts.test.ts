@@ -43,9 +43,9 @@ describe('Next up and Posts tell the same story (UX redesign)', () => {
   it('every card carries a thumb, a step and a pill per column', async () => {
     const repo = new SheetsContentRepository(new FakeSheetTransport());
     const queue = await loadReviewQueue(repo, parseReviewFilters({ lane: 'blocked' }));
-    const rework = queue.cards.find((c) => c.libraryId === 'SYN-L002');
-    expect(rework?.pills.qa).toEqual({ label: 'REWORK', tone: 'problem' });
-    expect(rework?.step.action).toBe('Rework copy');
+    const duplicate = queue.cards.find((c) => c.libraryId === 'SYN-L003');
+    expect(duplicate?.pills.qa).toEqual({ label: 'Duplicate?', tone: 'problem' });
+    expect(duplicate?.step.action).toBe('Decide duplicate');
     expect(queue.cards.every((c) => c.tab === 'blocked')).toBe(true);
     const withImage = (await loadReviewQueue(repo, parseReviewFilters({}))).cards.find((c) => c.libraryId === 'SYN-L012');
     expect(withImage?.thumb.src).toContain('/api/library/SYN-L012/');
@@ -53,13 +53,13 @@ describe('Next up and Posts tell the same story (UX redesign)', () => {
 
   it('old lane links still filter by their earlier meaning', async () => {
     const repo = new SheetsContentRepository(new FakeSheetTransport());
-    const q = await loadReviewQueue(repo, parseReviewFilters({ lane: 'copyright' }));
-    expect(q.cards.map((c) => c.libraryId)).toEqual(['SYN-L002']);
+    const q = await loadReviewQueue(repo, parseReviewFilters({ lane: 'duplicate' }));
+    expect(q.cards.map((c) => c.libraryId)).toEqual(['SYN-L003']);
   });
 
   it('the urgent synthetic tasks are all in the now list with readable titles', async () => {
     const board = await loadBoard(new SheetsContentRepository(new FakeSheetTransport()));
     const now = board.tasks.filter((t) => t.step.urgency === 'now').map((t) => t.step.action);
-    expect(now).toEqual(expect.arrayContaining(['Update Chinese', 'Rework copy', 'Decide duplicate']));
+    expect(now).toEqual(expect.arrayContaining(['Update Chinese', 'Decide duplicate']));
   });
 });

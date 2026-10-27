@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { EditorModel } from '@/domain/views';
 import { InlineResult } from '../inline-result';
@@ -63,7 +63,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
   const snapshotRef = useRef(snapshot);
   const onSnapshot = useCallback((s: EditorSnapshot) => { snapshotRef.current = s; setSnapshot(s); }, []);
 
-  async function reload(refreshPage = true) {
+  const reload = useCallback(async (refreshPage = true) => {
     try {
       const res = await fetch(`/api/library/${encodeURIComponent(model.libraryId)}/editor`, { credentials: 'same-origin', cache: 'no-store' });
       const body = (await res.json()) as { ok: boolean; model?: EditorModel };
@@ -80,7 +80,15 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
     } catch {
       setReloadFailed(true);
     }
-  }
+  }, [model.libraryId, router]);
+
+  useEffect(() => {
+    const imageChanged = (event: Event) => {
+      if ((event as CustomEvent<{ libraryId: string }>).detail?.libraryId === model.libraryId && !snapshot.dirty) void reload(false);
+    };
+    window.addEventListener('cs:post-image-changed', imageChanged);
+    return () => window.removeEventListener('cs:post-image-changed', imageChanged);
+  }, [model.libraryId, snapshot.dirty, reload]);
 
   async function refreshSavedMetadata() {
     const res = await fetch(`/api/library/${encodeURIComponent(model.libraryId)}/editor`, { credentials: 'same-origin', cache: 'no-store' }).catch(() => null);

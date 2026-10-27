@@ -1,0 +1,397 @@
+{
+  "fields": {
+    "E01": {
+      "options": [
+        "array",
+        "text",
+        2,
+        2
+      ],
+      "rows": [
+        "array",
+        {
+          "dimension": "text",
+          "left": "text",
+          "right": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "E02": {
+      "before": "text",
+      "after": "text"
+    },
+    "E03": {
+      "steps": [
+        "array",
+        "text",
+        2,
+        4
+      ]
+    },
+    "E04": {
+      "question": "text",
+      "yes_label": "text",
+      "no_label": "text",
+      "yes_action": "text",
+      "no_action": "text",
+      "caveat": "text"
+    },
+    "E05": {
+      "parts": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "callouts": [
+        "array",
+        "text",
+        3,
+        3
+      ]
+    },
+    "E06": {
+      "sources": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "result": "text"
+    },
+    "E07": {
+      "rows": [
+        "array",
+        {
+          "label": "text",
+          "prompt": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "E08": {
+      "profile": "text",
+      "control": "text",
+      "annotation": "text",
+      "visibility_label": "text",
+      "setting": "text",
+      "caveat": "text"
+    },
+    "E09": {
+      "proof_heading": "text",
+      "rows": [
+        "array",
+        {
+          "need": "text",
+          "proof": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "E10": {
+      "asker": "text",
+      "question": "text",
+      "speaker": "text",
+      "answer": "text"
+    },
+    "N01": {
+      "caveat": "text",
+      "x_axis": "text",
+      "y_axis": "text",
+      "cells": [
+        "array",
+        "text",
+        4,
+        4
+      ]
+    },
+    "N02": {
+      "low": "text",
+      "high": "text",
+      "positions": [
+        "array",
+        "text",
+        3,
+        3
+      ]
+    },
+    "N03": {
+      "caveat": "text",
+      "stages": [
+        "array",
+        "text",
+        3,
+        3
+      ]
+    },
+    "N04": {
+      "steps": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "repeat": "text"
+    },
+    "N05": {
+      "milestones": [
+        "array",
+        {
+          "day": "text",
+          "task": "text"
+        },
+        4,
+        4
+      ]
+    },
+    "N06": {
+      "levels": [
+        "array",
+        "text",
+        4,
+        4
+      ],
+      "caveat": "text"
+    },
+    "N07": {
+      "stated": "text",
+      "ask_heading": "text",
+      "questions": "text"
+    },
+    "N08": {
+      "sets": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "overlap": "text"
+    },
+    "N09": {
+      "layers": [
+        "array",
+        {
+          "label": "text",
+          "copy": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "N10": {
+      "claim": "text",
+      "proofs": [
+        "array",
+        "text",
+        3,
+        3
+      ]
+    },
+    "X02": {
+      "headings": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "rows": [
+        "array",
+        {
+          "need": "text",
+          "status": "text",
+          "next": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "X03": {
+      "need": "text",
+      "weak_proof": "text",
+      "problem": "text",
+      "repair": "text"
+    },
+    "X04": {
+      "inputs": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "result": "text"
+    },
+    "X05": {
+      "start": "text",
+      "routes": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "goal": "text"
+    },
+    "X06": {
+      "goal": "text",
+      "proof": "text",
+      "task": "text",
+      "start_label": "text",
+      "direction_label": "text"
+    },
+    "X08": {
+      "broad": "text",
+      "context": "text",
+      "specific": "text"
+    },
+    "X10": {
+      "caveat": "text",
+      "causes": [
+        "array",
+        {
+          "label": "text",
+          "question": "text"
+        },
+        4,
+        4
+      ],
+      "effect": "text"
+    },
+    "X11": {
+      "centre": "text",
+      "people": [
+        "array",
+        "text",
+        4,
+        4
+      ]
+    },
+    "X12": {
+      "cells": [
+        "array",
+        {
+          "label": "text",
+          "copy": "text"
+        },
+        4,
+        4
+      ]
+    },
+    "X14": {
+      "rows": [
+        "array",
+        {
+          "action": "text",
+          "copy": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "X15": {
+      "stages": [
+        "array",
+        {
+          "label": "text",
+          "copy": "text"
+        },
+        3,
+        3
+      ]
+    },
+    "X16": {
+      "goal": "text",
+      "pillars": [
+        "array",
+        "text",
+        3,
+        3
+      ],
+      "foundation": "text"
+    },
+    "NEW-01": {
+      "lanes": [
+        "array",
+        {
+          "role": "text",
+          "step": "text"
+        },
+        4,
+        4
+      ]
+    },
+    "NEW-02": {
+      "person": "text",
+      "ai": "text",
+      "supply": "text",
+      "approve": "text",
+      "check": "text",
+      "draft": "text",
+      "revision_label": "text"
+    },
+    "NEW-03": {
+      "steps": [
+        "array",
+        {
+          "kind": "text",
+          "label": "text"
+        },
+        6,
+        6
+      ]
+    },
+    "NEW-04": {
+      "measure": "text",
+      "groups": [
+        "array",
+        {
+          "label": "text",
+          "count": "number"
+        },
+        2,
+        2
+      ],
+      "base_count": "number",
+      "unit": "text"
+    },
+    "NEW-05": {
+      "cohort": "text",
+      "window": "text",
+      "base_count": "number",
+      "stages": [
+        "array",
+        {
+          "label": "text",
+          "count": "number"
+        },
+        4,
+        4
+      ]
+    }
+  },
+  "exampleLabelRequired": [
+    "E01",
+    "E02",
+    "E05",
+    "E08",
+    "E09",
+    "E10",
+    "N02",
+    "N07",
+    "N09",
+    "N10",
+    "NEW-01",
+    "NEW-02",
+    "NEW-03",
+    "NEW-04",
+    "NEW-05",
+    "X02",
+    "X03",
+    "X05",
+    "X08",
+    "X12",
+    "X15"
+  ]
+}

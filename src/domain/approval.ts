@@ -8,8 +8,6 @@ import type { Gate, GateCode } from './gates';
 export const APPROVAL_BLOCKERS: ReadonlySet<GateCode> = new Set<GateCode>([
   'UNRECOGNISED_VALUE',
   'MISSING_IDENTITY',
-  'COPYRIGHT_REWORK',
-  'COPYRIGHT_UNCHECKED',
   'DUPLICATE_CHECK',
   'DUPLICATE_CONFIRMED',
   'DUPLICATE_UNCHECKED',

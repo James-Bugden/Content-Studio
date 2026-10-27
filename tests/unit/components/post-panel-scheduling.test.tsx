@@ -3,6 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+// Image transport/state has its own component contract tests. Keep scheduling
+// races deterministic without adding unrelated point reads to their mock queue.
+vi.mock('@/components/panel/image-section', () => ({ ImageSection: () => null }));
 import { PostPanel } from '@/components/panel/post-panel';
 
 const slots = [

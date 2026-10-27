@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["syd1"],
+  "functions": {
+    "api/render-image.py": {
+      "includeFiles": "image-renderer/**",
+      "maxDuration": 60
+    }
+  }
+}

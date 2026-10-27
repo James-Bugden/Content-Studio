@@ -83,7 +83,9 @@ export class SupabaseContentRepository implements ContentRepository {
     // ordinary Sheet mapper still sees the exact original text in both modes.
     if (typeof originalAngle === 'string' && numberedContentAngle(originalAngle) !== null
       && numberedContentAngle(originalAngle) === row.content_angle) c.contentAngle = originalAngle;
-    return { value: toLibraryItem(c), cells: c, row: row.source_sheet_row ?? 0,
+    const value = toLibraryItem(c);
+    if (row.image_sketch) value.visual.sketch = row.image_sketch;
+    return { value, cells: c, row: row.source_sheet_row ?? 0,
       revision: this.revision(row, 'content_studio_posts', `${row.collection}:${c.libraryId}`), formulaFields: [], passthrough,
       links: { ...(row.source_markdown_url ? { sourceMarkdown: row.source_markdown_url } : {}),
         ...(row.source_master_file_url ? { sourceMasterFile: row.source_master_file_url } : {}),
@@ -158,7 +160,7 @@ export class SupabaseContentRepository implements ContentRepository {
     if (!entries.length) return fail('VALIDATION_FAILED', { reason: 'empty_patch' });
     const writable: readonly string[] = kind === 'schedule' ? SCHEDULE_WRITABLE : LIBRARY_WRITABLE;
     for (const [field, value] of entries) {
-      if (!idea && !writable.includes(field)) return fail('VALIDATION_FAILED', { reason: 'field_not_writable', field });
+      if (!idea && !writable.includes(field) && !(kind === 'library' && field === 'imageSketch')) return fail('VALIDATION_FAILED', { reason: 'field_not_writable', field });
       if (field === 'contentId' && value !== id) return fail('VALIDATION_FAILED', { reason: 'field_not_writable', field });
       if (typeof value !== 'string' || value.length > 50_000) return fail('VALIDATION_FAILED', { reason: 'value_invalid', field });
     }

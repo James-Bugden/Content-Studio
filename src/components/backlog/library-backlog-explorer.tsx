@@ -7,7 +7,7 @@ import { useLeaveConfirmation } from '../leave-confirm';
 import { isTypingTarget } from '../keyboard';
 import { adjacentPosition } from '@/domain/backlog-navigation';
 import { useBacklogNavigation, type BacklogResult } from './backlog-navigation';
-import { LibraryBacklogTable } from './library-backlog-table';
+import { ImageBacklog } from './image-backlog';
 import { StateView } from '../state-view';
 
 type Props = {
@@ -196,7 +196,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     {pending || loading ? <StateView kind="loading" title="Searching…" /> : null}
     {error ? <StateView kind="provider_error" title="Search could not load" detail="Your search text is kept here." action={<button type="button" className="min-h-11 font-semibold underline" onClick={() => { setPending(true); setError(false); setRetry((n) => n + 1); }}>Try again</button>} /> : null}
     {search.trim() && (pending || loading || error) ? null : active.total === 0 ? <StateView kind={emptyLibrary ? 'empty' : 'no_match'} nextStep={emptyLibrary ? null : undefined} />
-      : <LibraryBacklogTable rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} canEdit={canEdit} pestoOptions={pestoOptions}
+      : <ImageBacklog key={JSON.stringify([filtersKey, active.page, search])} rows={active.rows} statuses={active.statuses} compact={compact} showHooks={showHooks} canEdit={canEdit} pestoOptions={pestoOptions}
         sort={sort ?? 'sheet'} dir={dir ?? 'asc'} group={group} groupTotals={active.groupTotals} onSort={sortBy} />}
     {/* Keep search controls mounted and focusable during loading and at page edges.
         aria-disabled plus guarded handlers prevents navigation without losing keyboard focus. */}

@@ -14,6 +14,8 @@ import type { VisualDecision } from './visual';
 
 /** Visual fields shared by Library and Schedule rows. */
 export type VisualFields = {
+  /** Database-only ASCII plan. Never added to the legacy Sheet schema. */
+  sketch?: string;
   source: VisualDecision;
   imageStatus: EnumParse<ImageStatus>;
   brief: string;

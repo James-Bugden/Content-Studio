@@ -22,13 +22,10 @@ describe('backlog pills (UX redesign)', () => {
     expect(p.scheduled).toEqual({ label: 'Not yet', tone: 'none' });
   });
 
-  it('marks copyright rework and duplicate checks as problems in words', () => {
-    const rework = backlogPills(facts(['COPYRIGHT_REWORK']));
-    expect(rework.copy.label).toBe('Rework');
-    expect(rework.qa).toEqual({ label: 'REWORK', tone: 'problem' });
+  it('marks duplicate checks as problems in words', () => {
     expect(backlogPills(facts(['DUPLICATE_CHECK'])).qa).toEqual({ label: 'Duplicate?', tone: 'problem' });
     expect(backlogPills(facts(['MISSING_COPY'])).copy).toEqual({ label: 'Write', tone: 'todo' });
-    expect(backlogPills(facts(['COPYRIGHT_UNCHECKED'])).qa.label).toBe('Not checked');
+    expect(backlogPills(facts(['DUPLICATE_UNCHECKED'])).qa.label).toBe('Not checked');
   });
 
   it('reads review state, including a stale approval', () => {

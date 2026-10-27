@@ -69,7 +69,7 @@ function libraryRaw(cells: WithUrl, opts: { nextActionFormula?: boolean } = {}):
       return `=HYPERLINK("${cells.sourceMarkdownUrl ?? SYNTH_MASTER_URL}","Open master")`;
     }
     if (f === 'hasImage') return '=IF(LEN(AC2)>0,"Has file","No file")';
-    if (f === 'nextAction' && opts.nextActionFormula) return '=IF(H2="REWORK","Fix copyright","Review LinkedIn")';
+    if (f === 'nextAction' && opts.nextActionFormula) return '=IF(H2="REWORK","Review copy","Review LinkedIn")';
     return merged[f] ?? '';
   });
   return { values, formulas };
@@ -117,8 +117,8 @@ const L8_DRAFT = '談薪水不是吵架 🙂\n\nIt is a joint problem:\n  – th
 export const SYNTH_LIBRARY: WithUrl[] = [
   // Normal: clean, waiting for review.
   { libraryId: 'SYN-L001', slug: 'negotiate-scope-first', pairKey: 'syn-scope-first', currentHook: 'Most people negotiate the salary.', draftContent: L1_DRAFT, visualSource: 'Text only' },
-  // Blocked: copyright rework.
-  { libraryId: 'SYN-L002', slug: 'quoted-framework', pairKey: 'syn-quoted', copyrightQa: 'REWORK', nextAction: 'Fix copyright', currentHook: 'Here is the famous five-step script.', draftContent: 'Here is the famous five-step script.\n\nStep one...' },
+  // Legacy copyright data is retained but ignored.
+  { libraryId: 'SYN-L002', slug: 'quoted-framework', pairKey: 'syn-quoted', copyrightQa: 'REWORK', nextAction: 'Review copy', currentHook: 'Here is the famous five-step script.', draftContent: 'Here is the famous five-step script.\n\nStep one...' },
   // Blocked: duplicate check.
   { libraryId: 'SYN-L003', slug: 'anchor-high', pairKey: 'syn-anchor', duplicateQa: 'CHECK', nextAction: 'Duplicate decision', currentHook: 'Anchor high.', draftContent: 'Anchor high.\n\nThen explain why.' },
   // X source, approved and queued, but its Threads adaptation is missing.
@@ -310,7 +310,7 @@ export function syntheticQueueSummaryRows(): RawRow[] {
     ...[...groups].sort(([a], [b]) => a.localeCompare(b)).map(([source, rows]) => ({
       values: [source, String(rows.length), String(rows.filter(r => ['', 'Not Reviewed', 'Pending'].includes(r.reviewStatus ?? '')).length),
         String(rows.filter(r => r.reviewStatus === 'Approved').length), String(rows.filter(r => r.queueForSchedule === 'TRUE').length),
-        String(rows.filter(r => r.reviewStatus === 'Changes Requested' || r.copyrightQa === 'REWORK' || ['CHECK', 'DUPLICATE'].includes(r.duplicateQa ?? '')).length), 'Open master'],
+        String(rows.filter(r => r.reviewStatus === 'Changes Requested' || ['CHECK', 'DUPLICATE'].includes(r.duplicateQa ?? '')).length), 'Open master'],
       links: [null, null, null, null, null, null, rows.map(r => r.sourceMarkdownUrl ?? SYNTH_MASTER_URL).sort()[0]],
     })),
   ];

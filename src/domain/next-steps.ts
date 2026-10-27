@@ -3,6 +3,9 @@ import type { LibraryItem, ScheduledPost } from './records';
 import { renderStampMatches, visualApprovalState } from './stage';
 import { parseBrief, validateBrief } from './visual';
 import type { ZhAdaptationState } from './gates';
+import { editorialSidecar } from './image-renderer';
+import { shortHash } from './hash';
+import { hasImageSketch } from './image-pipeline';
 
 /**
  * One vocabulary for "what do I do next" and "what does the image look like",
@@ -45,6 +48,12 @@ function visualThumb(libraryId: string, item: Pick<LibraryItem, 'visual'>): Thum
       return { src, label: 'Screenshot needs approval', tone: 'todo' };
     }
     case 'original_graphic': {
+        if (editorialSidecar(v.brief) && v.imageFile.trim()) {
+          const src = `/api/library/${id}/asset?m=${shortHash(v.imageFile + v.version)}`;
+          if (approval === 'stale' || approval === 'not_approved' && !renderStampMatches(v)) return { src, label: 'Image out of date', tone: 'problem' };
+          return approval === 'approved' || approval === 'approved_legacy' ? { src, label: 'Image approved', tone: 'done' } : { src, label: 'Image needs approval', tone: 'todo' };
+        }
+      if (hasImageSketch(v)) return { src: null, label: 'Sketch to review', tone: 'todo' };
       const brief = parseBrief(v.brief);
       const briefOk = brief !== null && validateBrief(brief).length === 0;
       if (approval === 'stale') return { src: briefOk ? `/api/library/${id}/render?rev=draft` : null, label: 'Image out of date', tone: 'problem' };
@@ -91,8 +100,6 @@ export type NextStep = {
 const LIB_STEP: Partial<Record<GateCode, Omit<NextStep, 'why'>>> = {
   UNRECOGNISED_VALUE: { kind: 'fix_sheet', action: 'Fix in Sheet', urgency: 'now' },
   MISSING_IDENTITY: { kind: 'fix_sheet', action: 'Fix in Sheet', urgency: 'now' },
-  COPYRIGHT_REWORK: { kind: 'fix_copy', action: 'Rework copy', urgency: 'now' },
-  COPYRIGHT_UNCHECKED: { kind: 'fix_sheet', action: 'Run copyright QA', urgency: 'soon' },
   DUPLICATE_CHECK: { kind: 'decide_duplicate', action: 'Decide duplicate', urgency: 'now' },
   DUPLICATE_CONFIRMED: { kind: 'fix_copy', action: 'Skip or rewrite', urgency: 'later' },
   DUPLICATE_UNCHECKED: { kind: 'fix_sheet', action: 'Run duplicate QA', urgency: 'soon' },

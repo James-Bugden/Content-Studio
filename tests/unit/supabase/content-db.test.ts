@@ -141,7 +141,7 @@ describe('QueueSummaryRow SQL parity (DB-1 review item 8)', () => {
     const seed = syntheticContentDbSeed(); seed.posts = seed.posts.filter(r => r.collection === 'queue').slice(0, 3);
     seed.posts[0]!.source_master_file_url = 'https://example.com/z';
     seed.posts[1]!.source_master_file_url = 'https://example.com/a'; seed.posts[1]!.review_status = 'Approved'; seed.posts[1]!.queue_for_schedule = true;
-    seed.posts[2]!.copyright_qa = 'REWORK';
+    seed.posts[2]!.duplicate_qa = 'CHECK';
     for (const row of seed.posts) {
       const keys = Object.keys(row);
       await db.query(`insert into content_studio_posts (${keys.join(',')}) select ${keys.join(',')} from jsonb_populate_record(null::content_studio_posts, $1::jsonb)`, [JSON.stringify(row)]);

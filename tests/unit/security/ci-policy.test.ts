@@ -14,7 +14,8 @@ describe('DEP-01 deterministic clean-checkout pipeline', () => {
     expect(job).toBeDefined();
     for (const required of ['runs-on: ubuntu-latest', 'needs: verify', 'contents: read', 'actions: read',
       '--name sweep-server', "CS_E2E_PREBUILT: '1'", 'CS_E2E_CONTENT_STORE: db\n',
-      'tests/e2e/content-write-cutover.spec.ts --project=w375 --project=w1280']) expect(job).toContain(required);
+      'tests/e2e/markdown-authority.spec.ts', 'tests/e2e/content-write-cutover.spec.ts', 'tests/e2e/image-pipeline.spec.ts',
+      '--project=w375 --project=w1280']) expect(job).toContain(required);
     const aggregate = ci.match(/^  browser:\n([\s\S]*?)(?=^  [\w-]+:)/m)![1]!;
     expect(aggregate).toContain('browser-db-write]');
     expect(aggregate).toContain('DB_WRITE_RESULT: ${{ needs.browser-db-write.result }}');

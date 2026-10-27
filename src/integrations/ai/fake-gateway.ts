@@ -60,6 +60,12 @@ export class FakeAiGateway implements AiGateway {
 
   private generate(name: AiTaskName, input: unknown): unknown {
     switch (name) {
+      case 'image_check':
+        return { needsImage: !(input as { draft: string }).draft.includes('[text-only]'), reason: 'A short diagram makes the steps easier to follow.' };
+      case 'ascii_sketch':
+        return { title: 'Make the next step clear', blocks: ['Name the task', 'Show the evidence', 'Choose the next step'], grammar: 'flow', altText: 'Three steps connect the task to evidence and a next step.' };
+      case 'image_render':
+        return { format: 'E03', title: 'Make the next step clear', fields: { steps: ['Name the task', 'Show the evidence', 'Choose the next step'] }, alt_text: 'Three steps connect the task to evidence and a next step.', platform: (input as { platform: string }).platform, language: 'en' };
       case 'english_qa':
         return fakeEnglishQa(input as EnglishQaInput);
       case 'hooks':

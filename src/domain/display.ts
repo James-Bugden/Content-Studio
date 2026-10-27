@@ -49,7 +49,7 @@ export function shortWhen(when: { isoDate: string; time: string }): string {
   return /^\d{1,2}:\d{2}$/.test(when.time.trim()) ? `${day}, ${when.time.trim()}` : day;
 }
 
-/** "Next: Rework copy, copyright QA says this needs rework." */
+/** "Next: Rework copy, duplicate QA needs a decision." */
 export function nextLine(step: Pick<NextStep, 'action' | 'why'>): string {
   const why = step.why.trim();
   // Lower-case the first word of the reason unless it is an acronym or a name like "X".

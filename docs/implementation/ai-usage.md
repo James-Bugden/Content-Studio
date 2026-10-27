@@ -10,6 +10,9 @@ Acceptance:
 - AI-USE-1: timestamp, feature, provider model, input/output tokens and estimated
   USD cost for each Content attempt, including repair, refusal and invalid output.
   Replies ideas/rewrite/translation and embeddings use the same budget.
+  Image checks, ASCII sketch proposals and render-brief mapping also use this
+  path (`image_check`, `ascii_sketch`, `image_render`, #243). The deterministic
+  Python PNG render does not call a model or incur provider token usage.
 - AI-USE-2: atomic admission refuses at/above the cap before provider invocation;
   the 80% threshold warns. Months reset at midnight on the 1st in Asia/Taipei.
 - AI-USE-3: owner-only private read/edit routes; cap edits use operation identity,
@@ -24,10 +27,10 @@ the repository's normal deployment migration process before enabling this code
 with a live AI provider. Missing database configuration/schema fails closed for
 AI while manual editing remains available.
 
-`20261027000400_ai_usage_image_need.sql` adds the `image_need` feature (the
-single-post image check, #242) to the ledger's feature list. Apply it with the
-first migration; until it is applied, the image check fails closed while hooks
-and the other features keep working.
+The `image_need` feature (the single-post image check, #242) and the image pipeline features
+(`image_check`, `ascii_sketch`, `image_render`, #243) are added to the ledger's feature list by the
+single idempotent `20261027000400_image_pipeline.sql`. Until it is applied, those checks fail
+closed while hooks and the other features keep working.
 
 Amounts are integer USD microdollars. Rates are a versioned estimate, verified
 2026-10-27 against [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)
