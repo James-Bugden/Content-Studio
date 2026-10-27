@@ -3,6 +3,16 @@ import type { MarkdownExport } from '@/application/markdown-export';
 import type { ContentCollection, ContentDb, ContentPostRow, ContentScheduleRow, ContentSettingRow, ContentSummaryRow, ContentTarget, ContentWrite, ContentWriteResult } from '@/application/content-db';
 import { z } from 'zod';
 import { AppError, isAppError } from '@/domain/errors';
+import { LIBRARY_HEADERS, SCHEDULE_HEADERS } from '@/domain/sheet-schema';
+
+// List reads need domain facts for global gates/filter counts, never storage
+// bookkeeping (timestamps, operation identities or future administrative columns).
+const columns = (headers: Record<string, string>, extra: string[]) => [
+  ...Object.keys(headers).map(field => field.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`)),
+  'row_version', 'source_sheet_row', 'sheet_revision', 'passthrough', 'image_file_url', ...extra,
+].join(',');
+const POST_COLUMNS = columns(LIBRARY_HEADERS, ['collection', 'source_markdown_url', 'source_master_file_url']);
+const SCHEDULE_COLUMNS = columns(SCHEDULE_HEADERS, ['final_synced_hash', 'source_link_url']);
 
 export type SupabaseContentDbOptions = { url: string; serviceKey: string; fetch?: typeof fetch; timeoutMs?: number; readOnly?: boolean;
   /** Live composition supplies a durable gate, checked afresh before each RPC. */
@@ -124,11 +134,12 @@ export class SupabaseContentDb implements ContentDb {
   }
   listPosts(collection: ContentCollection | 'ready') {
     return this.select<ContentPostRow>(collection === 'ready' ? 'ready_queue' : 'posts', {
+      select: POST_COLUMNS,
       ...(collection === 'ready' ? {} : { collection: `eq.${collection}` }), order: 'source_sheet_row.asc.nullslast,library_id.asc',
     });
   }
   async getPost(collection: ContentCollection, id: string) { return (await this.select<ContentPostRow>('posts', { collection: `eq.${collection}`, library_id: `eq.${id}`, order: 'library_id.asc' }))[0] ?? null; }
-  listSchedule() { return this.select<ContentScheduleRow>('schedule', { order: 'date.asc,platform.asc,slot.asc,content_id.asc' }); }
+  listSchedule() { return this.select<ContentScheduleRow>('schedule', { select: SCHEDULE_COLUMNS, order: 'date.asc,platform.asc,slot.asc,content_id.asc' }); }
   async getSchedule(id: string) { return (await this.select<ContentScheduleRow>('schedule', { content_id: `eq.${id}`, order: 'content_id.asc' }))[0] ?? null; }
   queueSummary() { return this.select<ContentSummaryRow>('queue_summary', { order: 'content_source.asc' }); }
   workflowSettings() { return this.select<ContentSettingRow>('workflow_settings', { order: 'source_sheet_row.asc.nullslast,setting.asc' }); }

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { getServices, resetServices } from '@/application/container';
 import { PLATFORMS } from '@/domain/enums';
-import { LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
+import { discoverHeaders, LIBRARY_HEADERS, SCHEDULE_HEADERS, SHEET_TABS } from '@/domain/sheet-schema';
+import { toLibraryRecord } from '@/domain/mapping';
+import type { ContentPostRow } from '@/application/content-db';
 import { ERROR_CODES } from '@/domain/errors';
 import { testAuthEnabled } from '@/lib/auth/policy';
 import { json } from '@/lib/http';
@@ -98,6 +100,23 @@ export async function POST(request: Request) {
   if (body.kind === 'seed_library_pages') {
     const grid = fakes.sheet.rawTab(SHEET_TABS.library.name);
     const rows = largeLibraryRows(body.total === undefined ? 45 : Math.max(0, body.total - (grid.length - 1))).slice(1);
+    // Exercise the database authority with the same large inventory as legacy
+    // journeys. Never seed a different number of rows while labelling it DB QA.
+    if (process.env.CS_CONTENT_STORE === 'db') {
+      const snapshot = fakes.db.snapshot();
+      const header = largeLibraryRows(0)[0]!;
+      const found = discoverHeaders(LIBRARY_HEADERS, header.values);
+      if (!found.ok) throw new Error('Invalid synthetic headers');
+      const firstRow = snapshot.posts.filter(p => p.collection === 'library').length + 2;
+      rows.forEach((raw, i) => {
+        const record = toLibraryRecord(found.index, raw, firstRow + i);
+        snapshot.posts.push({ ...contentPatch(record.cells), collection: 'library', row_version: 1,
+          source_sheet_row: record.row, sheet_revision: record.revision, passthrough: {},
+          source_markdown_url: record.links.sourceMarkdown ?? '', source_master_file_url: record.links.sourceMasterFile ?? '',
+          image_file_url: record.links.imageFile ?? '', library_id: `SYN-B${String(i + 1).padStart(4, '0')}` } as ContentPostRow);
+      });
+      fakes.db.replaceSnapshot(snapshot);
+    }
     for (const row of rows) grid.push(row.values.map((value, index) => {
       const formula = row.formulas?.[index];
       return { value: String(value ?? ''), ...(typeof formula === 'string' && formula.startsWith('=') ? { formula } : {}) };

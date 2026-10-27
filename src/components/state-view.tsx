@@ -42,8 +42,8 @@ export const STATE_LOOK: Record<StateKind, KindLook> = {
     label: 'Loading',
     frame: 'border border-line bg-card',
     mark: 'border-line text-ink-soft',
-    title: 'Loading the latest version',
-    detail: 'Reading from the Sheet. Nothing is changed while this loads.',
+    title: 'Loading',
+    detail: '',
   },
   empty: {
     role: 'status',

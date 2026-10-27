@@ -10,6 +10,23 @@ const serviceKey = 'SYNTHETIC_SERVICE_KEY_ONLY';
 const options = { url, serviceKey };
 
 describe('read-only PostgREST transport', () => {
+  it('list queries select domain columns explicitly and exclude storage bookkeeping', async () => {
+    const request = vi.fn<typeof fetch>(async input => {
+      const selected = new URL(String(input)).searchParams.get('select')!.split(',');
+      expect(selected).not.toContain('*');
+      expect(selected).toContain('row_version');
+      expect(selected).not.toContain('created_by_op');
+      expect(selected).not.toContain('updated_by_op');
+      expect(new Set(selected).size).toBe(selected.length);
+      return Response.json([], { headers: { 'content-range': '*/0' } });
+    });
+    const db = new SupabaseContentDb({ ...options, fetch: request });
+    await db.listPosts('library');
+    await db.listPosts('queue');
+    await db.listPosts('ready');
+    await db.listSchedule();
+    expect(request).toHaveBeenCalledTimes(4);
+  });
   it.each([{ rows: [] }, { rows: [{ operation_id: 'synthetic_import_latest' }] }])('reads only the latest committed import identity: $rows', async ({ rows }) => {
     const request = vi.fn<typeof fetch>(async (input, init) => {
       const target = new URL(String(input));
