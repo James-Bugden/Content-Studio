@@ -9,9 +9,9 @@ import type { NextStep, Thumb } from './next-steps';
  */
 /**
  * Posts lanes: the backlog tabs first, then the earlier review lanes kept as URL
- * aliases (`clean`, `copyright`, `duplicate`, `approved`) so old links still work.
+ * aliases (`clean`, `duplicate`, `approved`) so old links still work.
  */
-export const LEGACY_LANES = ['clean', 'copyright', 'duplicate', 'approved'] as const;
+export const LEGACY_LANES = ['clean', 'duplicate', 'approved'] as const;
 export const LANES = [...BACKLOG_TABS, ...LEGACY_LANES] as const;
 export type Lane = (typeof LANES)[number];
 
@@ -28,7 +28,6 @@ export type ReviewCard = {
   hook: string;
   preview: string;
   reviewStatus: string;
-  copyrightQa: string;
   duplicateQa: string;
   queued: boolean | null;
   visual: string;

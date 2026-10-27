@@ -193,7 +193,7 @@ export class FakeContentDb implements ContentDb {
         ?? rows.map(r => r.source_markdown_url).filter(Boolean).sort()[0] ?? '', count: rows.length,
       counts: { Total: rows.length, 'Not Reviewed': rows.filter(r => ['', 'Not Reviewed', 'Pending'].includes(String(r.review_status))).length,
         Approved: rows.filter(r => r.review_status === 'Approved').length, Queued: rows.filter(r => r.queue_for_schedule).length,
-        'Needs Fix': rows.filter(r => r.review_status === 'Changes Requested' || r.copyright_qa === 'REWORK' || ['CHECK', 'DUPLICATE'].includes(String(r.duplicate_qa))).length },
+        'Needs Fix': rows.filter(r => r.review_status === 'Changes Requested' || ['CHECK', 'DUPLICATE'].includes(String(r.duplicate_qa))).length },
     }));
   }
 }

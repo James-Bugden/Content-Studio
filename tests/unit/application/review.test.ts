@@ -26,8 +26,8 @@ async function transition(libraryId: string, action: ReviewTransition['action'],
 
 describe('REV-03: filters', () => {
   it('drops unknown or free-text values instead of passing them through', () => {
-    const f = parseReviewFilters({ lane: 'copyright', target: 'LinkedIn', src: 'not-a-hash', review: '<script>', page: '-3', extra: 'x' });
-    expect(f).toEqual({ lane: 'copyright', target: 'LinkedIn', src: undefined, from: undefined, review: undefined, copyright: undefined, duplicate: undefined, queue: undefined, page: 1 });
+    const f = parseReviewFilters({ lane: 'clean', target: 'LinkedIn', src: 'not-a-hash', review: '<script>', page: '-3', extra: 'x' });
+    expect(f).toEqual({ lane: 'clean', target: 'LinkedIn', src: undefined, from: undefined, review: undefined, duplicate: undefined, queue: undefined, page: 1 });
   });
 
   it('filters compose and match a direct repository query', async () => {
@@ -40,13 +40,12 @@ describe('REV-03: filters', () => {
     expect(q.total).toBe(direct.length);
   });
 
-  it('lanes separate clean review, copyright rework and duplicate checks', async () => {
+  it('lanes separate clean review and duplicate checks', async () => {
     const q = await loadReviewQueue(repo, parseReviewFilters({}));
     const lane = (id: string) => q.cards.find((c) => c.libraryId === id)?.lane;
     expect(lane('SYN-L001')).toBe('clean');
-    expect(lane('SYN-L002')).toBe('copyright');
+    expect(lane('SYN-L002')).toBe('clean');
     expect(lane('SYN-L003')).toBe('duplicate');
-    expect(q.laneCounts.copyright).toBe(1);
     expect(q.laneCounts.all).toBe(q.totalUnfiltered);
   });
 
@@ -104,7 +103,6 @@ describe('REV-04 / REV-06: transitions', () => {
   });
 
   it.each([
-    ['SYN-L002', 'COPYRIGHT_REWORK'],
     ['SYN-L003', 'DUPLICATE_CHECK'],
     ['SYN-L011', 'UNRECOGNISED_VALUE'],
   ])('%s cannot be approved or queued while %s', async (id, code) => {

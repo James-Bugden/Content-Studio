@@ -61,6 +61,7 @@ export type VisualItemView = {
   altText: string;
   version: string;
   hasFile: boolean;
+  editorialPng?: boolean;
   /** Short hash of `Image File`. The Drive link itself never reaches the browser. */
   fileHash: string;
   approval: VisualApprovalState;

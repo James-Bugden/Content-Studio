@@ -61,7 +61,7 @@ export function backlogPills(f: BacklogFacts): BacklogPills {
   const codes = new Set<GateCode>(f.gates.blockers.map((g) => g.code));
   const has = (...c: GateCode[]) => c.some((x) => codes.has(x));
 
-  const copy: Pill = has('COPYRIGHT_REWORK', 'MARKDOWN_MISMATCH', 'DUPLICATE_CONFIRMED')
+  const copy: Pill = has('MARKDOWN_MISMATCH', 'DUPLICATE_CONFIRMED')
     ? { label: 'Rework', tone: 'problem' }
     : has('MISSING_COPY')
       ? { label: 'Write', tone: 'todo' }
@@ -69,13 +69,11 @@ export function backlogPills(f: BacklogFacts): BacklogPills {
         ? { label: 'Choose hook', tone: 'todo' }
         : { label: 'Done', tone: 'done' };
 
-  const qa: Pill = has('COPYRIGHT_REWORK')
-    ? { label: 'REWORK', tone: 'problem' }
-    : has('DUPLICATE_CHECK')
+  const qa: Pill = has('DUPLICATE_CHECK')
       ? { label: 'Duplicate?', tone: 'problem' }
       : has('DUPLICATE_CONFIRMED')
         ? { label: 'Duplicate', tone: 'problem' }
-        : has('COPYRIGHT_UNCHECKED', 'DUPLICATE_UNCHECKED')
+        : has('DUPLICATE_UNCHECKED')
           ? { label: 'Not checked', tone: 'todo' }
           : { label: 'Cleared', tone: 'done' };
 

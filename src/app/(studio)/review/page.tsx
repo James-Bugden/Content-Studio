@@ -8,7 +8,7 @@ import { CapabilityBanner, ErrorState, FilterBar, GuardedLink, PageHeader, State
 import { BacklogTable } from '@/components/review/backlog-table';
 import { ReviewCard } from '@/components/review/review-card';
 import { BACKLOG_TABS, TAB_LABEL } from '@/domain/backlog';
-import { COPYRIGHT_QA, DUPLICATE_QA, PLATFORMS, REVIEW_STATUSES } from '@/domain/enums';
+import { DUPLICATE_QA, PLATFORMS, REVIEW_STATUSES } from '@/domain/enums';
 import { isAppError } from '@/domain/errors';
 import type { QueueSummaryRow } from '@/domain/records';
 import { requireActor } from '@/lib/auth';
@@ -18,7 +18,6 @@ export const dynamic = 'force-dynamic';
 
 const LEGACY_LABEL: Record<(typeof LEGACY_LANES)[number], string> = {
   clean: 'Ready to review',
-  copyright: 'Copyright rework',
   duplicate: 'Duplicate check',
   approved: 'Approved',
 };
@@ -67,7 +66,6 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     { key: 'review', label: 'Review status', control: 'chips', options: REVIEW_STATUSES.map((s) => ({ value: s, label: s === 'Pending' ? 'Not reviewed' : s })) },
     { key: 'src', label: 'Source', options: queue.sources.map((s) => ({ value: s.key, label: s.label })) },
     { key: 'from', label: 'Source platform', options: PLATFORMS.map((p) => ({ value: p, label: p })) },
-    { key: 'copyright', label: 'Copyright QA', options: COPYRIGHT_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
     { key: 'duplicate', label: 'Duplicate QA', options: DUPLICATE_QA.map((s) => ({ value: s, label: QA_LABEL[s] ?? s })) },
     {
       key: 'queue',
@@ -162,7 +160,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
           ) : null}
         </nav>
 
-        <FilterBar announcement={resultCount} clearKeys={['lane']} hideClear={queue.total === 0 && queue.totalUnfiltered > 0} variant="toolbar" disclosureKeys={['src', 'from', 'copyright', 'duplicate', 'queue']} filters={filterDefs} />
+        <FilterBar announcement={resultCount} clearKeys={['lane']} hideClear={queue.total === 0 && queue.totalUnfiltered > 0} variant="toolbar" disclosureKeys={['src', 'from', 'duplicate', 'queue']} filters={filterDefs} />
 
         {queue.scheduleUnavailable ? (
           <StateView

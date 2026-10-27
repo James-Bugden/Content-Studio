@@ -27,9 +27,16 @@ const item = (id: string) => items.get(id)!;
 const codes = (i: LibraryItem, ctx: GateContext) => evaluateLibraryGates(i, ctx).blockers.map((g) => g.code);
 
 describe('READY-01 / READY-05: table-driven hard gates (incl. image, stale visual and screenshot reuse)', () => {
+  it('retains imported copyright values without blocking or displaying them, including unknown legacy values', () => {
+    const base = item('SYN-L001');
+    const expected = evaluateLibraryGates(base, { purpose: 'review' });
+    for (const copyrightQa of [{ ok: true, value: 'REWORK' }, { ok: true, value: 'Unchecked' }, { ok: false, raw: 'legacy value', reason: 'unrecognised' }] as const) {
+      expect(evaluateLibraryGates({ ...base, copyrightQa }, { purpose: 'review' })).toEqual(expected);
+    }
+  });
   const cases: [string, GateContext, GateCode[], 'ready' | 'needs_action' | 'blocked'][] = [
     ['SYN-L001', { purpose: 'review' }, ['REVIEW_PENDING'], 'needs_action'],
-    ['SYN-L002', { purpose: 'review' }, ['COPYRIGHT_REWORK', 'REVIEW_PENDING', 'VISUAL_UNDECIDED'], 'blocked'],
+    ['SYN-L002', { purpose: 'review' }, ['REVIEW_PENDING', 'VISUAL_UNDECIDED'], 'needs_action'],
     ['SYN-L003', { purpose: 'review' }, ['DUPLICATE_CHECK', 'REVIEW_PENDING', 'VISUAL_UNDECIDED'], 'blocked'],
     ['SYN-X004', { purpose: 'ready', zh: 'missing' }, ['ZH_ADAPTATION_MISSING'], 'needs_action'],
     ['SYN-X004', { purpose: 'ready', zh: 'stale' }, ['ZH_ADAPTATION_STALE'], 'blocked'],

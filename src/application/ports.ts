@@ -104,7 +104,7 @@ export const DRIVE_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 
 // ------------------------------------------------------------------ AI (CS-009)
 
-export type AiTaskName = 'english_qa' | 'hooks' | 'zh_tw' | 'zh_qa';
+export type AiTaskName = 'image_check' | 'ascii_sketch' | 'image_render' | 'english_qa' | 'hooks' | 'zh_tw' | 'zh_qa';
 
 /**
  * One structured AI task. The gateway sends `system` plus `render(input)`, asks for

@@ -187,7 +187,7 @@ export function toScheduleRecord(index: HeaderIndex<ScheduleField>, raw: RawRow,
   return { value: toScheduledPost(cells), row: rowNumber, revision: revisionOf(raw, index.width), cells, ...extras(index, raw) };
 }
 
-export type LibraryPatch = Partial<Record<LibraryField, string>>;
+export type LibraryPatch = Partial<Record<LibraryField, string>> & { imageSketch?: string };
 export type SchedulePatch = Partial<Record<ScheduleField, string>>;
 
 export const ALL_LIBRARY_FIELDS = Object.keys(LIBRARY_HEADERS) as LibraryField[];
