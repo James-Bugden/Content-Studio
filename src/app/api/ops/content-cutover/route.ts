@@ -11,7 +11,7 @@ import { timed } from '@/observability/events';
 import { ownerCutoverResult } from '@/application/cutover-result';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 /** Read-only, build-bound admission; no caller payload or operation identity. */
 export async function GET(request: Request) {
   try {
