@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { cleanMarkdown, fewerLineBreaks, findMarkdown, platformLength, PLATFORM_LIMIT, toggleBold, toggleBullets, toggleItalic, toggleNumbers, toPlain } from '@/domain/format';
 
 /**
@@ -25,6 +26,13 @@ function lineRange(text: string, start: number, end: number): [number, number] {
 }
 
 export function FormatToolbar({ textarea, text, platform, disabled, onChange }: Props) {
+  const [removed, setRemoved] = useState<number | null>(null);
+  useEffect(() => {
+    if (removed === null) return;
+    const timer = setTimeout(() => setRemoved(null), 3500);
+    return () => clearTimeout(timer);
+  }, [removed]);
+  const compact = fewerLineBreaks(text);
   const markdown = findMarkdown(text);
   const length = platformLength(text);
   const limit = PLATFORM_LIMIT[platform];
@@ -71,7 +79,11 @@ export function FormatToolbar({ textarea, text, platform, disabled, onChange }: 
         <button type="button" className={btn} disabled={disabled} onClick={() => apply('selection', toPlain)} aria-label="Remove bold and italic from the selection">
           Clear style
         </button>
-        <button type="button" className={btn} disabled={disabled || fewerLineBreaks(text) === text} onClick={() => onChange(fewerLineBreaks(text))}>Fewer line breaks</button>
+        <button type="button" className={btn} disabled={disabled || compact === text} onClick={() => {
+          setRemoved((text.match(/\n/g)?.length ?? 0) - (compact.match(/\n/g)?.length ?? 0));
+          onChange(compact);
+        }}>Fewer line breaks</button>
+        {removed !== null ? <span role="status" className="text-sm">{removed} fewer line breaks</span> : null}
         <span className="ml-auto text-xs tabular-nums text-ink-soft">
           {length.toLocaleString('en-GB')}
           {limit ? ` / ${limit.toLocaleString('en-GB')}` : ''} characters

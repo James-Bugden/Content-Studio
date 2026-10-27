@@ -10,6 +10,7 @@ import type { ContentRepository, DriveGateway } from './ports';
 import { screenshotUses } from './review';
 import { AppError } from '@/domain/errors';
 import { thumbFor } from '@/domain/next-steps';
+import { toVisualView } from './visuals';
 
 /**
  * Editor view model (CS-008). Loads the authoritative Library row and its
@@ -36,6 +37,9 @@ export async function loadEditor(repo: ContentRepository, drive: DriveGateway, l
     screenshotUses: schedule === null && item.visual.source.kind === 'screenshot' ? null : screenshotUses(item, library, schedule ?? []),
   });
   return {
+    visualItem: toVisualView(record, library, schedule),
+    imageBrief: item.visual.brief,
+    qa: { copyright: item.copyrightQa.ok ? item.copyrightQa.value : '', duplicate: item.duplicateQa.ok ? item.duplicateQa.value : '' },
     thumb: thumbFor(libraryId, item),
     ...(repo.postProperties ? { versions: (await repo.postProperties(libraryId)).versions } : {}),
     refreshPending: repo.pendingRefresh?.('library', item.libraryId) ?? false,
