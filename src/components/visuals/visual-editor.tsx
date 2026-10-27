@@ -236,9 +236,6 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
           <Fact label="Visual version" value={item.version || 'None yet'} mono />
           <Fact label="Approval" value={item.decision === 'text_only' ? 'Not needed for Text only' : APPROVAL_TEXT[item.approval]} />
         </dl>
-        {item.language ? (
-          <p className="mt-2 text-xs text-ink-soft">English and zh-TW visuals are composed separately. Write this copy in {item.language === 'zh-TW' ? 'zh-TW' : 'English'} for {item.platformLabel}.</p>
-        ) : null}
         {item.approval === 'stale' ? (
           <div className="mt-3" data-testid="stale-banner">
             <InlineResult tone="warning">
@@ -327,7 +324,6 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
           <h2 id="brief-h" className="text-base font-semibold">
             2. Brief
           </h2>
-          <p className="mt-1 text-sm text-ink-soft">Plan the structure in ASCII first, then the simplest grammar that teaches it, 2 to 4 main ideas and the exact copy with its line breaks.</p>
           {item.briefUnreadable ? (
             <div className="mt-3">
               <InlineResult tone="warning">Image Brief holds free text, not a structured brief. Saving here replaces it with a structured brief.</InlineResult>
@@ -424,9 +420,8 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
 
             {liveSrc ? (
               <figure className="flex flex-col gap-1">
-                <figcaption className="text-xs text-ink-soft">Draft preview of the brief as typed (not a revision; nothing saved)</figcaption>
+                <figcaption className="text-xs text-ink-soft">Draft preview</figcaption>
                 <TransferImage actions={false} src={liveSrc} alt={brief.altText || 'Draft preview'} width={240} height={Math.round((240 * canvasFor(form.placement).height) / 1080)} className="border border-line" />
-                <p className="text-xs text-ink-soft">Only saved Library or Schedule images can be copied, downloaded or dragged.</p>
               </figure>
             ) : null}
 
@@ -492,7 +487,6 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
               <p className="mt-2 text-sm">
                 Revision under review: <span className="font-mono font-semibold" data-testid="version-label">{item.version}</span>
               </p>
-              <p className="mt-1 text-xs text-ink-soft">Check it at full size and at both phone widths before approving. Approval belongs to this exact revision only.</p>
               <figure className="mt-4 flex flex-col gap-1">
                 <figcaption className="text-sm font-medium">Full size ({canvas.width} x {canvas.height} px)</figcaption>
                 <TransferImage filename={item.slug} contentId={item.libraryId} src={previewSrc} alt={item.altText} width={canvas.width} height={canvas.height} className="block max-w-none" frame={{ tabIndex: 0, role: 'region', 'aria-label': 'Full-size preview (scrolls)', className: 'max-h-[36rem] max-w-full overflow-auto rounded-md border border-line bg-paper' }} />
@@ -552,7 +546,7 @@ export function VisualEditor({ initial, canEdit }: { initial: VisualItemView; ca
               ) : null}
             </div>
           ) : (
-            <p className="mt-3 text-xs text-ink-soft">Read-only access: approval is hidden.</p>
+            <p className="mt-3 text-xs text-ink-soft">Read-only access.</p>
           )}
           {sectionResult('approve')}
         </section>

@@ -24,6 +24,11 @@ the repository's normal deployment migration process before enabling this code
 with a live AI provider. Missing database configuration/schema fails closed for
 AI while manual editing remains available.
 
+`20261027000400_ai_usage_image_need.sql` adds the `image_need` feature (the
+single-post image check, #242) to the ledger's feature list. Apply it with the
+first migration; until it is applied, the image check fails closed while hooks
+and the other features keep working.
+
 Amounts are integer USD microdollars. Rates are a versioned estimate, verified
 2026-10-27 against [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing)
 and [OpenAI embedding pricing](https://developers.openai.com/api/docs/pricing).

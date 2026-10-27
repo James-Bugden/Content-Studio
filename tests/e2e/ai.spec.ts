@@ -49,7 +49,7 @@ test('the server-rendered draft waits for hydration before accepting edits (CS-0
   await expect(editor(page)).toBeEditable();
   await editor(page).fill(QA_TEXT);
   await expect(editor(page)).toHaveValue(QA_TEXT);
-  await expect(page.getByText('Unsaved changes, kept in this tab until you save')).toBeVisible();
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
 });
 
 test('ENQA-01/02: a British spelling finding applies only its range, and Save persists it', async ({ page }) => {

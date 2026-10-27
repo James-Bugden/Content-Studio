@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import type { EditorModel } from '@/domain/views';
 import { InlineResult } from '../inline-result';
 import { HookPanel } from './hook-panel';
-import { initialEditorText, PostEditor, type EditorSnapshot } from './post-editor';
+import { initialEditorText, PostEditor, type EditorSnapshot, type PostEditorHandle } from './post-editor';
+import { AiAssist } from './ai-assist';
 import { QaPanel } from './qa-panel';
 import { ReviewActions } from '../review/review-actions';
 import { LibraryPestoField } from '../backlog/library-pesto-field';
@@ -43,6 +44,8 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
   const [previewPlatform, setPreviewPlatform] = useState<SavePlatform>(SAVE_PLATFORMS.includes(initialModel.targetPlatform as SavePlatform) ? initialModel.targetPlatform as SavePlatform : 'LinkedIn');
   const [previewChinese, setPreviewChinese] = useState(false);
   const [aiOpen, setAiOpen] = useState(true);
+  const editorHandle = useRef<PostEditorHandle>(null);
+  const [pendingHook, setPendingHook] = useState<string | null>(null);
   const aiRef = useRef<HTMLDivElement>(null);
   const [snapshot, setSnapshot] = useState<EditorSnapshot>({
     dirty: false,
@@ -61,6 +64,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       if (!res.ok || !body.ok || !body.model) throw new Error('reload');
       setModel(body.model);
       setText(initialEditorText(body.model));
+      setPendingHook(null);
       setSelection(savedSelection(body.model.versions, body.model.targetPlatform));
       setEditorKey((k) => k + 1);
       setReloadFailed(false);
@@ -95,12 +99,16 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
         <span className="text-sm font-semibold">English master</span>
         <div className="flex items-center gap-3 text-sm">
           <GuardedLink href={`/visuals/${encodeURIComponent(model.libraryId)}`} className="inline-flex min-h-11 items-center underline">Visuals</GuardedLink>
-          <button type="button" aria-expanded={aiOpen} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-ink px-3 font-semibold" onClick={() => { setAiOpen(v => !v); if (!aiOpen) requestAnimationFrame(() => aiRef.current?.scrollIntoView({ block: 'nearest' })); }}><span aria-hidden="true">✧</span> AI</button>
+          <button type="button" aria-expanded={aiOpen} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line px-3" onClick={() => { setAiOpen(v => !v); if (!aiOpen) requestAnimationFrame(() => aiRef.current?.scrollIntoView({ block: 'nearest' })); }}>Checks</button>
         </div>
       </div>
       <div className="grid min-w-0 gap-5 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         <div className="min-w-0">
-          <PostEditor key={editorKey} model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? (onSaved ?? (() => router.refresh())) : undefined} onSaveFailed={onSaveFailed} autoFocus={focusMode}
+          <PostEditor key={editorKey} handleRef={editorHandle} onPendingHookChange={setPendingHook} onHookSaved={(hook) => setModel((m) => ({ ...m, sheet: { ...m.sheet, hook } }))}
+            assist={<AiAssist libraryId={model.libraryId} text={text} canEdit={canEdit} decided={model.visual.trim() !== '' && model.visual !== 'Undecided'} dirty={snapshot.dirty} revision={snapshot.sheetRevision}
+              onUseHook={(hook) => editorHandle.current?.applyHook(hook)}
+              onDecided={(decision, revision) => { editorHandle.current?.setRevision(revision); setModel((m) => ({ ...m, visual: decision })); }} />}
+            model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={focusMode ? (onSaved ?? (() => router.refresh())) : undefined} onSaveFailed={onSaveFailed} autoFocus={focusMode}
             selection={model.contentProvider === 'db' ? selection : undefined}
             onSelectionChange={setSelection}
             saveAsControl={model.contentProvider === 'db' ? <SaveAs libraryId={model.libraryId} text={text} value={selection} onChange={setSelection} canEdit={canEdit} /> : undefined} />
@@ -112,7 +120,6 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
           </div>
           {selection.chinese && selection.chinese.source === text ? <label className="mb-2 flex min-h-11 items-center gap-2 text-xs"><input type="checkbox" checked={previewChinese} onChange={e => setPreviewChinese(e.target.checked)} />Preview Chinese</label> : null}
           <PlatformPreview key={previewPlatform} platform={previewPlatform} text={previewChinese && selection.chinese?.source === text ? selection.chinese.content : text} thumb={model.thumb ?? null} language={previewChinese && selection.chinese?.source === text ? 'zh-Hant-TW' : 'en-GB'} />
-          <p className="mt-2 text-xs text-ink-soft">Preview · saved versions remain drafts until reviewed.</p>
         </aside>
       </div>
       {reviewActions && canEdit ? (
@@ -132,7 +139,9 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
       {reloadFailed ? <InlineResult tone="warning">The change was saved, but the editor could not reload it. Reload the page to see the latest version.</InlineResult> : null}
       <div ref={aiRef} hidden={!aiOpen} className="space-y-4">
       <HookChoice
-        key={`hook:${model.sheet.revision}`}
+        key={`hook:${model.sheet.revision}:${model.sheet.hook}`}
+        pendingHook={pendingHook}
+        onUse={(hook) => editorHandle.current?.applyHook(hook)}
         libraryId={model.libraryId}
         contentStore={contentStore}
         alternatives={model.hookAlternatives}
@@ -145,11 +154,11 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
           if (focusMode) onSaved?.();
         }}
       />
-      {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} /></div></details>
-        : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={setText} />}
+      {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={(next) => editorHandle.current?.replaceText(next)} /></div></details>
+        : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={(next) => editorHandle.current?.replaceText(next)} />}
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">Hook review</summary><div className="mt-3">{hookPanel()}</div></details> : hookPanel()}
       </div>
-      {snapshot.mismatch ? <MismatchNotice contentStore={contentStore} sheetDraft={model.sheet.draft} canEdit={canEdit} onUseSheetVersion={() => setText(model.sheet.draft)} /> : null}
+      {snapshot.mismatch ? <MismatchNotice contentStore={contentStore} sheetDraft={model.sheet.draft} canEdit={canEdit} onUseSheetVersion={() => editorHandle.current?.replaceText(model.sheet.draft)} /> : null}
     </div>
   );
 

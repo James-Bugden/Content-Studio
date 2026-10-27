@@ -68,6 +68,7 @@ test('Delete closes the panel, removes the post and Undo restores its saved copy
   const panel = page.getByRole('dialog');
   const before = await panel.getByLabel(/Post copy/).inputValue();
   await panel.getByRole('button', { name: 'Delete post', exact: true }).click();
+  await panel.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(panel).not.toBeVisible();
   await expect(page).toHaveURL(/\/backlog$/);
   expect((await page.request.get('/api/library/SYN-L001/editor')).status()).toBe(404);
@@ -85,6 +86,7 @@ test('Delete and Undo refresh private search results while preserving the query'
   await expect(row).toBeVisible();
   await row.getByRole('link', { name: 'Show full post', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Delete post', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await expect(page.getByText('No items match these filters', { exact: true })).toBeVisible();
   await expect(page.getByText('0 posts · page 1 of 1.', { exact: true })).toBeVisible();

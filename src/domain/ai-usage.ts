@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const aiFeatureSchema = z.enum(['english_qa', 'hooks', 'zh_tw', 'zh_qa', 'replies_ideas', 'replies_rewrite', 'replies_translation', 'embeddings']);
+export const aiFeatureSchema = z.enum(['english_qa', 'hooks', 'zh_tw', 'zh_qa', 'image_need', 'replies_ideas', 'replies_rewrite', 'replies_translation', 'embeddings']);
 export type AiFeature = z.infer<typeof aiFeatureSchema>;
 export const aiCallSchema = z.object({
   id: z.string().uuid(), timestamp: z.iso.datetime({ offset: true }), feature: aiFeatureSchema, model: z.string().min(1).max(100),

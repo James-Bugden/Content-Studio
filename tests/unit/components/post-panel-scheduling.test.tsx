@@ -32,7 +32,7 @@ it('previews the first open slot automatically and only writes after explicit co
   render(<PostPanel libraryId="SYN-L005" />);
   const confirm = await screen.findByRole('button', { name: 'Confirm and write to Thu 1 Oct \u00b7 21:00' });
   expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
-  expect(screen.getByText('These cells will be written to the Schedule. Nothing else changes.')).toBeTruthy();
+  expect(screen.getByRole('list', { name: 'Cells to write' })).toBeTruthy();
   fireEvent.click(confirm);
   await screen.findByText(/Scheduled into 2026-10-01-MAIN-LI/);
   const writes = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');

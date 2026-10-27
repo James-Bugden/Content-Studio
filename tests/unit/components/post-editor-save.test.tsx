@@ -114,7 +114,7 @@ describe('PostEditor save notification (CS-050)', () => {
 
     await complete(success);
     expect(dirtyWhenSaved).toEqual([false]);
-    expect(screen.getByText('Matches the saved version')).toBeTruthy();
+    expect(screen.getByText('Saved')).toBeTruthy();
 
     // A host re-render must not advance again for the same successful save.
     const replacement = vi.fn();

@@ -15,7 +15,12 @@ type Props = {
   text: string;
   platform: string;
   disabled?: boolean;
-  onChange: (next: string) => void;
+  /** Every edit goes through here so the editor can record history and keep the caret. */
+  onChange: (next: string, opts?: { selection?: [number, number]; focus?: boolean }) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 };
 
 function lineRange(text: string, start: number, end: number): [number, number] {
@@ -24,7 +29,7 @@ function lineRange(text: string, start: number, end: number): [number, number] {
   return [start === end && start > 0 && text[start - 1] === '\n' ? start : s, nl === -1 ? text.length : nl];
 }
 
-export function FormatToolbar({ textarea, text, platform, disabled, onChange }: Props) {
+export function FormatToolbar({ textarea, text, platform, disabled, onChange, canUndo = false, canRedo = false, onUndo, onRedo }: Props) {
   const markdown = findMarkdown(text);
   const length = platformLength(text);
   const limit = PLATFORM_LIMIT[platform];
@@ -44,22 +49,22 @@ export function FormatToolbar({ textarea, text, platform, disabled, onChange }: 
     }
     const middle = fn(text.slice(start, end));
     const next = text.slice(0, start) + middle + text.slice(end);
-    onChange(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start, start + middle.length);
-    });
+    onChange(next, { selection: [start, start + middle.length], focus: true });
   }
 
   const btn =
     'inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-line bg-card px-2 text-sm hover:border-ink disabled:opacity-50';
+  const historyBtn =
+    'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-line bg-card px-2 text-lg hover:border-ink disabled:opacity-50';
   return (
     <div className="flex flex-col gap-2">
       <div role="toolbar" aria-label="Formatting" className="flex flex-wrap items-center gap-1.5">
-        <button type="button" className={`${btn} font-bold`} disabled={disabled} onClick={() => apply('selection', toggleBold)} aria-label="Bold (Unicode letters)" title="Bold: uses Unicode letters that X, LinkedIn and Threads display">
+        <button type="button" className={historyBtn} disabled={disabled || !canUndo} onClick={onUndo} aria-label="Undo edit" title="Undo (Ctrl/Cmd+Z)"><span aria-hidden="true">↶</span></button>
+        <button type="button" className={historyBtn} disabled={disabled || !canRedo} onClick={onRedo} aria-label="Redo edit" title="Redo (Shift+Ctrl/Cmd+Z)"><span aria-hidden="true">↷</span></button>
+        <button type="button" className={`${btn} font-bold`} disabled={disabled} onClick={() => apply('selection', toggleBold)} aria-label="Bold (Unicode letters)" title="Bold (special letters; screen readers may spell them out)">
           B
         </button>
-        <button type="button" className={`${btn} italic`} disabled={disabled} onClick={() => apply('selection', toggleItalic)} aria-label="Italic (Unicode letters)" title="Italic: uses Unicode letters">
+        <button type="button" className={`${btn} italic`} disabled={disabled} onClick={() => apply('selection', toggleItalic)} aria-label="Italic (Unicode letters)" title="Italic (special letters)">
           I
         </button>
         <button type="button" className={btn} disabled={disabled} onClick={() => apply('lines', toggleBullets)} aria-label="Bulleted list">
@@ -71,7 +76,7 @@ export function FormatToolbar({ textarea, text, platform, disabled, onChange }: 
         <button type="button" className={btn} disabled={disabled} onClick={() => apply('selection', toPlain)} aria-label="Remove bold and italic from the selection">
           Clear style
         </button>
-        <button type="button" className={btn} disabled={disabled || fewerLineBreaks(text) === text} onClick={() => onChange(fewerLineBreaks(text))}>Fewer line breaks</button>
+        <button type="button" className={btn} disabled={disabled || fewerLineBreaks(text) === text} onClick={() => onChange(fewerLineBreaks(text), { focus: true })}>Fewer line breaks</button>
         <span className="ml-auto text-xs tabular-nums text-ink-soft">
           {length.toLocaleString('en-GB')}
           {limit ? ` / ${limit.toLocaleString('en-GB')}` : ''} characters
@@ -83,12 +88,11 @@ export function FormatToolbar({ textarea, text, platform, disabled, onChange }: 
           <span>
             This text contains Markdown ({markdown.map((m) => m.kind).join(', ')}). {platform || 'The platform'} will show those symbols as typed.
           </span>
-          <button type="button" className="underline" disabled={disabled} onClick={() => onChange(cleanMarkdown(text))}>
+          <button type="button" className="underline" disabled={disabled} onClick={() => onChange(cleanMarkdown(text), { focus: true })}>
             Clean up Markdown
           </button>
         </div>
       ) : null}
-      <p className="text-xs text-ink-soft">Bold and italic use special letters. Screen readers may spell them out, so keep them to a few words.</p>
     </div>
   );
 }

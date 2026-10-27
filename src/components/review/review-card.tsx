@@ -216,7 +216,7 @@ export function ReviewCard({ initial, canEdit }: { initial: Card; canEdit: boole
           </GuardedLink>
         </div>
       ) : (
-        <p className="mt-3 text-xs text-ink-soft">Read-only access: review actions are hidden.</p>
+        <p className="mt-3 text-xs text-ink-soft">Read-only access.</p>
       )}
 
       {canEdit && approvalBlockers.length > 0 && (!approved || stale) ? (

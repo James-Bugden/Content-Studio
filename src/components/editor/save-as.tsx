@@ -40,7 +40,7 @@ export function SaveAs({ libraryId, text, value, onChange, canEdit }: { libraryI
     <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={wantChinese} onChange={e => { sequence.current++; setBusy(false); onChange({ ...value, includeChinese: e.target.checked, chinese: e.target.checked ? value.chinese : undefined }); }} />Chinese from English</label>
     {wantChinese ? <div className="flex flex-col gap-2">
       <button type="button" className={buttonClass()} disabled={busy || !text.trim()} onClick={() => void generate()}>{busy ? 'Generating…' : value.chinese ? 'Regenerate Chinese' : 'Generate Chinese'}</button>
-      {value.chinese ? <label className="text-xs font-medium">Chinese review draft<textarea lang="zh-Hant-TW" rows={6} value={value.chinese.content} onChange={e => onChange({ ...value, chinese: { source: value.chinese!.source, content: e.target.value } })} className="copy mt-2 w-full resize-y rounded border border-line p-3 text-base leading-relaxed" /></label> : <p className="text-xs text-ink-soft">Generate and review Chinese before saving it.</p>}
+      {value.chinese ? <label className="text-xs font-medium">Chinese review draft<textarea lang="zh-Hant-TW" rows={6} value={value.chinese.content} onChange={e => onChange({ ...value, chinese: { source: value.chinese!.source, content: e.target.value } })} className="copy mt-2 w-full resize-y rounded border border-line p-3 text-base leading-relaxed" /></label> : null}
       {stale ? <InlineResult tone="warning">English changed. Regenerate Chinese before saving.</InlineResult> : null}
     </div> : null}
     {value.platforms.length === 0 ? <p className="text-xs text-block">Select a platform to save.</p> : null}

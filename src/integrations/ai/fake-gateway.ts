@@ -5,7 +5,8 @@ import type { AiGateway, AiResult, AiTask, AiTaskName } from '@/application/port
 import type { EnglishQaInput } from '@/application/english-qa';
 import type { HookInput } from '@/application/hooks';
 import type { ZhInput } from '@/application/zh-tw';
-import { fakeEnglishQa, fakeHooks, fakeZhTw } from './fake-generators';
+import { fakeEnglishQa, fakeHooks, fakeImageNeed, fakeZhTw } from './fake-generators';
+import type { ImageNeedInput } from '@/application/image-need';
 import { AiCancelled, runTask, type ModelCaller } from './pipeline';
 import type { AiUsageService } from '@/application/ai-usage';
 
@@ -65,6 +66,8 @@ export class FakeAiGateway implements AiGateway {
         return fakeHooks(input as HookInput);
       case 'zh_tw':
         return fakeZhTw(input as ZhInput);
+      case 'image_need':
+        return fakeImageNeed(input as ImageNeedInput);
       case 'zh_qa':
         throw new AppError('CONFIG_MISSING', { reason: 'no_fake_for_task' });
     }

@@ -11,6 +11,8 @@ import { sectionBodyProblems } from '@/domain/markdown';
 export const versionSaveSchema = z.object({
   operationId: operationIdSchema, expectedRevision: revisionSchema,
   proposed: z.string().max(40_000),
+  /** A hook chosen in the editor, written in the same revision as the text. */
+  currentHook: z.string().trim().min(1).max(500).optional(),
   platforms: z.array(z.enum(SAVE_PLATFORMS)).min(1).max(3).refine(p => new Set(p).size === p.length),
   chinese: z.object({ source: z.string().max(40_000), content: z.string().min(1).max(40_000) }).strict().optional(),
 }).strict();
@@ -24,7 +26,7 @@ export async function savePostVersions(repo: ContentRepository, actor: Actor, li
   if (sectionBodyProblems(data.proposed, 2).length) throw new AppError('VALIDATION_FAILED', { reason: 'unsafe_markdown_structure' });
   if (data.chinese && data.chinese.source !== data.proposed) throw new AppError('STALE_READ');
   return repo.updatePostProperties({ operationId: data.operationId, actor, target: { libraryId }, expectedRevision: data.expectedRevision,
-    patch: { draft: data.proposed, versions: data.platforms.map(platform => ({ platform, english: data.proposed,
+    patch: { draft: data.proposed, ...(data.currentHook ? { currentHook: data.currentHook } : {}), versions: data.platforms.map(platform => ({ platform, english: data.proposed,
       sourceHash: fingerprint(data.proposed), ...(data.chinese ? { chinese: data.chinese.content } : {}) })) } });
 }
 

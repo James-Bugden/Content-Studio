@@ -80,7 +80,7 @@ export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision
           </button>
         </div>
       )}
-      {!approved && dirty ? <p className="text-xs text-ink-soft">Save the draft first; approval covers the saved copy.</p> : null}
+      {!approved && dirty ? <p className="text-xs text-ink-soft">Save the draft first.</p> : null}
       {!approved && !dirty && blocking.length > 0 ? (
         <p className="text-xs text-ink-soft">Approval opens once these are fixed: {blocking.map((b) => b.message).join(' ')}</p>
       ) : null}

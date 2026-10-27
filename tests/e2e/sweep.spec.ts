@@ -229,7 +229,7 @@ test('mutation proof: data-loss-guard', async ({ page }, info) => {
   const copy = page.getByLabel(/Post copy/);
   await expect(copy).toBeEditable();
   await copy.fill(draft);
-  await expect(page.getByText('Unsaved changes, kept in this tab until you save')).toBeVisible();
+  await expect(page.getByText('Unsaved changes')).toBeVisible();
   await guardedDraft(page, draft);
   await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Next up', exact: true }).evaluate((link) => {
     link.addEventListener('click', (event) => {

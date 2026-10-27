@@ -30,7 +30,7 @@ test('a Ready post can be scheduled from the panel', async ({ page }) => {
   const panel = page.getByRole('dialog');
   // Preview and confirm are available without a slot-selection click.
   await expect(panel.getByRole('button', { name: 'Thu 1 Oct \u00b7 21:00', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.getByText('These cells will be written to the Schedule. Nothing else changes.')).toBeVisible();
+  await expect(panel.getByRole('list', { name: 'Cells to write' })).toBeVisible();
   await panel.getByRole('button', { name: /Confirm and write to Thu 1 Oct \u00b7 21:00/ }).click();
   await expect(panel.getByText(/Scheduled into 2026-10-01-MAIN-LI/)).toBeVisible();
 });
