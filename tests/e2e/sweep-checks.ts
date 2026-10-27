@@ -342,7 +342,7 @@ export const FAULTS = [
   ['SCHEMA_DRIFT', 'blocked'], ['STALE_READ', 'conflict'],
   ['CONFLICT', 'conflict'], ['GATE_BLOCKED', 'blocked'],
   ['AMBIGUOUS_MATCH', 'conflict'], ['PARTIAL_FAILURE', 'partial_failure'],
-  ['VALIDATION_FAILED', 'blocked'], ['UNKNOWN', 'provider_error'],
+  ['VALIDATION_FAILED', 'blocked'], ['UNKNOWN', 'provider_error'], ['AI_LIMIT_REACHED', 'blocked'],
 ] as const;
 export const SHEET_READERS = [
   ['/', 'Content Schedule'], ['/backlog', 'Content Library'],
