@@ -6,4 +6,5 @@ export const nunitoSans = Nunito_Sans({
   subsets: ['latin'],
   variable: '--font-sans-polished',
   display: 'swap',
+  preload: false,
 });
