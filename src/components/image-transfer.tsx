@@ -10,6 +10,24 @@ export function imageFilename(name: string, contentId = 'post'): string {
   return `${slug || safe(contentId) || 'post'}-1.png`;
 }
 
+/** Width every SVG preview is rasterised to; raster assets keep their own size. */
+export const SVG_EXPORT_WIDTH = 1080;
+
+/** Pure sizing for the export canvas. SVG sources (the /render preview) are scaled to 1080 px wide. */
+export function exportSize(natural: { width: number; height: number }, svg: boolean): { width: number; height: number } | null {
+  const { width, height } = natural;
+  if (!(width > 0) || !(height > 0)) return null;
+  if (!svg || width === SVG_EXPORT_WIDTH) return { width, height };
+  return { width: SVG_EXPORT_WIDTH, height: Math.round((SVG_EXPORT_WIDTH * height) / width) };
+}
+
+/** Only PNG is ever exported or dragged, whatever the source type. */
+export const EXPORT_TYPE = 'image/png';
+
+export function isSvgSource(src: string): boolean {
+  return /\/render(?:[?#]|$)/.test(src) || /^data:image\/svg\+xml/.test(src) || /\.svg(?:[?#]|$)/i.test(src);
+}
+
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'onLoad' | 'onDragStart' | 'draggable'> & {
   src: string;
   filename?: string;
@@ -47,14 +65,16 @@ function PreparedImage({ filename = '', contentId, actions = true, preparation =
     try {
       // Reuse the bytes already loaded by <img>: no extra provider request.
       // SVG previews have a 1080px design width; raster assets keep their size.
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+      const size = exportSize({ width: img.naturalWidth, height: img.naturalHeight }, isSvgSource(img.currentSrc || img.src));
+      if (!size) throw new Error();
+      canvas.width = size.width;
+      canvas.height = size.height;
       const context = canvas.getContext('2d');
-      if (!context || !canvas.width || !canvas.height) throw new Error();
-      context.drawImage(img, 0, 0);
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error()), 'image/png'));
+      if (!context) throw new Error();
+      context.drawImage(img, 0, 0, size.width, size.height);
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error()), EXPORT_TYPE));
       if (!alive.current || current !== generation.current) return;
-      const png = new File([blob], imageFilename(filename, contentId), { type: 'image/png' });
+      const png = new File([blob], imageFilename(filename, contentId), { type: EXPORT_TYPE });
       setFile(png);
       setCopySupported(!!navigator.clipboard?.write && typeof ClipboardItem !== 'undefined');
       setShareSupported(!!navigator.share && !!navigator.canShare?.({ files: [png] }));
