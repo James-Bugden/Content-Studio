@@ -82,6 +82,10 @@ describe('editor undo and redo history (#242)', () => {
     expect(box().value).toBe(original);
     expect(pending).toEqual(['New hook', null]);
     expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(true);
+    click('Redo edit');
+    expect(box().value).toBe('New hook\n\nFirst line\nsecond line\nthird line\n\nClosing line');
+    expect(pending).toEqual(['New hook', null, 'New hook']);
+    expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('saves the text and the chosen hook in one request', async () => {

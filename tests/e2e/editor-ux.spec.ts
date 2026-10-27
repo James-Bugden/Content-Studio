@@ -57,7 +57,9 @@ test('a toolbar edit keeps the selection on the same lines and does not scroll t
 });
 
 test('Check with AI gives an image verdict and three hooks; a hook goes to the top and saves with the text', async ({ page }) => {
-  const panel = await openPanel(page, 'SYN-L003');
+  // SYN-L005 has a saveable Markdown section; SYN-L003's section is deliberately ambiguous.
+  expect((await page.request.post('/api/test-control', { data: { kind: 'sheet_edit', libraryId: 'SYN-L005', header: 'Visual Source', value: '' } })).status()).toBe(200);
+  const panel = await openPanel(page, 'SYN-L005');
   const box = panel.getByLabel(/Post copy/);
   const button = panel.getByRole('button', { name: /Check with AI/ });
   // Above the text box, on the left.
@@ -79,7 +81,7 @@ test('Check with AI gives an image verdict and three hooks; a hook goes to the t
   expect(((await box.inputValue()).split('\n')[0] ?? '').trim()).toBe(hook);
   await panel.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(panel.getByText(/^Saved/).first()).toBeVisible();
-  const saved = await (await page.request.get('/api/library/SYN-L003/editor')).json();
+  const saved = await (await page.request.get('/api/library/SYN-L005/editor')).json();
   expect(saved.model.sheet.hook).toBe(hook);
   expect(saved.model.sheet.draft.split('\n')[0].trim()).toBe(hook);
 });
