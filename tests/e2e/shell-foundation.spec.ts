@@ -6,11 +6,12 @@ test.beforeEach(async ({ page }) => {
   } }));
 });
 
-for (const width of [1280, 375, 800, 801]) {
+for (const width of [1280, 375, 500, 750, 800, 801]) {
   test(`CS-073 foundation: responsive navigation, counts and shared status slot at ${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/dev/states');
     const nav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(nav).toHaveCount(1);
     const phone = width <= 800;
     await expect(nav.locator('[data-nav-count="/"]')).toHaveText('999+');
     const visibleLinks = nav.getByRole('link');
@@ -30,6 +31,7 @@ for (const width of [1280, 375, 800, 801]) {
       await expect(nav.getByRole('link', { name: /^Fix issues/ })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(nav.getByRole('link', { name: /^Fix issues/ })).toBeHidden();
+      expect(await nav.locator('.studio-more-menu').evaluate(el => getComputedStyle(el).display)).toBe('none');
     } else {
       const before = (await nav.boundingBox())!.width;
       await page.getByRole('button', { name: 'Collapse navigation' }).click();
@@ -57,4 +59,39 @@ test('CS-073 collapsed desktop rail restores labelled phone tabs after resizing'
   const label = page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Posts' }).locator('.studio-nav-label');
   expect(await label.evaluate(el => ({ position: getComputedStyle(el).position, clip: getComputedStyle(el).clipPath }))).toEqual({ position: 'static', clip: 'none' });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('only one copy of each navigation destination is accessible across the shell breakpoint', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 900 });
+  await page.goto('/dev/states');
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  const secondary = ['Published', 'Fix issues', 'Replies'];
+  const more = nav.getByText('More', { exact: true });
+  await more.click();
+  for (const name of secondary) await expect(nav.getByRole('link', { name: new RegExp(`^${name}`) })).toHaveCount(1);
+  await page.setViewportSize({ width: 801, height: 900 });
+  for (const name of secondary) await expect(nav.getByRole('link', { name: new RegExp(`^${name}`) })).toHaveCount(1);
+  expect(await nav.locator('.studio-more').evaluate(el => getComputedStyle(el).display)).toBe('none');
+  expect(await nav.locator('.studio-more-menu').evaluate(el => getComputedStyle(el).display)).toBe('none');
+  await page.setViewportSize({ width: 800, height: 900 });
+  await more.click();
+  for (const name of secondary) await expect(nav.getByRole('link', { name: new RegExp(`^${name}`) })).toHaveCount(0);
+  expect(await nav.locator('.studio-secondary-nav').first().evaluate(el => getComputedStyle(el).display)).toBe('none');
+});
+
+test('attaching the shared status slot preserves streamed editors and Typefully panels', async ({ page }) => {
+  expect((await page.request.post('/api/test-control', { data: { kind: 'reset' } })).status()).toBe(200);
+  expect((await page.request.post('/api/test-auth', { data: { as: 'owner' } })).status()).toBe(200);
+  // Check unfiltered selectors too: a second server copy in a hidden stream
+  // container still breaks label-based editor and provider-state selectors.
+  for (let visit = 0; visit < 3; visit++) {
+    await page.goto('/review/SYN-L001');
+    const copy = page.getByLabel(/Post copy/);
+    await expect(copy).toBeEditable();
+    await expect(copy).toHaveCount(1);
+    await page.goto('/schedule/2026-10-02-MAIN-X');
+    await expect(page.locator('[data-typefully-state]')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Typefully', exact: true })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(1);
+  }
 });

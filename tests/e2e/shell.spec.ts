@@ -77,8 +77,11 @@ for (const width of [375, 500, 750, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto(GALLERY);
     await expectNoPageOverflow(page);
-    // Controls next to long English and CJK stay visible.
-    await expect(page.getByRole('button', { name: 'Action stays visible' })).toBeInViewport({ ratio: 1 });
+    // The shared status slot and wrapped Nunito Sans headings can put this
+    // second header below the fold. Its action must remain fully reachable.
+    const action = page.getByRole('button', { name: 'Action stays visible' });
+    await action.scrollIntoViewIfNeeded();
+    await expect(action).toBeInViewport({ ratio: 1 });
   });
 }
 
