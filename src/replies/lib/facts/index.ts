@@ -2,6 +2,7 @@ export type { Fact } from './types';
 
 export {
   isEligibleForGeneration,
+  isEligibleForSuggestion,
   eligibilityReason,
   type EligibilityReason,
 } from './eligibility';

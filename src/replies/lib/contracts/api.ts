@@ -185,13 +185,32 @@ export type SessionPatchResponse = z.infer<typeof sessionPatchResponseSchema>;
 // POST /api/replies/refine
 // ---------------------------------------------------------------------------
 
+/** A Content Library id, as the Library itself validates it. */
+export const libraryPostIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/, 'invalid post id');
+
+/**
+ * `use_sources` rewrites a reply around a changed set of sources (#245): facts to
+ * lean on, earlier posts as reference material, and facts to drop. Only ids travel.
+ * The server loads the text itself, from the owner's own rows, so the client can
+ * never smuggle a "fact" or an "earlier post" into the prompt.
+ */
+export const REFINE_SOURCE_LIMITS = { facts: 5, posts: 3, excluded: 10 } as const;
+
 export const refineRequestSchema = z.object({
   session_id: uuid,
   expected_editor_version: z.number().int().nonnegative(),
-  action: z.enum(['shorter', 'more_direct', 'warmer', 'add_personal_example']),
+  action: z.enum(['shorter', 'more_direct', 'warmer', 'add_personal_example', 'use_sources']),
   fact_id: uuid.nullish(),
   resource_id: uuid.nullish(),
   request_key: requestKeySchema,
+  /** Facts the rewrite may now lean on. Approved, active and in date, any sensitivity. */
+  extra_fact_ids: z.array(uuid).max(REFINE_SOURCE_LIMITS.facts).optional(),
+  /** Earlier Content Library posts, as reference material only. */
+  extra_post_ids: z.array(libraryPostIdSchema).max(REFINE_SOURCE_LIMITS.posts).optional(),
+  /** Facts the rewrite must stop relying on. */
+  excluded_fact_ids: z.array(uuid).max(REFINE_SOURCE_LIMITS.excluded).optional(),
+  /** Rewrite a saved idea instead of the draft. Looked up server-side for this session. */
+  idea_id: uuid.nullish(),
 });
 export type RefineRequest = z.infer<typeof refineRequestSchema>;
 
@@ -461,3 +480,142 @@ export const settingsSchema = z.object({
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
+
+// ---------------------------------------------------------------------------
+// POST /api/replies/suggestions (#245)
+// ---------------------------------------------------------------------------
+
+/** Never more than this many of each kind reach the browser. */
+export const SUGGESTION_LIMITS = { facts: 6, posts: 4, images: 6, excerptChars: 280, factChars: 300 } as const;
+
+export const suggestedFactSchema = z.object({
+  id: uuid,
+  text: z.string(),
+  /** Marked private_context_only. Usable, but shown with a small tag. */
+  private: z.boolean(),
+});
+export type SuggestedFact = z.infer<typeof suggestedFactSchema>;
+
+export const suggestedPostSchema = z.object({
+  id: libraryPostIdSchema,
+  title: z.string(),
+  excerpt: z.string(),
+  /** The post's own text, bounded, so Copy has something real to copy. */
+  text: z.string().max(1600),
+  platform: z.string(),
+});
+export type SuggestedPost = z.infer<typeof suggestedPostSchema>;
+
+export const suggestedImageSchema = z.object({
+  id: z.string().min(1).max(100),
+  /** Where it lives: the image bank, or attached to an earlier Content Library post. */
+  source: z.enum(['bank', 'post']),
+  title: z.string(),
+  alt_text: z.string(),
+  tags: z.array(z.string()),
+  /** Same-origin, owner-checked. Never a storage or Drive link. */
+  url: z.string().startsWith('/api/'),
+});
+export type SuggestedImage = z.infer<typeof suggestedImageSchema>;
+
+export const suggestionsRequestSchema = z.object({
+  session_id: uuid,
+  /** Fact ids ideas already cite, so their text can be shown under "Used". */
+  fact_ids: z.array(uuid).max(12).optional(),
+});
+export type SuggestionsRequest = z.infer<typeof suggestionsRequestSchema>;
+
+export const suggestionsResponseSchema = z.object({
+  facts: z.array(suggestedFactSchema).max(24),
+  posts: z.array(suggestedPostSchema).max(SUGGESTION_LIMITS.posts),
+  images: z.array(suggestedImageSchema).max(SUGGESTION_LIMITS.images),
+});
+export type SuggestionsResponse = z.infer<typeof suggestionsResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Image bank (#245)
+// ---------------------------------------------------------------------------
+
+export const BANK_IMAGE_LIMITS = { maxBytes: 5 * 1024 * 1024, maxTags: 20, tagChars: 40 } as const;
+
+const bankTags = z.array(z.string().trim().min(1).max(BANK_IMAGE_LIMITS.tagChars)).max(BANK_IMAGE_LIMITS.maxTags);
+
+export const bankImageSchema = z.object({
+  id: uuid,
+  version: z.number().int().positive(),
+  title: z.string(),
+  alt_text: z.string(),
+  tags: z.array(z.string()),
+  origin: z.enum(['upload', 'created']),
+  status: z.enum(['sketch', 'ready']),
+  mime_type: z.string().nullable(),
+  byte_size: z.number().int().nonnegative(),
+  sketch: z.string(),
+  sketch_approved: z.boolean(),
+  active: z.boolean(),
+  /** Present only once there are bytes to show. */
+  url: z.string().nullable(),
+});
+export type BankImage = z.infer<typeof bankImageSchema>;
+
+export const bankImageUpdateSchema = z.object({
+  expected_version: z.number().int().positive(),
+  request_key: requestKeySchema,
+  changes: withoutDefaults({
+    title: z.string().trim().min(1).max(200),
+    alt_text: z.string().trim().max(500),
+    tags: bankTags,
+    active: z.boolean(),
+  }),
+});
+export const bankImageDeleteSchema = z.object({
+  expected_version: z.number().int().positive(),
+  request_key: requestKeySchema,
+});
+
+/** One small AI call proposing editable metadata. Text only: the gateway sends no pixels. */
+export const bankImageSuggestSchema = z.object({
+  request_key: requestKeySchema,
+  file_name: z.string().max(200),
+  hint: z.string().trim().max(500).optional(),
+});
+export type BankImageSuggestRequest = z.infer<typeof bankImageSuggestSchema>;
+export const bankImageSuggestResponseSchema = z.object({
+  title: z.string(),
+  alt_text: z.string(),
+  tags: z.array(z.string()),
+});
+export type BankImageSuggestResponse = z.infer<typeof bankImageSuggestResponseSchema>;
+
+/** The existing ASCII sketch, approve, editorial image pipeline, for a bank image. */
+export const bankImageCreateSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('sketch'),
+    request_key: requestKeySchema,
+    title: z.string().trim().min(1).max(200),
+    brief: z.string().trim().min(1).max(4000),
+    platform: platformSchema,
+  }),
+  z.object({
+    action: z.literal('revise'),
+    id: uuid,
+    expected_version: z.number().int().positive(),
+    request_key: requestKeySchema,
+    note: z.string().trim().min(1).max(1000),
+    platform: platformSchema,
+  }),
+  z.object({
+    action: z.literal('approve'),
+    id: uuid,
+    expected_version: z.number().int().positive(),
+    request_key: requestKeySchema,
+  }),
+  z.object({
+    action: z.literal('create'),
+    id: uuid,
+    expected_version: z.number().int().positive(),
+    request_key: requestKeySchema,
+    platform: platformSchema,
+  }),
+]);
+export type BankImageCreateRequest = z.infer<typeof bankImageCreateSchema>;

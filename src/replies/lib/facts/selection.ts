@@ -1,4 +1,4 @@
-import { isEligibleForGeneration } from './eligibility';
+import { isEligibleForGeneration, isEligibleForSuggestion } from './eligibility';
 import type { Fact } from './types';
 
 /**
@@ -14,6 +14,8 @@ import type { Fact } from './types';
 export interface SelectRelevantFactsOptions {
   queryText: string;
   limit: number;
+  /** Suggestions may include private_context_only facts; generation never does. */
+  includePrivate?: boolean;
 }
 
 /**
@@ -77,7 +79,7 @@ export function selectRelevantFacts(
   if (queryTokens.size === 0 || options.limit <= 0) return [];
 
   return facts
-    .filter((fact) => isEligibleForGeneration(fact, now))
+    .filter((fact) => (options.includePrivate ? isEligibleForSuggestion(fact, now) : isEligibleForGeneration(fact, now)))
     .map((fact) => ({ fact, score: relevance(fact, queryTokens) }))
     .filter(({ score }) => score >= MIN_RELEVANCE)
     .sort((a, b) => b.score - a.score)

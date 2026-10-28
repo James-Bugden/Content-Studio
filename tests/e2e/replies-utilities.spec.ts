@@ -243,6 +243,7 @@ test.describe('navigation', () => {
       { link: 'Library', heading: 'Library' },
       { link: 'Resources', heading: 'Resources' },
       { link: 'Facts', heading: 'Facts' },
+      { link: 'Images', heading: 'Images' },
       { link: 'Settings', heading: 'Daily targets' },
     ];
 

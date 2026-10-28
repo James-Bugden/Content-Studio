@@ -14,13 +14,28 @@ import { searchReplies, type SearchOptions } from '@/replies/lib/retrieval/searc
 import { rpcCandidateSource } from '@/replies/lib/retrieval/candidates';
 import type { PastReply, Progress, QualifiedResource, ReplyIdea } from '@/replies/lib/contracts/api';
 import type { Platform } from '@/replies/lib/contracts/vocabulary';
-import { eligibilityReason, isEligibleForGeneration } from '@/replies/lib/facts/eligibility';
+import { eligibilityReason, isEligibleForGeneration, isEligibleForSuggestion } from '@/replies/lib/facts/eligibility';
+import { suggestFacts } from '@/replies/lib/suggestions/facts';
+import {
+  POST_CANDIDATE_LIMIT,
+  POST_CANDIDATE_SELECT,
+  postCandidateFilter,
+  postContextText,
+  postSearchTokens,
+  rankLibraryPosts,
+  type LibraryPostRow,
+} from '@/replies/lib/suggestions/library-posts';
+import { postImageCandidate, rankImages, type ImageCandidate, type PostImageRow } from '@/replies/lib/suggestions/images';
 import type {
   AdminFact,
   AdminResource,
   AdminSettings,
   AnalyseInput,
   AnalyseResult,
+  BankImageCreate,
+  BankImageFile,
+  BankImageRow,
+  BankImageUpdate,
   GenerationRunInput,
   LibrarySearchInput,
   ManualReplyInput,
@@ -199,6 +214,79 @@ export function createSupabaseStore(session: OwnerSession): Store {
       });
 
     return { items: qualified, reason: qualified.length > 0 ? null : 'no_match' };
+  }
+
+  /** The pasted post a session is about. Used only to find suggestions. */
+  async function sourceTextFor(sessionId: string): Promise<string> {
+    const { data: row } = await supabase
+      .from('reply_sessions')
+      .select('source_post_id')
+      .eq('user_id', userId)
+      .eq('id', sessionId)
+      .maybeSingle();
+    if (!row?.source_post_id) throw new AppError('not_found', 'That is not available.');
+    const { data: source, error } = await supabase
+      .from('source_posts')
+      .select('source_text')
+      .eq('user_id', userId)
+      .eq('id', row.source_post_id)
+      .maybeSingle();
+    if (error) throw new AppError('internal_error', 'Something went wrong.');
+    const text = String(source?.source_text ?? '');
+    if (text.trim() === '') throw new AppError('not_found', 'That is not available.');
+    return text;
+  }
+
+  const BANK_COLUMNS =
+    'id, version, title, alt_text, tags, origin, status, mime_type, byte_size, sketch, brief, sketch_approved_hash, active';
+
+  async function listBankRows(): Promise<BankImageRow[]> {
+    const { data, error } = await supabase
+      .from('reply_bank_images')
+      .select(BANK_COLUMNS)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) throw new AppError('internal_error', 'Something went wrong.');
+    return (data ?? []) as unknown as BankImageRow[];
+  }
+
+  async function findBankByKey(requestKey: string): Promise<{ id: string; version: number; request_hash: string } | null> {
+    const { data } = await supabase
+      .from('reply_bank_images')
+      .select('id, version, request_hash')
+      .eq('user_id', userId)
+      .eq('request_key', requestKey)
+      .maybeSingle();
+    return (data as { id: string; version: number; request_hash: string } | null) ?? null;
+  }
+
+  function replayCreate(existing: { id: string; version: number; request_hash: string }, requestHash: string) {
+    if (existing.request_hash !== requestHash) {
+      throw new AppError('idempotency_conflict', 'This save was already handled with different details.');
+    }
+    return { id: existing.id, version: existing.version, replayed: true };
+  }
+
+  async function audit(imageId: string, action: string, requestKey: string): Promise<void> {
+    // The record is evidence, not a gate: a failure to write it must not undo a
+    // change that has already committed, but it is not swallowed silently either.
+    const { error } = await supabase
+      .from('reply_bank_image_audit')
+      .insert({ user_id: userId, image_id: imageId, action, request_key: requestKey });
+    if (error) console.error('bank image audit write failed');
+  }
+
+  async function hasAudit(imageId: string, action: string, requestKey: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('reply_bank_image_audit')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('image_id', imageId)
+      .eq('action', action)
+      .eq('request_key', requestKey)
+      .limit(1);
+    return (data ?? []).length > 0;
   }
 
   return {
@@ -785,6 +873,254 @@ export function createSupabaseStore(session: OwnerSession): Store {
       return { id: data.id, version: data.version };
     },
 
+    async suggestions({ sessionId, factIds }) {
+      const text = await sourceTextFor(sessionId);
+      const now = new Date();
+
+      // Facts: the whole (small) bank is read server-side and filtered here, the
+      // same way generation does. Only short texts for the top matches go out.
+      const { data: factRows, error: factError } = await supabase
+        .from('facts')
+        .select('id, version, fact_text, tags, approved, active, sensitivity, valid_from, valid_to')
+        .eq('user_id', userId);
+      const facts = suggestFacts({
+        facts: factError ? [] : ((factRows ?? []) as never[]),
+        queryText: text,
+        explicitIds: factIds,
+        now,
+      });
+
+      // Earlier posts and their images share one bounded candidate query.
+      const filter = postCandidateFilter(postSearchTokens(text));
+      let postRows: (LibraryPostRow & PostImageRow)[] = [];
+      if (filter) {
+        const { data, error } = await supabase
+          .from('content_studio_posts')
+          .select(POST_CANDIDATE_SELECT)
+          .eq('collection', 'library')
+          .is('deleted_at', null)
+          .or(filter)
+          .limit(POST_CANDIDATE_LIMIT);
+        if (!error) postRows = (data ?? []) as unknown as (LibraryPostRow & PostImageRow)[];
+      }
+
+      const bankRows = await listBankRows();
+      const bank: ImageCandidate[] = bankRows
+        .filter((image) => image.active && image.status === 'ready')
+        .map((image) => ({
+          id: image.id,
+          source: 'bank' as const,
+          title: image.title,
+          alt_text: image.alt_text,
+          tags: image.tags,
+          brief: '',
+          url: `/api/replies/images/${image.id}/file`,
+        }));
+      const attached = postRows.flatMap((row) => postImageCandidate(row) ?? []);
+
+      return {
+        facts,
+        posts: rankLibraryPosts(text, postRows),
+        images: rankImages(text, [...bank, ...attached]),
+      };
+    },
+
+    async contextExtras({ factIds, excludedFactIds, postIds }) {
+      const now = new Date();
+      const wanted = [...new Set([...factIds, ...excludedFactIds])];
+      let factRows: Record<string, unknown>[] = [];
+      if (wanted.length > 0) {
+        const { data, error } = await supabase
+          .from('facts')
+          .select('id, version, fact_text, tags, approved, active, sensitivity, valid_from, valid_to')
+          .eq('user_id', userId)
+          .in('id', wanted);
+        if (error) throw new AppError('internal_error', 'Something went wrong.');
+        factRows = (data ?? []) as Record<string, unknown>[];
+      }
+      let postRows: Pick<LibraryPostRow, 'library_id' | 'current_hook' | 'draft_content'>[] = [];
+      if (postIds.length > 0) {
+        const { data, error } = await supabase
+          .from('content_studio_posts')
+          .select('library_id, current_hook, draft_content')
+          .eq('collection', 'library')
+          .is('deleted_at', null)
+          .in('library_id', postIds);
+        if (error) throw new AppError('internal_error', 'Something went wrong.');
+        postRows = (data ?? []) as typeof postRows;
+      }
+      return {
+        facts: factRows
+          .filter((row) => factIds.includes(String(row.id)) && isEligibleForSuggestion(row as never, now))
+          .map((row) => ({ id: String(row.id), version: Number(row.version), text: String(row.fact_text) })),
+        excluded: factRows
+          .filter((row) => excludedFactIds.includes(String(row.id)))
+          .map((row) => ({ id: String(row.id), text: String(row.fact_text) })),
+        posts: postRows.map((row) => ({ id: row.library_id, text: postContextText(row) })),
+      };
+    },
+
+    async getSuggestion(sessionId, ideaId) {
+      const { data: idea, error } = await supabase
+        .from('reply_suggestions')
+        .select('id, generation_run_id, reply_text, english_meaning, fact_ids')
+        .eq('user_id', userId)
+        .eq('id', ideaId)
+        .maybeSingle();
+      if (error || !idea) return null;
+      // The idea must belong to a run of THIS session, not merely to this owner.
+      const { data: run } = await supabase
+        .from('generation_runs')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('id', idea.generation_run_id)
+        .eq('session_id', sessionId)
+        .maybeSingle();
+      if (!run) return null;
+      return {
+        reply_text: String(idea.reply_text),
+        english_meaning: (idea.english_meaning as string | null) ?? null,
+        uses_fact_ids: ((idea.fact_ids as string[] | null) ?? []).map(String),
+      };
+    },
+
+    async listBankImages() {
+      return listBankRows();
+    },
+
+    async getBankImage(id) {
+      const { data, error } = await supabase
+        .from('reply_bank_images')
+        .select(BANK_COLUMNS)
+        .eq('user_id', userId)
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw new AppError('internal_error', 'Something went wrong.');
+      return data ? (data as unknown as BankImageRow) : null;
+    },
+
+    async readBankImageFile(id) {
+      const { data: row } = await supabase
+        .from('reply_bank_images')
+        .select('mime_type, status')
+        .eq('user_id', userId)
+        .eq('id', id)
+        .maybeSingle();
+      if (!row || row.status !== 'ready' || !row.mime_type) return null;
+      const { data: file } = await supabase
+        .from('reply_bank_image_files')
+        .select('bytes')
+        .eq('user_id', userId)
+        .eq('image_id', id)
+        .maybeSingle();
+      const bytes = fromBytea(file?.bytes);
+      return bytes ? { bytes, mime: String(row.mime_type) } : null;
+    },
+
+    async createBankImage(input: BankImageCreate) {
+      const existing = await findBankByKey(input.requestKey);
+      if (existing) return replayCreate(existing, input.requestHash);
+
+      const { data, error } = await supabase
+        .from('reply_bank_images')
+        .insert({
+          user_id: userId,
+          request_key: input.requestKey,
+          request_hash: input.requestHash,
+          title: input.title,
+          alt_text: input.altText,
+          tags: input.tags,
+          origin: input.origin,
+          status: input.status,
+          mime_type: input.file?.mime ?? null,
+          byte_size: input.file?.bytes.length ?? 0,
+          sha256: input.file?.sha256 ?? null,
+          sketch: input.sketch,
+          brief: input.brief,
+        })
+        .select('id, version')
+        .single();
+      if (error || !data) {
+        // Two presses of Save can race past the lookup above; the unique key then
+        // refuses the second, and the row the first made is the answer.
+        if (error?.code === '23505') {
+          const raced = await findBankByKey(input.requestKey);
+          if (raced) return replayCreate(raced, input.requestHash);
+        }
+        throw new AppError('validation_failed', 'That image could not be saved.');
+      }
+      if (input.file) {
+        const { error: fileError } = await supabase
+          .from('reply_bank_image_files')
+          .insert({ image_id: data.id, user_id: userId, bytes: toBytea(input.file.bytes) });
+        if (fileError) {
+          await supabase.from('reply_bank_images').delete().eq('user_id', userId).eq('id', data.id);
+          throw new AppError('internal_error', 'Something went wrong.');
+        }
+      }
+      await audit(data.id, 'create', input.requestKey);
+      return { id: data.id, version: data.version, replayed: false };
+    },
+
+    async updateBankImage(input: BankImageUpdate) {
+      const seen = await hasAudit(input.id, input.action, input.requestKey);
+      const current = await this.getBankImage(input.id);
+      if (!current) throw new AppError('not_found', 'That is not available.');
+      if (seen) return { id: current.id, version: current.version };
+      if (current.version !== input.expectedVersion) {
+        throw new AppError('version_conflict', 'This changed somewhere else. Reload before saving.');
+      }
+
+      if (input.file) {
+        // Bytes first, while the row still says "sketch": nothing serves them yet.
+        const { error: fileError } = await supabase
+          .from('reply_bank_image_files')
+          .upsert({ image_id: input.id, user_id: userId, bytes: toBytea(input.file.bytes) }, { onConflict: 'image_id' });
+        if (fileError) throw new AppError('internal_error', 'Something went wrong.');
+      }
+      const patch: Record<string, unknown> = { ...input.changes, version: input.expectedVersion + 1 };
+      if (input.file) {
+        Object.assign(patch, {
+          status: 'ready',
+          mime_type: input.file.mime,
+          byte_size: input.file.bytes.length,
+          sha256: input.file.sha256,
+        });
+      }
+      const { data, error } = await supabase
+        .from('reply_bank_images')
+        .update(patch)
+        .eq('user_id', userId)
+        .eq('id', input.id)
+        .eq('version', input.expectedVersion)
+        .select('id, version')
+        .maybeSingle();
+      if (error || !data) {
+        throw new AppError('version_conflict', 'This changed somewhere else. Reload before saving.');
+      }
+      await audit(input.id, input.action, input.requestKey);
+      return { id: data.id, version: data.version };
+    },
+
+    async deleteBankImage({ id, expectedVersion, requestKey }) {
+      const { data, error } = await supabase
+        .from('reply_bank_images')
+        .delete()
+        .eq('user_id', userId)
+        .eq('id', id)
+        .eq('version', expectedVersion)
+        .select('id');
+      if (error) throw new AppError('internal_error', 'Something went wrong.');
+      if (data && data.length > 0) {
+        await audit(id, 'delete', requestKey);
+        return;
+      }
+      if (await hasAudit(id, 'delete', requestKey)) return;
+      const stillThere = await this.getBankImage(id);
+      if (stillThere) throw new AppError('version_conflict', 'This changed somewhere else. Reload before deleting.');
+      throw new AppError('not_found', 'That is not available.');
+    },
+
     async getSettings(): Promise<AdminSettings> {
       const { data } = await supabase
         .from('app_settings')
@@ -812,3 +1148,15 @@ export function createSupabaseStore(session: OwnerSession): Store {
 }
 
 export const DEFAULT_TIMEZONE = APP.defaultTimezone;
+
+/** PostgREST speaks bytea as a `\x`-prefixed hex string, in both directions. */
+function toBytea(bytes: Uint8Array): string {
+  return `\\x${Buffer.from(bytes).toString('hex')}`;
+}
+
+function fromBytea(value: unknown): Uint8Array | null {
+  if (typeof value !== 'string' || !value.startsWith('\\x')) return null;
+  return new Uint8Array(Buffer.from(value.slice(2), 'hex'));
+}
+
+export type { BankImageFile };

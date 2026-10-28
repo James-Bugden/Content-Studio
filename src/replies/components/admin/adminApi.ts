@@ -2,7 +2,7 @@
 
 import { ApiError } from '@/replies/lib/workspace/client';
 import type { ErrorEnvelope } from '@/replies/lib/contracts/errors';
-import type { FactInput, LibraryPatchRequest, LibrarySearchRequest, LibrarySearchResponse, ResourceInput, Settings } from '@/replies/lib/contracts/api';
+import type { BankImage, BankImageCreateRequest, BankImageSuggestRequest, BankImageSuggestResponse, FactInput, LibraryPatchRequest, LibrarySearchRequest, LibrarySearchResponse, ResourceInput, Settings } from '@/replies/lib/contracts/api';
 import type { AdminFact, AdminResource, AdminSettings } from '@/replies/lib/server/store';
 
 /**
@@ -16,13 +16,15 @@ import type { AdminFact, AdminResource, AdminSettings } from '@/replies/lib/serv
  * `ApiError` keeps one error-envelope shape across the whole app.
  */
 
-async function send<T>(path: string, method: 'GET' | 'POST' | 'PATCH', body?: unknown): Promise<T> {
+async function send<T>(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method,
     credentials: 'same-origin',
     ...(body === undefined
       ? {}
-      : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      : body instanceof FormData
+        ? { body }
+        : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
   });
 
   if (!response.ok) {
@@ -76,6 +78,23 @@ export const adminApi = {
       expected_version: expectedVersion,
       changes,
     }),
+
+  listImages: () => send<{ images: BankImage[] }>('/api/replies/images', 'GET'),
+  uploadImage: (form: FormData) => send<{ id: string; version: number; replayed: boolean }>('/api/replies/images', 'POST', form),
+  updateImage: (id: string, expectedVersion: number, requestKey: string, changes: Record<string, unknown>) =>
+    send<{ id: string; version: number }>(`/api/replies/images/${id}`, 'PATCH', {
+      expected_version: expectedVersion,
+      request_key: requestKey,
+      changes,
+    }),
+  deleteImage: (id: string, expectedVersion: number, requestKey: string) =>
+    send<{ ok: true }>(`/api/replies/images/${id}`, 'DELETE', {
+      expected_version: expectedVersion,
+      request_key: requestKey,
+    }),
+  suggestImageMeta: (body: BankImageSuggestRequest) =>
+    send<BankImageSuggestResponse>('/api/replies/images/suggest', 'POST', body),
+  createImage: (body: BankImageCreateRequest) => send<{ image: BankImage }>('/api/replies/images/create', 'POST', body),
 
   getSettings: () => send<AdminSettings>('/api/replies/settings', 'GET'),
   saveSettings: (body: Settings) => send<AdminSettings>('/api/replies/settings', 'PATCH', body),

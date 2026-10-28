@@ -4,6 +4,7 @@ import type {
   Progress,
   QualifiedResource,
   ReplyIdea,
+  SuggestionsResponse,
 } from '@/replies/lib/contracts/api';
 import type { DatePrecision, Platform, Provenance, TargetKind } from '@/replies/lib/contracts/vocabulary';
 
@@ -217,6 +218,98 @@ export interface Store {
 
   getSettings(): Promise<AdminSettings>;
   saveSettings(settings: AdminSettings): Promise<AdminSettings>;
+
+  // --- Suggestions and the image bank (#245) -----------------------------
+  // Finding suggestions is free: lexical search only, bounded, and nothing larger
+  // than a short excerpt ever leaves the server.
+
+  /** Facts, earlier posts and images that fit this session's source. */
+  suggestions(input: { sessionId: string; factIds: string[] }): Promise<SuggestionsResponse>;
+
+  /**
+   * The text behind ids the browser named, loaded from the owner's own rows. Facts
+   * must be approved, active and in date (any sensitivity); posts must be live
+   * Content Library posts. An id that does not qualify is simply absent.
+   */
+  contextExtras(input: {
+    factIds: string[];
+    excludedFactIds: string[];
+    postIds: string[];
+  }): Promise<ContextExtras>;
+
+  /** A saved idea of this session, so a rewrite can start from it instead of the draft. */
+  getSuggestion(
+    sessionId: string,
+    ideaId: string,
+  ): Promise<{ reply_text: string; english_meaning: string | null; uses_fact_ids: string[] } | null>;
+
+  listBankImages(): Promise<BankImageRow[]>;
+  getBankImage(id: string): Promise<BankImageRow | null>;
+  readBankImageFile(id: string): Promise<BankImageFile | null>;
+  /** Replays by request key: the same key and payload returns the row already made. */
+  createBankImage(input: BankImageCreate): Promise<{ id: string; version: number; replayed: boolean }>;
+  updateBankImage(input: BankImageUpdate): Promise<{ id: string; version: number }>;
+  deleteBankImage(input: { id: string; expectedVersion: number; requestKey: string }): Promise<void>;
+}
+
+export interface ContextExtras {
+  /** Facts to lean on. */
+  facts: { id: string; version: number; text: string }[];
+  /** Facts to stop relying on, with their text so the instruction can name them. */
+  excluded: { id: string; text: string }[];
+  /** Earlier posts, bounded, for use as reference material only. */
+  posts: { id: string; text: string }[];
+}
+
+export interface BankImageRow {
+  id: string;
+  version: number;
+  title: string;
+  alt_text: string;
+  tags: string[];
+  origin: 'upload' | 'created';
+  status: 'sketch' | 'ready';
+  mime_type: string | null;
+  byte_size: number;
+  sketch: string;
+  brief: string;
+  sketch_approved_hash: string | null;
+  active: boolean;
+}
+
+export interface BankImageFile {
+  bytes: Uint8Array;
+  mime: string;
+}
+
+export interface BankImageCreate {
+  requestKey: string;
+  requestHash: string;
+  title: string;
+  altText: string;
+  tags: string[];
+  origin: 'upload' | 'created';
+  status: 'sketch' | 'ready';
+  sketch: string;
+  brief: string;
+  file: (BankImageFile & { sha256: string }) | null;
+}
+
+export interface BankImageUpdate {
+  id: string;
+  expectedVersion: number;
+  requestKey: string;
+  action: 'update' | 'approve' | 'attach';
+  changes: Partial<{
+    title: string;
+    alt_text: string;
+    tags: string[];
+    active: boolean;
+    sketch: string;
+    sketch_approved_hash: string | null;
+  }>;
+  /** Present when a rendered image completes a created entry. Makes it ready. */
+  file?: BankImageFile & { sha256: string };
 }
 
 export interface AdminResource {
