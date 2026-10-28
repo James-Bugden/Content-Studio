@@ -226,7 +226,7 @@ test.describe('the Images page', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
 
     await expect(page.getByText('Saved.')).toBeVisible();
-    await expect(page.getByText('Interview prep sheet')).toBeVisible();
+    await expect(page.getByText('Interview prep sheet', { exact: true })).toBeVisible();
     await expect(page.getByText('interview, prep')).toBeVisible();
     await noHorizontalScroll(page);
   });

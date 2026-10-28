@@ -93,7 +93,7 @@ export function Workspace({
   const [sourceBusy, setSourceBusy] = useState<string | null>(null);
   const [sourceNotice, setSourceNotice] = useState<{ scope: string; text: string } | null>(null);
   /** The source change whose rewrite preview is on screen, if any. */
-  const pendingSources = useRef<{ scope: string; selection: SourceSelection } | null>(null);
+  const pendingSources = useRef<{ scope: string; selection: SourceSelection; previous: SourceSelection } | null>(null);
 
   const generationAbort = useRef<AbortController | null>(null);
   const lastSyncedDraft = useRef<string>('');
@@ -316,7 +316,7 @@ export function Workspace({
     const pending = pendingSources.current;
     if (pending) {
       pendingSources.current = null;
-      setSelections((previous) => withoutScope(previous, pending.scope));
+      setSelections((current) => ({ ...current, [pending.scope]: pending.previous }));
     }
     dispatch({ type: 'edit_draft', value, hash: contentHash(value) });
   }, []);
@@ -495,7 +495,7 @@ export function Workspace({
     if (pending) {
       // Keep my reply: the change of sources was only ever a proposal.
       pendingSources.current = null;
-      setSelections((previous) => withoutScope(previous, pending.scope));
+      setSelections((current) => ({ ...current, [pending.scope]: pending.previous }));
     }
     dispatch({ type: 'reject_proposal' });
   }, []);
@@ -529,7 +529,7 @@ export function Workspace({
         // The reducer drops a proposal computed from an older editor version. If
         // that is about to happen, say so instead of leaving a change nobody can see.
         if (result.base_editor_version !== state.editorVersion) throw new Error('stale');
-        pendingSources.current = { scope, selection: next };
+        pendingSources.current = { scope, selection: next, previous };
         dispatch({
           type: 'propose',
           proposal: {
