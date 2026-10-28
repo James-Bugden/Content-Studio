@@ -66,6 +66,11 @@ export class FakeAiGateway implements AiGateway {
         return { title: 'Make the next step clear', blocks: ['Name the task', 'Show the evidence', 'Choose the next step'], grammar: 'flow', altText: 'Three steps connect the task to evidence and a next step.' };
       case 'image_render':
         return { format: 'E03', title: 'Make the next step clear', fields: { steps: ['Name the task', 'Show the evidence', 'Choose the next step'] }, alt_text: 'Three steps connect the task to evidence and a next step.', platform: (input as { platform: string }).platform, language: 'en' };
+      case 'bank_image_tags': {
+        const { fileName, hint } = input as { fileName: string; hint: string };
+        const stem = fileName.replace(/\.[A-Za-z0-9]+$/, '').replace(/[^A-Za-z0-9]+/g, ' ').trim() || 'image';
+        return { title: 'Example ' + stem, altText: hint.trim() ? hint.trim().slice(0, 200) : 'An example image from the fake provider.', tags: ['Example', '#fake image', 'example', stem.toLowerCase()] };
+      }
       case 'english_qa':
         return fakeEnglishQa(input as EnglishQaInput);
       case 'hooks':

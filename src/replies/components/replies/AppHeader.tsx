@@ -35,6 +35,9 @@ export function AppHeader({ progress }: { progress: Progress | null }) {
           <Link href="/replies/facts" className="text-ink-soft hover:text-ink">
             {NAV.facts}
           </Link>
+          <Link href="/replies/images" className="text-ink-soft hover:text-ink">
+            {NAV.images}
+          </Link>
           <Link href="/replies/settings" className="text-ink-soft hover:text-ink">
             {NAV.settings}
           </Link>

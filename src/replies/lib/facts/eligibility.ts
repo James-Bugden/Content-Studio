@@ -75,3 +75,14 @@ export function isEligibleForGeneration(fact: Fact, now: Date): boolean {
   return eligibilityReason(fact, now) === 'eligible';
 }
 
+
+/**
+ * Suggestions are looser than generation on exactly one gate (#245). A fact marked
+ * private_context_only may be offered to the owner, who sees a small "private" tag
+ * and chooses whether to lean on it. Approval, active and the validity window still
+ * apply: an unapproved, switched-off or out-of-date fact is never suggested.
+ */
+export function isEligibleForSuggestion(fact: Fact, now: Date): boolean {
+  const reason = eligibilityReason(fact, now);
+  return reason === 'eligible' || reason === 'private_only';
+}

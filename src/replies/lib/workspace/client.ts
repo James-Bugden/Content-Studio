@@ -17,6 +17,8 @@ import type {
   LibrarySearchRequest,
   LibrarySearchResponse,
   LibraryPatchRequest,
+  SuggestionsRequest,
+  SuggestionsResponse,
 } from '@/replies/lib/contracts/api';
 import type { ErrorEnvelope } from '@/replies/lib/contracts/errors';
 
@@ -81,6 +83,9 @@ export const api = {
 
   refine: (body: RefineRequest, signal?: AbortSignal) =>
     send<RefineResponse>('/api/replies/refine', 'POST', body, signal),
+
+  suggestions: (body: SuggestionsRequest, signal?: AbortSignal) =>
+    send<SuggestionsResponse>('/api/replies/suggestions', 'POST', body, signal),
 
   meaning: (body: MeaningRequest, signal?: AbortSignal) =>
     send<MeaningResponse>('/api/replies/meaning', 'POST', body, signal),

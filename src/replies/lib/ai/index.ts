@@ -9,6 +9,7 @@ export { generateIdeas, type GenerateOutcome } from './generator';
 export { runGuards, type GuardReport } from './guards';
 export {
   assembleRewriteInstruction,
+  assembleRewriteUserContent,
   assembleTranslationInstruction,
   checkRewrite,
   parseRewriteOutput,

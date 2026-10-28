@@ -5,12 +5,22 @@ import { APP, RETRIEVAL, RESOURCES as RESOURCE_LIMITS } from '@/replies/lib/cont
 import { AppError } from '@/replies/lib/contracts/errors';
 import type { PastReply, Progress, QualifiedResource, ReplyIdea } from '@/replies/lib/contracts/api';
 import type { Platform, Provenance } from '@/replies/lib/contracts/vocabulary';
+import { createHash } from 'node:crypto';
+import { suggestFacts } from '@/replies/lib/suggestions/facts';
+import { rankLibraryPosts, postContextText, type LibraryPostRow } from '@/replies/lib/suggestions/library-posts';
+import { postImageCandidate, rankImages, type ImageCandidate } from '@/replies/lib/suggestions/images';
+import { isEligibleForSuggestion } from '@/replies/lib/facts/eligibility';
+import type { Fact } from '@/replies/lib/facts/types';
 import type {
   AdminFact,
   AdminResource,
   AdminSettings,
   AnalyseInput,
   AnalyseResult,
+  BankImageCreate,
+  BankImageFile,
+  BankImageRow,
+  BankImageUpdate,
   GenerationRunInput,
   LibrarySearchInput,
   ManualReplyInput,
@@ -186,6 +196,77 @@ const SEED_RESOURCES: readonly MemoryResource[] = [
   },
 ];
 
+type SeedPost = LibraryPostRow & {
+  image_file: string;
+  image_file_url: string;
+  image_alt_text: string;
+  image_brief: string;
+};
+
+/** Synthetic earlier Content Library posts for the suggestion journeys. */
+const SEED_POSTS: readonly SeedPost[] = [
+  {
+    library_id: 'LIB-SYN-001',
+    current_hook: 'Example post: open a cover letter with the problem you solved',
+    pesto: 'cover letter',
+    draft_content:
+      'Example earlier post. A cover letter earns its place when its first line names the problem you solved, not the job you want.',
+    content_source: 'synthetic fixture',
+    target_platform: 'LinkedIn',
+    image_file: '',
+    image_file_url: '',
+    image_alt_text: '',
+    image_brief: '',
+  },
+  {
+    library_id: 'LIB-SYN-002',
+    current_hook: 'Example post: three questions before you apply',
+    pesto: 'application',
+    draft_content:
+      'Example earlier post. Before you apply, ask what the role is for, who it helps and what a good first month looks like.',
+    content_source: 'synthetic fixture',
+    target_platform: 'X',
+    image_file: '',
+    image_file_url: '',
+    image_alt_text: '',
+    image_brief: '',
+  },
+];
+
+/** A real 1x1 PNG, so a thumbnail and a copy action have something to work on. */
+const SEED_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1sAAAAASUVORK5CYII=';
+
+interface MemoryBankImage extends BankImageRow {
+  requestKey: string;
+  requestHash: string;
+  file: (BankImageFile & { sha256: string }) | null;
+}
+
+function seedBankImages(): MemoryBankImage[] {
+  const bytes = new Uint8Array(Buffer.from(SEED_PNG_BASE64, 'base64'));
+  return [
+    {
+      id: '66666666-6666-4666-8666-000000000001',
+      version: 1,
+      title: 'Example cover letter checklist',
+      alt_text: 'An example checklist for a cover letter.',
+      tags: ['cover letter', 'checklist'],
+      origin: 'upload',
+      status: 'ready',
+      mime_type: 'image/png',
+      byte_size: bytes.length,
+      sketch: '',
+      brief: '',
+      sketch_approved_hash: null,
+      active: true,
+      requestKey: 'seed-image-1',
+      requestHash: 'seed',
+      file: { bytes, mime: 'image/png', sha256: createHash('sha256').update(bytes).digest('hex') },
+    },
+  ];
+}
+
 function localDay(instant: Date, timezone: string): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -218,6 +299,15 @@ export function createMemoryStore(): Store {
     timezone: APP.defaultTimezone,
   };
   const suggestions = new Map<string, ReplyIdea[]>();
+  const bankImages: MemoryBankImage[] = seedBankImages();
+  /** Update and delete replays: action:id:requestKey -> the version it produced. */
+  const handled = new Map<string, number>();
+  const toRow = ({ requestKey: _key, requestHash: _hash, file: _file, ...row }: MemoryBankImage): BankImageRow => ({
+    ...row,
+    tags: [...row.tags],
+  });
+  const asFacts = (): Fact[] =>
+    facts.map((f) => ({ ...f, user_id: 'memory', source_reference: {}, created_at: '', updated_at: '' }) as Fact);
 
   function toPastReply(reply: MemoryReply): PastReply {
     return {
@@ -725,8 +815,148 @@ export function createMemoryStore(): Store {
         target.sensitivity = fields.sensitivity;
       }
       if (typeof fields.active === 'boolean') target.active = fields.active;
+      if (fields.valid_from === null || typeof fields.valid_from === 'string') target.valid_from = fields.valid_from;
+      if (fields.valid_to === null || typeof fields.valid_to === 'string') target.valid_to = fields.valid_to;
 
       return { id: target.id, version: target.version };
+    },
+
+    async suggestions({ sessionId, factIds }) {
+      const session = sessions.get(sessionId);
+      if (!session) throw new AppError('not_found', 'That is not available.');
+      const text = session.sourceText;
+      const bank: ImageCandidate[] = bankImages
+        .filter((image) => image.active && image.status === 'ready')
+        .map((image) => ({
+          id: image.id,
+          source: 'bank' as const,
+          title: image.title,
+          alt_text: image.alt_text,
+          tags: image.tags,
+          brief: '',
+          url: `/api/replies/images/${image.id}/file`,
+        }));
+      const attached = SEED_POSTS.flatMap((post) => postImageCandidate(post) ?? []);
+      return {
+        facts: suggestFacts({ facts: asFacts(), queryText: text, explicitIds: factIds, now: new Date() }),
+        posts: rankLibraryPosts(text, SEED_POSTS),
+        images: rankImages(text, [...bank, ...attached]),
+      };
+    },
+
+    async contextExtras({ factIds, excludedFactIds, postIds }) {
+      const now = new Date();
+      const pool = asFacts();
+      return {
+        facts: pool
+          .filter((f) => factIds.includes(f.id) && isEligibleForSuggestion(f, now))
+          .map((f) => ({ id: f.id, version: f.version, text: f.fact_text })),
+        excluded: pool.filter((f) => excludedFactIds.includes(f.id)).map((f) => ({ id: f.id, text: f.fact_text })),
+        posts: SEED_POSTS.filter((p) => postIds.includes(p.library_id)).map((p) => ({
+          id: p.library_id,
+          text: postContextText(p),
+        })),
+      };
+    },
+
+    async getSuggestion(sessionId, ideaId) {
+      for (const run of runs) {
+        if (run.sessionId !== sessionId) continue;
+        const idea = suggestions.get(run.id)?.find((candidate) => candidate.id === ideaId);
+        if (idea) {
+          return {
+            reply_text: idea.reply_text,
+            english_meaning: idea.english_meaning,
+            uses_fact_ids: idea.uses_fact_ids,
+          };
+        }
+      }
+      return null;
+    },
+
+    async listBankImages() {
+      return bankImages.map(toRow);
+    },
+
+    async getBankImage(id) {
+      const found = bankImages.find((image) => image.id === id);
+      return found ? toRow(found) : null;
+    },
+
+    async readBankImageFile(id) {
+      const found = bankImages.find((image) => image.id === id && image.status === 'ready');
+      return found?.file ? { bytes: found.file.bytes, mime: found.file.mime } : null;
+    },
+
+    async createBankImage(input: BankImageCreate) {
+      const existing = bankImages.find((image) => image.requestKey === input.requestKey);
+      if (existing) {
+        if (existing.requestHash !== input.requestHash) {
+          throw new AppError('idempotency_conflict', 'This save was already handled with different details.');
+        }
+        return { id: existing.id, version: existing.version, replayed: true };
+      }
+      const row: MemoryBankImage = {
+        id: randomUUID(),
+        version: 1,
+        title: input.title,
+        alt_text: input.altText,
+        tags: [...input.tags],
+        origin: input.origin,
+        status: input.status,
+        mime_type: input.file?.mime ?? null,
+        byte_size: input.file?.bytes.length ?? 0,
+        sketch: input.sketch,
+        brief: input.brief,
+        sketch_approved_hash: null,
+        active: true,
+        requestKey: input.requestKey,
+        requestHash: input.requestHash,
+        file: input.file,
+      };
+      bankImages.push(row);
+      return { id: row.id, version: row.version, replayed: false };
+    },
+
+    async updateBankImage(input: BankImageUpdate) {
+      const ledger = `${input.action}:${input.id}:${input.requestKey}`;
+      const target = bankImages.find((image) => image.id === input.id);
+      if (!target) throw new AppError('not_found', 'That is not available.');
+      const replay = handled.get(ledger);
+      if (replay !== undefined) return { id: target.id, version: replay };
+      if (target.version !== input.expectedVersion) {
+        throw new AppError('version_conflict', 'This changed somewhere else. Reload before saving.');
+      }
+      const c = input.changes;
+      if (c.title !== undefined) target.title = c.title;
+      if (c.alt_text !== undefined) target.alt_text = c.alt_text;
+      if (c.tags !== undefined) target.tags = [...c.tags];
+      if (c.active !== undefined) target.active = c.active;
+      if (c.sketch !== undefined) target.sketch = c.sketch;
+      if (c.sketch_approved_hash !== undefined) target.sketch_approved_hash = c.sketch_approved_hash;
+      if (input.file) {
+        target.file = input.file;
+        target.mime_type = input.file.mime;
+        target.byte_size = input.file.bytes.length;
+        target.status = 'ready';
+      }
+      target.version += 1;
+      handled.set(ledger, target.version);
+      return { id: target.id, version: target.version };
+    },
+
+    async deleteBankImage({ id, expectedVersion, requestKey }) {
+      const ledger = `delete:${id}:${requestKey}`;
+      const index = bankImages.findIndex((image) => image.id === id);
+      if (index < 0) {
+        if (handled.has(ledger)) return;
+        throw new AppError('not_found', 'That is not available.');
+      }
+      if (bankImages[index]!.version !== expectedVersion) {
+        throw new AppError('version_conflict', 'This changed somewhere else. Reload before deleting.');
+      }
+      bankImages.splice(index, 1);
+      handled.set(ledger, expectedVersion);
     },
 
     async getSettings() {

@@ -7,7 +7,7 @@ export const ROUTES = [
   '/', '/backlog', '/backlog?view=ideas', '/review', '/review?layout=cards',
   '/ready', '/schedule', '/schedule?view=month&month=2026-10',
   '/schedule?view=list&week=2026-10-01', '/published', '/visuals', '/reconcile',
-  '/login', '/replies', '/replies/library', '/replies/resources', '/replies/facts', '/replies/settings',
+  '/login', '/replies', '/replies/library', '/replies/resources', '/replies/facts', '/replies/images', '/replies/settings',
   '/review/SYN-L001', '/visuals/SYN-L012', '/published/2026-10-01-MAIN-X',
   '/schedule/2026-10-02-MAIN-X', '/schedule/2026-10-03-MAIN-X/adapt',
   '/ready/SYN-L005/promote?slot=2026-10-01-MAIN-LI',

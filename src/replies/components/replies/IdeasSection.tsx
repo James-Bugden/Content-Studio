@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button, Card, Meta, Pill, ReplyText, SectionHeading, StatusLine } from './primitives';
 import { IDEAS } from '@/replies/lib/workspace/copy';
 import { needsEnglishMeaning, type Platform } from '@/replies/lib/contracts/vocabulary';
@@ -25,12 +25,15 @@ function IdeaCard({
   isSuggested,
   platform,
   resourceTitle,
+  sources,
   onUse,
 }: {
   idea: ReplyIdea;
   isSuggested: boolean;
   platform: Platform;
   resourceTitle: string | null;
+  /** The Used / More suggestions panel for this idea, when suggestions are on. */
+  sources?: ReactNode;
   onUse(idea: ReplyIdea): void;
 }) {
   const [showMeaning, setShowMeaning] = useState(false);
@@ -61,6 +64,8 @@ function IdeaCard({
           {IDEAS.use}
         </Button>
       </div>
+
+      {sources}
     </Card>
   );
 }
@@ -69,11 +74,13 @@ export interface IdeasSectionProps {
   state: IdeasState;
   platform: Platform;
   resources: QualifiedResource[];
+  /** Optional: the sources panel to show under an idea. */
+  renderSources?(idea: ReplyIdea): ReactNode;
   onUse(idea: ReplyIdea): void;
   onRetry(): void;
 }
 
-export function IdeasSection({ state, platform, resources, onUse, onRetry }: IdeasSectionProps) {
+export function IdeasSection({ state, platform, resources, renderSources, onUse, onRetry }: IdeasSectionProps) {
   const titleFor = (id: string | null) => resources.find((r) => r.id === id)?.title ?? null;
 
   return (
@@ -115,6 +122,7 @@ export function IdeasSection({ state, platform, resources, onUse, onRetry }: Ide
                 isSuggested={index === state.suggestedIndex}
                 platform={platform}
                 resourceTitle={titleFor(idea.resource_id)}
+                sources={renderSources?.(idea)}
                 onUse={onUse}
               />
             ))}

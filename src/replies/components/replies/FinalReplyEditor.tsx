@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Button, Card, Meta, ReplyText, SectionHeading, StatusLine } from './primitives';
 import { FormatToolbar } from './FormatToolbar';
 import { EDITOR, MEANING } from '@/replies/lib/workspace/copy';
@@ -28,6 +28,8 @@ export interface FinalReplyEditorProps {
   hasInsertedResource: boolean;
   canAddPersonalExample: boolean;
   refining: boolean;
+  /** The Used / More suggestions panel for the draft, when suggestions are on. */
+  sources?: ReactNode;
   /** Shown when a rewrite was refused or failed, so a dead press is explained. */
   notice: string | null;
   onChange(value: string): void;
@@ -112,6 +114,8 @@ export function FinalReplyEditor(props: FinalReplyEditorProps) {
       </div>
 
       {props.notice ? <StatusLine tone="error">{props.notice}</StatusLine> : null}
+
+      {props.sources}
 
       {props.proposal ? (
         <Card className="mt-3 border-green bg-green-soft">

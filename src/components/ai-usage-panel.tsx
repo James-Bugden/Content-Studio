@@ -4,7 +4,7 @@ import { aiUsageSchema, type AiUsage } from '@/domain/ai-usage';
 import { AiUsageMeter, aiMoney } from './ai-usage-meter';
 import { buttonClass } from './button-styles';
 
-const FEATURES = { image_check: 'Check images', ascii_sketch: 'ASCII sketch', image_render: 'Create image', image_need: 'Image check', english_qa: 'Check English', hooks: 'Hooks', zh_tw: 'Chinese adapt', zh_qa: 'Chinese check',
+const FEATURES = { image_check: 'Check images', ascii_sketch: 'ASCII sketch', image_render: 'Create image', image_need: 'Image check', bank_image_tags: 'Image tags', english_qa: 'Check English', hooks: 'Hooks', zh_tw: 'Chinese adapt', zh_qa: 'Chinese check',
   replies_ideas: 'Reply ideas', replies_rewrite: 'Reply rewrite', replies_translation: 'Reply translation', embeddings: 'Embeddings' };
 export function AiUsagePanel() {
   const [usage, setUsage] = useState<AiUsage | null>(null);

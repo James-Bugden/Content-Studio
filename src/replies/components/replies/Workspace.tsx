@@ -9,13 +9,51 @@ import { ResourcesSection } from './ResourcesSection';
 import { IdeasSection } from './IdeasSection';
 import { FinalReplyEditor, FINAL_EDITOR_ID } from './FinalReplyEditor';
 import { ActionStrip } from './ActionStrip';
-import { EDITOR } from '@/replies/lib/workspace/copy';
+import { ImageSuggestionsSection } from './ImageSuggestionsSection';
+import { SourcesPanel, type SourceItem } from './SourcesPanel';
+import { EDITOR, SOURCES } from '@/replies/lib/workspace/copy';
+import {
+  addSource,
+  canAdd,
+  commit,
+  currentSources,
+  delta,
+  emptySelection,
+  moreSuggestions,
+  removeSource,
+  type SourceSelection,
+} from '@/replies/lib/suggestions/used';
 import { initialState, isEditedSinceCopy, workspaceReducer } from '@/replies/lib/workspace/reducer';
 import { api, ApiError, newOperationKey } from '@/replies/lib/workspace/client';
 import { forgetDraft, recallDraft, rememberDraft } from '@/replies/lib/workspace/recovery';
 import { contentHash } from '@/replies/lib/contracts/text';
 import type { Platform } from '@/replies/lib/contracts/vocabulary';
-import type { Progress, QualifiedResource, ReplyIdea } from '@/replies/lib/contracts/api';
+import type {
+  Progress,
+  QualifiedResource,
+  ReplyIdea,
+  SuggestedFact,
+  SuggestedImage,
+  SuggestedPost,
+} from '@/replies/lib/contracts/api';
+
+/** Facts, earlier posts and images that fit the pasted post (#245). */
+interface SuggestionPool {
+  status: 'idle' | 'loading' | 'ready' | 'failed';
+  facts: SuggestedFact[];
+  posts: SuggestedPost[];
+  images: SuggestedImage[];
+}
+
+const NO_SUGGESTIONS: SuggestionPool = { status: 'idle', facts: [], posts: [], images: [] };
+
+/** The editor's own sources scope. Ideas use their own id. */
+const DRAFT_SCOPE = 'draft';
+
+function withoutScope(selections: Record<string, SourceSelection>, scope: string): Record<string, SourceSelection> {
+  const { [scope]: _dropped, ...rest } = selections;
+  return rest;
+}
 
 /**
  * The workspace (D01, D04, UX-03).
@@ -49,6 +87,13 @@ export function Workspace({
   const [sourceExpanded, setSourceExpanded] = useState(false);
   const [ideaSave, setIdeaSave] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const router = useRouter();
+
+  const [suggestions, setSuggestions] = useState<SuggestionPool>(NO_SUGGESTIONS);
+  const [selections, setSelections] = useState<Record<string, SourceSelection>>({});
+  const [sourceBusy, setSourceBusy] = useState<string | null>(null);
+  const [sourceNotice, setSourceNotice] = useState<{ scope: string; text: string } | null>(null);
+  /** The source change whose rewrite preview is on screen, if any. */
+  const pendingSources = useRef<{ scope: string; selection: SourceSelection; previous: SourceSelection } | null>(null);
 
   const generationAbort = useRef<AbortController | null>(null);
   const lastSyncedDraft = useRef<string>('');
@@ -130,6 +175,28 @@ export function Workspace({
     return () => window.removeEventListener('focus', refresh);
   }, []);
 
+  /**
+   * Looks up facts, earlier posts and images. It is a search, so it costs nothing
+   * and runs on the same click as the ideas. A failure leaves the rest of the screen
+   * exactly as it was: suggestions are an extra, never a dependency.
+   */
+  const loadSuggestions = useCallback(async (sessionId: string, factIds: string[], reset: boolean) => {
+    if (reset) setSuggestions({ ...NO_SUGGESTIONS, status: 'loading' });
+    try {
+      const found = await api.suggestions({
+        session_id: sessionId,
+        ...(factIds.length > 0 ? { fact_ids: factIds } : {}),
+      });
+      setSuggestions((previous) => {
+        const known = reset ? [] : previous.facts;
+        const merged = [...known, ...found.facts.filter((fact) => !known.some((k) => k.id === fact.id))];
+        return { status: 'ready', facts: merged, posts: found.posts, images: found.images };
+      });
+    } catch {
+      setSuggestions((previous) => (previous.status === 'loading' ? { ...previous, status: 'failed' } : previous));
+    }
+  }, []);
+
   const runGeneration = useCallback(
     async (sessionId: string, sourceVersion: number, contextVersion: number, seedReplyIds: string[]) => {
       generationAbort.current?.abort();
@@ -155,6 +222,9 @@ export function Workspace({
           suggestedIndex: result.suggested_index,
           warnings: result.repetition_warning ? [result.repetition_warning] : [],
         });
+        // The facts an idea cites need their text to be shown under "Used".
+        const cited = [...new Set(result.ideas.flatMap((idea) => idea.uses_fact_ids))];
+        if (cited.length > 0) void loadSuggestions(sessionId, cited, false);
       } catch (error) {
         if (controller.signal.aborted) return;
         const code =
@@ -179,7 +249,7 @@ export function Workspace({
         });
       }
     },
-    [],
+    [loadSuggestions],
   );
 
   const analyse = useCallback(async () => {
@@ -214,6 +284,12 @@ export function Workspace({
         },
       });
 
+      // A new post is a new set of sources: nothing from the last one carries over.
+      pendingSources.current = null;
+      setSelections({});
+      setSourceNotice(null);
+      void loadSuggestions(result.session_id, [], true);
+
       // Retrieval renders first; generation follows for a post or comment target.
       // A model outage from here on cannot remove what has already been shown.
       if (result.generation_expected) {
@@ -224,9 +300,24 @@ export function Workspace({
     } finally {
       setBusy(false);
     }
-  }, [state.platform, state.targetKind, state.sourceText, state.parentText, state.sourceUrl, runGeneration]);
+  }, [
+    state.platform,
+    state.targetKind,
+    state.sourceText,
+    state.parentText,
+    state.sourceUrl,
+    runGeneration,
+    loadSuggestions,
+  ]);
 
   const onDraftChange = useCallback((value: string) => {
+    // Typing makes a pending rewrite preview stale (the reducer drops it), so the
+    // source change that preview carried is dropped with it.
+    const pending = pendingSources.current;
+    if (pending) {
+      pendingSources.current = null;
+      setSelections((current) => ({ ...current, [pending.scope]: pending.previous }));
+    }
     dispatch({ type: 'edit_draft', value, hash: contentHash(value) });
   }, []);
 
@@ -361,7 +452,111 @@ export function Workspace({
     }
   }, [state.sessionId, state.editorVersion, state.draft, state.insertedResource]);
 
-  const onUseIdea = useCallback((idea: ReplyIdea) => dispatch({ type: 'use_idea', idea }), []);
+  const onUseIdea = useCallback(
+    (idea: ReplyIdea) => {
+      // A pristine editor is filled directly, so the reply now draws on what the
+      // idea drew on. A dirty one gets a preview, and this is decided on Apply.
+      if (!state.dirty && state.draft.trim() === '') {
+        setSelections((previous) => ({
+          ...withoutScope(previous, idea.id),
+          [DRAFT_SCOPE]: emptySelection({ facts: idea.uses_fact_ids }),
+        }));
+      }
+      dispatch({ type: 'use_idea', idea });
+    },
+    [state.dirty, state.draft],
+  );
+
+  const onAcceptProposal = useCallback(() => {
+    const pending = pendingSources.current;
+    if (pending) {
+      // The rewrite that was previewed becomes the reply, so its sources are now
+      // what the reply draws on.
+      pendingSources.current = null;
+      setSelections((previous) => ({
+        ...withoutScope(previous, pending.scope),
+        [DRAFT_SCOPE]: commit(pending.selection),
+      }));
+    } else if (state.proposal?.origin === 'idea' && state.proposal.ideaId) {
+      const proposedId = state.proposal.ideaId;
+      const idea = state.ideas.status === 'ready' ? state.ideas.ideas.find((candidate) => candidate.id === proposedId) : null;
+      if (idea) {
+        setSelections((previous) => ({
+          ...previous,
+          [DRAFT_SCOPE]: emptySelection({ facts: idea.uses_fact_ids }),
+        }));
+      }
+    }
+    dispatch({ type: 'accept_proposal', hash: draftHash });
+  }, [state.proposal, state.ideas, draftHash]);
+
+  const onRejectProposal = useCallback(() => {
+    const pending = pendingSources.current;
+    if (pending) {
+      // Keep my reply: the change of sources was only ever a proposal.
+      pendingSources.current = null;
+      setSelections((current) => ({ ...current, [pending.scope]: pending.previous }));
+    }
+    dispatch({ type: 'reject_proposal' });
+  }, []);
+
+  /**
+   * An x or a + under an idea or the editor (#245).
+   *
+   * Either click asks the existing rewrite endpoint for a preview with the changed
+   * set of sources. The editor is not touched. If the request fails, the selection
+   * goes back to what it was and the owner is told, so the panel never shows a state
+   * the reply does not have.
+   */
+  const changeSources = useCallback(
+    async (scope: string, idea: ReplyIdea | null, previous: SourceSelection, next: SourceSelection) => {
+      if (!state.sessionId || sourceBusy !== null) return;
+      setSelections((current) => ({ ...current, [scope]: next }));
+      setSourceBusy(scope);
+      setSourceNotice(null);
+      const changed = delta(next);
+      try {
+        const result = await api.refine({
+          session_id: state.sessionId,
+          expected_editor_version: state.editorVersion,
+          action: 'use_sources',
+          request_key: newOperationKey(),
+          ...(changed.extra_fact_ids.length > 0 ? { extra_fact_ids: changed.extra_fact_ids } : {}),
+          ...(changed.extra_post_ids.length > 0 ? { extra_post_ids: changed.extra_post_ids } : {}),
+          ...(changed.excluded_fact_ids.length > 0 ? { excluded_fact_ids: changed.excluded_fact_ids } : {}),
+          ...(idea ? { idea_id: idea.id } : {}),
+        });
+        // The reducer drops a proposal computed from an older editor version. If
+        // that is about to happen, say so instead of leaving a change nobody can see.
+        if (result.base_editor_version !== state.editorVersion) throw new Error('stale');
+        pendingSources.current = { scope, selection: next, previous };
+        dispatch({
+          type: 'propose',
+          proposal: {
+            text: result.proposed_text,
+            baseEditorVersion: result.base_editor_version,
+            origin: idea ? 'idea' : 'refine',
+            ideaId: idea?.id ?? null,
+          },
+        });
+      } catch (error) {
+        setSelections((current) => ({ ...current, [scope]: previous }));
+        const code = error instanceof ApiError ? error.envelope.code : null;
+        setSourceNotice({
+          scope,
+          text:
+            code === 'withheld_unsafe'
+              ? SOURCES.withheld
+              : code === 'monthly_ai_limit_reached'
+                ? SOURCES.limit
+                : SOURCES.failed,
+        });
+      } finally {
+        setSourceBusy(null);
+      }
+    },
+    [state.sessionId, state.editorVersion, sourceBusy],
+  );
 
   const onSaveAsContentIdea = useCallback(async () => {
     if (state.save.status !== 'saved') return;
@@ -424,6 +619,103 @@ export function Workspace({
     [draftHash],
   );
 
+  const factsById = useMemo(() => new Map(suggestions.facts.map((fact) => [fact.id, fact])), [suggestions.facts]);
+  const postsById = useMemo(() => new Map(suggestions.posts.map((post) => [post.id, post])), [suggestions.posts]);
+
+  const factItem = useCallback(
+    (id: string): SourceItem => {
+      const fact = factsById.get(id);
+      return { kind: 'fact', id, text: fact?.text ?? SOURCES.unknownFact, isPrivate: fact?.private ?? false };
+    },
+    [factsById],
+  );
+  const postItem = useCallback(
+    (id: string): SourceItem => {
+      const post = postsById.get(id);
+      return {
+        kind: 'post',
+        id,
+        text: post?.title ?? id,
+        openHref: `/review/${encodeURIComponent(id)}`,
+        ...(post ? { copyText: post.text } : {}),
+      };
+    },
+    [postsById],
+  );
+
+  const selectionFor = useCallback(
+    (scope: string, base: { facts?: string[] }): SourceSelection => selections[scope] ?? emptySelection(base),
+    [selections],
+  );
+
+  const suggestionsLoading = suggestions.status === 'loading';
+
+  /** The panel under an idea. Guides are inserted from the editor, not from here. */
+  const renderIdeaSources = (idea: ReplyIdea) => {
+    if (suggestions.status === 'idle') return null;
+    const selection = selectionFor(idea.id, { facts: idea.uses_fact_ids });
+    const used = currentSources(selection);
+    const more = moreSuggestions({ facts: suggestions.facts, posts: suggestions.posts }, used);
+    const change = (next: SourceSelection) => void changeSources(idea.id, idea, selection, next);
+    return (
+      <SourcesPanel
+        scopeLabel={idea.angle_label}
+        used={[...used.facts.map(factItem), ...used.posts.map(postItem)]}
+        more={[...more.facts.map((fact) => factItem(fact.id)), ...more.posts.map((post) => postItem(post.id))]}
+        busy={sourceBusy !== null}
+        loadingMore={suggestionsLoading}
+        notice={sourceNotice?.scope === idea.id ? sourceNotice.text : null}
+        onRemove={(item) => item.kind !== 'guide' && change(removeSource(selection, item.kind, item.id))}
+        onAdd={(item) => {
+          if (item.kind !== 'guide' && canAdd(selection, item.kind)) change(addSource(selection, item.kind, item.id));
+        }}
+      />
+    );
+  };
+
+  /** The panel under the editor: the reply as it stands, including an inserted guide. */
+  const renderDraftSources = () => {
+    if (!state.sessionId || suggestions.status === 'idle') return null;
+    const selection = selectionFor(DRAFT_SCOPE, {});
+    const used = currentSources(selection);
+    const more = moreSuggestions({ facts: suggestions.facts, posts: suggestions.posts }, used);
+    const inserted = state.insertedResource;
+    const guideTitle = (id: string) => state.resources.items.find((resource) => resource.id === id)?.title ?? SOURCES.guide;
+    const otherGuides = state.resources.items.filter((resource) => resource.id !== inserted?.resourceId);
+    const change = (next: SourceSelection) => void changeSources(DRAFT_SCOPE, null, selection, next);
+    return (
+      <SourcesPanel
+        scopeLabel={EDITOR.heading}
+        used={[
+          ...(inserted ? [{ kind: 'guide' as const, id: inserted.resourceId, text: guideTitle(inserted.resourceId) }] : []),
+          ...used.facts.map(factItem),
+          ...used.posts.map(postItem),
+        ]}
+        more={[
+          ...more.facts.map((fact) => factItem(fact.id)),
+          ...more.posts.map((post) => postItem(post.id)),
+          ...otherGuides.map((resource): SourceItem => ({ kind: 'guide', id: resource.id, text: resource.title })),
+        ]}
+        busy={sourceBusy !== null}
+        loadingMore={suggestionsLoading}
+        notice={sourceNotice?.scope === DRAFT_SCOPE ? sourceNotice.text : null}
+        onRemove={(item) => {
+          if (item.kind === 'guide') dispatch({ type: 'remove_resource', hash: draftHash });
+          else change(removeSource(selection, item.kind, item.id));
+        }}
+        onAdd={(item) => {
+          if (item.kind === 'guide') {
+            // The link goes in the text, by the one convention Add to reply uses.
+            const resource = state.resources.items.find((candidate) => candidate.id === item.id);
+            if (resource) onAddResource(resource);
+          } else if (canAdd(selection, item.kind)) {
+            change(addSource(selection, item.kind, item.id));
+          }
+        }}
+      />
+    );
+  };
+
   return (
     <>
       <AppHeader progress={state.progress} />
@@ -481,6 +773,7 @@ export function Workspace({
           state={state.ideas}
           platform={state.platform}
           resources={state.resources.items}
+          renderSources={renderIdeaSources}
           onUse={onUseIdea}
           onRetry={() => {
             if (state.sessionId) {
@@ -501,12 +794,25 @@ export function Workspace({
           notice={refineNotice}
           onChange={onDraftChange}
           onRefine={onRefine}
-          onAcceptProposal={() => dispatch({ type: 'accept_proposal', hash: draftHash })}
-          onRejectProposal={() => dispatch({ type: 'reject_proposal' })}
+          sources={renderDraftSources()}
+          onAcceptProposal={onAcceptProposal}
+          onRejectProposal={onRejectProposal}
           onRemoveResource={() => dispatch({ type: 'remove_resource', hash: draftHash })}
           onUndo={() => dispatch({ type: 'undo' })}
           onRefreshMeaning={onRefreshMeaning}
         />
+
+        {state.sessionId && suggestions.status !== 'idle' ? (
+          <ImageSuggestionsSection
+            status={suggestions.status}
+            images={suggestions.images}
+            platform={state.platform}
+            sourceText={state.sourceText}
+            onCreated={() => {
+              if (state.sessionId) void loadSuggestions(state.sessionId, [], false);
+            }}
+          />
+        ) : null}
 
         <div className="mb-4">
           <a href="#your-reply" className="text-meta text-ink-soft underline">
@@ -532,6 +838,10 @@ export function Workspace({
           forgetDraft();
           lastSyncedDraft.current = '';
           setIdeaSave('idle');
+          pendingSources.current = null;
+          setSelections({});
+          setSuggestions(NO_SUGGESTIONS);
+          setSourceNotice(null);
           dispatch({ type: 'next_reply' });
         }}
       />
