@@ -4,12 +4,13 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { TransferImage } from '@/components/image-transfer';
 import { Button, Card, Meta, Pill, SectionHeading, StatusLine } from '@/replies/components/replies/primitives';
 import { CreateImagePanel } from '@/replies/components/images/CreateImagePanel';
-import { BANK_ADMIN, IMAGE_SUGGESTIONS } from '@/replies/lib/workspace/copy';
+import { BANK_ADMIN } from '@/replies/lib/workspace/copy';
 import { parseTagInput } from '@/replies/lib/images/tags';
-import { BANK_IMAGE_MAX_BYTES, UPLOAD_REFUSAL, validateBankUpload } from '@/replies/lib/images/validate';
 import { ApiError } from '@/replies/lib/workspace/client';
 import type { BankImage } from '@/replies/lib/contracts/api';
 import { adminApi } from './adminApi';
+import { ImageDropZone } from './ImageDropZone';
+import { UploadQueue } from './UploadQueue';
 
 /**
  * Image bank administration (#245).
@@ -17,10 +18,11 @@ import { adminApi } from './adminApi';
  * The same shape as the Facts and Resources pages: a list, an add form, an edit in
  * place, and a version on every change so a stale form cannot overwrite a newer one.
  *
- * Adding an image is two steps the owner stays in charge of. Choosing a file shows a
- * preview and, if asked, one small AI call proposes a title, alt text and tags. All
- * three are ordinary fields the owner edits before pressing Save. Saving sends the
- * file once, with a request key that is reused if Save is pressed again.
+ * Adding images (#246) starts at the drop zone (click, drop or paste). Each file gets
+ * a review row in `UploadQueue`: a preview and, if asked, one small AI call proposes a
+ * title, alt text and tags. All three are ordinary fields the owner edits before
+ * pressing Save. Saving sends the file once, with a request key that is reused if
+ * Save is pressed again.
  */
 
 function problem(error: unknown, fallback: string): string {
@@ -31,217 +33,6 @@ function problem(error: unknown, fallback: string): string {
     return error.envelope.message;
   }
   return fallback;
-}
-
-function AddForm({ onSaved, onCancel }: { onSaved(): Promise<void>; onCancel(): void }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [alt, setAlt] = useState('');
-  const [tags, setTags] = useState('');
-  const [hint, setHint] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
-  /** One key per Save attempt, kept until it succeeds, so a repeat is a replay. */
-  const saveKey = useRef<string | null>(null);
-  const suggestKey = useRef<string | null>(null);
-  const fileId = useId();
-  const titleId = useId();
-  const altId = useId();
-  const tagsId = useId();
-  const hintId = useId();
-
-  useEffect(() => {
-    document.getElementById(fileId)?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** The object URL for the chosen file's local preview, released when replaced. */
-  const preview = useRef<string | null>(null);
-  useEffect(
-    () => () => {
-      if (preview.current) URL.revokeObjectURL(preview.current);
-    },
-    [],
-  );
-
-  function showPreview(next: File | null) {
-    if (preview.current) URL.revokeObjectURL(preview.current);
-    preview.current = next ? URL.createObjectURL(next) : null;
-    setPreviewUrl(preview.current);
-  }
-
-  async function choose(next: File | null) {
-    setError(null);
-    setNote(null);
-    saveKey.current = null;
-    suggestKey.current = null;
-    if (!next) {
-      setFile(null);
-      showPreview(null);
-      return;
-    }
-    // The server checks again. This is only so a wrong file is refused before a
-    // 5 MB upload rather than after it.
-    const bytes = new Uint8Array(await next.arrayBuffer());
-    const verdict = validateBankUpload({ bytes, declaredType: next.type });
-    if (!verdict.ok) {
-      setFile(null);
-      showPreview(null);
-      setError(UPLOAD_REFUSAL[verdict.reason]);
-      return;
-    }
-    setFile(next);
-    showPreview(next);
-    if (!title) setTitle(next.name.replace(/\.[A-Za-z0-9]+$/, '').replace(/[-_]+/g, ' ').trim());
-  }
-
-  async function suggest() {
-    if (!file) return;
-    setSuggesting(true);
-    setError(null);
-    setNote(null);
-    suggestKey.current ??= crypto.randomUUID();
-    try {
-      const result = await adminApi.suggestImageMeta({
-        request_key: suggestKey.current,
-        file_name: file.name.slice(0, 200),
-        ...(hint.trim() ? { hint: hint.trim() } : {}),
-      });
-      suggestKey.current = null;
-      setTitle(result.title);
-      setAlt(result.alt_text);
-      setTags(result.tags.join(', '));
-      setNote(BANK_ADMIN.suggested);
-    } catch (caught) {
-      setError(problem(caught, BANK_ADMIN.notSetUp));
-    } finally {
-      setSuggesting(false);
-    }
-  }
-
-  async function save() {
-    if (!file) {
-      setError(BANK_ADMIN.chooseFile);
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    saveKey.current ??= crypto.randomUUID();
-    const form = new FormData();
-    form.set('file', file);
-    form.set('request_key', saveKey.current);
-    form.set('title', title);
-    form.set('alt_text', alt);
-    form.set('tags', tags);
-    try {
-      await adminApi.uploadImage(form);
-      saveKey.current = null;
-      await onSaved();
-    } catch (caught) {
-      setError(problem(caught, BANK_ADMIN.saveFailed));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card className="mb-4">
-      <SectionHeading>{BANK_ADMIN.addTitle}</SectionHeading>
-      <div className="space-y-3">
-        <div>
-          <label htmlFor={fileId} className="mb-1 block text-meta font-medium">
-            {BANK_ADMIN.file}
-          </label>
-          <input
-            id={fileId}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => void choose(event.target.files?.[0] ?? null)}
-            className="block w-full text-meta"
-          />
-          <Meta className="mt-1">{BANK_ADMIN.subheading}</Meta>
-        </div>
-
-        {previewUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a local preview of the chosen file
-          <img src={previewUrl} alt="" className="max-h-48 max-w-full rounded-md border border-hairline object-contain" />
-        ) : null}
-
-        <div>
-          <label htmlFor={hintId} className="mb-1 block text-meta font-medium">
-            {BANK_ADMIN.hint}
-          </label>
-          <input
-            id={hintId}
-            type="text"
-            value={hint}
-            maxLength={500}
-            onChange={(event) => setHint(event.target.value)}
-            className="w-full rounded-md border border-border-input bg-card px-3 py-2 text-meta"
-          />
-          <Meta className="mt-1">{BANK_ADMIN.hintHelp}</Meta>
-          <Button className="mt-2" disabled={!file || suggesting} onClick={() => void suggest()}>
-            {suggesting ? BANK_ADMIN.suggesting : BANK_ADMIN.suggest}
-          </Button>
-          {note ? <StatusLine>{note}</StatusLine> : null}
-        </div>
-
-        <div>
-          <label htmlFor={titleId} className="mb-1 block text-meta font-medium">
-            {BANK_ADMIN.title}
-          </label>
-          <input
-            id={titleId}
-            type="text"
-            value={title}
-            maxLength={200}
-            onChange={(event) => setTitle(event.target.value)}
-            className="w-full rounded-md border border-border-input bg-card px-3 py-2 text-meta"
-          />
-        </div>
-        <div>
-          <label htmlFor={altId} className="mb-1 block text-meta font-medium">
-            {BANK_ADMIN.altText}
-          </label>
-          <textarea
-            id={altId}
-            value={alt}
-            rows={2}
-            maxLength={500}
-            onChange={(event) => setAlt(event.target.value)}
-            className="w-full resize-y rounded-md border border-border-input bg-card p-3 text-meta"
-          />
-        </div>
-        <div>
-          <label htmlFor={tagsId} className="mb-1 block text-meta font-medium">
-            {BANK_ADMIN.tags}
-          </label>
-          <input
-            id={tagsId}
-            type="text"
-            value={tags}
-            onChange={(event) => setTags(event.target.value)}
-            className="w-full rounded-md border border-border-input bg-card px-3 py-2 text-meta"
-          />
-          <Meta className="mt-1">{BANK_ADMIN.tagsHint}</Meta>
-        </div>
-
-        {error ? <StatusLine tone="error">{error}</StatusLine> : null}
-
-        <div className="flex flex-wrap gap-2">
-          <Button variant="primary" size="primary" disabled={saving || !file || title.trim() === ''} onClick={() => void save()}>
-            {saving ? BANK_ADMIN.saving : BANK_ADMIN.save}
-          </Button>
-          <Button variant="quiet" onClick={onCancel}>
-            {BANK_ADMIN.cancel}
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
 }
 
 function EditForm({
@@ -354,11 +145,15 @@ function EditForm({
 
 export interface ImageAdminProps {
   initial: BankImage[];
+  /** Server-provided: false when the image renderer has no secret or adapter. Never the secret itself. */
+  rendererReady?: boolean;
 }
 
-export function ImageAdmin({ initial }: ImageAdminProps) {
+export function ImageAdmin({ initial, rendererReady = true }: ImageAdminProps) {
   const [items, setItems] = useState(initial);
-  const [mode, setMode] = useState<'closed' | 'add' | 'create'>('closed');
+  const [creating, setCreating] = useState(false);
+  const [incoming, setIncoming] = useState<{ batch: number; files: File[] } | null>(null);
+  const batch = useRef(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -392,51 +187,50 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
       {status ? <StatusLine>{status}</StatusLine> : null}
       {error ? <StatusLine tone="error">{error}</StatusLine> : null}
 
-      {mode === 'add' ? (
-        <AddForm
-          onCancel={() => setMode('closed')}
-          onSaved={async () => {
-            await refresh();
-            setMode('closed');
-            setStatus(BANK_ADMIN.saved);
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+        <ImageDropZone
+          onFiles={(files) => {
+            setStatus(null);
+            batch.current += 1;
+            setIncoming({ batch: batch.current, files });
           }}
         />
-      ) : null}
-
-      {mode === 'create' ? (
-        <CreateImagePanel
-          platform="linkedin"
-          onClose={() => setMode('closed')}
-          onCreated={() => void refresh()}
-        />
-      ) : null}
-
-      {mode === 'closed' ? (
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="sm:w-60">
           <Button
-            variant="primary"
             size="primary"
-            onClick={() => {
-              setStatus(null);
-              setMode('add');
-            }}
+            className="w-full"
+            disabled={!rendererReady || creating}
+            aria-describedby="images-create-note"
+            onClick={() => setCreating(true)}
           >
-            {BANK_ADMIN.add}
+            {BANK_ADMIN.createWithAi}
           </Button>
-          <Button size="primary" onClick={() => setMode('create')}>
-            {IMAGE_SUGGESTIONS.createNew}
-          </Button>
+          <Meta className="mt-1">
+            <span id="images-create-note">{rendererReady ? BANK_ADMIN.createExplainer : BANK_ADMIN.rendererOff}</span>
+          </Meta>
         </div>
+      </div>
+
+      <UploadQueue
+        incoming={incoming}
+        onSaved={async (count) => {
+          await refresh();
+          setStatus(count === 1 ? BANK_ADMIN.saved : BANK_ADMIN.savedMany(count));
+        }}
+      />
+
+      {creating ? (
+        <CreateImagePanel platform="linkedin" onClose={() => setCreating(false)} onCreated={() => void refresh()} />
       ) : null}
 
       {items.length === 0 ? (
         <StatusLine>{BANK_ADMIN.empty}</StatusLine>
       ) : (
-        <ul className="m-0 list-none p-0">
+        <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 lg:grid-cols-4">
           {items.map((image) => {
             if (editingId === image.id) {
               return (
-                <li key={image.id}>
+                <li key={image.id} className="col-span-full">
                   <EditForm
                     image={image}
                     onCancel={() => setEditingId(null)}
@@ -450,7 +244,7 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
               );
             }
             return (
-              <Card as="li" key={image.id} className="mb-2">
+              <Card as="li" key={image.id} className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   {image.origin === 'created' ? <Pill>{BANK_ADMIN.createdTag}</Pill> : null}
                   {image.status === 'sketch' ? (
@@ -463,7 +257,7 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
                 {image.tags.length > 0 ? <Meta className="mt-1">{image.tags.join(', ')}</Meta> : null}
 
                 {image.url ? (
-                  <div className="mt-2 max-w-[320px]">
+                  <div className="mt-2">
                     <TransferImage
                       src={image.url}
                       alt={image.alt_text}
@@ -479,10 +273,10 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
                   <div className="mt-2" role="alert">
                     <StatusLine>{BANK_ADMIN.confirmDelete}</StatusLine>
                     <div className="mt-1 flex flex-wrap gap-2">
-                      <Button variant="primary" onClick={() => void remove(image)}>
+                      <Button variant="primary" size="primary" onClick={() => void remove(image)}>
                         {BANK_ADMIN.confirmYes}
                       </Button>
-                      <Button variant="quiet" onClick={() => setConfirmingId(null)}>
+                      <Button variant="quiet" size="primary" onClick={() => setConfirmingId(null)}>
                         {BANK_ADMIN.cancel}
                       </Button>
                     </div>
@@ -490,6 +284,7 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button
+                      size="primary"
                       onClick={() => {
                         setStatus(null);
                         setEditingId(image.id);
@@ -497,7 +292,7 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
                     >
                       {BANK_ADMIN.edit}
                     </Button>
-                    <Button variant="quiet" onClick={() => setConfirmingId(image.id)}>
+                    <Button variant="quiet" size="primary" onClick={() => setConfirmingId(image.id)}>
                       {BANK_ADMIN.delete}
                     </Button>
                   </div>
@@ -507,7 +302,6 @@ export function ImageAdmin({ initial }: ImageAdminProps) {
           })}
         </ul>
       )}
-      <Meta className="mt-3">Largest upload: {Math.round(BANK_IMAGE_MAX_BYTES / (1024 * 1024))} MB.</Meta>
     </section>
   );
 }
