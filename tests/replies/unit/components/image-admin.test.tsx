@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { BankImage } from '@/replies/lib/contracts/api';
 import { ApiError } from '@/replies/lib/workspace/client';
@@ -61,9 +61,16 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-async function openAdd() {
-  await userEvent.click(screen.getByRole('button', { name: 'Add image' }));
-}
+/** The file input behind the drop zone. */
+const picker = () => screen.getByLabelText('Image files') as HTMLInputElement;
+const zone = () => screen.getByRole('button', { name: /Drop (images here or click to choose|to add)/ });
+const textFile = () => {
+  const text = new File(['hello'], 'notes.txt', { type: 'text/plain' });
+  if (typeof text.arrayBuffer !== 'function') {
+    Object.defineProperty(text, 'arrayBuffer', { value: async () => new TextEncoder().encode('hello').buffer });
+  }
+  return text;
+};
 
 describe('the Images admin list', () => {
   it('lists images with their title, alt text and tags, and no bytes', () => {
@@ -77,7 +84,8 @@ describe('the Images admin list', () => {
 
   it('says so when the bank is empty', () => {
     render(<ImageAdmin initial={[]} />);
-    expect(screen.getByText('No images yet.')).toBeTruthy();
+    expect(screen.getByText('No images yet. Drop a file above.')).toBeTruthy();
+    expect(screen.queryByText(/Largest upload/)).toBeNull();
   });
 
   it('marks a created image that is still a sketch', () => {
@@ -90,14 +98,9 @@ describe('the Images admin list', () => {
 describe('adding an image', () => {
   it('refuses a wrong file before uploading anything', async () => {
     render(<ImageAdmin initial={[]} />);
-    await openAdd();
-    const text = new File(['hello'], 'notes.txt', { type: 'text/plain' });
-    if (typeof text.arrayBuffer !== 'function') {
-      Object.defineProperty(text, 'arrayBuffer', { value: async () => new TextEncoder().encode('hello').buffer });
-    }
-    await userEvent.upload(screen.getByLabelText('Image file'), text, { applyAccept: false });
+    await userEvent.upload(picker(), textFile(), { applyAccept: false });
     expect(await screen.findByText('Use a PNG, JPG or WebP image.')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
     expect(api.uploadImage).not.toHaveBeenCalled();
   });
 
@@ -105,8 +108,7 @@ describe('adding an image', () => {
     api.suggestImageMeta.mockResolvedValue({ title: 'Cover letter checklist', alt_text: 'A checklist.', tags: ['cover letter', 'checklist'] });
     api.uploadImage.mockResolvedValue({ id: 'new', version: 1, replayed: false });
     render(<ImageAdmin initial={[]} />);
-    await openAdd();
-    await userEvent.upload(screen.getByLabelText('Image file'), pngFile());
+    await userEvent.upload(screen.getByLabelText('Image files'), pngFile());
 
     await userEvent.type(screen.getByLabelText(/What does it show/), 'a checklist for letters');
     await userEvent.click(screen.getByRole('button', { name: 'Suggest title, alt text and tags' }));
@@ -136,8 +138,7 @@ describe('adding an image', () => {
   it('does not need the suggestion: the fields can be filled by hand', async () => {
     api.uploadImage.mockResolvedValue({ id: 'new', version: 1, replayed: false });
     render(<ImageAdmin initial={[]} />);
-    await openAdd();
-    await userEvent.upload(screen.getByLabelText('Image file'), pngFile());
+    await userEvent.upload(screen.getByLabelText('Image files'), pngFile());
     await userEvent.clear(screen.getByLabelText('Title'));
     await userEvent.type(screen.getByLabelText('Title'), 'By hand');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -148,8 +149,7 @@ describe('adding an image', () => {
   it('says Monthly AI limit reached when the cap refuses the suggestion, and keeps the form', async () => {
     api.suggestImageMeta.mockRejectedValue(new ApiError(429, envelope('monthly_ai_limit_reached', 'Monthly AI limit reached')));
     render(<ImageAdmin initial={[]} />);
-    await openAdd();
-    await userEvent.upload(screen.getByLabelText('Image file'), pngFile());
+    await userEvent.upload(screen.getByLabelText('Image files'), pngFile());
     await userEvent.click(screen.getByRole('button', { name: 'Suggest title, alt text and tags' }));
     expect(await screen.findByText('Monthly AI limit reached')).toBeTruthy();
     // Nothing was lost and saving by hand still works.
@@ -162,8 +162,7 @@ describe('adding an image', () => {
       .mockRejectedValueOnce(new ApiError(500, envelope('internal_error', 'Something went wrong.')))
       .mockResolvedValueOnce({ id: 'new', version: 1, replayed: true });
     render(<ImageAdmin initial={[]} />);
-    await openAdd();
-    await userEvent.upload(screen.getByLabelText('Image file'), pngFile());
+    await userEvent.upload(screen.getByLabelText('Image files'), pngFile());
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.uploadImage).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -171,6 +170,97 @@ describe('adding an image', () => {
     const first = (api.uploadImage.mock.calls[0]![0] as FormData).get('request_key');
     const second = (api.uploadImage.mock.calls[1]![0] as FormData).get('request_key');
     expect(second).toBe(first);
+  });
+});
+
+describe('the drop zone', () => {
+  it('opens the file picker on click, Enter and Space', async () => {
+    render(<ImageAdmin initial={[]} />);
+    const click = vi.spyOn(picker(), 'click');
+    await userEvent.click(zone());
+    expect(click).toHaveBeenCalledTimes(1);
+    zone().focus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard(' ');
+    expect(click).toHaveBeenCalledTimes(3);
+  });
+
+  it('is a real multi-file picker limited to PNG, JPG and WebP, and says how to use it', () => {
+    render(<ImageAdmin initial={[]} />);
+    expect(picker().multiple).toBe(true);
+    expect(picker().accept).toBe('image/png,image/jpeg,image/webp');
+    expect(screen.getByText('PNG, JPG or WebP, up to 5 MB')).toBeTruthy();
+    expect(zone().tabIndex).toBe(0);
+  });
+
+  it('highlights on drag over and handles a dropped file', async () => {
+    render(<ImageAdmin initial={[]} />);
+    fireEvent.dragOver(zone(), { dataTransfer: { files: [] } });
+    expect(zone().getAttribute('data-dragging')).toBe('true');
+    fireEvent.drop(zone(), { dataTransfer: { files: [pngFile('dropped.png')] } });
+    expect(zone().getAttribute('data-dragging')).toBe('false');
+    expect(((await screen.findByLabelText('Title')) as HTMLInputElement).value).toBe('dropped');
+  });
+
+  it('handles an image pasted from the clipboard anywhere on the page', async () => {
+    render(<ImageAdmin initial={[]} />);
+    fireEvent.paste(document.body, { clipboardData: { files: [pngFile('pasted.png')] } });
+    expect(((await screen.findByLabelText('Title')) as HTMLInputElement).value).toBe('pasted');
+  });
+
+  it('ignores a paste that has no image', () => {
+    render(<ImageAdmin initial={[]} />);
+    fireEvent.paste(document.body, { clipboardData: { files: [textFile()] } });
+    expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+
+  it('refuses a file over 5 MB with the reason, without uploading it', async () => {
+    render(<ImageAdmin initial={[]} />);
+    const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'huge.png', { type: 'image/png' });
+    await userEvent.upload(picker(), big);
+    expect(await screen.findByText('That image is over 5 MB.')).toBeTruthy();
+    expect(api.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('reviews several files one row each, refuses the bad one, and saves the rest with Save all', async () => {
+    api.uploadImage.mockResolvedValue({ id: 'new', version: 1, replayed: false });
+    render(<ImageAdmin initial={[]} />);
+    await userEvent.upload(picker(), [pngFile('first.png'), textFile(), pngFile('second.png')], { applyAccept: false });
+    expect(await screen.findByText('Use a PNG, JPG or WebP image.')).toBeTruthy();
+    await waitFor(() => expect(screen.getAllByLabelText('Title')).toHaveLength(2));
+    expect(screen.getAllByRole('button', { name: 'Skip' })).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save all' }));
+    await waitFor(() => expect(api.uploadImage).toHaveBeenCalledTimes(2));
+    const titles = api.uploadImage.mock.calls.map((call) => (call[0] as FormData).get('title'));
+    expect(titles).toEqual(['first', 'second']);
+    expect(await screen.findByText('Saved 2 images.')).toBeTruthy();
+    // The refused row stays until dismissed.
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByText('Use a PNG, JPG or WebP image.')).toBeNull();
+  });
+
+  it('skips one file without uploading it', async () => {
+    render(<ImageAdmin initial={[]} />);
+    await userEvent.upload(picker(), pngFile());
+    await userEvent.click(await screen.findByRole('button', { name: 'Skip' }));
+    expect(screen.queryByLabelText('Title')).toBeNull();
+    expect(api.uploadImage).not.toHaveBeenCalled();
+  });
+});
+
+describe('Create with AI', () => {
+  it('explains itself and opens the create panel', async () => {
+    render(<ImageAdmin initial={[]} />);
+    expect(screen.getByText('Draft a sketch, approve it, then it renders an image.')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Create with AI' }));
+    expect(screen.getByRole('button', { name: 'Make a sketch' })).toBeTruthy();
+  });
+
+  it('is disabled with the reason when the renderer is not set up', () => {
+    render(<ImageAdmin initial={[]} rendererReady={false} />);
+    expect((screen.getByRole('button', { name: 'Create with AI' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Set up the image renderer first')).toBeTruthy();
   });
 });
 
@@ -210,7 +300,7 @@ describe('editing and deleting', () => {
     await waitFor(() => expect(api.deleteImage).toHaveBeenCalledTimes(1));
     expect(api.deleteImage.mock.calls[0]![1]).toBe(3);
     expect(await screen.findByText('Deleted.')).toBeTruthy();
-    expect(screen.getByText('No images yet.')).toBeTruthy();
+    expect(screen.getByText('No images yet. Drop a file above.')).toBeTruthy();
   });
 
   it('can back out of a delete', async () => {
