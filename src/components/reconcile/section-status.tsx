@@ -22,7 +22,7 @@ export function SectionSkeleton({ id, title, what }: { id: string; title: string
 }
 
 /**
- * One check could not complete. It says which source, that the result is unknown
+ * One check could not complete. The banner keeps the page-wide wording, then says which source, that the result is unknown
  * rather than clear, and offers a fresh re-check that skips the short result cache.
  */
 export function SectionError({ what, detail }: { what: string; detail?: string }) {
@@ -31,8 +31,8 @@ export function SectionError({ what, detail }: { what: string; detail?: string }
   return (
     <StateView
       kind="provider_error"
-      title={`Couldn't check ${what}`}
-      detail={`${detail ? `${detail} ` : ''}Unknown, not clear. Everything else on this page is unaffected.`}
+      title="Some sources could not be read"
+      detail={`Couldn't check ${what}. ${detail ? `${detail} ` : ''}Unknown, not clear. Everything else on this page is unaffected.`}
       nextStep={null}
       action={
         <button

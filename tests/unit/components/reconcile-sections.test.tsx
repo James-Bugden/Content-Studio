@@ -33,7 +33,8 @@ describe('Fix issues streamed sections (CS #250)', () => {
 
   it('a rejected check shows a per-section error with Retry, not an all-clear', async () => {
     render(await Section({ ...props, promise: Promise.reject(new Error('synthetic')) }));
-    expect(screen.getByText("Couldn't check Drive")).toBeTruthy();
+    expect(screen.getByText('Some sources could not be read')).toBeTruthy();
+    expect(screen.getByText(/Couldn't check Drive/)).toBeTruthy();
     expect(screen.queryByText('Drive matches the database')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(router.replace).toHaveBeenCalledWith(expect.stringMatching(/^\/reconcile\?fresh=\d+$/));
@@ -41,7 +42,8 @@ describe('Fix issues streamed sections (CS #250)', () => {
 
   it('partial provider failure keeps the findings and adds the error with the failed count', async () => {
     render(await Section({ ...props, promise: Promise.resolve(section({ items: [item], failed: 2, checked: 5 })) }));
-    expect(screen.getByText("Couldn't check Drive")).toBeTruthy();
+    expect(screen.getByText('Some sources could not be read')).toBeTruthy();
+    expect(screen.getByText(/Couldn't check Drive/)).toBeTruthy();
     expect(screen.getByText(/2 of 5 Drive files could not be read in time/)).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'SYN-L001: Drive could not be checked' })).toBeTruthy();
     expect(screen.queryByText('Drive matches the database')).toBeNull();
@@ -49,7 +51,8 @@ describe('Fix issues streamed sections (CS #250)', () => {
 
   it('SectionError names the source, says unknown, and offers a retry', async () => {
     render(<SectionError what="Typefully" />);
-    expect(screen.getByText("Couldn't check Typefully")).toBeTruthy();
+    expect(screen.getByText('Some sources could not be read')).toBeTruthy();
+    expect(screen.getByText(/Couldn't check Typefully/)).toBeTruthy();
     expect(screen.getByText(/Unknown, not clear/)).toBeTruthy();
     expect(screen.getByRole('alert')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
