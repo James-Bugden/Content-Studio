@@ -35,14 +35,18 @@ export function SectionError({ what, detail }: { what: string; detail?: string }
       detail={`Couldn't check ${what}. ${detail ? `${detail} ` : ''}Unknown, not clear. Everything else on this page is unaffected.`}
       nextStep={null}
       action={
-        <button
-          type="button"
+        // A link, not a button: re-checking only re-reads, and the sweep treats links as safe navigation.
+        <a
+          href="/reconcile?fresh=1"
           className={buttonClass('secondary')}
-          disabled={pending}
-          onClick={() => start(() => router.replace(`/reconcile?fresh=${Date.now()}`))}
+          aria-disabled={pending}
+          onClick={(e) => {
+            e.preventDefault();
+            if (!pending) start(() => router.replace(`/reconcile?fresh=${Date.now()}`));
+          }}
         >
           {pending ? 'Retrying…' : 'Retry'}
-        </button>
+        </a>
       }
     />
   );

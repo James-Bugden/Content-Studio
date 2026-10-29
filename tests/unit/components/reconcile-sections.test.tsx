@@ -28,7 +28,7 @@ describe('Fix issues streamed sections (CS #250)', () => {
     render(await Section({ ...props, promise: Promise.resolve(section()) }));
     expect(screen.getByText('Drive matches the database')).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Drive Markdown vs database/ }).textContent).toContain('(0)');
-    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Retry' })).toBeNull();
   });
 
   it('a rejected check shows a per-section error with Retry, not an all-clear', async () => {
@@ -36,7 +36,7 @@ describe('Fix issues streamed sections (CS #250)', () => {
     expect(screen.getByText('Some sources could not be read')).toBeTruthy();
     expect(screen.getByText(/Couldn't check Drive/)).toBeTruthy();
     expect(screen.queryByText('Drive matches the database')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Retry' }));
     expect(router.replace).toHaveBeenCalledWith(expect.stringMatching(/^\/reconcile\?fresh=\d+$/));
   });
 
@@ -55,7 +55,7 @@ describe('Fix issues streamed sections (CS #250)', () => {
     expect(screen.getByText(/Couldn't check Typefully/)).toBeTruthy();
     expect(screen.getByText(/Unknown, not clear/)).toBeTruthy();
     expect(screen.getByRole('alert')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Retry' }));
     expect(router.replace).toHaveBeenCalledOnce();
   });
 });
