@@ -2,7 +2,7 @@ import { StatusBanner } from '@/components/shell-status';
 import { MarkdownImport } from '@/components/reconcile/markdown-import';
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
-import { buildReconcileReport, type ReconcileReport } from '@/application/reconcile';
+import { SLOW_CACHE_TTL_MS, startReconcile, type ReconcileReport, type ReconcileStart } from '@/application/reconcile';
 import { CapabilityBanner, ErrorState, PageHeader, StateView } from '@/components';
 import { ReconcileList } from '@/components/reconcile/reconcile-list';
 import { isAppError } from '@/domain/errors';
@@ -12,26 +12,42 @@ import { recentEvents } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
 import { DatabaseSwitchPanel } from '@/components/reconcile/database-switch-panel';
 import { ContentImportButton } from '@/components/reconcile/content-import-button';
-import { BackupCard } from '@/components/reconcile/backup-card';
-import { backupSignal, loadBackupCard } from '@/lib/weekly-backup';
+import { BackupSection } from '@/components/reconcile/backup-section';
+import { backupSignal, loadBackupCard, type BackupCard } from '@/lib/weekly-backup';
+import { withTimeout } from '@/lib/concurrency';
+import { DriveSection, STREAMED_SECTIONS, TypefullySection } from '@/components/reconcile/sections';
+import { ReconcileActionsProvider } from '@/components/reconcile/actions-gate';
 
 export const metadata: Metadata = { title: 'Reconcile | Content Studio' };
 export const dynamic = 'force-dynamic';
 
 /**
- * Reconciliation centre and health (CS-017). Rebuilt from the Sheet, Drive and
- * this instance's redacted telemetry on every load. Nothing here stores content.
+ * Reconciliation centre and health (CS-017). Rebuilt from the database, Drive,
+ * Typefully and this instance's redacted telemetry on every load. Nothing here
+ * stores content.
+ *
+ * CS #250: the page waits only for the database checks. The Drive and Typefully
+ * checks stream in as their own sections, so a slow provider delays only itself.
+ * `?fresh=` (the Retry button) skips the short result cache.
  */
-export default async function ReconcilePage() {
+export default async function ReconcilePage({ searchParams }: { searchParams?: Promise<{ fresh?: string }> } = {}) {
   const actor = await requireActor('viewer');
   const databaseOnly = serverEnv().CS_CONTENT_STORE === 'db';
   const sources = databaseOnly ? 'the database, Drive and Typefully' : 'the Sheet, Drive and Typefully';
+  const fresh = Boolean((await searchParams)?.fresh);
   let report: ReconcileReport;
-  const backupCard = await loadBackupCard();
+  // DB-only run-history read, started now so it overlaps the other checks. Never waits on a provider.
+  const backupCard: Promise<BackupCard> = withTimeout(() => loadBackupCard(), 4_000).catch((): BackupCard => ({ state: 'unavailable' }));
+  let start: ReconcileStart;
   try {
     const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport, liveCutover } = getServices();
-    await contentBackup?.prepare?.().catch(() => { /* Invalid/unavailable evidence is marked unverified by the adapter. */ });
-    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport, liveCutover, weeklyBackup: backupSignal(backupCard) });
+    // Sheet-era evidence (backup, cutover, export parity, import parity) is not read in db mode.
+    if (!databaseOnly) await contentBackup?.prepare?.().catch(() => { /* Invalid/unavailable evidence is marked unverified by the adapter. */ });
+    start = startReconcile(reconcileRepo ?? repo, drive, undefined, {
+      typefully, markdownExport, weeklyBackup: backupCard.then((card) => backupSignal(card)), cache: { ttlMs: SLOW_CACHE_TTL_MS, fresh },
+      ...(databaseOnly ? {} : { contentParity, contentCutover, backupJournal: contentBackup?.journal, liveCutover }),
+    });
+    report = await start.fast;
   } catch (error) {
     return (
       <>
@@ -42,14 +58,14 @@ export default async function ReconcilePage() {
     );
   }
   const checked = new Date(report.checkedAt).toLocaleString('en-GB', { timeZone: 'Asia/Taipei' });
-  const parity = getServices().contentParity?.summary();
+  const parity = databaseOnly ? undefined : getServices().contentParity?.summary();
 
   return (
-    <>
+    <ReconcileActionsProvider sections={STREAMED_SECTIONS}>
       <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <StatusBanner kind="capability"><CapabilityBanner capabilities={report.capabilities} /></StatusBanner>
-        <BackupCard status={backupCard.state === 'ok' ? backupCard.status : null} now={Date.parse(report.checkedAt)} isOwner={actor.role === 'owner'} folderConfigured={backupCard.state === 'ok' ? backupCard.folderConfigured : true} unavailable={backupCard.state === 'unavailable'} />
+        <BackupSection promise={backupCard} now={Date.parse(report.checkedAt)} isOwner={actor.role === 'owner'} />
         {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
         {databaseOnly ? <p>Store mode: db. Database is the only content store.</p> : <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
@@ -101,11 +117,11 @@ export default async function ReconcilePage() {
 
         <section aria-labelledby="items-h">
           <h2 id="items-h" className="text-lg font-semibold">
-            Items to reconcile <span className="text-sm font-normal text-ink-soft">({report.items.length})</span>
+            Database checks <span className="text-sm font-normal text-ink-soft">({report.items.length})</span>
           </h2>
           {report.items.length === 0 ? report.unreadable.length > 0 ? null : (
             <div className="mt-2">
-              <StateView kind="empty" title="Everything agrees" detail="The Sheet, Markdown and schedule lineage match for every readable source." nextStep={null} />
+              <StateView kind="empty" title="Database checks agree" detail="Approvals, zh-TW lineage and sync age match for every readable source. Drive and Typefully are checked below." nextStep={null} />
             </div>
           ) : (
             <div className="mt-2">
@@ -113,6 +129,9 @@ export default async function ReconcilePage() {
             </div>
           )}
         </section>
+
+        <DriveSection promise={start.drive} />
+        <TypefullySection promise={start.typefully} />
 
         {/* CS-048: engineering diagnostics stay available but out of the way. */}
         <details className="rounded-lg border border-line bg-card px-4 py-2">
@@ -169,6 +188,6 @@ export default async function ReconcilePage() {
           </div>
         </details>
       </div>
-    </>
+    </ReconcileActionsProvider>
   );
 }

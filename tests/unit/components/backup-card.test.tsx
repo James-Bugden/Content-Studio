@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const refresh = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 import { BackupCard } from '@/components/reconcile/backup-card';
+import { ReconcileActionsProvider, SectionGate } from '@/components/reconcile/actions-gate';
 import type { BackupRunView, BackupStatus } from '@/domain/weekly-backup';
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); refresh.mockClear(); });
@@ -74,4 +75,21 @@ it('reports a failed run without claiming success', async () => {
   render(<BackupCard status={ok} now={NOW} isOwner />);
   fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
   await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Backup failed/));
+});
+
+it('Back up now is disabled while streamed checks load or fail, and enabled once all are ok', () => {
+  const btn = () => screen.getByRole('button', { name: 'Back up now' }) as HTMLButtonElement;
+  const page = (drive: 'ok' | 'failed' | null) => (
+    <ReconcileActionsProvider sections={['drive']}>
+      {drive ? <SectionGate id="drive" state={drive} /> : null}
+      <BackupCard status={ok} now={NOW} isOwner />
+    </ReconcileActionsProvider>
+  );
+  const view = render(page(null));
+  expect(screen.getByText(/Last backup: 2 Nov 2026/)).toBeTruthy();
+  expect(btn().disabled).toBe(true);
+  view.rerender(page('failed'));
+  expect(btn().disabled).toBe(true);
+  view.rerender(page('ok'));
+  expect(btn().disabled).toBe(false);
 });

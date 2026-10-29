@@ -56,6 +56,8 @@ test('DB-7 body authority, failed Drive save and explicit Markdown import; Sheet
   expect((await new AxeBuilder({ page }).include('[aria-labelledby="markdown-import-h"]').analyze()).violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/db-body-import-${test.info().project.name}.png`, fullPage: true });
+  // CS #250: writes wait for the streamed Drive/Typefully checks to finish.
+  await expect(page.locator('[data-reconcile-checks="ready"]'), 'streamed checks finished').toHaveCount(1);
   await section.getByRole('button', { name: 'Keep database body' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Database body kept.' })).toBeVisible();
   await section.getByRole('button', { name: 'Use Markdown body' }).click();

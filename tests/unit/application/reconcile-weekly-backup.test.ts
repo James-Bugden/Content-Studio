@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FakeSheetTransport } from '@/integrations/google/fake-sheet';
 import { FakeDriveGateway } from '@/integrations/google/fake-drive';
 import { SheetsContentRepository } from '@/integrations/google/sheets-repository';
-import { buildReconcileReport, type WeeklyBackupSignal } from '@/application/reconcile';
+import { buildReconcileReport, startReconcile, type WeeklyBackupSignal } from '@/application/reconcile';
 import { fixIssuesCount } from '@/application/navigation-counts';
 
 const NOW = Date.parse('2026-10-05T00:00:00+08:00');
@@ -27,5 +27,17 @@ describe('weekly backup in the Fix issues report', () => {
       expect(r.items.find(i => i.kind === 'weekly_backup')).toMatchObject({ severity: 'attention' });
       expect(fixIssuesCount(r)).toBe(fixIssuesCount(base));
     }
+  });
+  it('accepts the signal as a promise, and a rejected read becomes a quiet unavailable item', async () => {
+    const repo = new SheetsContentRepository(new FakeSheetTransport());
+    const ok = await buildReconcileReport(repo, new FakeDriveGateway(), NOW, { weeklyBackup: Promise.resolve({ kind: 'warning', level: 'failed', message: 'Last backup failed.' }) });
+    expect(ok.items.find(i => i.kind === 'weekly_backup')).toMatchObject({ severity: 'blocking' });
+    const bad = await buildReconcileReport(repo, new FakeDriveGateway(), NOW, { weeklyBackup: Promise.reject(new Error('db down')) });
+    expect(bad.items.find(i => i.kind === 'weekly_backup')).toMatchObject({ severity: 'attention', title: 'Backup status could not be read' });
+  });
+  it('the fast part carries the backup item without waiting for Drive or Typefully', async () => {
+    const start = startReconcile(new SheetsContentRepository(new FakeSheetTransport()), new FakeDriveGateway(), NOW, { weeklyBackup: { kind: 'warning', level: 'stale', message: 'Old.' } });
+    expect((await start.fast).items.some(i => i.kind === 'weekly_backup')).toBe(true);
+    await start.report;
   });
 });

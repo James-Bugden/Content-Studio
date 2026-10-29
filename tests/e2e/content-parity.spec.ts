@@ -17,6 +17,7 @@ test('MIG-09/10 reconcile exposes mode, measurements, import evidence and a safe
   await expect(report).toContainText('Shadow thresholds not yet met.');
   await expect(report).toContainText('not permission to switch reads');
   const imported = page.waitForResponse(response => response.url().endsWith('/api/ops/sheet-mirror') && response.request().method() === 'POST');
+  await expect(page.locator('[data-reconcile-checks="ready"]'), 'streamed checks finished').toHaveCount(1);
   await page.getByRole('region', { name: 'Database switch', exact: true }).getByRole('button', { name: 'Import now' }).click();
   const importResponse = await imported;
   const key = importResponse.request().headers()['idempotency-key'];

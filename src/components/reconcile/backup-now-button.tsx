@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buttonClass } from '../button-styles';
+import { useActionsGate } from './actions-gate';
 
 /**
  * Owner's "Back up now". One UUID per attempt: a retry after a lost response
@@ -9,12 +10,14 @@ import { buttonClass } from '../button-styles';
  */
 export function BackupNowButton() {
   const router = useRouter();
+  // A write-class action: disabled while the page's streamed checks load or any failed.
+  const gate = useActionsGate();
   const key = useRef<string | null>(null);
   const running = useRef(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
   async function run() {
-    if (running.current) return;
+    if (running.current || !gate.enabled) return;
     running.current = true;
     setPending(true); setMessage('');
     try {
@@ -32,7 +35,8 @@ export function BackupNowButton() {
   }
   return (
     <div className="mt-3">
-      <button type="button" className={buttonClass('secondary')} onClick={run} disabled={pending}>{pending ? 'Backing up…' : 'Back up now'}</button>
+      <button type="button" className={buttonClass('secondary')} onClick={run} disabled={pending || !gate.enabled} title={gate.reason ?? undefined}>{pending ? 'Backing up…' : 'Back up now'}</button>
+      {!gate.enabled && gate.reason ? <p className="mt-2 text-sm text-ink-soft">{gate.reason}</p> : null}
       <p role="status" className="mt-2 text-sm">{message}</p>
     </div>
   );
