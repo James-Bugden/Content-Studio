@@ -33,7 +33,6 @@ test('Backlog filters, sort, direction and page survive a reload and Back', asyn
 test('Ctrl+Shift+Enter does nothing while Approve and queue is disabled (unsaved copy)', async ({ page }) => {
   await page.goto('/backlog?post=SYN-L001');
   const panel = page.getByRole('dialog');
-  await panel.getByRole('tab', { name: 'Edit' }).click();
   const box = panel.getByLabel(/Post copy/);
   await box.fill('Unsaved synthetic change');
   const approve = panel.getByRole('button', { name: 'Approve and queue' });
