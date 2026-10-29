@@ -38,6 +38,10 @@ export const schema = z.object({
   SUPABASE_READ_MODEL_SOURCE_KEY: z.string().regex(/^[a-z0-9][a-z0-9_-]{7,63}$/).optional(),
   RESOURCE_BASE_URL: z.string().url().optional(),
   CRON_SECRET: z.string().min(16).optional(),
+  /** Private Drive folder that receives the weekly full backup (#249). */
+  BACKUP_DRIVE_FOLDER_ID: z.string().regex(/^[A-Za-z0-9_-]{10,200}$/).optional(),
+  /** Optional heartbeat (healthchecks.io style): GET on success, GET <url>/fail on failure. https only. */
+  HEALTHCHECK_PING_URL: z.string().url().startsWith('https://').optional(),
   IMAGE_RENDERER_SECRET: z.string().min(16).optional(),
   AI_PROVIDER: z.enum(['fake', 'anthropic']).default('fake'),
   AI_MODEL: z.string().optional(),

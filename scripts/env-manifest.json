@@ -386,6 +386,30 @@
       "field": "password"
     },
     {
+      "name": "BACKUP_DRIVE_FOLDER_ID",
+      "required": false,
+      "schemaRequired": false,
+      "secret": false,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "drive"
+      ]
+    },
+    {
+      "name": "HEALTHCHECK_PING_URL",
+      "required": false,
+      "schemaRequired": false,
+      "secret": true,
+      "default": null,
+      "schemaDefault": null,
+      "capabilities": [
+        "drive"
+      ],
+      "lastpass": "content-studio/HEALTHCHECK_PING_URL",
+      "field": "password"
+    },
+    {
       "name": "IMAGE_RENDERER_SECRET",
       "required": false,
       "schemaRequired": false,

@@ -12,6 +12,8 @@ import { recentEvents } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
 import { DatabaseSwitchPanel } from '@/components/reconcile/database-switch-panel';
 import { ContentImportButton } from '@/components/reconcile/content-import-button';
+import { BackupCard } from '@/components/reconcile/backup-card';
+import { backupSignal, loadBackupCard } from '@/lib/weekly-backup';
 
 export const metadata: Metadata = { title: 'Reconcile | Content Studio' };
 export const dynamic = 'force-dynamic';
@@ -25,10 +27,11 @@ export default async function ReconcilePage() {
   const databaseOnly = serverEnv().CS_CONTENT_STORE === 'db';
   const sources = databaseOnly ? 'the database, Drive and Typefully' : 'the Sheet, Drive and Typefully';
   let report: ReconcileReport;
+  const backupCard = await loadBackupCard();
   try {
     const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport, liveCutover } = getServices();
     await contentBackup?.prepare?.().catch(() => { /* Invalid/unavailable evidence is marked unverified by the adapter. */ });
-    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport, liveCutover });
+    report = await buildReconcileReport(reconcileRepo ?? repo, drive, undefined, { typefully, contentParity, contentCutover, backupJournal: contentBackup?.journal, markdownExport, liveCutover, weeklyBackup: backupSignal(backupCard) });
   } catch (error) {
     return (
       <>
@@ -46,6 +49,7 @@ export default async function ReconcilePage() {
       <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <StatusBanner kind="capability"><CapabilityBanner capabilities={report.capabilities} /></StatusBanner>
+        <BackupCard status={backupCard.state === 'ok' ? backupCard.status : null} now={Date.parse(report.checkedAt)} isOwner={actor.role === 'owner'} folderConfigured={backupCard.state === 'ok' ? backupCard.folderConfigured : true} unavailable={backupCard.state === 'unavailable'} />
         {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
         {databaseOnly ? <p>Store mode: db. Database is the only content store.</p> : <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>

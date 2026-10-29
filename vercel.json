@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["syd1"],
+  "crons": [
+    { "path": "/api/ops/backup", "schedule": "0 19 * * 0" }
+  ],
   "functions": {
     "api/render-image.py": {
       "includeFiles": "image-renderer/**",

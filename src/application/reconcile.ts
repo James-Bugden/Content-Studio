@@ -42,6 +42,7 @@ export type ReconcileKind =
   | 'export_parity'
   | 'backup_fresh'
   | 'backup_waived'
+  | 'weekly_backup'
   | 'provider_config'
   | 'markdown_export_lag'
   | 'markdown_mismatch'
@@ -65,6 +66,12 @@ export type ReconcileItem = {
   operationId?: string;
   action: { label: 'Compare' | 'Retry' | 'Relink' | 'Restore Drive link' | 'Fix in the Sheet' | 'Configure' | 'Review'; href?: string };
 };
+
+/** Precomputed by the caller from the backup run history (#249). */
+export type WeeklyBackupSignal =
+  | { kind: 'warning'; level: 'failed' | 'stale' | 'never'; message: string }
+  | { kind: 'not_configured' }
+  | { kind: 'unavailable' };
 
 export type ReconcileReport = {
   items: ReconcileItem[];
@@ -98,7 +105,7 @@ export async function buildReconcileReport(
   repo: ContentRepository,
   drive: DriveGateway,
   now = Date.now(),
-  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter; liveCutover?: LiveCutoverOps } = {},
+  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter; liveCutover?: LiveCutoverOps; weeklyBackup?: WeeklyBackupSignal } = {},
 ): Promise<ReconcileReport> {
   rememberNavigationCount(repo, 'fixIssues', null);
   const items: ReconcileItem[] = [];
@@ -152,6 +159,11 @@ export async function buildReconcileReport(
     if ((!backupWaived && (!last || now - last.verifiedAt > 36 * 3600_000)) || options.backupJournal?.failureSince != null) items.push(item('backup_fresh', 'attention', 'Verified backup needs attention',
       [last ? 'Last verified backup is older than 36 hours or a later backup failed.' : 'No verified backup has been recorded. Supabase plan backups still require owner confirmation.'], [], { label: 'Review' }));
   }
+
+  const wb = options.weeklyBackup;
+  if (wb?.kind === 'warning') items.push(item('weekly_backup', 'blocking', 'Weekly backup needs attention', [wb.message, 'Open Backup on this page and press Back up now.'], [wb.level], { label: 'Review' }));
+  else if (wb?.kind === 'not_configured') items.push(item('weekly_backup', 'attention', 'Weekly backup is not set up', ['The Drive folder for backups is not configured, so nothing is backed up off-project. See docs/ops/backup-and-restore.md.'], ['not_configured'], { label: 'Configure' }));
+  else if (wb?.kind === 'unavailable') items.push(item('weekly_backup', 'attention', 'Backup status could not be read', ['The backup run history is unavailable (migration not applied or database unreachable).'], ['unavailable'], { label: 'Review' }));
 
   const caps = capabilities();
   for (const c of caps) {

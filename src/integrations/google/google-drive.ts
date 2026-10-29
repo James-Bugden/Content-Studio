@@ -2,6 +2,8 @@ import 'server-only';
 import type { Capability } from '@/domain/capability';
 import { AppError } from '@/domain/errors';
 import { DRIVE_CREATE_MAX_BYTES, DRIVE_FILE_NAME, type DriveCreateInput, type DriveFileMeta, type DriveGateway } from '@/application/ports';
+import type { BackupDriveFile, BackupDriveStore, BackupUploadInput } from '@/application/backup-ports';
+import { BACKUP_FILE_PREFIX, BACKUP_MARKER_KEY, BACKUP_MARKER_VALUE, backupUploadRefusal, isOurBackupFile } from '@/domain/weekly-backup';
 import { SCOPES, googleError, withReadRetry, type ServiceAccountTokens } from './service-account';
 
 /**
@@ -20,7 +22,9 @@ const FILE_ID = /^[A-Za-z0-9_-]{10,200}$/;
 /** How many master files keep their text in memory between editor opens. */
 const TEXT_CACHE_FILES = 16;
 
-export class GoogleDriveGateway implements DriveGateway {
+const BACKUP_FIELDS = 'id,name,size,md5Checksum,createdTime,trashed,parents,appProperties';
+
+export class GoogleDriveGateway implements DriveGateway, BackupDriveStore {
   constructor(
     private readonly tokens: ServiceAccountTokens,
     private readonly writeEnabled: boolean,
@@ -136,6 +140,114 @@ export class GoogleDriveGateway implements DriveGateway {
       trashed: Boolean(b.trashed),
       webLink: `https://drive.google.com/file/d/${b.id}/view`,
     };
+  }
+
+  // ------------------------------------------------------------ weekly backup (#249)
+
+  private static backupFile(b: Record<string, unknown>): BackupDriveFile {
+    const props = b.appProperties && typeof b.appProperties === 'object'
+      ? (Object.fromEntries(Object.entries(b.appProperties as Record<string, unknown>).filter(([, v]) => typeof v === 'string')) as Record<string, string>)
+      : null;
+    return {
+      id: String(b.id), name: String(b.name ?? ''), size: Number(b.size ?? 0), md5Checksum: typeof b.md5Checksum === 'string' ? b.md5Checksum : null,
+      createdTime: String(b.createdTime ?? ''), trashed: Boolean(b.trashed), parents: Array.isArray(b.parents) ? b.parents.map(String) : [], appProperties: props,
+    };
+  }
+
+  /** The target must be a live folder with no link/domain-wide sharing. Unreadable permissions do not block (a limited service account cannot always list them). */
+  private async assertBackupFolder(folderId: string): Promise<void> {
+    if (!FILE_ID.test(folderId)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'folder_id' });
+    const res = await this.fetchImpl(`${API}/${folderId}?fields=id,mimeType,trashed&supportsAllDrives=true`, { headers: await this.headers() });
+    if (!res.ok) throw googleError(res.status, 'drive');
+    const meta = (await res.json()) as { id?: string; mimeType?: string; trashed?: boolean };
+    if (meta.id !== folderId || meta.mimeType !== 'application/vnd.google-apps.folder' || meta.trashed) throw new AppError('FORBIDDEN', { provider: 'drive', reason: 'backup_folder' });
+    const perms = await this.fetchImpl(`${API}/${folderId}/permissions?fields=permissions(type)&pageSize=100&supportsAllDrives=true`, { headers: await this.headers() });
+    if (!perms.ok) return;
+    const body = (await perms.json()) as { permissions?: { type?: string }[] };
+    if (body.permissions?.some(p => p.type === 'anyone' || p.type === 'domain')) throw new AppError('FORBIDDEN', { provider: 'drive', reason: 'backup_folder_shared' });
+  }
+
+  /**
+   * Guarded upload of one backup file: a new file only (never an overwrite),
+   * fixed name patterns, gzip for the data file and plain text for its manifest,
+   * size-capped, always stamped with the marker that makes it ours.
+   */
+  async uploadBackupFile(input: BackupUploadInput): Promise<BackupDriveFile> {
+    if (!this.writeEnabled) throw new AppError('CONFIG_MISSING', { provider: 'drive', reason: 'write_disabled' });
+    const refusal = backupUploadRefusal({ name: input.name, mimeType: input.mimeType, size: input.bytes.length, appProperties: input.appProperties });
+    if (refusal) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: refusal });
+    await this.assertBackupFolder(input.folderId);
+
+    const boundary = `cs_${crypto.randomUUID().replace(/-/g, '')}`;
+    const metadata = JSON.stringify({ name: input.name, mimeType: input.mimeType, parents: [input.folderId], appProperties: input.appProperties, description: 'Content Studio automatic backup (managed by the app).' });
+    const encoder = new TextEncoder();
+    const head = encoder.encode(`--${boundary}\r\ncontent-type: application/json; charset=utf-8\r\n\r\n${metadata}\r\n--${boundary}\r\ncontent-type: ${input.mimeType}\r\n\r\n`);
+    const tail = encoder.encode(`\r\n--${boundary}--\r\n`);
+    const body = new Uint8Array(head.length + input.bytes.length + tail.length);
+    body.set(head, 0);
+    body.set(input.bytes, head.length);
+    body.set(tail, head.length + input.bytes.length);
+    // Not retried: a lost response could otherwise create a second file.
+    const res = await this.fetchImpl(`${UPLOAD}?uploadType=multipart&supportsAllDrives=true&fields=${BACKUP_FIELDS}`, {
+      method: 'POST', headers: { ...(await this.headers()), 'content-type': `multipart/related; boundary=${boundary}` }, body: body as unknown as BodyInit,
+    });
+    if (!res.ok) throw googleError(res.status, 'drive');
+    const file = GoogleDriveGateway.backupFile((await res.json()) as Record<string, unknown>);
+    if (!FILE_ID.test(file.id)) throw new AppError('PROVIDER_UNAVAILABLE', { provider: 'drive', reason: 'bad_create_response' });
+    return file;
+  }
+
+  async getBackupFile(id: string): Promise<BackupDriveFile> {
+    this.check(id);
+    return withReadRetry(async () => {
+      const res = await this.fetchImpl(`${API}/${id}?fields=${BACKUP_FIELDS}&supportsAllDrives=true`, { headers: await this.headers() });
+      if (!res.ok) throw googleError(res.status, 'drive');
+      return GoogleDriveGateway.backupFile((await res.json()) as Record<string, unknown>);
+    });
+  }
+
+  async listBackupFiles(folderId: string): Promise<BackupDriveFile[]> {
+    if (!FILE_ID.test(folderId)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'folder_id' });
+    const q = `'${folderId}' in parents and trashed=false and name contains '${BACKUP_FILE_PREFIX}' and appProperties has { key='${BACKUP_MARKER_KEY}' and value='${BACKUP_MARKER_VALUE}' }`;
+    const out: BackupDriveFile[] = [];
+    let pageToken: string | undefined;
+    for (let pages = 0; pages < 20; pages++) {
+      const query = new URLSearchParams({ q, fields: `nextPageToken,files(${BACKUP_FIELDS})`, pageSize: '100', supportsAllDrives: 'true', includeItemsFromAllDrives: 'true', ...(pageToken ? { pageToken } : {}) });
+      const body = await withReadRetry(async () => {
+        const res = await this.fetchImpl(`${API}?${query}`, { headers: await this.headers() });
+        if (!res.ok) throw googleError(res.status, 'drive');
+        return (await res.json()) as { files?: Record<string, unknown>[]; nextPageToken?: string };
+      });
+      out.push(...(body.files ?? []).map(GoogleDriveGateway.backupFile));
+      if (!body.nextPageToken) return out;
+      pageToken = body.nextPageToken;
+    }
+    throw new AppError('PROVIDER_UNAVAILABLE', { provider: 'drive', reason: 'too_many_backup_files' });
+  }
+
+  async readBackupBytes(id: string, maxBytes: number): Promise<Uint8Array> {
+    const file = await this.getBackupFile(id);
+    if (file.trashed || !isOurBackupFile(file)) throw new AppError('FORBIDDEN', { provider: 'drive', reason: 'not_a_backup' });
+    if (file.size > maxBytes) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'too_large' });
+    const bytes = await withReadRetry(async () => {
+      const res = await this.fetchImpl(`${API}/${id}?alt=media&supportsAllDrives=true`, { headers: await this.headers() });
+      if (!res.ok) throw googleError(res.status, 'drive');
+      return new Uint8Array(await res.arrayBuffer());
+    });
+    if (bytes.length > maxBytes) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'too_large' });
+    return bytes;
+  }
+
+  /** Reversible (Drive trash). Only a marked, correctly named file directly inside the configured folder. */
+  async trashBackupFile(id: string, folderId: string): Promise<void> {
+    if (!this.writeEnabled) throw new AppError('CONFIG_MISSING', { provider: 'drive', reason: 'write_disabled' });
+    if (!FILE_ID.test(folderId)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'folder_id' });
+    const file = await this.getBackupFile(id);
+    if (!isOurBackupFile(file) || !file.parents.includes(folderId)) throw new AppError('FORBIDDEN', { provider: 'drive', reason: 'not_a_backup' });
+    const res = await this.fetchImpl(`${API}/${id}?supportsAllDrives=true&fields=id`, {
+      method: 'PATCH', headers: { ...(await this.headers()), 'content-type': 'application/json' }, body: JSON.stringify({ trashed: true }),
+    });
+    if (!res.ok) throw googleError(res.status, 'drive');
   }
 
   async readBytes(fileId: string, maxBytes: number): Promise<{ bytes: Uint8Array; meta: DriveFileMeta }> {
