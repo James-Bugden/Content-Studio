@@ -172,7 +172,7 @@ test('HOOK: choosing works on unsaved text, but suggestions go stale once the dr
   await page.getByRole('button', { name: 'Suggest three hooks' }).click();
   await expect(alternatives(page)).toHaveCount(3);
   await alternatives(page).nth(0).getByRole('radio').check();
-  await editor(page).press('End');
+  await editor(page).press('Control+End');
   await editor(page).pressSequentially(' Edited.');
   // The suggestions were written for the old text: they cannot be used until generated again.
   await expect(page.getByText('The draft changed; generate again.')).toBeVisible();
