@@ -76,6 +76,55 @@ describe('AiAssist (#242, #247)', () => {
     expect(calls.find((c) => c.url.endsWith('/visual'))!.body).toMatchObject({ decision: 'original_graphic' });
   });
 
+  const OPTIONS = [
+    { title: 'Three steps', reason: 'A short sequence.', layout: 'steps', sketch: 'A\n+---+\n| B |\n+---+' },
+    { title: 'Comparison card', reason: 'Two choices.', layout: 'comparison', sketch: 'A   B\n+-+ +-+\n| | | |\n+-+ +-+' },
+  ];
+  it('saves the verdict and its sketch options in one guarded write when an image is needed (#248)', async () => {
+    const calls = route({
+      '/image-need': () => ({ ok: true, verdict: 'needs_image', reason: 'Three steps read best as a graphic.', options: OPTIONS }),
+      '/images': () => ({ ok: true, image: { revision: 'rev-3', options: OPTIONS } }),
+    });
+    const onDecided = vi.fn();
+    const saved = vi.fn();
+    window.addEventListener('cs:image-options-saved', saved);
+    render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={onDecided} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
+    window.removeEventListener('cs:image-options-saved', saved);
+    expect(calls.filter((c) => c.url.endsWith('/image-need'))).toHaveLength(1);
+    expect(calls.some((c) => c.url.endsWith('/visual'))).toBe(false);
+    expect(calls.find((c) => c.url.endsWith('/api/images'))!.body).toMatchObject({ action: 'store', libraryId: 'SYN-L001', expectedRevision: 'rev-1', reason: 'Three steps read best as a graphic.', options: OPTIONS });
+    expect(onDecided).toHaveBeenCalledWith('Original graphic', 'rev-3');
+    expect(saved).toHaveBeenCalledOnce();
+    expect(screen.getByText('Needs an image')).toBeTruthy();
+    expect(screen.getByText('2 sketch options in Image')).toBeTruthy();
+  });
+
+  it('on an already decided post it still saves the options, and carries on from the new revision', async () => {
+    const calls = route({
+      '/image-need': () => ({ ok: true, verdict: 'needs_image', reason: 'r', options: OPTIONS.slice(0, 1) }),
+      '/images': () => ({ ok: true, image: { revision: 'rev-4', options: OPTIONS.slice(0, 1) } }),
+    });
+    const onDecided = vi.fn();
+    const onRevision = vi.fn();
+    render(<AiAssist {...props} decided onUseHook={vi.fn()} onDecided={onDecided} onRevision={onRevision} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
+    expect(calls.some((c) => c.url.endsWith('/api/images'))).toBe(true);
+    expect(onDecided).not.toHaveBeenCalled();
+    expect(onRevision).toHaveBeenCalledWith('rev-4');
+    expect(screen.getByText('1 sketch option in Image')).toBeTruthy();
+  });
+
+  it('reports "Not recorded" when the options could not be saved', async () => {
+    route({
+      '/image-need': () => ({ ok: true, verdict: 'needs_image', reason: 'r', options: OPTIONS }),
+      '/images': () => ({ ok: false, code: 'STALE_READ', message: 'This post changed.' }),
+    });
+    render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={vi.fn()} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
+    expect(screen.getByText(/Not recorded/)).toBeTruthy();
+  });
+
   it('never overwrites an existing decision and waits for a save when the draft has unsaved changes', async () => {
     const calls = route();
     const { rerender } = render(<AiAssist {...props} decided onUseHook={vi.fn()} onDecided={vi.fn()} />);

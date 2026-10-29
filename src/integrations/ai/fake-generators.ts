@@ -6,6 +6,7 @@ import type { EnglishQaInput } from '@/application/english-qa';
 import type { HookInput } from '@/application/hooks';
 import type { ZhInput } from '@/application/zh-tw';
 import type { ImageNeedInput, ImageNeedOutput } from '@/application/image-need';
+import type { ImageLayout, ImageOptionDraft } from '@/domain/image-options';
 
 /**
  * Deterministic stand-ins for the model (fake mode, unit and e2e tests).
@@ -132,12 +133,33 @@ function alt(template: string, text: string, scores: HookScores, input: HookInpu
   };
 }
 
+/**
+ * Ranked fake sketch options. Markers in the draft steer the count so tests can
+ * cover the adaptive behaviour: [one-option], [two-options], default three.
+ */
+const box = (label: string) => [`+${'-'.repeat(label.length + 2)}+`, `| ${label} |`, `+${'-'.repeat(label.length + 2)}+`];
+const FAKE_OPTIONS: { layout: ImageLayout; title: string; reason: string; sketch: string }[] = [
+  { layout: 'steps', title: 'Three steps', reason: 'The post reads as a short sequence.', sketch: ['Make the next step clear', '', ...box('Name the task'), '    |', '    v', ...box('Show the evidence'), '    |', '    v', ...box('Choose the next step')].join('\n') },
+  { layout: 'comparison', title: 'Comparison card', reason: 'Two choices read best side by side.', sketch: ['Option A         Option B', '+---------+     +---------+', '| Task    |     | Task    |', '| Evidence|     | Evidence|', '+---------+     +---------+'].join('\n') },
+  { layout: 'before_after', title: 'Before and after', reason: 'A weak line becomes a strong one.', sketch: ['Before            After', '+----------+  ->  +----------+', '| Vague    |      | Specific |', '+----------+      +----------+'].join('\n') },
+  { layout: 'decision', title: 'Decision fork', reason: 'The post turns on one yes or no question.', sketch: ['Is the evidence clear?', '   |            |', '  Yes           No', '   v            v', 'Choose it     Ask again'].join('\n') },
+  { layout: 'quadrant', title: 'Two-by-two', reason: 'Two criteria sort the choices.', sketch: ['        High effort', '   +--------+--------+', '   | Plan   | Skip   |', '   +--------+--------+', '   | Do now | Delay  |', '   +--------+--------+', '        Low effort'].join('\n') },
+  { layout: 'timeline', title: 'Timeline', reason: 'The advice follows the calendar.', sketch: ['Day 1 --- Day 3 --- Day 7 --- Day 14', ' Ask      Wait      Follow    Decide'].join('\n') },
+  { layout: 'ladder', title: 'Ladder', reason: 'Levels build on each other.', sketch: ['4 | Lead', '3 | Own', '2 | Contribute', '1 | Learn'].join('\n') },
+];
+export function fakeImageOptions(draft: string, opts: { exclude?: readonly ImageLayout[]; max?: number } = {}): ImageOptionDraft[] {
+  const marker = /\[one-option\]/.test(draft) ? 1 : /\[two-options\]/.test(draft) ? 2 : 3;
+  if (/\[no-more\]/.test(draft) && opts.exclude) return [];
+  const taken = new Set(opts.exclude ?? []);
+  return FAKE_OPTIONS.filter(o => !taken.has(o.layout)).slice(0, Math.min(opts.max ?? 3, opts.exclude ? 3 : marker));
+}
+
 /** Lists, numbers and step-by-step posts read better with a graphic; the rest stay text only. */
 export function fakeImageNeed(input: ImageNeedInput): ImageNeedOutput {
-  const structured = /^\s*(?:[-*\u2022]|\d+[.)])\s/m.test(input.draft) || /\d+\s*%/.test(input.draft);
+  const structured = /^\s*(?:[-*•]|\d+[.)])\s/m.test(input.draft) || /\d+\s*%/.test(input.draft);
   return structured
-    ? { verdict: 'needs_image', reason: 'The steps or numbers are easier to scan as a simple graphic.' }
-    : { verdict: 'no_image', reason: 'The point lands as plain text.' };
+    ? { verdict: 'needs_image', reason: 'The steps or numbers are easier to scan as a simple graphic.', options: fakeImageOptions(input.draft) }
+    : { verdict: 'no_image', reason: 'The point lands as plain text.', options: [] };
 }
 
 export function fakeHooks(input: HookInput): HookOutput {

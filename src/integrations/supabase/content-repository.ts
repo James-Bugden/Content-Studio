@@ -14,6 +14,7 @@ import { LIBRARY_HEADERS, SCHEDULE_HEADERS, LIBRARY_WRITABLE, SCHEDULE_WRITABLE 
 import { parseWorkflowSettings } from '@/domain/settings';
 import { assertContentSchemaVersion } from './content-schema';
 import { validateContentRow } from './content-row-schema';
+import { parseStoredOptions } from '@/domain/image-options';
 import { postVersionsSchema, type PostProperties, type PostPropertiesPatch } from '@/domain/post-versions';
 import { CONTENT_TIMESTAMP_FIELDS, FINAL_SYNCED_AT_RAW_KEY, contentTimestampParts, sameContentTimestamp, taipeiContentTimestamp } from '@/application/content-timestamps';
 
@@ -85,6 +86,8 @@ export class SupabaseContentRepository implements ContentRepository {
       && numberedContentAngle(originalAngle) === row.content_angle) c.contentAngle = originalAngle;
     const value = toLibraryItem(c);
     if (row.image_sketch) value.visual.sketch = row.image_sketch;
+    const options = parseStoredOptions(row.image_sketch_options);
+    if (options.length) value.visual.sketchOptions = options;
     return { value, cells: c, row: row.source_sheet_row ?? 0,
       revision: this.revision(row, 'content_studio_posts', `${row.collection}:${c.libraryId}`), formulaFields: [], passthrough,
       links: { ...(row.source_markdown_url ? { sourceMarkdown: row.source_markdown_url } : {}),
@@ -160,7 +163,7 @@ export class SupabaseContentRepository implements ContentRepository {
     if (!entries.length) return fail('VALIDATION_FAILED', { reason: 'empty_patch' });
     const writable: readonly string[] = kind === 'schedule' ? SCHEDULE_WRITABLE : LIBRARY_WRITABLE;
     for (const [field, value] of entries) {
-      if (!idea && !writable.includes(field) && !(kind === 'library' && field === 'imageSketch')) return fail('VALIDATION_FAILED', { reason: 'field_not_writable', field });
+      if (!idea && !writable.includes(field) && !(kind === 'library' && (field === 'imageSketch' || field === 'imageSketchOptions'))) return fail('VALIDATION_FAILED', { reason: 'field_not_writable', field });
       if (field === 'contentId' && value !== id) return fail('VALIDATION_FAILED', { reason: 'field_not_writable', field });
       if (typeof value !== 'string' || value.length > 50_000) return fail('VALIDATION_FAILED', { reason: 'value_invalid', field });
     }
@@ -236,6 +239,11 @@ export function contentPatch(patch: Record<string, string | undefined>, currentC
       if (field === 'finalSyncedAt') result.final_synced_hash = hash;
     }
     if (field === 'parentContentId' && value === '') typed = null;
+    if (field === 'imageSketchOptions') {
+      const options = value === '' ? [] : parseStoredOptions(value);
+      if (value !== '' && !options.length) throw new AppError('VALIDATION_FAILED', { reason: 'value_invalid', field });
+      typed = options.length ? options : null;
+    }
     // A new plain cell value replaces its old hyperlink, including clearing it.
     // Otherwise the asset route could keep serving the previous imported file.
     if (['imageFile', 'sourceLink', 'sourceMarkdown', 'sourceMasterFile'].includes(field) && currentCells?.[field] !== value) {

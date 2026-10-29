@@ -36,7 +36,7 @@ export function ImageBacklog(props: ComponentProps<typeof LibraryBacklogTable>) 
         if (body.ok) { operations.current.delete(key); invalidateEditor(item.libraryId); }
         if (body.ok) setKnown(current => ({ ...current, [item.libraryId]: { image: body.image, baseRevision: item.baseRevision } }));
         return body;
-      }, (id, state, result) => setProgress(current => ({ ...current, [id]: state === 'running' ? (action === 'check' ? 'Checking images...' : 'Creating image...') : result?.ok ? (action === 'check' ? result.image.sketch ? 'Needs image: ' : 'Text only: ' : 'Image created. ') + result.image.reason : result && !result.ok ? result.message : 'Could not finish. Try again.' })), result => result.ok);
+      }, (id, state, result) => setProgress(current => ({ ...current, [id]: state === 'running' ? (action === 'check' ? 'Checking images...' : 'Creating image...') : result?.ok ? (action === 'check' ? result.image.sketch ? 'Needs image: ' : 'Text only: ' : 'Image created. ') + result.image.reason + (action === 'check' && result.image.options.length ? ` (${result.image.options.length} sketch ${result.image.options.length === 1 ? 'option' : 'options'})` : '') : result && !result.ok ? result.message : 'Could not finish. Try again.' })), result => result.ok);
       setSummary(`${total.succeeded} completed, ${total.failed} failed.`);
     } finally { running.current = false; setBusy(false); router.refresh(); }
   }

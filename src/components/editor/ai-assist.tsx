@@ -5,6 +5,7 @@ import type { ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
 import type { HookAlternative } from '@/domain/hook-frameworks';
 import type { QaProposal } from '@/domain/proposals';
+import type { ImageOutcome } from '@/domain/image-pipeline';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
 import { AiErrorView } from './ai-error';
@@ -16,7 +17,9 @@ import { AI_PART_LABEL, collapseFailures, runCombinedAiCheck, type AiPart, type 
  * Runs three advisory calls in parallel on the exact text in the box: the English
  * check, three hook options and the image need. The image verdict is written
  * through the guarded Visual Studio decision (only while the post has no decision
- * yet and the text was not edited meanwhile); the English findings are handed to
+ * yet and the text was not edited meanwhile). When an image is needed the same
+ * call also returns 1 to 3 ASCII sketch options, saved with the verdict through the
+ * guarded image action so the Image section shows them (#248); the English findings are handed to
  * the English check panel and hooks are only offered. All calls go through the AI
  * gateway, so each counts against the monthly cap and stops when it is reached.
  */
@@ -29,7 +32,7 @@ type DecideResponse = { ok: true; item: { revision: string } } | { ok: false; co
 
 const PARTS: AiPart[] = ['qa', 'hooks', 'image'];
 
-export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, onUseHook, onDecided, onQaResult }: {
+export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, onUseHook, onDecided, onRevision, onQaResult }: {
   libraryId: string;
   text: string;
   canEdit: boolean;
@@ -41,6 +44,8 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
   onUseHook: (hook: string) => void;
   /** The decision was written; the editor carries on from the new revision. */
   onDecided: (decision: 'Text only' | 'Original graphic', revision: string) => void;
+  /** Options were saved on an already decided post; carry on from the new revision. */
+  onRevision?: (revision: string) => void;
   /** The English check finished; the English check panel shows its findings. */
   onQaResult?: (proposal: QaProposal) => void;
 }) {
@@ -71,7 +76,7 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
       if (!r.ok) { failed.push({ part: r.part, code: r.code }); return; }
       if (r.part === 'qa') { setQa(r.proposal); onQaResult?.(r.proposal); }
       else if (r.part === 'hooks') setHooks(r.alternatives);
-      else { setImage(r.image); recordings.push(record(r.image.verdict, draft, ctrl.signal).catch(() => {})); }
+      else { setImage(r.image); recordings.push(record(r.image, draft, ctrl.signal).catch(() => { if (!ctrl.signal.aborted) setRecorded({ kind: 'failed' }); })); }
     };
     try {
       await runCombinedAiCheck({ libraryId, draft, draftHash: fingerprint(draft), signal: ctrl.signal, onPart });
@@ -84,12 +89,26 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
     }
   }
 
-  async function record(verdict: Verdict['verdict'], draft: string, signal: AbortSignal) {
+  async function record(image: Verdict, draft: string, signal: AbortSignal) {
     const now = latest.current;
-    if (now.decided || !canEdit) return;
+    if (!canEdit) return;
+    const withOptions = image.verdict === 'needs_image' && image.options.length > 0;
+    if (now.decided && !withOptions) return;
     // Only a decision for the exact text that was checked, on a saved row.
     if (now.dirty || now.text !== draft) { setRecorded({ kind: 'skipped' }); return; }
-    const decision = verdict === 'no_image' ? 'text_only' : 'original_graphic';
+    if (withOptions) {
+      // The verdict and its sketch options are one guarded write; the server re-validates them.
+      const res = await postJson<ImageOutcome>('/api/images', {
+        action: 'store', libraryId, operationId: newOperationId('imgopts'), expectedRevision: now.revision, reason: image.reason, options: image.options,
+      }, signal);
+      const body = res.body as ImageOutcome;
+      if (!body.ok) { setRecorded({ kind: 'failed' }); return; }
+      if (now.decided) onRevision?.(body.image.revision); else onDecided('Original graphic', body.image.revision);
+      setRecorded({ kind: 'saved', label: now.decided ? 'sketch options' : 'Original graphic' });
+      window.dispatchEvent(new CustomEvent('cs:image-options-saved', { detail: { libraryId } }));
+      return;
+    }
+    const decision = image.verdict === 'no_image' ? 'text_only' : 'original_graphic';
     const res = await postJson<DecideResponse>(`/api/library/${encodeURIComponent(libraryId)}/visual`, {
       action: 'decide', operationId: newOperationId('imgneed'), libraryId, expectedRevision: now.revision, decision,
     }, signal);
@@ -128,7 +147,8 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
         <p role="status" className="min-w-0 text-sm" data-image-verdict={image.verdict}>
           <strong>{image.verdict === 'needs_image' ? 'Needs an image' : 'No image needed'}</strong>
           {' · '}{image.reason}
-          {recorded.kind === 'saved' ? <span className="text-ink-soft"> Recorded as {recorded.label}.</span> : null}
+          {recorded.kind === 'saved' ? <span className="text-ink-soft"> {recorded.label === 'sketch options' ? 'Sketch options saved.' : `Recorded as ${recorded.label}.`}</span> : null}
+          {image.options.length > 0 ? <> <a href="#image-section-heading" className="underline">{image.options.length === 1 ? '1 sketch option' : `${image.options.length} sketch options`} in Image</a></> : null}
           {recorded.kind === 'skipped' ? <span className="text-ink-soft"> Save the draft to record it.</span> : null}
           {recorded.kind === 'failed' ? <span className="font-semibold text-block"> Not recorded.</span> : null}
         </p>

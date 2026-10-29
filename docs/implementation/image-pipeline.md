@@ -66,3 +66,27 @@ Local Next builds do not verify Vercel's mixed Python/Next function discovery,
 Verify the secret-protected `/api/render-image` route with synthetic copy on a
 Vercel preview before enabling live rendering. No live provider calls are part
 of this build. See `image-renderer/README.md` for provenance and runtime docs.
+
+## Sketch options (#248)
+
+One AI call per post (`image_check` for the Backlog bulk check, `image_need` for the
+editor's one-click "Check with AI") decides the need and, when an image helps,
+returns 1 to 3 ranked options: `{title, reason, layout, sketch}`. The count is
+adaptive (one is fine), layouts are unique, each sketch is printable ASCII, at most
+3000 characters and 40 lines, and a bad reply gets one repair. `layout` names a
+relationship family that maps onto the renderer formats (`IMAGE_LAYOUTS` in
+`src/domain/image-options.ts`); the render step still picks the final format.
+
+Options are stored in `content_studio_posts.image_sketch_options` (jsonb array of
+1 to 9, migration `20261028000200_image_sketch_options.sql`). `image_sketch` stays
+the current, approved sketch. Actions on `/api/images`, all with the usual
+operation id and expected revision:
+
+- `check`: one call, saves the verdict and options; the best fit becomes the pending sketch.
+- `store`: the one-click check saves the verdict and options it already holds; the server re-validates them. On a post that is already decided, has an image or has an approved sketch, only the options are saved.
+- `choose`: approves one option (optionally with the owner's edited text). "Make image" runs `choose` then `create`.
+- `more`: up to 3 further layouts not already shown (feature `ascii_sketch`), capped at 9 in total; an empty answer is "no other layout fits".
+- `force`: "Needs an image anyway" on a no-image verdict drafts options.
+
+Posts checked before options existed keep the single-sketch controls (approve,
+revise, create).

@@ -46,6 +46,28 @@ describe('combined AI check runner (#247)', () => {
     ])).toEqual([{ part: 'qa', code: 'AI_LIMIT_REACHED' }, { part: 'hooks', code: 'PROVIDER_UNAVAILABLE' }]);
   });
 
+  it('passes up to three sketch options through with the image verdict, and none for no image', () => {
+    const option = (n: number) => ({ title: `T${n}`, reason: 'r', layout: 'steps', sketch: 'x' });
+    const four = [1, 2, 3, 4].map(option);
+    expect(toPartResult('image', ok({ ok: true, verdict: 'needs_image', reason: 'r', options: four }))).toMatchObject({ ok: true, image: { verdict: 'needs_image', options: four.slice(0, 3) } });
+    expect(toPartResult('image', ok({ ok: true, verdict: 'needs_image', reason: 'r', options: [option(1)] }))).toMatchObject({ image: { options: [option(1)] } });
+    expect(toPartResult('image', ok({ ok: true, verdict: 'no_image', reason: 'r', options: four }))).toMatchObject({ image: { options: [] } });
+    expect(toPartResult('image', ok({ ok: true, verdict: 'needs_image', reason: 'r' }))).toMatchObject({ image: { options: [] } });
+  });
+
+  it('keeps the image check a single request even with options', async () => {
+    const urls: string[] = [];
+    const post = vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url.endsWith('/qa')) return ok({ ok: true, proposal: { id: 'q', draftHash: 'h', summary: '', findings: [] } });
+      if (url.endsWith('/hooks')) return ok({ ok: true, proposal: { alternatives: [] } });
+      return ok({ ok: true, verdict: 'needs_image', reason: 'r', options: [{ title: 'T', reason: 'r', layout: 'steps', sketch: 'x' }] });
+    });
+    await runCombinedAiCheck({ libraryId: 'L', draft: 'd', draftHash: 'h', signal: new AbortController().signal, onPart: () => {}, post });
+    expect(urls.filter((u) => u.endsWith('/image-need'))).toHaveLength(1);
+    expect(urls).toHaveLength(3);
+  });
+
   it('maps unknown error codes safely', () => {
     expect(toPartResult('qa', { status: 500, body: { ok: false, code: 'NOPE' } })).toMatchObject({ ok: false, code: 'UNKNOWN' });
   });

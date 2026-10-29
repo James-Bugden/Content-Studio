@@ -18,6 +18,7 @@ export type ContentRowMeta = {
 };
 export type ContentPostRow = Columns<LibraryField> & ContentRowMeta & {
   image_sketch?: string;
+  image_sketch_options?: unknown;
   platform_versions?: import('@/domain/post-versions').PostVersion[];
   deleted_at?: string | null;
   collection: ContentCollection;

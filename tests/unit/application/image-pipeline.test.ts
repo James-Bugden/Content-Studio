@@ -73,7 +73,7 @@ describe('image decision and sketch state', () => {
     const original = deps.ai.run.bind(deps.ai);
     vi.spyOn(deps.ai, 'run').mockImplementation(async (task, input, opts) => {
       const output = await original(task, input, opts);
-      if (task.name === 'ascii_sketch') {
+      if (task.name === 'image_check') {
         const row = await deps.repo.getLibrary('SYN-L001');
         await deps.repo.updateLibrary({ actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: row.revision, operationId: `concurrent_${++seq}`, patch: { draftContent: 'A newer owner edit.' } });
       }
@@ -99,7 +99,7 @@ describe('image decision and sketch state', () => {
     expect(await runImageAction(deps, { ...owner, role: 'viewer' }, input)).toMatchObject({ ok: false, code: 'FORBIDDEN' });
     expect(await runImageAction(deps, owner, input)).toMatchObject({ ok: true });
     expect(await runImageAction(deps, owner, input)).toMatchObject({ ok: true });
-    expect(deps.ai.requests).toHaveLength(2);
+    expect(deps.ai.requests).toHaveLength(1);
     expect(await runImageAction(deps, owner, { ...input, action: 'revise', note: 'change' })).toMatchObject({ ok: false, code: 'CONFLICT' });
   });
   it('refuses an approved sketch after a newer text-only decision or alt-text edit', async () => {
@@ -134,7 +134,7 @@ describe('image decision and sketch state', () => {
     fail.mockImplementation(original);
     expect(await runImageAction(deps, owner, input)).toMatchObject({ ok: true });
     expect(deps.drive.created).toHaveLength(1);
-    expect(usage.calls.map(c => c.feature)).toEqual(['image_check', 'ascii_sketch', 'image_render']);
+    expect(usage.calls.map(c => c.feature)).toEqual(['image_check', 'image_render']);
     expect(usage.calls.every(c => c.status === 'completed')).toBe(true);
   });
 });

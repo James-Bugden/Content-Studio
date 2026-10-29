@@ -1,4 +1,5 @@
 import type { ErrorCode } from '@/domain/errors';
+import type { ImageOptionDraft } from '@/domain/image-options';
 import type { HookAlternative } from '@/domain/hook-frameworks';
 import type { QaProposal } from '@/domain/proposals';
 import { postJson, type ApiResult } from '@/lib/client/api';
@@ -6,14 +7,14 @@ import { asErrorCode } from './ai-error';
 
 /**
  * The three advisory AI calls behind the single "Check with AI" button (#247):
- * English check, three hook options, image need. They run in parallel on the same
+ * English check, three hook options, image need (with up to 3 sketch options, #248). They run in parallel on the same
  * draft; each part reports on its own as soon as it finishes, and a failure or a
  * spend-cap refusal in one part never hides the others. Each call goes through the
  * AI gateway on the server, so usage is recorded per part against the monthly cap.
  */
 export type AiPart = 'qa' | 'hooks' | 'image';
 export const AI_PART_LABEL: Record<AiPart, string> = { qa: 'English check', hooks: 'Hook suggestions', image: 'Image check' };
-export type ImageVerdict = { verdict: 'needs_image' | 'no_image'; reason: string };
+export type ImageVerdict = { verdict: 'needs_image' | 'no_image'; reason: string; /** 1 to 3 ranked ASCII sketch options when an image is needed. */ options: ImageOptionDraft[] };
 
 export type PartResult =
   | { part: 'qa'; ok: true; proposal: QaProposal }
@@ -31,8 +32,9 @@ export function toPartResult(part: AiPart, res: ApiResult<unknown>): PartResult 
   }
   if (part === 'qa') return { part, ok: true, proposal: (body as unknown as { proposal: QaProposal }).proposal };
   if (part === 'hooks') return { part, ok: true, alternatives: (body as unknown as { proposal: { alternatives: HookAlternative[] } }).proposal.alternatives.slice(0, 3) };
-  const image = body as unknown as ImageVerdict;
-  return { part, ok: true, image: { verdict: image.verdict, reason: image.reason } };
+  const image = body as unknown as Partial<ImageVerdict> & Pick<ImageVerdict, 'verdict' | 'reason'>;
+  const options = image.verdict === 'needs_image' && Array.isArray(image.options) ? image.options.slice(0, 3) : [];
+  return { part, ok: true, image: { verdict: image.verdict, reason: image.reason, options } };
 }
 
 const PATH: Record<AiPart, string> = { qa: 'qa', hooks: 'hooks', image: 'image-need' };
