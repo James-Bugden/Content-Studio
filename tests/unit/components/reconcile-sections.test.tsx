@@ -12,7 +12,7 @@ import type { SlowSection } from '@/application/reconcile';
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-const props = { id: 'drive-check-h', title: 'Drive Markdown vs database', what: 'Drive files', source: 'Drive', clear: 'Drive matches the database' };
+const props = { id: 'drive-check-h', gate: 'drive', title: 'Drive Markdown vs database', what: 'Drive files', source: 'Drive', clear: 'Drive matches the database' };
 const item = { id: 'i1', kind: 'markdown_export_lag' as const, severity: 'attention' as const, title: 'SYN-L001: Drive could not be checked', facts: ['A synthetic fact.'], stableIds: ['SYN-L001'], action: { label: 'Retry' as const, href: '/review/SYN-L001' } };
 const section = (over: Partial<SlowSection> = {}): SlowSection => ({ items: [], unreadable: [], failed: 0, checked: 3, ...over });
 

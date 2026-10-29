@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { MarkdownImportPreview } from '@/domain/markdown-import';
 import { buttonClass } from '../button-styles';
+import { useActionsGate } from './actions-gate';
 
 export function MarkdownImport() {
   const router = useRouter();
@@ -11,6 +12,8 @@ export function MarkdownImport() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const keys = useRef(new Map<string, string>());
+  // CS #250: applying writes the database; wait until every streamed check finished successfully.
+  const gate = useActionsGate();
   async function send(input: unknown) {
     const response = await fetch('/api/markdown-import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     const result = await response.json();
@@ -24,7 +27,7 @@ export function MarkdownImport() {
     finally { setBusy(false); }
   }
   async function apply(section: MarkdownImportPreview['sections'][number], direction: 'markdown_to_db' | 'keep_db') {
-    if (!preview) return;
+    if (!preview || !gate.enabled) return;
     setBusy(true); setMessage('');
     const key = `${section.libraryId}:${direction}`;
     if (!keys.current.has(key)) keys.current.set(key, crypto.randomUUID());
@@ -50,8 +53,9 @@ export function MarkdownImport() {
         <div className="min-w-0"><p>Database body</p><pre className="copy whitespace-pre-wrap break-words">{section.databaseBody}</pre></div>
         <div className="min-w-0"><p>Markdown body</p><pre className="copy whitespace-pre-wrap break-words">{section.markdownBody}</pre></div>
       </div>
-      <div className="mt-2 flex flex-wrap gap-2"><button type="button" className={buttonClass()} disabled={busy} onClick={() => void apply(section, 'markdown_to_db')}>Use Markdown body</button>
-        <button type="button" className={buttonClass()} disabled={busy} onClick={() => void apply(section, 'keep_db')}>Keep database body</button></div>
+      <div className="mt-2 flex flex-wrap gap-2"><button type="button" className={buttonClass()} disabled={busy || !gate.enabled} onClick={() => void apply(section, 'markdown_to_db')}>Use Markdown body</button>
+        <button type="button" className={buttonClass()} disabled={busy || !gate.enabled} onClick={() => void apply(section, 'keep_db')}>Keep database body</button></div>
+      {gate.reason ? <p className="mt-1 text-sm text-ink-soft">{gate.reason}</p> : null}
     </article>)}
   </section>;
 }

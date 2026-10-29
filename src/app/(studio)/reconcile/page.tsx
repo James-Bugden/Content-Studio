@@ -12,7 +12,8 @@ import { recentEvents } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
 import { DatabaseSwitchPanel } from '@/components/reconcile/database-switch-panel';
 import { ContentImportButton } from '@/components/reconcile/content-import-button';
-import { DriveSection, TypefullySection } from '@/components/reconcile/sections';
+import { DriveSection, STREAMED_SECTIONS, TypefullySection } from '@/components/reconcile/sections';
+import { ReconcileActionsProvider } from '@/components/reconcile/actions-gate';
 
 export const metadata: Metadata = { title: 'Reconcile | Content Studio' };
 export const dynamic = 'force-dynamic';
@@ -55,7 +56,7 @@ export default async function ReconcilePage({ searchParams }: { searchParams?: P
   const parity = databaseOnly ? undefined : getServices().contentParity?.summary();
 
   return (
-    <>
+    <ReconcileActionsProvider sections={STREAMED_SECTIONS}>
       <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <StatusBanner kind="capability"><CapabilityBanner capabilities={report.capabilities} /></StatusBanner>
@@ -181,6 +182,6 @@ export default async function ReconcilePage({ searchParams }: { searchParams?: P
           </div>
         </details>
       </div>
-    </>
+    </ReconcileActionsProvider>
   );
 }

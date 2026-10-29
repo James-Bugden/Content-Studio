@@ -17,7 +17,7 @@ vi.mock('@/application/reconcile', () => {
     startReconcile: () => ({ fast: (p => p)(report()), drive: Promise.resolve(emptySection), typefully: Promise.resolve(emptySection), report: Promise.resolve() }),
   };
 });
-vi.mock('@/components/reconcile/sections', () => ({ DriveSection: () => null, TypefullySection: () => null }));
+vi.mock('@/components/reconcile/sections', () => ({ STREAMED_SECTIONS: ['drive', 'typefully'], DriveSection: () => null, TypefullySection: () => null }));
 vi.mock('@/lib/auth', () => ({ requireActor: async () => ({ role: mocks.role }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock('@/components/reconcile/database-switch-panel', () => ({ DatabaseSwitchPanel: ({ importsBlocked }: { importsBlocked?: boolean }) => <section aria-label="Database switch" data-imports-blocked={importsBlocked}>Database switch</section> }));

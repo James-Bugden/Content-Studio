@@ -4,11 +4,13 @@ import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { buttonClass } from '../button-styles';
 import { StateView } from '../state-view';
+import { SectionGate } from './actions-gate';
 
 /** Placeholder while one slow check runs; the rest of the page is already usable. */
-export function SectionSkeleton({ id, title, what }: { id: string; title: string; what: string }) {
+export function SectionSkeleton({ id, gate, title, what }: { id: string; gate?: string; title: string; what: string }) {
   return (
     <section aria-labelledby={id} aria-busy="true">
+      {gate ? <SectionGate id={gate} state="loading" /> : null}
       <h2 id={id} className="text-lg font-semibold">{title}</h2>
       <div role="status" className="mt-2 rounded-lg border border-line bg-card p-4">
         <p className="text-sm text-ink-soft">Checking {what}. The rest of this page is ready.</p>
