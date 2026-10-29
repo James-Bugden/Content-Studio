@@ -134,14 +134,30 @@ test('HOOK-01/02/04: three scored alternatives with LinkedIn checks, and nothing
   expect(after).toEqual(before);
 });
 
-test('HOOK-03: choosing an alternative updates the hook and the opening together', async ({ page }) => {
+test('HOOK-03: choosing an alternative puts it at the top of the draft; one Save writes text and hook together', async ({ page }) => {
+  const before = await editorModel(page);
   await page.goto('/review/SYN-L001');
+  const original = await editor(page).inputValue();
   await page.getByRole('button', { name: 'Suggest three hooks' }).click();
   await expect(alternatives(page)).toHaveCount(3);
   const chosen = (await alternatives(page).nth(1).locator('.copy').first().innerText()).trim();
   await alternatives(page).nth(1).getByRole('radio').check();
   await page.getByRole('button', { name: 'Use this hook' }).click();
-  await expect(page.getByText('Hook updated: the Sheet hook fields and the opening of the draft were saved together.')).toBeVisible();
+  await expect(page.getByText('Hook put at the top of the draft. Save to keep it, or Undo.')).toBeVisible();
+  // Choosing only edits the editor text: the draft is dirty and nothing is written yet.
+  const applied = await editor(page).inputValue();
+  expect(applied.startsWith(`${chosen}\n`)).toBe(true);
+  expect(applied.endsWith('Scope decides the salary band.')).toBe(true);
+  await expect(page.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+  expect(await editorModel(page)).toEqual(before);
+  // Undo restores the previous text; redo brings the hook back.
+  await page.getByRole('button', { name: 'Undo edit' }).click();
+  await expect(editor(page)).toHaveValue(original);
+  await page.getByRole('button', { name: 'Redo edit' }).click();
+  await expect(editor(page)).toHaveValue(applied);
+  // One ordinary Save writes the text and the hook together.
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
   const model = await editorModel(page);
   expect(model.sheet.hook).toBe(chosen);
   expect(model.markdown.body.startsWith(`${chosen}\n`)).toBe(true);
@@ -149,22 +165,30 @@ test('HOOK-03: choosing an alternative updates the hook and the opening together
   expect(model.sheet.draft).toBe(model.markdown.body);
   await expect(editor(page)).toHaveValue(model.markdown.body);
   await expect(page.locator('[data-hook-card="current"]')).toContainText(chosen);
-  // The reloaded editor holds the new revisions: an ordinary save still works.
-  await editor(page).fill(`${model.markdown.body}\n\nOne more line.`);
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByText('Saved to the master Markdown and mirrored to the Sheet.')).toBeVisible();
 });
 
-test('HOOK: choosing is refused while the draft has unsaved changes, and after it changed', async ({ page }) => {
+test('HOOK: choosing works on unsaved text, but suggestions go stale once the draft changes', async ({ page }) => {
   await page.goto('/review/SYN-L001');
   await page.getByRole('button', { name: 'Suggest three hooks' }).click();
   await expect(alternatives(page)).toHaveCount(3);
   await alternatives(page).nth(0).getByRole('radio').check();
-  await editor(page).press('End');
+  await editor(page).press('Control+End');
   await editor(page).pressSequentially(' Edited.');
+  // The suggestions were written for the old text: they cannot be used until generated again.
   await expect(page.getByText('The draft changed; generate again.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Use this hook' })).toBeDisabled();
-  await expect(page.getByText(/Save or undo your draft changes first/)).toBeVisible();
+  // Generating again on the unsaved text works, and choosing keeps the unsaved edit.
+  await page.getByRole('button', { name: 'Suggest three new hooks' }).click();
+  await expect(alternatives(page)).toHaveCount(3);
+  const chosen = (await alternatives(page).nth(0).locator('.copy').first().innerText()).trim();
+  await alternatives(page).nth(0).getByRole('radio').check();
+  await expect(page.getByRole('button', { name: 'Use this hook' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Use this hook' }).click();
+  await expect(page.getByText('Hook put at the top of the draft. Save to keep it, or Undo.')).toBeVisible();
+  const text = await editor(page).inputValue();
+  expect(text.startsWith(`${chosen}\n`)).toBe(true);
+  expect(text.endsWith('Scope decides the salary band. Edited.')).toBe(true);
+  await expect(page.getByRole('button', { name: 'Save draft' })).toBeEnabled();
 });
 
 test('ZHTW-01/05: an eligible X row generates, saves for review and is approved explicitly', async ({ page }) => {

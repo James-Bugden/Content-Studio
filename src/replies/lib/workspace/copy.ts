@@ -382,6 +382,7 @@ export const SOURCES = {
   limit: 'Monthly AI limit reached',
   loading: 'Finding facts, posts and images...',
   lookupFailed: "Couldn't look for matches.",
+  searchFailed: { facts: "Couldn't search your facts.", posts: "Couldn't search your posts.", images: "Couldn't search your images." },
   unknownFact: 'A saved fact',
   postsHeading: 'Earlier posts',
   referenceOnly: 'Reference only. Nothing is inserted.',

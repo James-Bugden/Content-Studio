@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
-import { loadBacklogOptions, loadBacklogGroups, type BacklogFilters } from '@/application/backlog';
+import { loadBacklogOptions, loadBacklogGroups, paginateBacklogGroups, type BacklogFilters } from '@/application/backlog';
 import { ErrorState, PageHeader, StateView } from '@/components';
 import { BacklogGroupTable } from '@/components/backlog/backlog-group-table';
 import { LibraryBacklogExplorer } from '@/components/backlog/library-backlog-explorer';
@@ -99,15 +99,21 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
   try {
     queue = await repo.listQueue();
   } catch (error) {
-    return <><PageHeader title="Backlog ideas" description="Ideas from the Content Queue Sheet, before they become posts." /><ErrorState code={safeBacklogErrorCode(error)} action={<a href={retryHref} className="inline-flex min-h-11 items-center font-semibold underline">Try again</a>} /></>;
+    return <><PageHeader title="Backlog ideas" description="Ideas, before they become posts." /><ErrorState code={safeBacklogErrorCode(error)} action={<a href={retryHref} className="inline-flex min-h-11 items-center font-semibold underline">Try again</a>} /></>;
   }
   const approvedRaw = one(params, 'approved');
   const filters: BacklogFilters = { source: urlState.source, platform: urlState.platform, approved: approvedRaw === 'yes' ? true : approvedRaw === 'no' ? false : undefined };
   const [groups, options] = await Promise.all([loadBacklogGroups(repo, filters, queue), loadBacklogOptions(repo, queue)]);
-  const total = groups.reduce((sum, g) => sum + g.total, 0);
+  const paged = paginateBacklogGroups(groups, urlState.page);
+  const total = paged.total;
+  const pageHref = (target: number) => {
+    const next = new URLSearchParams(query);
+    if (target > 1) next.set('page', String(target)); else next.delete('page');
+    return `/backlog?${next}`;
+  };
   return (
     <>
-      <PageHeader title="Backlog ideas" description="Ideas from the Content Queue Sheet, before they become posts." />
+      <PageHeader title="Backlog ideas" description="Ideas, before they become posts." />
       <nav aria-label="Backlog views" className="mb-4 flex gap-3 text-sm"><a className="text-primary underline" href="/backlog">Content Library posts</a><span aria-current="page" className="font-semibold">Ideas ({queue.length})</span></nav>
       <FilterBar filters={[
         { key: 'source', label: 'Content Source', options: options.sources.map((s) => ({ value: s, label: s })) },
@@ -115,11 +121,16 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
         { key: 'approved', label: 'Approved', options: [{ value: 'yes', label: 'Approved' }, { value: 'no', label: 'Not yet approved' }] },
       ]} />
       {total === 0 ? <StateView kind={queue.length ? 'no_match' : 'empty'} detail={queue.length ? 'No ideas match these filters.' : 'The Content Queue is empty.'} nextStep={queue.length ? undefined : null} /> :
-        <ul className="flex flex-col gap-3">{groups.map((group) => <li key={group.source}>
+        <ul className="flex flex-col gap-3">{paged.groups.map((group) => <li key={group.source}>
           <details key={`${group.source}-${filters.source ?? ''}-${filters.platform ?? ''}-${filters.approved ?? ''}`} open={Boolean(filters.source || filters.platform || filters.approved !== undefined)} className="group rounded-lg border border-line bg-card"><summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 px-4 py-2 text-sm marker:hidden [&::-webkit-details-marker]:hidden"><span aria-hidden="true" className="inline-block text-ink-soft transition-transform duration-150 group-open:rotate-90">▸</span><span className="font-semibold">{group.source}</span><span className="text-ink-soft">({group.total} {group.total === 1 ? 'idea' : 'ideas'})</span></summary>
             <BacklogGroupTable source={group.source} canEdit={actor.role === 'owner'} pestoOptions={options.pestoStages} hookTemplateOptions={options.hookTemplates} items={group.items.map((item) => ({ libraryId: item.libraryId, revision: item.revision, hook: item.hook, reviewStatus: item.reviewStatus, pesto: item.pesto, platform: item.platform, hookTemplate: item.hookTemplate, preview: item.draftContent.slice(0, 240) }))} />
           </details>
         </li>)}</ul>}
+      {paged.totalPages > 1 ? <nav aria-label="Ideas pages" className="mt-3 flex items-center justify-between text-sm">
+        {paged.page > 1 ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(paged.page - 1)}>Previous page</a> : <span />}
+        <span>Page {paged.page} / {paged.totalPages}</span>
+        {paged.page < paged.totalPages ? <a className="min-h-11 py-3 text-primary underline" href={pageHref(paged.page + 1)}>Next page</a> : <span />}
+      </nav> : null}
       <PanelHost />
     </>
   );

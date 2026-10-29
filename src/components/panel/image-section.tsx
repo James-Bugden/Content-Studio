@@ -10,8 +10,8 @@ import { TransferImage } from '../image-transfer';
 import { invalidateEditor } from './editor-cache';
 import { SketchOptionCard } from './sketch-options';
 
-type Kind = 'check' | 'revise' | 'approve' | 'create' | 'choose' | 'more' | 'force';
-type Extra = { optionId?: string; sketch?: string };
+type Kind = 'check' | 'revise' | 'approve' | 'plan' | 'create' | 'choose' | 'more' | 'force';
+type Extra = { optionId?: string; sketch?: string; renderBrief?: Record<string, unknown> };
 
 /**
  * The Image section of the post panel. The one-click "Check with AI" (and the
@@ -65,18 +65,25 @@ export function ImageSection({ libraryId, canEdit, dirty = false }: { libraryId:
     router.refresh();
   }
 
+  /** Make image is two requests: plan (the AI step), then create (the render only). */
+  async function createImage(revision: string): Promise<ImageOutcome> {
+    const planned = await send('plan', revision);
+    if (!planned.ok || !planned.renderBrief) return planned.ok ? { ok: false, code: 'PROVIDER_UNAVAILABLE', message: 'The image plan was empty. Try again.' } : planned;
+    return send('create', planned.image.revision, { renderBrief: planned.renderBrief });
+  }
+
   /** Legacy single-sketch controls (posts without options). */
   async function action(kind: 'check' | 'revise' | 'approve' | 'create') {
     if (!image || busy || dirty) return;
     setBusy(kind === 'check' ? 'check' : 'other'); setMessage('');
     try {
-      let result = await send(kind, image.revision);
+      let result = await (kind === 'create' ? createImage(image.revision) : send(kind, image.revision));
       const changed = result.ok;
       if (result.ok) {
         setImage(result.image); setNoMore(false);
         if (kind === 'approve') {
           setMessage('Sketch approved. Creating image...');
-          result = await send('create', result.image.revision);
+          result = await createImage(result.image.revision);
           if (result.ok) setImage(result.image);
         }
       }
@@ -98,7 +105,7 @@ export function ImageSection({ libraryId, canEdit, dirty = false }: { libraryId:
         if (!chosen.ok) { setMessage(chosen.message); finish(false, chosen); return; }
         changed = true; current = chosen.image; setImage(chosen.image);
       }
-      const made = await send('create', current.revision);
+      const made = await createImage(current.revision);
       if (!made.ok) {
         setMessage(`Sketch chosen, but the image was not made. ${made.message}`);
         finish(changed, made);

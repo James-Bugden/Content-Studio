@@ -32,6 +32,7 @@ interface Call {
   in: [string, unknown[]][];
   or: string[];
   limit?: number;
+  order: [string, boolean][];
   payload?: Row | Row[];
 }
 
@@ -45,7 +46,7 @@ interface Chain {
   is(column: string, value: unknown): Chain;
   in(column: string, values: unknown[]): Chain;
   or(filter: string): Chain;
-  order(): Chain;
+  order(column: string, options?: { ascending?: boolean }): Chain;
   limit(count: number): Chain;
   maybeSingle(): Promise<unknown>;
   single(): Promise<unknown>;
@@ -55,6 +56,7 @@ interface Chain {
 function makeClient(tables: Record<string, Row[]>) {
   const calls: Call[] = [];
   let failInsert: string | null = null;
+  let failSelect: string | null = null;
 
   const matches = (row: Row, call: Call) =>
     call.eq.every(([column, value]) => row[column] === value) &&
@@ -70,7 +72,7 @@ function makeClient(tables: Record<string, Row[]>) {
     );
 
   function builder(table: string) {
-    const call: Call = { table, op: 'select', eq: [], is: [], in: [], or: [] };
+    const call: Call = { table, op: 'select', eq: [], is: [], in: [], or: [], order: [] };
     let single: 'one' | 'maybe' | null = null;
     let returning = false;
     const rows = () => (tables[table] ??= []);
@@ -79,6 +81,7 @@ function makeClient(tables: Record<string, Row[]>) {
       calls.push(call);
       const target = rows();
       if (call.op === 'select') {
+        if (failSelect === table) return { data: null, error: { code: 'XX000' } };
         let found = target.filter((row) => matches(row, call));
         if (call.limit !== undefined) found = found.slice(0, call.limit);
         if (single) return { data: found[0] ?? null, error: single === 'one' && !found[0] ? { code: 'PGRST116' } : null };
@@ -156,7 +159,8 @@ function makeClient(tables: Record<string, Row[]>) {
         call.or.push(filter);
         return chain;
       },
-      order() {
+      order(column: string, options?: { ascending?: boolean }) {
+        call.order.push([column, options?.ascending !== false]);
         return chain;
       },
       limit(count: number) {
@@ -179,7 +183,7 @@ function makeClient(tables: Record<string, Row[]>) {
   }
 
   const client = { from: builder, rpc: vi.fn() };
-  return { client, calls, failInsertOn: (table: string | null) => (failInsert = table) };
+  return { client, calls, failInsertOn: (table: string | null) => (failInsert = table), failSelectOn: (table: string | null) => (failSelect = table) };
 }
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -242,6 +246,31 @@ describe('suggestions on the real store', () => {
     expect(query.select).toBe(POST_CANDIDATE_SELECT);
     expect(query.or[0]).toContain('draft_content.ilike.%cover%');
     expect(result.posts.map((post) => post.id)).toEqual(['LIB-1']);
+  });
+
+  it('orders the candidate posts deterministically before the limit', async () => {
+    await store.suggestions({ sessionId: SESSION, factIds: [] });
+    const query = harness.calls.find((call) => call.table === 'content_studio_posts')!;
+    expect(query.order).toEqual([['updated_at', false], ['library_id', true]]);
+  });
+
+  it('reports a failed post search per kind instead of an empty result', async () => {
+    harness.failSelectOn('content_studio_posts');
+    const result = await store.suggestions({ sessionId: SESSION, factIds: [] });
+    expect(result.posts).toEqual([]);
+    expect(result.failed).toEqual(['posts', 'images']);
+    expect(result.facts.length).toBeGreaterThan(0);
+  });
+
+  it('reports a failed facts search', async () => {
+    harness.failSelectOn('facts');
+    const result = await store.suggestions({ sessionId: SESSION, factIds: [] });
+    expect(result.failed).toEqual(['facts']);
+    expect(result.posts.map((post) => post.id)).toEqual(['LIB-1']);
+  });
+
+  it('leaves failed out when every search worked', async () => {
+    expect(await store.suggestions({ sessionId: SESSION, factIds: [] })).not.toHaveProperty('failed');
   });
 
   it('finds the image attached to a post, through the asset route and never the Drive link', async () => {

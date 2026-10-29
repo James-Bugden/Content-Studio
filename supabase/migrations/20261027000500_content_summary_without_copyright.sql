@@ -1,4 +1,4 @@
--- #243. UNAPPLIED. Also applies to the retained legacy Content SQL chain.
+-- #243. Applied to production 2026-10-27. Also applies to the retained legacy Content SQL chain.
 begin;
 create or replace view public.content_studio_queue_summary with (security_invoker = true) as
   select content_source, coalesce(min(nullif(source_master_file_url, '') collate "C"), min(nullif(source_markdown_url, '') collate "C"), '') as master_link,

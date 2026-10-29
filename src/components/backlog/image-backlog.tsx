@@ -32,7 +32,10 @@ export function ImageBacklog(props: ComponentProps<typeof LibraryBacklogTable>) 
         const key = JSON.stringify([item.libraryId, item.expectedRevision, action]);
         const operationId = operations.current.get(key) ?? newOperationId('image');
         operations.current.set(key, operationId);
-        const { body } = await postJson<ImageOutcome>('/api/images', { libraryId: item.libraryId, expectedRevision: item.expectedRevision, action, operationId });
+        const call = (act: string, extra: Record<string, unknown> = {}, id = operationId) => postJson<ImageOutcome>('/api/images', { libraryId: item.libraryId, expectedRevision: item.expectedRevision, action: act, operationId: id, ...extra });
+        let { body } = action === 'create' ? await call('plan', {}, newOperationId('image')) : await call(action);
+        // Make image is two requests: plan (the AI step), then create (the render only).
+        if (action === 'create' && body.ok) body = body.renderBrief ? (await call('create', { renderBrief: body.renderBrief })).body : { ok: false, code: 'PROVIDER_UNAVAILABLE', message: 'The image plan was empty. Try again.' };
         if (body.ok) { operations.current.delete(key); invalidateEditor(item.libraryId); }
         if (body.ok) setKnown(current => ({ ...current, [item.libraryId]: { image: body.image, baseRevision: item.baseRevision } }));
         return body;

@@ -38,6 +38,8 @@ export interface SourcesPanelProps {
   busy: boolean;
   /** Matches are still being looked up. */
   loadingMore?: boolean;
+  /** Kinds whose search failed. Shown instead of "No other matches". */
+  searchFailed?: ('facts' | 'posts')[];
   notice?: string | null;
   /** Guides can only be inserted into the editor, so an idea card omits the control. */
   onRemove(item: SourceItem): void;
@@ -136,7 +138,7 @@ export function SourcesPanel(props: SourcesPanelProps) {
 
       <p className="mb-1 mt-2 text-meta font-medium text-ink">{SOURCES.more}</p>
       {more.length === 0 ? (
-        <Meta>{props.loadingMore ? SOURCES.loading : SOURCES.moreNone}</Meta>
+        props.searchFailed?.length && !props.loadingMore ? null : <Meta>{props.loadingMore ? SOURCES.loading : SOURCES.moreNone}</Meta>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-1 p-0">
           {more.map((item) => (
@@ -144,6 +146,9 @@ export function SourcesPanel(props: SourcesPanelProps) {
           ))}
         </ul>
       )}
+      {props.searchFailed?.map((kind) => (
+        <StatusLine key={kind} tone="error">{SOURCES.searchFailed[kind]}</StatusLine>
+      ))}
       {more.some((item) => item.kind === 'post') ? <Meta className="mt-1">{SOURCES.referenceOnly}</Meta> : null}
 
       {busy ? <StatusLine>{SOURCES.rewriting}</StatusLine> : null}
