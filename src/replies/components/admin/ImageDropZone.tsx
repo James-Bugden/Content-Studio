@@ -8,8 +8,8 @@ import { BANK_ADMIN } from '@/replies/lib/workspace/copy';
  *
  * One big target that takes files three ways: click or Enter/Space to open the
  * picker, drag and drop, and paste (Ctrl/Cmd+V of an image anywhere on the page).
- * The real file input sits beside the zone, not inside it, so the zone is the one
- * interactive control for a keyboard or screen reader user.
+ * The real file input sits beside the zone and is hidden (display none), so the zone
+ * is the one interactive control and Tab stop; it opens the picker via ref.click().
  *
  * It only hands files up. Validation and upload stay in the parent.
  */
@@ -110,8 +110,7 @@ export function ImageDropZone({ onFiles }: ImageDropZoneProps) {
         multiple
         accept="image/png,image/jpeg,image/webp"
         aria-label={BANK_ADMIN.filesInput}
-        tabIndex={-1}
-        className="sr-only"
+        hidden
         onChange={(event) => {
           const files = Array.from(event.target.files ?? []);
           // Reset so choosing the same file again still fires a change.

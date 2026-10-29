@@ -250,8 +250,11 @@ test.describe('the Images page', () => {
 
   test('is accessible', async ({ page }) => {
     await page.goto('/replies/images');
-    await page.getByLabel('Image files').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png });
-    await expect(page.getByLabel('Title')).toBeVisible();
+    // Retry the pick: a file chosen before hydration finishes is dropped by the page.
+    await expect(async () => {
+      await page.getByLabel('Image files').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png });
+      await expect(page.getByLabel('Title')).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
     const results = await scanAxe(page, ['wcag2a', 'wcag2aa']);
     expect(results.violations).toEqual([]);
   });
