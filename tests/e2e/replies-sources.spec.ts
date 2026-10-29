@@ -209,13 +209,14 @@ test.describe('the Images page', () => {
 
   test('adds an image: a suggestion is editable before saving, and a wrong file is refused', async ({ page }) => {
     await page.goto('/replies/images');
-    await page.getByRole('button', { name: 'Add image' }).click();
+    await expect(page.getByText('Drop images here or click to choose')).toBeVisible();
 
-    await page.getByLabel('Image file').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+    await page.getByLabel('Image files').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
     await expect(page.getByText('Use a PNG, JPG or WebP image.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Dismiss' }).click();
 
-    await page.getByLabel('Image file').setInputFiles({ name: 'interview-prep.png', mimeType: 'image/png', buffer: png });
+    await page.getByLabel('Image files').setInputFiles({ name: 'interview-prep.png', mimeType: 'image/png', buffer: png });
     await page.getByLabel(/What does it show/).fill('a one-page interview prep sheet');
     await page.getByRole('button', { name: 'Suggest title, alt text and tags' }).click();
     await expect(page.getByText('Suggestion added. Edit anything before saving.')).toBeVisible();
@@ -249,7 +250,11 @@ test.describe('the Images page', () => {
 
   test('is accessible', async ({ page }) => {
     await page.goto('/replies/images');
-    await page.getByRole('button', { name: 'Add image' }).click();
+    // Retry the pick: a file chosen before hydration finishes is dropped by the page.
+    await expect(async () => {
+      await page.getByLabel('Image files').setInputFiles({ name: 'a.png', mimeType: 'image/png', buffer: png });
+      await expect(page.getByLabel('Title')).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
     const results = await scanAxe(page, ['wcag2a', 'wcag2aa']);
     expect(results.violations).toEqual([]);
   });
