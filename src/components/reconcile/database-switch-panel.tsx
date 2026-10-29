@@ -6,6 +6,7 @@ import { cutoverReasonText, cutoverStatusSchema, sameCutoverDecision, verifiedCu
 import { buttonClass } from '../button-styles';
 import { ModalDialog } from '../modal-dialog';
 import { ContentImportButton } from './content-import-button';
+import { useActionsGate } from './actions-gate';
 import { completeCutover, pendingCutover } from './cutover-retry';
 
 const labels: Record<CutoverAction, string> = { measure: 'Measure', backup: 'Backup check', rollback: 'Rehearse rollback',
@@ -41,6 +42,8 @@ export function DatabaseSwitchPanel({ importsBlocked = false }: { importsBlocked
   const running = useRef(false);
   const switchOpener = useRef<HTMLElement | null>(null);
   const status = snapshot?.status;
+  // CS #250: on Fix issues, writes wait until every streamed check finished successfully.
+  const gate = useActionsGate();
   const elapsed = snapshot ? Math.max(0, now - snapshot.at) : 0;
   const importAge = status?.lastImportAgeMs === null || !status ? null : status.lastImportAgeMs + elapsed;
   const acceptStatus = useCallback((status: CutoverStatus) => {
@@ -63,6 +66,7 @@ export function DatabaseSwitchPanel({ importsBlocked = false }: { importsBlocked
 
   function blocked(action: CutoverAction): string | null {
     if (!status) return 'Refresh status first.';
+    if (gate.reason) return gate.reason;
     if (status.synthetic) return 'Live cutover operations are unavailable in this synthetic preview.';
     if (action === 'activate-read' || action === 'activate-db') {
       const gate = status.gates[action === 'activate-read' ? 'db-read' : 'db'];
@@ -155,8 +159,9 @@ export function DatabaseSwitchPanel({ importsBlocked = false }: { importsBlocked
         </tbody>
       </table>
     </> : null}
-    <ContentImportButton label="Import now" disabled={importsBlocked || busy || checking || status?.store === 'db'} onPending={pending => { running.current = pending; setBusy(pending); }} onComplete={() => void refresh()} />
+    <ContentImportButton label="Import now" disabled={importsBlocked || !gate.enabled || busy || checking || status?.store === 'db'} onPending={pending => { running.current = pending; setBusy(pending); }} onComplete={() => void refresh()} />
     {importsBlocked ? <p className="text-sm text-ink-soft">Some content sources could not be checked. Reload Fix issues before importing from this panel.</p> : null}
+    {!importsBlocked && gate.reason ? <p className="text-sm text-ink-soft">{gate.reason}</p> : null}
     {status?.store === 'db' ? <p className="text-sm text-ink-soft">Imports stop after database authority.</p> : null}
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       {(Object.keys(labels) as CutoverAction[]).map(action => {

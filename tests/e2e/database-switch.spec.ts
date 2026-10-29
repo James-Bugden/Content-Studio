@@ -27,9 +27,11 @@ test('Database switch: deliberate confirmation, retry, stale refusal and accessi
   const panel = page.getByRole('region', { name:'Database switch', exact:true });
   await expect(panel).toContainText(cutoverBuild);
   await expect(panel).toContainText('15-minute freshness window');
+  await expect(page.locator('[data-reconcile-checks="ready"]'), 'streamed checks finished').toHaveCount(1);
   await panel.getByRole('button', {name:'Backup check'}).click();
   await expect(panel.getByText(/Completion is unconfirmed. The pending request is kept./)).toBeVisible();
   await page.reload();
+  await expect(page.locator('[data-reconcile-checks="ready"]'), 'streamed checks finished').toHaveCount(1);
   await panel.getByRole('button', {name:'Backup check'}).click();
   await expect(panel).toContainText('Backup check verified.'); expect(keys[1]).toBe(keys[0]);
   const open = panel.getByRole('button', {name:'Switch reads to database'});

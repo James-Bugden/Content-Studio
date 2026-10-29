@@ -6,10 +6,18 @@ import { ContentParityJournal } from '@/application/content-parity';
 import { resetEnvCache } from '@/lib/env';
 const mocks = vi.hoisted(() => ({ parity: undefined as unknown, role: 'owner', refresh: vi.fn(), unreadable: [] as string[], reportError: false }));
 vi.mock('@/application/container', () => ({ getServices: () => ({ contentParity: mocks.parity }) }));
-vi.mock('@/application/reconcile', () => ({ buildReconcileReport: async () => {
-  if (mocks.reportError) throw new Error('Synthetic report failure');
-  return { checkedAt: new Date(0).toISOString(), capabilities: [], alerts: [], unreadable: mocks.unreadable, items: [], events: [] };
-} }));
+const emptySection = { items: [], unreadable: [], failed: 0, checked: 0 };
+vi.mock('@/application/reconcile', () => {
+  const report = async () => {
+    if (mocks.reportError) throw new Error('Synthetic report failure');
+    return { checkedAt: new Date(0).toISOString(), capabilities: [], alerts: [], unreadable: mocks.unreadable, items: [], events: [] };
+  };
+  return {
+    SLOW_CACHE_TTL_MS: 60_000,
+    startReconcile: () => ({ fast: (p => p)(report()), drive: Promise.resolve(emptySection), typefully: Promise.resolve(emptySection), report: Promise.resolve() }),
+  };
+});
+vi.mock('@/components/reconcile/sections', () => ({ STREAMED_SECTIONS: ['drive', 'typefully'], DriveSection: () => null, TypefullySection: () => null }));
 vi.mock('@/lib/auth', () => ({ requireActor: async () => ({ role: mocks.role }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock('@/components/reconcile/database-switch-panel', () => ({ DatabaseSwitchPanel: ({ importsBlocked }: { importsBlocked?: boolean }) => <section aria-label="Database switch" data-imports-blocked={importsBlocked}>Database switch</section> }));
