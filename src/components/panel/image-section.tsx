@@ -183,6 +183,6 @@ export function ImageSection({ libraryId, canEdit, dirty = false }: { libraryId:
       {image.hasImage ? <GuardedLink href={`/visuals/${encodeURIComponent(libraryId)}`} className="inline-flex min-h-11 items-center text-sm underline">Review image</GuardedLink> : null}
     </> : <p className="text-sm">Loading image decision...</p>}
     {dirty ? <p className="text-sm">Save or undo the draft before changing the image.</p> : null}
-    <p aria-live="polite" role="status" className="text-sm">{busy && !message ? 'Working...' : message}</p>
+    <p aria-live="polite" className="text-sm">{busy && !message ? 'Working...' : message}</p>
   </section>;
 }
