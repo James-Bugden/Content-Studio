@@ -21,15 +21,19 @@ import { exportKey } from './content-export';
 import type { BackupJournal } from './content-backup';
 import type { MarkdownExporter } from './markdown-export';
 import { isAppError } from '@/domain/errors';
+import { mapLimitSettled, withTimeout } from '@/lib/concurrency';
 import type { LiveCutoverOps } from './live-content-cutover';
 
 /**
  * Reconciliation centre (CS-017).
  *
- * Every item is recomputed from the authorities on every load: a Sheet or Drive
- * re-read, never a stored list. So an item disappears only when the sources
+ * Every item is recomputed from the authorities on every load: a database or
+ * Drive re-read, never a stored list. So an item disappears only when the sources
  * actually agree again (REV-09). Items carry safe facts, stable ids, the
  * operation id when there is one, and one explicit recovery action.
+ *
+ * CS #250: the database checks and the two slow provider checks (Drive, Typefully)
+ * are separate parts so a page can show the first immediately and stream the rest.
  */
 export type ReconcileKind =
   | 'schema_drift'
@@ -63,7 +67,7 @@ export type ReconcileItem = {
   facts: string[];
   stableIds: string[];
   operationId?: string;
-  action: { label: 'Compare' | 'Retry' | 'Relink' | 'Restore Drive link' | 'Fix in the Sheet' | 'Configure' | 'Review'; href?: string };
+  action: { label: 'Compare' | 'Retry' | 'Relink' | 'Restore Drive link' | 'Fix mapping' | 'Add section' | 'Configure' | 'Review'; href?: string };
 };
 
 export type ReconcileReport = {
@@ -91,16 +95,60 @@ export function stalePublishedRows(schedule: ScheduleRecord[], now = Date.now())
   });
 }
 
+
 /** How far ahead the Typefully scan looks for Ready rows without a Draft ID. */
 export const TYPEFULLY_SCAN_DAYS = 7;
+/** At most this many rows are sent to Typefully per run, newest first. */
+export const TYPEFULLY_SCAN_MAX = 50;
+/** Provider reads run this many at a time. */
+export const PROVIDER_CONCURRENCY = 5;
+/** One provider call that takes longer than this counts as failed, not slow. */
+export const PROVIDER_TIMEOUT_MS = 8_000;
+/** How long the slow checks (Drive, Typefully) may be reused by a refresh or the nav badge. */
+export const SLOW_CACHE_TTL_MS = 60_000;
 
-export async function buildReconcileReport(
-  repo: ContentRepository,
-  drive: DriveGateway,
-  now = Date.now(),
-  options: { typefully?: TypefullyGateway; today?: string; contentParity?: ContentParityJournal; contentCutover?: ContentWriteCutover; backupJournal?: BackupJournal; markdownExport?: MarkdownExporter; liveCutover?: LiveCutoverOps } = {},
-): Promise<ReconcileReport> {
-  rememberNavigationCount(repo, 'fixIssues', null);
+export type ReconcileOptions = {
+  typefully?: TypefullyGateway;
+  today?: string;
+  contentParity?: ContentParityJournal;
+  contentCutover?: ContentWriteCutover;
+  backupJournal?: BackupJournal;
+  markdownExport?: MarkdownExporter;
+  liveCutover?: LiveCutoverOps;
+  /** Reuse slow results for `ttlMs`; `fresh` skips the cache and replaces it. Off by default. */
+  cache?: { ttlMs: number; fresh?: boolean };
+  concurrency?: number;
+  providerTimeoutMs?: number;
+};
+
+/** A slow, provider-backed check. It never throws for one failing call: it reports `failed`. */
+export type SlowSection = {
+  items: ReconcileItem[];
+  unreadable: string[];
+  /** Provider calls that failed or timed out; their rows are unknown, not clear. */
+  failed: number;
+  /** Provider calls made. */
+  checked: number;
+};
+
+const emptySection = (): SlowSection => ({ items: [], unreadable: [], failed: 0, checked: 0 });
+
+type Context = {
+  now: number;
+  items: ReconcileItem[];
+  unreadable: string[];
+  caps: Capability[];
+  library: LibraryRecord[];
+  schedule: ScheduleRecord[];
+  dbBody: boolean;
+  queuedMarkdown: Set<string>;
+  editedMarkdown: Set<string>;
+  byFile: Map<string, LibraryRecord[]>;
+  navigationSnapshots: ReturnType<NonNullable<ContentRepository['navigationSnapshots']>> | undefined;
+};
+
+/** Database-only checks plus the Sheet-era ones when their options are passed. No Drive or Typefully call. */
+async function loadContext(repo: ContentRepository, options: ReconcileOptions, now: number): Promise<Context> {
   const items: ReconcileItem[] = [];
   const unreadable: string[] = [];
   let backupWaived = false;
@@ -162,7 +210,12 @@ export async function buildReconcileReport(
     }
   }
 
-  const schema = await repo.schema().catch(() => null);
+  // The four independent database reads run together.
+  const [schema, libraryRead, scheduleRead] = await Promise.all([
+    repo.schema().catch(() => null),
+    repo.listLibrary().then((value) => ({ value }), () => null),
+    repo.listSchedule().then((value) => ({ value }), () => null),
+  ]);
   if (!schema) unreadable.push('Sheet schema');
   for (const t of schema?.tabs ?? []) {
     if (!t.ok) {
@@ -173,24 +226,15 @@ export async function buildReconcileReport(
           `${t.tab} columns do not match the mapping`,
           t.problems.map((p) => (p.kind === 'missing' ? `Missing or renamed: ${p.header}` : `Duplicated: ${p.header}`)),
           [t.tab],
-          { label: 'Fix in the Sheet' },
+          { label: 'Fix mapping' },
         ),
       );
     }
   }
-
-  let library: LibraryRecord[] = [];
-  let schedule: ScheduleRecord[] = [];
-  try {
-    library = await repo.listLibrary();
-  } catch {
-    unreadable.push('Content Library');
-  }
-  try {
-    schedule = await repo.listSchedule();
-  } catch {
-    unreadable.push('Content Schedule');
-  }
+  const library: LibraryRecord[] = libraryRead?.value ?? [];
+  if (!libraryRead) unreadable.push('Content Library');
+  const schedule: ScheduleRecord[] = scheduleRead?.value ?? [];
+  if (!scheduleRead) unreadable.push('Content Schedule');
 
   const navigationSnapshots = repo.navigationSnapshots?.();
 
@@ -213,29 +257,40 @@ export async function buildReconcileReport(
       }
     } catch { unreadable.push('Markdown export queue'); }
   }
-  // Sheet vs Markdown, reading each master file once.
+  // Group rows by master file so each file is read once.
   const byFile = new Map<string, LibraryRecord[]>();
   for (const r of library) {
     const id = markdownFileId(r);
     if (!id && dbBody && !queuedMarkdown.has(r.value.libraryId) && (r.value.draftContent || editedMarkdown.has(r.value.libraryId))) items.push(item('markdown_missing', editedMarkdown.has(r.value.libraryId) ? 'blocking' : 'attention', `${r.value.libraryId}: no Drive master link`, ['No usable master link. Restore the link before exporting a database edit.'], [r.value.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
     if (id) byFile.set(id, [...(byFile.get(id) ?? []), r]);
   }
-  for (const [fileId, rows] of byFile) {
-    let text: string;
-    try {
-      text = (await drive.readText(fileId)).text;
-    } catch {
-      if (dbBody) for (const r of rows.filter(r => !queuedMarkdown.has(r.value.libraryId))) items.push(item('markdown_export_lag', 'attention', `${r.value.libraryId}: Drive could not be checked`, ['Drive could not be read. The database draft is saved. Retry when Drive is available.'], [r.value.libraryId], { label: 'Retry', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
-      else unreadable.push(`Markdown file ${shortHash(fileId)}`);
-      continue;
+  return { now, items, unreadable, caps, library, schedule, dbBody, queuedMarkdown, editedMarkdown, byFile, navigationSnapshots };
+}
+
+/** Drive Markdown versus the database draft. One read per file, bounded concurrency, per-call timeout. */
+async function checkDrive(drive: DriveGateway, ctx: Context, options: ReconcileOptions): Promise<SlowSection> {
+  const section = emptySection();
+  const { dbBody, queuedMarkdown, editedMarkdown } = ctx;
+  const files = [...ctx.byFile];
+  const reads = await mapLimitSettled(files, options.concurrency ?? PROVIDER_CONCURRENCY, ([fileId]) =>
+    withTimeout(() => drive.readText(fileId), options.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS));
+  section.checked = files.length;
+  files.forEach(([fileId, rows], index) => {
+    const read = reads[index]!;
+    if (read.status === 'rejected') {
+      section.failed++;
+      if (dbBody) for (const r of rows.filter(r => !queuedMarkdown.has(r.value.libraryId))) section.items.push(item('markdown_export_lag', 'attention', `${r.value.libraryId}: Drive could not be checked`, ['Drive could not be read. The database draft is saved. Retry when Drive is available.'], [r.value.libraryId], { label: 'Retry', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
+      else section.unreadable.push(`Markdown file ${shortHash(fileId)}`);
+      return;
     }
+    const text = read.value.text;
     for (const r of rows) {
       const found = findSection(text, r.value.libraryId);
       if (dbBody) {
         if (!queuedMarkdown.has(r.value.libraryId)) {
-          if (!found.ok && (r.value.draftContent || editedMarkdown.has(r.value.libraryId))) items.push(item('markdown_missing', editedMarkdown.has(r.value.libraryId) ? 'blocking' : 'attention', `${r.value.libraryId}: ${found.reason === 'duplicate' ? 'duplicate Drive sections' : 'no Drive section'}`,
+          if (!found.ok && (r.value.draftContent || editedMarkdown.has(r.value.libraryId))) section.items.push(item('markdown_missing', editedMarkdown.has(r.value.libraryId) ? 'blocking' : 'attention', `${r.value.libraryId}: ${found.reason === 'duplicate' ? 'duplicate Drive sections' : 'no Drive section'}`,
             [editedMarkdown.has(r.value.libraryId) ? 'Give this Library ID one section and export the exact saved body before rollback.' : 'Give this Library ID one section before exporting a database edit. This legacy section warning does not block rollback.'], [r.value.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
-          else if (found.ok && found.section.body !== r.value.draftContent) items.push(item('markdown_export_lag', 'blocking', `${r.value.libraryId}: Drive export is behind`,
+          else if (found.ok && found.section.body !== r.value.draftContent) section.items.push(item('markdown_export_lag', 'blocking', `${r.value.libraryId}: Drive export is behind`,
             ['The database is authoritative. A conflicting Drive body is preserved; preview Import Markdown master to choose a direction.'], [r.value.libraryId], { label: 'Review', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
         }
         continue;
@@ -243,14 +298,65 @@ export async function buildReconcileReport(
       if (!found.ok) {
         // Rows without a section are only a problem once they are in review or approved.
         if (r.value.draftContent.trim() === '') continue;
-        items.push(
-          item('markdown_missing', 'attention', found.reason === 'duplicate' ? `${r.value.libraryId} has more than one Markdown section` : `${r.value.libraryId} has no Markdown section`, [found.reason === 'duplicate' ? `${found.count} sections claim this Library ID.` : 'No heading carries this Library ID.'], [r.value.libraryId], { label: 'Fix in the Sheet' }),
+        section.items.push(
+          item('markdown_missing', 'attention', found.reason === 'duplicate' ? `${r.value.libraryId} has more than one Markdown section` : `${r.value.libraryId} has no Markdown section`, [found.reason === 'duplicate' ? `${found.count} sections claim this Library ID.` : 'No heading carries this Library ID.'], [r.value.libraryId], { label: 'Add section', href: `/review/${encodeURIComponent(r.value.libraryId)}` }),
         );
       } else if (found.section.body !== r.value.draftContent) {
-        items.push(item('markdown_mismatch', 'blocking', `${r.value.libraryId}: Sheet draft and Markdown differ`, ['The Markdown section is canonical; the Sheet mirror is out of date or edited directly.'], [r.value.libraryId], { label: 'Compare', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
+        section.items.push(item('markdown_mismatch', 'blocking', `${r.value.libraryId}: saved draft and Markdown differ`, ['The Markdown section is canonical; the saved draft is out of date or was edited directly.'], [r.value.libraryId], { label: 'Compare', href: `/review/${encodeURIComponent(r.value.libraryId)}` }));
       }
     }
-  }
+  });
+  return section;
+}
+
+/** Ready rows with no Draft ID in the next days that Typefully may match (TYPE-03), newest first, capped. */
+function typefullyDue(ctx: Context, options: ReconcileOptions): ScheduleRecord[] {
+  const tf = options.typefully;
+  const state = tf ? tf.capability().state : null;
+  if (!tf || !(state === 'ready' || state === 'read_only' || state === 'degraded')) return [];
+  const from = options.today ?? today();
+  const until = addDays(from, TYPEFULLY_SCAN_DAYS);
+  return ctx.schedule
+    .map((r) => ({ r, parsed: parseContentId(r.value.contentId) }))
+    .filter(({ r, parsed }) => !r.value.typefullyDraftId && r.value.contentStage?.ok && r.value.contentStage.value === 'Ready' && parsed && parsed.isoDate >= from && parsed.isoDate <= until)
+    .sort((a, b) => (a.parsed!.isoDate < b.parsed!.isoDate ? 1 : a.parsed!.isoDate > b.parsed!.isoDate ? -1 : 0))
+    .slice(0, TYPEFULLY_SCAN_MAX)
+    .map(({ r }) => r);
+}
+
+async function checkTypefully(repo: ContentRepository, ctx: Context, options: ReconcileOptions, due: ScheduleRecord[]): Promise<SlowSection> {
+  const section = emptySection();
+  const tf = options.typefully;
+  if (!tf || due.length === 0) return section;
+  const results = await mapLimitSettled(due, options.concurrency ?? PROVIDER_CONCURRENCY, (r) =>
+    withTimeout(() => reconcileRecord(repo, tf, ctx.schedule, r), options.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS));
+  section.checked = due.length;
+  due.forEach((r, index) => {
+    const result = results[index]!;
+    if (result.status === 'rejected' || result.value.kind === 'provider_error') {
+      section.failed++;
+      if (!section.unreadable.includes('Typefully drafts')) section.unreadable.push('Typefully drafts');
+      return;
+    }
+    const rec = result.value;
+    if (rec.kind !== 'ambiguous') return;
+    section.items.push(
+      item('typefully_ambiguous', 'attention', `${r.value.contentId}: ${rec.candidates.length} Typefully drafts could match`, ['None is linked or created automatically. Pick the right draft by date, slot, platform, planned time and similarity.'], [r.value.contentId], {
+        label: 'Review',
+        href: `/schedule/${encodeURIComponent(r.value.contentId)}`,
+      }),
+    );
+  });
+  return section;
+}
+
+type Fast = { items: ReconcileItem[]; unreadable: string[]; alerts: Alert[]; events: EventSummary[] };
+
+/** Everything else from the database: approvals, zh-TW lineage, sync age, partial operations. */
+async function finishFast(repo: ContentRepository, ctx: Context, options: ReconcileOptions): Promise<Fast> {
+  const { now, library, schedule } = ctx;
+  const items: ReconcileItem[] = [];
+  const unreadable: string[] = [];
 
   // Stale approvals.
   for (const r of library) {
@@ -282,43 +388,16 @@ export async function buildReconcileReport(
     items.push(item('stale_published_sync', 'attention', `${r.value.contentId}: published but not synced for over 48 hours`, [`Final synced: ${r.value.finalSyncedAt || 'never'}; analytics synced: ${r.value.analyticsSyncedAt || 'never'}.`], [r.value.contentId], { label: 'Retry', href: `/published/${encodeURIComponent(r.value.contentId)}` }));
   }
 
-  // Typefully: Final Content edited in the Sheet after the last sync (TYPE-05). Pure; no provider call.
+  // Typefully: Final Content edited after the last sync (TYPE-05). Pure; no provider call.
   for (const r of schedule) {
     const v = r.value;
     if (!v.typefullyDraftId || finalEditedSinceSync(v) !== true) continue;
     items.push(
-      item('typefully_sync_conflict', 'attention', `${v.contentId}: Final Content changed in the Sheet after the last Typefully sync`, ['The Sheet and Typefully may now disagree. Nothing is overwritten until you choose a direction.'], [v.contentId], {
+      item('typefully_sync_conflict', 'attention', `${v.contentId}: Final Content changed after the last Typefully sync`, ['The saved post and Typefully may now disagree. Nothing is overwritten until you choose a direction.'], [v.contentId], {
         label: 'Compare',
         href: `/schedule/${encodeURIComponent(v.contentId)}`,
       }),
     );
-  }
-
-  // Typefully: Ready rows with no Draft ID in the next days whose candidates are ambiguous (TYPE-03).
-  const tf = options.typefully;
-  const tfReady = tf ? tf.capability().state : null;
-  if (tf && (tfReady === 'ready' || tfReady === 'read_only' || tfReady === 'degraded')) {
-    const from = options.today ?? today();
-    const until = addDays(from, TYPEFULLY_SCAN_DAYS);
-    const due = schedule.filter((r) => {
-      const v = r.value;
-      const parsed = parseContentId(v.contentId);
-      return !v.typefullyDraftId && v.contentStage?.ok && v.contentStage.value === 'Ready' && parsed && parsed.isoDate >= from && parsed.isoDate <= until;
-    });
-    for (const r of due) {
-      const rec = await reconcileRecord(repo, tf, schedule, r);
-      if (rec.kind === 'provider_error') {
-        unreadable.push('Typefully drafts');
-        break;
-      }
-      if (rec.kind !== 'ambiguous') continue;
-      items.push(
-        item('typefully_ambiguous', 'attention', `${r.value.contentId}: ${rec.candidates.length} Typefully drafts could match`, ['None is linked or created automatically. Pick the right draft by date, slot, platform, planned time and similarity.'], [r.value.contentId], {
-          label: 'Review',
-          href: `/schedule/${encodeURIComponent(r.value.contentId)}`,
-        }),
-      );
-    }
   }
 
   // Partial mutations seen by this server instance, mapped back to ids by hash.
@@ -346,6 +425,7 @@ export async function buildReconcileReport(
     );
   }
 
+  // Sheet-era import comparison; only runs when the caller passes the journal (never in db mode).
   if (options.contentParity) {
     await options.contentParity.refresh();
     const parity = options.contentParity.summary(Math.max(now, options.contentParity.samples.at(-1)?.at ?? now));
@@ -365,16 +445,87 @@ export async function buildReconcileReport(
         pending.refusal ? `Copy refused (${pending.refusal}). Review the Sheet value or copy limits; imports continue for other rows.`
           : 'A fresh import can refresh this copy.'], [pending.id], { label: 'Review' }, pending.operationId));
   }
-  const order: Record<ReconcileItem['severity'], number> = { blocking: 0, attention: 1 };
-  items.sort((a, b) => order[a.severity] - order[b.severity] || a.kind.localeCompare(b.kind));
-  const report: ReconcileReport = {
-    items,
-    alerts: evaluateAlerts(events, stale.length, now),
-    events: summariseEvents(events),
-    capabilities: caps,
+  return { items, unreadable, alerts: evaluateAlerts(events, stale.length, now), events: summariseEvents(events) };
+}
+
+const bySeverity: Record<ReconcileItem['severity'], number> = { blocking: 0, attention: 1 };
+const sortItems = (items: ReconcileItem[]) => items.sort((a, b) => bySeverity[a.severity] - bySeverity[b.severity] || a.kind.localeCompare(b.kind));
+
+// ------------------------------------------------------------------ brief reuse of slow results
+
+type CacheEntry = { key: string; at: number; value: Promise<SlowSection> };
+const slowCache = new WeakMap<object, Map<string, CacheEntry>>();
+
+/** Reuse a slow check while its inputs are unchanged and it is younger than ttl. Failures are never kept. */
+function cachedSection(repo: ContentRepository, name: string, key: string, cache: ReconcileOptions['cache'], run: () => Promise<SlowSection>): Promise<SlowSection> {
+  if (!cache) return run();
+  const entries = slowCache.get(repo) ?? new Map<string, CacheEntry>();
+  slowCache.set(repo, entries);
+  const hit = entries.get(name);
+  if (!cache.fresh && hit && hit.key === key && Date.now() - hit.at < cache.ttlMs) return hit.value;
+  const entry: CacheEntry = { key, at: Date.now(), value: run() };
+  entries.set(name, entry);
+  const drop = () => { if (entries.get(name) === entry) entries.delete(name); };
+  entry.value.then((v) => { if (v.failed > 0 || v.unreadable.length > 0) drop(); }, drop);
+  return entry.value;
+}
+
+export type ReconcileStart = {
+  /** Resolves after the database-only checks. Drive and Typefully are not waited for. */
+  fast: Promise<ReconcileReport>;
+  drive: Promise<SlowSection>;
+  typefully: Promise<SlowSection>;
+  /** Everything, assembled. Also records the navigation badge count. */
+  report: Promise<ReconcileReport>;
+};
+
+/**
+ * Start every check at once. The database checks resolve first (`fast`); the
+ * Drive and Typefully checks are separate promises so a page can stream each.
+ * The navigation badge count is recorded only when all parts are known.
+ */
+export function startReconcile(repo: ContentRepository, drive: DriveGateway, now = Date.now(), options: ReconcileOptions = {}): ReconcileStart {
+  rememberNavigationCount(repo, 'fixIssues', null);
+  const loaded = loadContext(repo, options, now);
+  const fastPart = loaded.then((ctx) => finishFast(repo, ctx, options));
+  const driveP = loaded.then((ctx) => cachedSection(repo, 'drive', shortHash(JSON.stringify([ctx.dbBody, ctx.library.map((r) => [r.value.libraryId, r.revision]), [...ctx.queuedMarkdown], [...ctx.editedMarkdown]])), options.cache, () => checkDrive(drive, ctx, options)));
+  const tfP = loaded.then((ctx) => {
+    const due = typefullyDue(ctx, options);
+    return cachedSection(repo, 'typefully', shortHash(JSON.stringify([options.today ?? today(), due.map((r) => [r.value.contentId, r.revision])])), options.cache, () => checkTypefully(repo, ctx, options, due));
+  });
+
+  const fast = Promise.all([loaded, fastPart]).then(([ctx, f]): ReconcileReport => ({
+    items: sortItems([...ctx.items, ...f.items]),
+    alerts: f.alerts,
+    events: f.events,
+    capabilities: ctx.caps,
     checkedAt: new Date(now).toISOString(),
-    unreadable,
-  };
-  rememberNavigationCount(repo, 'fixIssues', fixIssuesCount(report), navigationSnapshots);
-  return report;
+    unreadable: [...ctx.unreadable, ...f.unreadable],
+  }));
+  const report = Promise.all([loaded, fastPart, driveP, tfP]).then(([ctx, f, d, t]): ReconcileReport => {
+    const full: ReconcileReport = {
+      // Original order: queue and link items, Drive items, database checks, Typefully scan.
+      items: sortItems([...ctx.items, ...d.items, ...f.items, ...t.items]),
+      alerts: f.alerts,
+      events: f.events,
+      capabilities: ctx.caps,
+      checkedAt: new Date(now).toISOString(),
+      unreadable: [...ctx.unreadable, ...d.unreadable, ...f.unreadable, ...t.unreadable],
+    };
+    rememberNavigationCount(repo, 'fixIssues', fixIssuesCount(full), ctx.navigationSnapshots);
+    return full;
+  });
+  // Callers await the part they need; none of these may surface as an unhandled rejection.
+  for (const p of [fast, driveP, tfP, report]) p.catch(() => undefined);
+  return { fast, drive: driveP, typefully: tfP, report };
+}
+
+/** Whole report, awaited. Same signature as before; the checks now run in parallel. */
+export async function buildReconcileReport(
+  repo: ContentRepository,
+  drive: DriveGateway,
+  now = Date.now(),
+  options: ReconcileOptions = {},
+): Promise<ReconcileReport> {
+  return startReconcile(repo, drive, now, options).report;
 }
