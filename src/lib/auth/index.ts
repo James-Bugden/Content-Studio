@@ -86,7 +86,7 @@ export async function requireMutation(request: Request): Promise<Actor> {
   const actor = await requireActor('owner');
   const env = serverEnv(), path = new URL(request.url).pathname;
   const frozen = env.CS_CONTENT_WRITE_ENABLED === 'false';
-  const maintenanceImport = path === '/api/ops/sheet-mirror' || path === '/api/ops/sheet-mirror/parity'
+  const maintenanceImport = path === '/api/ops/sheet-mirror' || path === '/api/ops/sheet-mirror/parity' || path === '/api/ops/backup'
     || path === '/api/ops/content-cutover';
   const replies = path === '/api/replies' || path.startsWith('/api/replies/');
   // Refuse before a provider-first saga can mutate Drive or Typefully. Final

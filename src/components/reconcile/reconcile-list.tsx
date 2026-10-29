@@ -128,6 +128,7 @@ const KIND_LABEL: Record<string, string> = {
   export_mismatch: 'Sheet export differs',
   export_parity: 'Sheet export comparison',
   backup_fresh: 'Backup verification',
+  weekly_backup: 'Weekly backup',
   backup_waived: 'Backup gate waived by owner',
   refresh_pending: 'Database refresh pending',
   schema_drift: 'Content schema changed',

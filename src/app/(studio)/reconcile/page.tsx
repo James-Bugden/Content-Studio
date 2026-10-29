@@ -12,6 +12,9 @@ import { recentEvents } from '@/observability/events';
 import { serverEnv } from '@/lib/env';
 import { DatabaseSwitchPanel } from '@/components/reconcile/database-switch-panel';
 import { ContentImportButton } from '@/components/reconcile/content-import-button';
+import { BackupSection } from '@/components/reconcile/backup-section';
+import { backupSignal, loadBackupCard, type BackupCard } from '@/lib/weekly-backup';
+import { withTimeout } from '@/lib/concurrency';
 import { DriveSection, STREAMED_SECTIONS, TypefullySection } from '@/components/reconcile/sections';
 import { ReconcileActionsProvider } from '@/components/reconcile/actions-gate';
 
@@ -33,13 +36,15 @@ export default async function ReconcilePage({ searchParams }: { searchParams?: P
   const sources = databaseOnly ? 'the database, Drive and Typefully' : 'the Sheet, Drive and Typefully';
   const fresh = Boolean((await searchParams)?.fresh);
   let report: ReconcileReport;
+  // DB-only run-history read, started now so it overlaps the other checks. Never waits on a provider.
+  const backupCard: Promise<BackupCard> = withTimeout(() => loadBackupCard(), 4_000).catch((): BackupCard => ({ state: 'unavailable' }));
   let start: ReconcileStart;
   try {
     const { repo, reconcileRepo, drive, typefully, contentParity, contentCutover, contentBackup, markdownExport, liveCutover } = getServices();
     // Sheet-era evidence (backup, cutover, export parity, import parity) is not read in db mode.
     if (!databaseOnly) await contentBackup?.prepare?.().catch(() => { /* Invalid/unavailable evidence is marked unverified by the adapter. */ });
     start = startReconcile(reconcileRepo ?? repo, drive, undefined, {
-      typefully, markdownExport, cache: { ttlMs: SLOW_CACHE_TTL_MS, fresh },
+      typefully, markdownExport, weeklyBackup: backupCard.then((card) => backupSignal(card)), cache: { ttlMs: SLOW_CACHE_TTL_MS, fresh },
       ...(databaseOnly ? {} : { contentParity, contentCutover, backupJournal: contentBackup?.journal, liveCutover }),
     });
     report = await start.fast;
@@ -60,6 +65,7 @@ export default async function ReconcilePage({ searchParams }: { searchParams?: P
       <PageHeader title="Fix issues" description={`Everything that disagrees between ${sources}, with the safe next step. Checked ${checked} Taipei.`} />
       <div className="mt-4 flex flex-col gap-6">
         <StatusBanner kind="capability"><CapabilityBanner capabilities={report.capabilities} /></StatusBanner>
+        <BackupSection promise={backupCard} now={Date.parse(report.checkedAt)} isOwner={actor.role === 'owner'} />
         {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
         {databaseOnly ? <p>Store mode: db. Database is the only content store.</p> : <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
