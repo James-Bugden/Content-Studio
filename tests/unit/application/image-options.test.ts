@@ -35,6 +35,13 @@ async function cappedAi() {
   await usage.setCap({ operationId: crypto.randomUUID(), actorHash: 'a'.repeat(64), expectedVersion: 1, capMicros: 0 });
   return new FakeAiGateway(new AiUsageService(usage));
 }
+
+/** Make image is two requests: plan (AI), then create (render only). */
+async function makeImage() {
+  const planned = await act('plan');
+  if (!planned.ok || !planned.renderBrief) return planned;
+  return act('create', { renderBrief: planned.renderBrief });
+}
 beforeEach(() => {
   deps = { repo: new SupabaseContentRepository(new FakeContentDb()), ai: new FakeAiGateway(), drive: new FakeDriveGateway(), renderer: new FakeImageRenderer() };
 });
@@ -125,7 +132,7 @@ describe('Make image: choose then create', () => {
     await act('check');
     const second = (await options())[1]!;
     expect(await act('choose', { optionId: second.id })).toMatchObject({ ok: true, image: { approval: 'approved', chosenId: second.id, sketch: second.sketch } });
-    expect(await act('create')).toMatchObject({ ok: true, image: { hasImage: true, approval: 'approved', chosenId: second.id } });
+    expect(await makeImage()).toMatchObject({ ok: true, image: { hasImage: true, approval: 'approved', chosenId: second.id } });
     expect(deps.ai.requests.map(r => r.task)).toEqual(['image_check', 'image_render']);
     expect(deps.renderer.calls).toHaveLength(1);
   });
@@ -147,13 +154,13 @@ describe('Make image: choose then create', () => {
     await act('choose', { optionId: (await options())[0]!.id });
     await setDraft('A different lesson.');
     expect(imageState(await row()).approval).toBe('stale');
-    expect(await act('create')).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
+    expect(await makeImage()).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
   });
   it('shows the monthly limit as the existing refusal, with no renderer work', async () => {
     await act('check');
     await act('choose', { optionId: (await options())[0]!.id });
     deps.ai = await cappedAi();
-    expect(await act('create')).toEqual({ ok: false, code: 'AI_LIMIT_REACHED', message: 'Monthly AI limit reached' });
+    expect(await makeImage()).toEqual({ ok: false, code: 'AI_LIMIT_REACHED', message: 'Monthly AI limit reached' });
     expect(deps.renderer.calls).toHaveLength(0);
   });
 });

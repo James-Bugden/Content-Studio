@@ -250,6 +250,21 @@ export class GoogleDriveGateway implements DriveGateway, BackupDriveStore {
     if (!res.ok) throw googleError(res.status, 'drive');
   }
 
+  async findFileByName(name: string, folderId?: string): Promise<(DriveFileMeta & { webLink: string }) | null> {
+    const folder = folderId ?? this.assetFolderId;
+    if (!folder) throw new AppError('CONFIG_MISSING', { provider: 'drive', reason: 'asset_folder' });
+    if (!FILE_ID.test(folder)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'folder_id' });
+    if (!DRIVE_FILE_NAME.test(name)) throw new AppError('VALIDATION_FAILED', { provider: 'drive', reason: 'file_name' });
+    const q = encodeURIComponent(`name = '${name}' and '${folder}' in parents and trashed = false`);
+    return withReadRetry(async () => {
+      const res = await this.fetchImpl(`${API}?q=${q}&pageSize=1&fields=${encodeURIComponent(`files(${FIELDS})`)}&supportsAllDrives=true&includeItemsFromAllDrives=true`, { headers: await this.headers() });
+      if (!res.ok) throw googleError(res.status, 'drive');
+      const b = ((await res.json()) as { files?: { id: string; mimeType: string; modifiedTime: string; version: string; size?: string; trashed?: boolean }[] }).files?.[0];
+      if (!b || typeof b.id !== 'string' || !FILE_ID.test(b.id) || b.trashed) return null;
+      return { id: b.id, mimeType: b.mimeType, modifiedTime: b.modifiedTime, revision: String(b.version), size: Number(b.size ?? 0), trashed: false, webLink: `https://drive.google.com/file/d/${b.id}/view` };
+    });
+  }
+
   async readBytes(fileId: string, maxBytes: number): Promise<{ bytes: Uint8Array; meta: DriveFileMeta }> {
     const meta = await this.getMeta(fileId);
     if (meta.trashed) throw new AppError('NOT_FOUND', { provider: 'drive', reason: 'trashed' });

@@ -129,7 +129,7 @@ server instance; a restart discards it. It is explicitly labelled on the page
 and cannot evidence a production phase exit. Durable cross-instance telemetry,
 three full real-data Phase A imports, real summary parity and hosted security
 checks remain prerequisites to live enablement. Rollback is `CS_CONTENT_STORE=sheet`;
-the Sheet remains authoritative throughout this work.
+the database is the sole Content store and the Sheet is retired (cut over 2026-10-27).
 
 ## Rollback (CS-019)
 

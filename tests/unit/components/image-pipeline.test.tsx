@@ -24,7 +24,7 @@ it('renders a monospace sketch, requires a revision note and approves before cre
   vi.stubGlobal('fetch', vi.fn(async (_url, options) => {
     if (options?.method !== 'POST') return Response.json({ ok: true, image });
     const request = JSON.parse(options.body); actions.push(request.action);
-    return Response.json({ ok: true, image: { ...image, revision: 'b'.repeat(16), approval: 'approved', hasImage: request.action === 'create' } });
+    return Response.json({ ok: true, image: { ...image, revision: 'b'.repeat(16), approval: 'approved', hasImage: request.action === 'create' }, ...(request.action === 'plan' ? { renderBrief: { format: 'E03' } } : {}) });
   }));
   render(<ImageSection libraryId="SYN-L001" canEdit />);
   await screen.findByLabelText('Image sketch');
@@ -33,7 +33,7 @@ it('renders a monospace sketch, requires a revision note and approves before cre
   fireEvent.change(screen.getByLabelText('Revision note'), { target: { value: 'Use two blocks' } });
   expect((screen.getByRole('button', { name: 'Revise sketch' }) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(screen.getByRole('button', { name: 'Approve sketch' }));
-  await waitFor(() => expect(actions).toEqual(['approve', 'create']));
+  await waitFor(() => expect(actions).toEqual(['approve', 'plan', 'create']));
   await screen.findByText('Image created. Review it in the image studio.');
 });
 it('shows monthly limit refusal and preserves the sketch for retry', async () => {

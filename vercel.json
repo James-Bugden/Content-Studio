@@ -7,7 +7,7 @@
   "functions": {
     "api/render-image.py": {
       "includeFiles": "image-renderer/**",
-      "maxDuration": 60
+      "maxDuration": 120
     }
   }
 }

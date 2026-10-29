@@ -123,6 +123,11 @@ export class FakeDriveGateway implements DriveGateway {
     return { ...this.meta(id), webLink: `https://drive.google.com/file/d/${id}/view` };
   }
 
+  async findFileByName(name: string): Promise<(DriveFileMeta & { webLink: string }) | null> {
+    const hit = [...this.created].reverse().find(c => c.name === name && !this.files.get(c.id)?.trashed && this.files.has(c.id));
+    return hit ? { ...this.meta(hit.id), webLink: `https://drive.google.com/file/d/${hit.id}/view` } : null;
+  }
+
   bytesOf(fileId: string): Uint8Array | undefined {
     return this.files.get(fileId)?.bytes;
   }

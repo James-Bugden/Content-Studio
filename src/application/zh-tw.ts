@@ -1,5 +1,6 @@
 import 'server-only';
 import { fewerLineBreaks } from '@/domain/format';
+import { COMPACT_SAVED_VERSIONS } from '@/domain/post-versions';
 import { CONTENT_STAGES } from '@/domain/enums';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
@@ -145,7 +146,8 @@ export async function generateAdaptation(args: {
     ok: true,
     proposal: {
       ...result.value,
-      content: fewerLineBreaks(result.value.content),
+      // Compaction is an owner decision; see COMPACT_SAVED_VERSIONS.
+      content: COMPACT_SAVED_VERSIONS ? fewerLineBreaks(result.value.content) : result.value.content,
       id: `zh_${fingerprint(JSON.stringify([x.contentId, stamp, ZH_TW_TASK.promptVersion, result.value.hook, result.value.content]))}`,
       sourceContentId: x.contentId,
       sourceRevision: found.x.revision,

@@ -53,7 +53,7 @@ export default async function ReconcilePage() {
         {!databaseOnly && actor.role === 'owner' ? <DatabaseSwitchPanel importsBlocked={report.unreadable.length > 0} /> : null}
         {databaseOnly ? <p>Store mode: db. Database is the only content store.</p> : <section aria-labelledby="content-parity-h" className="rounded-lg border border-line bg-card p-4">
           <h2 id="content-parity-h" className="text-lg font-semibold">Content import and parity</h2>
-          <p>Store mode: {serverEnv().CS_CONTENT_STORE}. {serverEnv().CS_CONTENT_STORE === 'db' ? 'Database is authoritative; Sheet is a one-way comparison export.' : 'Sheet remains authoritative.'}</p>
+          <p>Store mode: {serverEnv().CS_CONTENT_STORE}. {serverEnv().CS_CONTENT_STORE === 'db' ? 'Database is the only Content store; the Sheet is retired.' : 'Sheet remains authoritative.'}</p>
           {parity ? <>
             <p>{parity.sampleCount} compared requests · {parity.daysGreen} complete days green · import lag p95: {parity.lagP95 === null ? 'not measured' : `${Math.round(parity.lagP95 / 60000)} min`}.</p>
             <p>{!parity.available ? 'Durable measurements unavailable; thresholds unknown.' : parity.ready ? 'Shadow thresholds met.' : 'Shadow thresholds not yet met.'} Evidence covers {parity.scope}{parity.scope === 'this server instance' ? '; a restart loses this measurement window.' : '; measurements survive server restarts.'} This is not permission to switch reads; durable deployment evidence and the phase gates are still required.</p>

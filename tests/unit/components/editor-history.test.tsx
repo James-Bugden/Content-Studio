@@ -105,6 +105,38 @@ describe('editor undo and redo history (#242)', () => {
     expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('a second hook pick before saving replaces the first and never duplicates it', () => {
+    const handle = createRef<PostEditorHandle>();
+    const pending: (string | null)[] = [];
+    render(<PostEditor model={model} canEdit ns="synthetic" handleRef={handle} onPendingHookChange={(h) => pending.push(h)} />);
+    const rest = '\n\nFirst line\nsecond line\nthird line\n\nClosing line';
+    act(() => handle.current!.applyHook('Hook A'));
+    expect(box().value).toBe(`Hook A${rest}`);
+    act(() => handle.current!.applyHook('Hook B'));
+    expect(box().value).toBe(`Hook B${rest}`);
+    expect(box().value).not.toContain('Hook A');
+    expect(pending).toEqual(['Hook A', 'Hook B']);
+    act(() => { press({ key: 'z', ctrlKey: true }); });
+    expect(box().value).toBe(`Hook A${rest}`);
+    act(() => { press({ key: 'z', ctrlKey: true }); });
+    expect(box().value).toBe(original);
+    expect(pending).toEqual(['Hook A', 'Hook B', 'Hook A', null]);
+  });
+
+  it('pick, undo, then pick another puts only the new hook at the top', () => {
+    const handle = createRef<PostEditorHandle>();
+    render(<PostEditor model={model} canEdit ns="synthetic" handleRef={handle} />);
+    const rest = '\n\nFirst line\nsecond line\nthird line\n\nClosing line';
+    act(() => handle.current!.applyHook('Hook A'));
+    act(() => { press({ key: 'z', ctrlKey: true }); });
+    expect(box().value).toBe(original);
+    act(() => handle.current!.applyHook('Hook B'));
+    expect(box().value).toBe(`Hook B${rest}`);
+    act(() => handle.current!.applyHook('Hook A'));
+    expect(box().value).toBe(`Hook A${rest}`);
+    expect(box().value.match(/Hook/g)).toHaveLength(1);
+  });
+
   it('does not duplicate a hook that already opens the text', () => {
     const handle = createRef<PostEditorHandle>();
     render(<PostEditor model={model} canEdit ns="synthetic" handleRef={handle} />);

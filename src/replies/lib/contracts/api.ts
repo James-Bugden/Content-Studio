@@ -529,6 +529,8 @@ export const suggestionsResponseSchema = z.object({
   facts: z.array(suggestedFactSchema).max(24),
   posts: z.array(suggestedPostSchema).max(SUGGESTION_LIMITS.posts),
   images: z.array(suggestedImageSchema).max(SUGGESTION_LIMITS.images),
+  /** Kinds whose search failed, so the screen says so instead of showing "no matches". */
+  failed: z.array(z.enum(['facts', 'posts', 'images'])).max(3).optional(),
 });
 export type SuggestionsResponse = z.infer<typeof suggestionsResponseSchema>;
 

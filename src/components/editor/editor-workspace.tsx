@@ -220,6 +220,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
         sectionHash={snapshot.sectionHash}
         canEdit={canEdit}
         onChanged={() => void reload()}
+        onUseHook={(hook) => editorHandle.current?.applyHook(hook)}
       />;
   }
 }

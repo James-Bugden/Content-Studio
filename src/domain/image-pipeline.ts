@@ -20,12 +20,16 @@ export function asciiSketch(sketch: ImageSketch): string {
 const sketchText = z.string().min(1).max(8000);
 export const imageActionSchema = z.object({
   libraryId: libraryIdSchema, expectedRevision: revisionSchema, operationId: operationIdSchema,
-  action: z.enum(['check', 'revise', 'approve', 'create', 'store', 'choose', 'more', 'force']), note: z.string().trim().max(1000).optional(),
+  action: z.enum(['check', 'revise', 'approve', 'plan', 'create', 'store', 'choose', 'more', 'force']), note: z.string().trim().max(1000).optional(),
   /** `store`: the one-click check already holds the verdict; the server validates and saves it. */
   reason: line.optional(), options: z.array(imageOptionDraftSchema).min(1).max(MAX_FIRST_OPTIONS).optional(),
   /** `choose`: the option to approve, with the owner's edited sketch when they changed it. */
   optionId: z.string().regex(/^[a-z0-9]{8}$/).optional(), sketch: sketchText.optional(),
+  /** `create`: the renderer brief that `plan` returned. Make image is two requests: plan (AI) then create (render only). */
+  renderBrief: z.record(z.string(), z.unknown()).optional(),
 }).strict()
+  .refine(v => v.action !== 'create' || Boolean(v.renderBrief), { path: ['renderBrief'], message: 'Plan the image first.' })
+  .refine(v => v.action === 'create' || !v.renderBrief, { path: ['renderBrief'], message: 'Only create takes a render brief.' })
   .refine(v => v.action !== 'revise' || Boolean(v.note), { path: ['note'], message: 'Add a revision note.' })
   .refine(v => v.action !== 'store' || Boolean(v.options && v.reason), { path: ['options'], message: 'Options and a reason are required.' })
   .refine(v => v.action !== 'choose' || Boolean(v.optionId), { path: ['optionId'], message: 'Choose an option.' })
@@ -39,7 +43,7 @@ export type ImageState = { libraryId: string; revision: string; sketch: string; 
   options: ImageOption[];
   /** The option whose sketch is the current approved one, when known. */
   chosenId?: string };
-export type ImageOutcome = { ok: true; image: ImageState; /** `more` found no further layout that fits. */ noMore?: boolean } | { ok: false; code: string; message: string };
+export type ImageOutcome = { ok: true; image: ImageState; /** `more` found no further layout that fits. */ noMore?: boolean; /** `plan`: the renderer brief to send with `create`. */ renderBrief?: Record<string, unknown> } | { ok: false; code: string; message: string };
 /** The small stamp also identifies pipeline posts in projections that omit sketches. */
 export function hasImageSketch(visual: LibraryItem['visual']): boolean {
   return Boolean(visual.sketch) || /\[cs:sketch-source:[a-f0-9]{8}\]/.test(visual.imageNextAction);

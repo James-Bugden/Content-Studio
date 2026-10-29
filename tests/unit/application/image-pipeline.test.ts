@@ -20,6 +20,13 @@ async function act(action: ImageAction['action'], overrides: Partial<ImageAction
   const row = await deps.repo.getLibrary('SYN-L001');
   return runImageAction(deps, owner, { action, libraryId: 'SYN-L001', expectedRevision: row.revision, operationId: `image_test_${++seq}`, ...overrides });
 }
+
+/** Make image is two requests: plan (AI), then create (render only). */
+async function makeImage() {
+  const planned = await act('plan');
+  if (!planned.ok || !planned.renderBrief) return planned;
+  return act('create', { renderBrief: planned.renderBrief });
+}
 beforeEach(() => {
   deps = { repo: new SupabaseContentRepository(new FakeContentDb()), ai: new FakeAiGateway(), drive: new FakeDriveGateway(), renderer: new FakeImageRenderer() };
 });
@@ -41,9 +48,9 @@ describe('image decision and sketch state', () => {
     expect(toVisualView(row, [row], []).canRender.ok).toBe(false);
     expect(await runVisualAction(deps.repo, deps.drive, owner, { action: 'render', libraryId: 'SYN-L001', expectedRevision: row.revision, operationId: `no_svg_${++seq}` })).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
     await expect(renderPreview(deps.repo, 'SYN-L001', 'draft')).rejects.toMatchObject({ code: 'GATE_BLOCKED' });
-    expect(await act('create')).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
+    expect(await makeImage()).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
     expect(await act('approve')).toMatchObject({ ok: true, image: { approval: 'approved' } });
-    expect(await act('create')).toMatchObject({ ok: true, image: { hasImage: true, approval: 'approved' } });
+    expect(await makeImage()).toMatchObject({ ok: true, image: { hasImage: true, approval: 'approved' } });
     const rendered = await deps.repo.getLibrary('SYN-L001');
     expect(rendered.cells.imageFile).toContain('drive.google.com');
     expect(rendered.cells.imageStatus).toBe('Needs Review');
@@ -89,7 +96,7 @@ describe('image decision and sketch state', () => {
     await deps.repo.updateLibrary({ actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: row.revision, operationId: `source_edit_${++seq}`, patch: { draftContent: 'Changed lesson.' } });
     expect(imageState(await deps.repo.getLibrary('SYN-L001')).approval).toBe('stale');
     expect(await act('approve')).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
-    expect(await act('create')).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
+    expect(await makeImage()).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
     expect(await act('revise', { note: 'Use two simple steps.' })).toMatchObject({ ok: true, image: { approval: 'pending' } });
     expect(deps.ai.requests.at(-1)?.messages[0]?.content).toContain('Use two simple steps.');
   });
@@ -106,11 +113,11 @@ describe('image decision and sketch state', () => {
     await act('check'); await act('approve');
     let row = await deps.repo.getLibrary('SYN-L001');
     await deps.repo.updateLibrary({ actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: row.revision, operationId: `new_alt_${++seq}`, patch: { imageAltText: 'An owner edit.' } });
-    expect(await act('create')).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
+    expect(await makeImage()).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
     await act('revise', { note: 'Keep the lesson.' }); await act('approve');
     row = await deps.repo.getLibrary('SYN-L001');
     await deps.repo.updateLibrary({ actor: owner, target: { libraryId: 'SYN-L001' }, expectedRevision: row.revision, operationId: `text_only_${++seq}`, patch: { visualSource: 'Text only' } });
-    expect(await act('create')).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
+    expect(await makeImage()).toMatchObject({ ok: false, code: 'GATE_BLOCKED' });
     expect(deps.renderer.calls).toHaveLength(0);
   });
   it('monthly cap refuses without provider or renderer work', async () => {
@@ -129,13 +136,42 @@ describe('image decision and sketch state', () => {
     const operationId = `image_upload_retry_${++seq}`;
     const original = deps.repo.updateLibrary.bind(deps.repo);
     const fail = vi.spyOn(deps.repo, 'updateLibrary').mockResolvedValueOnce({ ok: false, code: 'PROVIDER_UNAVAILABLE', operationId, steps: [] });
-    const input = { action: 'create' as const, libraryId: 'SYN-L001', operationId, expectedRevision: row.revision };
+    const planned = await act('plan');
+    expect(planned).toMatchObject({ ok: true, renderBrief: expect.any(Object) });
+    const input = { action: 'create' as const, libraryId: 'SYN-L001', operationId, expectedRevision: row.revision, renderBrief: (planned as { renderBrief: Record<string, unknown> }).renderBrief };
     expect(await runImageAction(deps, owner, input)).toMatchObject({ ok: false });
     fail.mockImplementation(original);
     expect(await runImageAction(deps, owner, input)).toMatchObject({ ok: true });
     expect(deps.drive.created).toHaveLength(1);
     expect(usage.calls.map(c => c.feature)).toEqual(['image_check', 'image_render']);
     expect(usage.calls.every(c => c.status === 'completed')).toBe(true);
+  });
+  it('create only renders: it needs a plan and makes no model call', async () => {
+    await act('check'); await act('approve');
+    const row = await deps.repo.getLibrary('SYN-L001');
+    expect(await act('create')).toMatchObject({ ok: false, code: 'VALIDATION_FAILED' });
+    const planned = await act('plan');
+    expect(planned).toMatchObject({ ok: true, renderBrief: expect.any(Object) });
+    expect((await deps.repo.getLibrary('SYN-L001')).revision).toBe(row.revision);
+    const before = deps.ai.requests.length;
+    const bad = await act('create', { renderBrief: { format: 'nope' } });
+    expect(bad).toMatchObject({ ok: false, code: 'VALIDATION_FAILED' });
+    expect(await act('create', { renderBrief: (planned as { renderBrief: Record<string, unknown> }).renderBrief })).toMatchObject({ ok: true, image: { hasImage: true } });
+    expect(deps.ai.requests).toHaveLength(before);
+    expect(deps.renderer.calls).toHaveLength(1);
+  });
+  it('a retry from another instance reuses the Drive file the first attempt made', async () => {
+    await act('check'); await act('approve');
+    const planned = await act('plan') as { renderBrief: Record<string, unknown> };
+    const original = deps.repo.updateLibrary.bind(deps.repo);
+    const fail = vi.spyOn(deps.repo, 'updateLibrary').mockResolvedValueOnce({ ok: false, code: 'PROVIDER_UNAVAILABLE', operationId: 'x', steps: [] });
+    expect(await act('create', { renderBrief: planned.renderBrief })).toMatchObject({ ok: false });
+    fail.mockImplementation(original);
+    // A new operation id has no in-memory prepared patch, as after a cold start.
+    expect(await act('create', { renderBrief: planned.renderBrief })).toMatchObject({ ok: true });
+    expect(deps.drive.created).toHaveLength(1);
+    const row = await deps.repo.getLibrary('SYN-L001');
+    expect(row.cells.imageFile).toContain(deps.drive.created[0]!.id);
   });
 });
 

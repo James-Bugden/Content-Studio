@@ -21,13 +21,15 @@ import type { Platform } from '@/replies/lib/contracts/vocabulary';
 export interface ImageSuggestionsSectionProps {
   status: 'idle' | 'loading' | 'ready' | 'failed';
   images: SuggestedImage[];
+  /** The image search failed: say so instead of "No matching images yet". */
+  searchFailed?: boolean;
   platform: Platform;
   /** Prefill for Create new, drawn from the pasted post. */
   sourceText: string;
   onCreated(image: BankImage): void;
 }
 
-export function ImageSuggestionsSection({ status, images, platform, sourceText, onCreated }: ImageSuggestionsSectionProps) {
+export function ImageSuggestionsSection({ status, images, searchFailed = false, platform, sourceText, onCreated }: ImageSuggestionsSectionProps) {
   const [creating, setCreating] = useState(false);
 
   return (
@@ -35,7 +37,8 @@ export function ImageSuggestionsSection({ status, images, platform, sourceText, 
       <SectionHeading id="image-suggestions-heading">{IMAGE_SUGGESTIONS.heading}</SectionHeading>
 
       {status === 'loading' ? <StatusLine>{SOURCES.loading}</StatusLine> : null}
-      {status === 'ready' && images.length === 0 ? <StatusLine>{IMAGE_SUGGESTIONS.none}</StatusLine> : null}
+      {status === 'ready' && searchFailed ? <StatusLine tone="error">{SOURCES.searchFailed.images}</StatusLine> : null}
+      {status === 'ready' && images.length === 0 && !searchFailed ? <StatusLine>{IMAGE_SUGGESTIONS.none}</StatusLine> : null}
       {status === 'ready' && images.length > 0 ? <Meta className="mb-2">{IMAGE_SUGGESTIONS.hint}</Meta> : null}
 
       {images.length > 0 ? (

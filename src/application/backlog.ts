@@ -108,6 +108,31 @@ export async function loadBacklogGroups(repo: ContentRepository, filters: Backlo
   return groups;
 }
 
+/** Ideas per page, the same size as the Library view. */
+export const IDEAS_PAGE_SIZE = 40;
+
+/**
+ * One page of the (already filtered) idea groups: the items are cut in group order, so a
+ * group that straddles a page edge shows on both pages. `total` stays the group's full count.
+ */
+export function paginateBacklogGroups(groups: BacklogGroup[], page: number, size: number = IDEAS_PAGE_SIZE): { groups: BacklogGroup[]; page: number; totalPages: number; total: number } {
+  const total = groups.reduce((sum, g) => sum + g.items.length, 0);
+  const totalPages = Math.max(1, Math.ceil(total / size));
+  const current = Math.min(Math.max(Number.isSafeInteger(page) ? page : 1, 1), totalPages);
+  let from = (current - 1) * size;
+  let room = size;
+  const shown: BacklogGroup[] = [];
+  for (const group of groups) {
+    if (room <= 0) break;
+    if (from >= group.items.length) { from -= group.items.length; continue; }
+    const items = group.items.slice(from, from + room);
+    from = 0;
+    room -= items.length;
+    shown.push({ ...group, items });
+  }
+  return { groups: shown, page: current, totalPages, total };
+}
+
 /**
  * The full, unfiltered set of sources and platforms for the filter bar, plus the
  * distinct PESTO and Hook template values already in use, for the edit cells'

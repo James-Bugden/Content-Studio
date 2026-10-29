@@ -883,6 +883,8 @@ export function createSupabaseStore(session: OwnerSession): Store {
         .from('facts')
         .select('id, version, fact_text, tags, approved, active, sensitivity, valid_from, valid_to')
         .eq('user_id', userId);
+      // A failed search is reported per kind, never passed off as "no matches".
+      const failed: ('facts' | 'posts' | 'images')[] = factError ? ['facts'] : [];
       const facts = suggestFacts({
         facts: factError ? [] : ((factRows ?? []) as never[]),
         queryText: text,
@@ -900,8 +902,12 @@ export function createSupabaseStore(session: OwnerSession): Store {
           .eq('collection', 'library')
           .is('deleted_at', null)
           .or(filter)
+          // Deterministic: the newest posts first, then by id, so the same 60 are ranked every time.
+          .order('updated_at', { ascending: false })
+          .order('library_id', { ascending: true })
           .limit(POST_CANDIDATE_LIMIT);
-        if (!error) postRows = (data ?? []) as unknown as (LibraryPostRow & PostImageRow)[];
+        if (error) failed.push('posts', 'images');
+        else postRows = (data ?? []) as unknown as (LibraryPostRow & PostImageRow)[];
       }
 
       const bankRows = await listBankRows();
@@ -922,6 +928,7 @@ export function createSupabaseStore(session: OwnerSession): Store {
         facts,
         posts: rankLibraryPosts(text, postRows),
         images: rankImages(text, [...bank, ...attached]),
+        ...(failed.length ? { failed } : {}),
       };
     },
 

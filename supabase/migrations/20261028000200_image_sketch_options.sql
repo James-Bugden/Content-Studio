@@ -1,4 +1,4 @@
--- #248. UNAPPLIED by the build workflow; the coordinator applies it. Idempotent.
+-- #248. Applied to production 2026-10-28. Idempotent.
 -- Ranked ASCII sketch options from the image check: a nullable jsonb array of
 -- {id,title,reason,layout,sketch} on each post (1 to 9 entries). The chosen,
 -- approved sketch stays in image_sketch. The column is written through the

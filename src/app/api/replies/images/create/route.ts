@@ -12,7 +12,7 @@ import { renderBankImage, sketchBankImage } from '@/application/bank-images';
 import { getImageRenderer } from '@/integrations/image-renderer/container';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * POST /api/replies/images/create (#245): "Create new" for a bank image.

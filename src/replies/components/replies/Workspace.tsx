@@ -43,9 +43,11 @@ interface SuggestionPool {
   facts: SuggestedFact[];
   posts: SuggestedPost[];
   images: SuggestedImage[];
+  /** Kinds whose search failed on the server. */
+  failed: ('facts' | 'posts' | 'images')[];
 }
 
-const NO_SUGGESTIONS: SuggestionPool = { status: 'idle', facts: [], posts: [], images: [] };
+const NO_SUGGESTIONS: SuggestionPool = { status: 'idle', facts: [], posts: [], images: [], failed: [] };
 
 /** The editor's own sources scope. Ideas use their own id. */
 const DRAFT_SCOPE = 'draft';
@@ -190,7 +192,7 @@ export function Workspace({
       setSuggestions((previous) => {
         const known = reset ? [] : previous.facts;
         const merged = [...known, ...found.facts.filter((fact) => !known.some((k) => k.id === fact.id))];
-        return { status: 'ready', facts: merged, posts: found.posts, images: found.images };
+        return { status: 'ready', facts: merged, posts: found.posts, images: found.images, failed: found.failed ?? [] };
       });
     } catch {
       setSuggestions((previous) => (previous.status === 'loading' ? { ...previous, status: 'failed' } : previous));
@@ -664,6 +666,7 @@ export function Workspace({
         more={[...more.facts.map((fact) => factItem(fact.id)), ...more.posts.map((post) => postItem(post.id))]}
         busy={sourceBusy !== null}
         loadingMore={suggestionsLoading}
+        searchFailed={suggestions.failed.filter((kind): kind is 'facts' | 'posts' => kind !== 'images')}
         notice={sourceNotice?.scope === idea.id ? sourceNotice.text : null}
         onRemove={(item) => item.kind !== 'guide' && change(removeSource(selection, item.kind, item.id))}
         onAdd={(item) => {
@@ -698,6 +701,7 @@ export function Workspace({
         ]}
         busy={sourceBusy !== null}
         loadingMore={suggestionsLoading}
+        searchFailed={suggestions.failed.filter((kind): kind is 'facts' | 'posts' => kind !== 'images')}
         notice={sourceNotice?.scope === DRAFT_SCOPE ? sourceNotice.text : null}
         onRemove={(item) => {
           if (item.kind === 'guide') dispatch({ type: 'remove_resource', hash: draftHash });
@@ -806,6 +810,7 @@ export function Workspace({
           <ImageSuggestionsSection
             status={suggestions.status}
             images={suggestions.images}
+            searchFailed={suggestions.failed.includes('images')}
             platform={state.platform}
             sourceText={state.sourceText}
             onCreated={() => {

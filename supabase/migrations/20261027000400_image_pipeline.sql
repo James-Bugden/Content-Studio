@@ -1,4 +1,4 @@
--- #243. UNAPPLIED. Idempotent; retains all imported copyright data.
+-- #243. Applied to production 2026-10-27. Idempotent; retains all imported copyright data.
 begin;
 alter table public.content_studio_posts add column if not exists image_sketch text not null default '';
 alter table public.content_studio_posts drop constraint if exists content_studio_image_sketch_size;

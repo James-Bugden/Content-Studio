@@ -115,6 +115,13 @@ async function execute({ repo, drive, ai, renderer }: Dependencies, actor: Actor
   if (!item.targetPlatform.ok) return failure('VALIDATION_FAILED');
   const data: ImageInput = { title: item.currentHook || item.slug, draft: item.draftContent, sketch: item.visual.sketch, note: input.note, platform: item.targetPlatform.value.toLowerCase() };
   if (!data.draft.trim()) return failure('VALIDATION_FAILED', 'Write the post before checking images.');
+  if (input.action === 'plan') {
+    // The AI step of Make image. Writes nothing, so a retry only repeats a model call.
+    if (sketchApproval(item) !== 'approved') return failure('GATE_BLOCKED', 'Approve the current sketch before creating an image.');
+    const brief = await model(ai, imageRenderTask, data);
+    if (brief.platform !== data.platform) return failure('VALIDATION_FAILED', 'The image platform does not match this post.');
+    return { ok: true, image: imageState(record), renderBrief: brief };
+  }
   const patch: LibraryPatch = {};
   let note: string;
   // Actions that change only options keep the row's note, so approval and render stamps survive.
@@ -170,8 +177,10 @@ async function execute({ repo, drive, ai, renderer }: Dependencies, actor: Actor
     note = `Sketch approved [cs:sketch:${sketchMaterial(item)}]`;
   } else {
     if (sketchApproval(item) !== 'approved') return failure('GATE_BLOCKED', 'Approve the current sketch before creating an image.');
-    const brief = await model(ai, imageRenderTask, data);
-    if (brief.platform !== data.platform) return failure('VALIDATION_FAILED', 'The image platform does not match this post.');
+    // Render only: the brief was planned (AI) in an earlier request, so this one never calls a model.
+    const planned = rendererBriefSchema.safeParse(input.renderBrief);
+    if (!planned.success || planned.data.platform !== data.platform) return failure('VALIDATION_FAILED', 'The image plan is not valid for this post. Plan it again.');
+    const brief = planned.data;
     const rendered = await renderer.render(brief);
     // Refuse a changed draft before uploading; the final CAS fences a change
     // during upload. New Drive assets never overwrite an existing file.
@@ -179,7 +188,10 @@ async function execute({ repo, drive, ai, renderer }: Dependencies, actor: Actor
     const revision = (parseVisualVersion(item.visual.version)?.revision ?? 0) + 1;
     if (revision > 999) return failure('GATE_BLOCKED');
     const version = formatVisualVersion({ system: 'SOAR-v1.1', platform: item.targetPlatform.value, language: 'en', revision });
-    const file = await drive.createFile({ name: assetFileName(item.libraryId, { revision, platform: item.targetPlatform.value, language: 'en' }).replace(/\.svg$/, '.png'), mimeType: 'image/png', bytes: rendered.png });
+    // Idempotent upload: the name carries the PNG digest, so a retry (other instance, lost
+    // response) finds the file the first attempt made instead of uploading a second one.
+    const name = assetFileName(item.libraryId, { revision, platform: item.targetPlatform.value, language: 'en' }).replace(/\.svg$/, `-${rendered.sidecar.sha256.slice(0, 12)}.png`);
+    const file = (await drive.findFileByName?.(name)) ?? await drive.createFile({ name, mimeType: 'image/png', bytes: rendered.png });
     // Preserve the standard Visuals brief. Sidecar records the original renderer,
     // exact PNG digest and copy for later guarded asset approval.
     const imageBrief = JSON.stringify({ ...parseBrief(item.visual.brief), altText: brief.alt_text, editorial: rendered.sidecar });
