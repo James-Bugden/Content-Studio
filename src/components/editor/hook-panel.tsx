@@ -42,6 +42,7 @@ type Sel =
   | { kind: 'saving'; choice: 'current' | number }
   | { kind: 'done'; choice: 'current' | 'alternative' }
   | { kind: 'stale' }
+  | { kind: 'applied' }
   | { kind: 'partial'; steps: StepResult[]; operationId: string; choice: 'current' | number }
   | { kind: 'error'; message: string };
 
@@ -58,10 +59,15 @@ export type HookPanelProps = {
   canEdit: boolean;
   /** Called after a successful choice so the editor reloads the hook and the draft together. */
   onChanged: () => Promise<void> | void;
+  /**
+   * Put a chosen alternative at the top of the draft in the editor (undoable, saved
+   * with the draft by one Save). Nothing is written to the server by choosing.
+   */
+  onUseHook?: (hook: string) => void;
 };
 
 export function HookPanel(props: HookPanelProps) {
-  const { libraryId, currentHook, text, dirty, markdownOk, sheetRevision, sectionHash, canEdit, onChanged, contentStore = 'Sheet' } = props;
+  const { libraryId, currentHook, text, dirty, markdownOk, sheetRevision, sectionHash, canEdit, onChanged, onUseHook, contentStore = 'Sheet' } = props;
   const headingId = useId();
   const groupName = useId();
   const [gen, setGen] = useState<Gen>({ kind: 'idle' });
@@ -111,6 +117,15 @@ export function HookPanel(props: HookPanelProps) {
       setSel({ kind: 'stale' });
       return;
     }
+    if (choice !== 'current' && onUseHook) {
+      const alternative = proposal.alternatives[choice];
+      if (!alternative) return;
+      onUseHook(alternative.text);
+      setProposal(null);
+      setPicked('current');
+      setSel({ kind: 'applied' });
+      return;
+    }
     const key = `${proposal.id}:${choice}`;
     const op = opRef.current && opRef.current.key === key ? opRef.current : { key, id: newOperationId('hook') };
     opRef.current = op;
@@ -155,11 +170,13 @@ export function HookPanel(props: HookPanelProps) {
     setSel({ kind: 'error', message: res.status === 401 ? 'You were signed out. Nothing was written. Sign in again, then choose.' : (body.message ?? 'The choice was not saved. Nothing is confirmed as written.') });
   }
 
-  const blockedReason = !markdownOk
+  const keepBlockedReason = !markdownOk
     ? 'Choosing a hook is off because the master Markdown section could not be loaded.'
     : dirty
-      ? 'Save or undo your draft changes first: choosing a hook rewrites the opening and saves the draft through the same checked save.'
+      ? 'Save or undo your draft changes first: keeping the current hook records the alternatives on the saved row.'
       : null;
+  // Using an alternative edits the draft in the editor, so it only needs the editor to be editable.
+  const blockedReason = onUseHook ? null : keepBlockedReason;
   const busy = sel.kind === 'saving';
 
   return (
@@ -193,6 +210,7 @@ export function HookPanel(props: HookPanelProps) {
             : `Kept the current hook. The three suggestions were recorded as alternatives in the ${contentStore}.`}
         </InlineResult>
       ) : null}
+      {sel.kind === 'applied' ? <InlineResult tone="success">Hook put at the top of the draft. Save to keep it, or Undo.</InlineResult> : null}
       {sel.kind === 'stale' || (proposal && stale) ? (
         <div role="status" className="rounded-md border-2 border-block bg-block-soft p-3 text-sm">
           <p className="font-semibold">{STALE_HOOK_MESSAGE}</p>
@@ -258,12 +276,12 @@ export function HookPanel(props: HookPanelProps) {
 
       {proposal && canEdit ? (
         <div className="flex flex-col gap-2">
-          {blockedReason ? <p className="text-sm text-block">{blockedReason}</p> : null}
+          {keepBlockedReason ? <p className="text-sm text-block">{keepBlockedReason}</p> : null}
           <div className="flex flex-wrap gap-2">
             <button type="button" className={buttonClass('primary')} disabled={picked === 'current' || !!blockedReason || busy || stale} onClick={() => void choose(picked)}>
               {sel.kind === 'saving' && sel.choice !== 'current' ? 'Saving…' : 'Use this hook'}
             </button>
-            <button type="button" className={buttonClass()} disabled={!!blockedReason || busy || stale} onClick={() => void choose('current')}>
+            <button type="button" className={buttonClass()} disabled={!!keepBlockedReason || busy || stale} onClick={() => void choose('current')}>
               {sel.kind === 'saving' && sel.choice === 'current' ? 'Saving…' : 'Keep current hook'}
             </button>
           </div>

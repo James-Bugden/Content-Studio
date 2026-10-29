@@ -40,3 +40,17 @@ it('returns safe field errors, rejects corrupt bytes, wrong sidecars and unavail
     await expect(new HttpImageRenderer(url, 'synthetic-render-secret').render(brief)).rejects.toMatchObject({ code: response.status === 422 ? 'VALIDATION_FAILED' : 'PROVIDER_UNAVAILABLE' });
   }
 });
+
+it('accepts the echoed brief when only the key order differs, and still rejects changed content', async () => {
+  const fake = await new FakeImageRenderer().render(brief);
+  const reordered = { language: 'en', platform: 'linkedin', alt_text: brief.alt_text, fields: { steps: brief.fields.steps }, title: brief.title, format: brief.format };
+  const url = await server(async () => ({ status: 200, data: { png: Buffer.from(fake.png).toString('base64'), sidecar: { ...fake.sidecar, resolved_copy: reordered } } }));
+  await expect(new HttpImageRenderer(url, 'synthetic-render-secret').render(brief)).resolves.toMatchObject({ png: fake.png });
+  const changed = await server(async () => ({ status: 200, data: { png: Buffer.from(fake.png).toString('base64'), sidecar: { ...fake.sidecar, resolved_copy: { ...reordered, fields: { steps: ['Name task', 'Other'] } } } } }));
+  await expect(new HttpImageRenderer(changed, 'synthetic-render-secret').render(brief)).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+});
+it('waits less than the Python function allows', async () => {
+  const { RENDER_TIMEOUT_MS } = await import('@/integrations/image-renderer/http');
+  const config = JSON.parse((await import('node:fs')).readFileSync('vercel.json', 'utf8'));
+  expect(RENDER_TIMEOUT_MS / 1000).toBeLessThanOrEqual(config.functions['api/render-image.py'].maxDuration);
+});

@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { fingerprint } from './hash';
 
+/**
+ * OWNER DECISION PENDING: saved platform versions (English and Chinese) are
+ * compacted with Fewer line breaks, while the draft keeps its own breaks. Set this
+ * to false to store the versions exactly as the draft/Chinese text is written.
+ * Also used by the zh-TW proposal (application/zh-tw.ts).
+ */
+export const COMPACT_SAVED_VERSIONS = true;
 export const SAVE_PLATFORMS = ['LinkedIn', 'Threads', 'X'] as const;
 export type SavePlatform = (typeof SAVE_PLATFORMS)[number];
 export const postVersionSchema = z.object({

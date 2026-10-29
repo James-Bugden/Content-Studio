@@ -69,16 +69,18 @@ describe('sketch option cards (#248)', () => {
   it('chooses the sketch, then renders, in one click; marks the chosen card and shows the image with transfer controls', async () => {
     const sent = api(state(3), (request, current) => {
       if (request.action === 'choose') return { ok: true, image: chosenState({ chosenId: request.optionId as string, sketch: option(1).sketch })(current) };
+      if (request.action === 'plan') return { ok: true, image: current, renderBrief: { format: 'E03' } };
       if (request.action === 'create') return { ok: true, image: { ...chosenState({ chosenId: 'abcdef01', sketch: option(1).sketch })(current), revision: 'c'.repeat(16), hasImage: true, imageUrl: '/api/library/SYN-L001/asset' } };
     });
     render(<ImageSection libraryId="SYN-L001" canEdit />);
     await screen.findByRole('list', { name: 'Sketch options' });
     fireEvent.click(screen.getByRole('button', { name: 'Make image from Comparison card' }));
     await screen.findByText(/Image made\./);
-    expect(sent.map(s => s.action)).toEqual(['choose', 'create']);
+    expect(sent.map(s => s.action)).toEqual(['choose', 'plan', 'create']);
     expect(sent[0]).toMatchObject({ optionId: 'abcdef01', expectedRevision: 'a'.repeat(16) });
     expect(sent[0]).not.toHaveProperty('sketch');
     expect(sent[1]).toMatchObject({ expectedRevision: 'b'.repeat(16) });
+    expect(sent[2]).toMatchObject({ action: 'create', renderBrief: { format: 'E03' } });
     const cards = within(screen.getByRole('list', { name: 'Sketch options' })).getAllByRole('listitem');
     expect(cards[1]!.getAttribute('data-chosen')).toBe('true');
     expect(within(cards[1]!).getByText('Chosen')).toBeTruthy();
@@ -120,8 +122,8 @@ describe('sketch option cards (#248)', () => {
     await screen.findByRole('list', { name: 'Sketch options' });
     fireEvent.click(screen.getByRole('button', { name: 'Make image from Three steps' }));
     await screen.findByText(/Monthly AI limit reached/);
-    // Already approved: only the render was attempted.
-    expect(sent.map(s => s.action)).toEqual(['create']);
+    // Already approved: no choose; the AI plan is refused, so no render was attempted.
+    expect(sent.map(s => s.action)).toEqual(['plan']);
   });
 
   it('shows a choose refusal and stops before rendering', async () => {

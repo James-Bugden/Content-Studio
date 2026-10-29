@@ -177,3 +177,17 @@ describe('under each idea', () => {
     expect(screen.getAllByRole('button', { name: 'Use this' })).toHaveLength(3);
   });
 });
+
+describe('a failed search is not "no matches" (#251)', () => {
+  it('says the post search failed instead of "No other matches."', () => {
+    panel({ more: [], searchFailed: ['posts'] });
+    expect(screen.getByText("Couldn't search your posts.")).toBeTruthy();
+    expect(screen.queryByText('No other matches.')).toBeNull();
+  });
+
+  it('names the facts search separately and keeps working matches visible', () => {
+    panel({ searchFailed: ['facts'] });
+    expect(screen.getByText("Couldn't search your facts.")).toBeTruthy();
+    expect(screen.queryByText("Couldn't search your posts.")).toBeNull();
+  });
+});

@@ -8,7 +8,7 @@ import { errorResponse, json } from '@/lib/http';
 import { getImageRenderer } from '@/integrations/image-renderer/container';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 export async function GET(request: Request) {
   try {
     await requireActor('viewer');

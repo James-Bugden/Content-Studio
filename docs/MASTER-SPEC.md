@@ -283,7 +283,7 @@ Use the Content Studio Vercel project with preview and production environments. 
 
 ## 11. Supabase migration path
 
-Do not dual-write Content records. The `content_studio_*` Supabase namespace is an optional read model only; Sheet writes remain authoritative. Reply tables are a separate authority for Replies and are never joined into Content snapshot tables. Any future Content authority cutover still requires parity reports, explicit approval, rollback and history export.
+Do not dual-write Content records. The `content_studio_*` Supabase namespace is an optional read model only; Sheet writes were authoritative until the cut-over below; the Sheet is now retired. Reply tables are a separate authority for Replies and are never joined into Content snapshot tables. Any future Content authority cutover still requires parity reports, explicit approval, rollback and history export.
 
 **Cut over on 2026-10-27 (owner decision).** The database (Supabase) is the sole Content store (`CS_CONTENT_STORE=db`, #234); the Sheet is no longer read or written. Where sections 2, 5 and 7 describe Sheet authority, they describe the historical contract and the migration tooling kept for reference in `docs/implementation/database-migration.md`.
 

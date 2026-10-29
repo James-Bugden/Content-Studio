@@ -89,6 +89,12 @@ export interface DriveGateway {
    * folder is CONFIG_MISSING.
    */
   createFile(input: DriveCreateInput): Promise<DriveFileMeta & { webLink: string }>;
+  /**
+   * Look before create: the live, non-trashed file with this exact name in the asset
+   * folder, or null. A retry after a lost response reuses it instead of uploading a
+   * second copy. Optional so older fakes keep working; callers fall back to create.
+   */
+  findFileByName?(name: string, folderId?: string): Promise<(DriveFileMeta & { webLink: string }) | null>;
 }
 
 export type DriveCreateInput = {
