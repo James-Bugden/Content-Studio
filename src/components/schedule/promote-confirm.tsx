@@ -7,6 +7,7 @@ import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
 import { GateChip } from '../status';
 import { InlineResult } from '../inline-result';
+import { ScheduledTypefully } from './scheduled-typefully';
 
 /**
  * Explicit promotion confirmation (CS-014). The operation id is created once per
@@ -36,13 +37,16 @@ export function PromoteConfirm(props: { libraryId: string; contentId: string; sl
 
   if (result?.ok) {
     return (
-      <InlineResult tone="success">
-        Scheduled into {result.contentId}
-        {result.replayed ? ' (it was already there)' : ''}.{' '}
-        <button type="button" className="underline" onClick={() => router.push('/schedule')}>
-          Open the schedule
-        </button>
-      </InlineResult>
+      <div className="flex flex-col gap-3">
+        <InlineResult tone="success">
+          Scheduled into {result.contentId}
+          {result.replayed ? ' (it was already there)' : ''}.{' '}
+          <button type="button" className="underline" onClick={() => router.push('/schedule')}>
+            Open the schedule
+          </button>
+        </InlineResult>
+        <ScheduledTypefully contentId={result.contentId} />
+      </div>
     );
   }
   const elapsedSlot = result && !result.ok && result.code === 'VALIDATION_FAILED'

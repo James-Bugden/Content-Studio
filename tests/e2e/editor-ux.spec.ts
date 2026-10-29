@@ -56,7 +56,7 @@ test('a toolbar edit keeps the selection on the same lines and does not scroll t
   expect(after.top).toBe(before.top);
 });
 
-test('Check with AI gives an image verdict and three hooks; a hook goes to the top and saves with the text', async ({ page }) => {
+test('Check with AI gives the English result, an image verdict and three hooks; a hook goes to the top and saves with the text', async ({ page }) => {
   // SYN-L005 has a saveable Markdown section; SYN-L003's section is deliberately ambiguous.
   expect((await page.request.post('/api/test-control', { data: { kind: 'sheet_edit', libraryId: 'SYN-L005', header: 'Visual Source', value: '' } })).status()).toBe(200);
   const panel = await openPanel(page, 'SYN-L005');
@@ -69,6 +69,7 @@ test('Check with AI gives an image verdict and three hooks; a hook goes to the t
   expect(buttonBox.x).toBeLessThanOrEqual(textBox.x + 24);
   await button.click();
   await expect(panel.locator('[data-image-verdict]')).toBeVisible();
+  await expect(panel.locator('[data-qa-chips]')).toBeVisible();
   const options = panel.getByRole('list', { name: 'Hook options' }).getByRole('listitem');
   await expect(options).toHaveCount(3);
   const hook = (await options.first().locator('p.copy').innerText()).trim();

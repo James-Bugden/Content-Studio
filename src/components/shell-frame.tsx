@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShellIcon } from './shell-icon';
 import { ShellStatusProvider } from './shell-status';
+import { ShortcutsHelp } from './shortcuts-help';
 
 export function ShellFrame({ children, navigation, accountSlot, statusSlot }: {
   children: React.ReactNode; navigation: React.ReactNode; accountSlot?: React.ReactNode; statusSlot?: React.ReactNode;
@@ -28,6 +29,7 @@ export function ShellFrame({ children, navigation, accountSlot, statusSlot }: {
       <header className="studio-topbar">
         <div className="studio-search" aria-hidden="true" />
         <button type="button" className="studio-new-post" disabled title="New post creation is not available yet"><ShellIcon name="plus" /><span>New post</span></button>
+        <ShortcutsHelp />
         <button type="button" className="studio-icon-button" aria-label="Notifications" disabled title="Notifications are not available yet"><ShellIcon name="bell" /></button>
         <details ref={account} className="studio-account" onKeyDown={event => {
           if (event.key === 'Escape' && account.current?.open) {

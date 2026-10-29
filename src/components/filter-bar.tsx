@@ -4,6 +4,7 @@ import { startTransition, useId, useOptimistic } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useLeaveConfirmation } from './leave-confirm';
 import { buttonClass } from './button-styles';
+import { nextHistoryMode } from '@/lib/client/url-state';
 
 /**
  * URL-addressable filters (CS-006, SEC-10, UX-04).
@@ -80,7 +81,7 @@ export function FilterBar({ filters, variant = 'panel', trailing, disclosureKeys
     // navigation. The committed URL takes over when the transition finishes.
     guard(() => startTransition(() => {
       setQuery(next.replace(/^\?/, ''));
-      router.push(`${pathname}${next}`, { scroll: false });
+      router[nextHistoryMode()](`${pathname}${next}`, { scroll: false });
     }));
   };
 

@@ -9,6 +9,8 @@ import { adjacentPosition } from '@/domain/backlog-navigation';
 import { useBacklogNavigation, type BacklogResult } from './backlog-navigation';
 import { ImageBacklog } from './image-backlog';
 import { StateView } from '../state-view';
+import { nextHistoryMode } from '@/lib/client/url-state';
+import { listMemoryKey, readListMemory, tabStorage, writeListMemory } from '@/lib/client/list-memory';
 
 type Props = {
   initial: BacklogResult;
@@ -21,11 +23,25 @@ type Props = {
 
 
 
+function showRow(id: string | null) {
+  if (!id) return;
+  const row = document.querySelector<HTMLElement>(`[data-backlog-id="${CSS.escape(id)}"]`);
+  const box = row?.getBoundingClientRect();
+  if (row && box && (box.top < 0 || box.bottom > window.innerHeight)) row.scrollIntoView({ block: 'center' });
+}
+
 const subscribeHydration = () => () => {};
 const clientHydrated = () => true;
 const serverHydrated = () => false;
 
-/** Search is deliberately ephemeral: private post copy never goes in a URL. */
+const SEARCH_KEY = 'cs:backlog-search';
+
+/**
+ * Filters, sort, group, view and page live in the URL (enum values only). Search
+ * text never goes in a URL (SEC-10: private post copy); it is remembered for this
+ * tab instead, so reload and Back keep the view. The scroll position and the last
+ * opened row are remembered per view the same way (#247).
+ */
 export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pestoOptions = [], emptyLibrary = false }: Props) {
   // Like the post editor, accept input only once React can retain it. A full
   // pagination navigation can show the server-rendered field before hydration.
@@ -47,6 +63,8 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     next.set('page', String(target));
     return `/backlog?${next}`;
   };
+  const postParam = params.get('post');
+  const memoryKey = listMemoryKey(pathname, new URLSearchParams(params.toString()));
   const { setNavigation, search, setSearch, searchPage, setSearchPage, result, setResult } = useBacklogNavigation();
   const filtersKey = JSON.stringify([source, platform, pesto, status, sort, dir, group]);
   const previousFilters = useRef(filtersKey);
@@ -156,6 +174,58 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     return () => setNavigation(null);
   }, [usable, active, adjacent, search, setNavigation]);
 
+  // Remember the search text for this tab (debounced) and bring it back after a reload or when returning.
+  const searchRestored = useRef(false);
+  useEffect(() => {
+    if (searchRestored.current) return;
+    searchRestored.current = true;
+    const saved = tabStorage()?.getItem(SEARCH_KEY);
+    if (saved && !search) queueMicrotask(() => { setSearch(saved.slice(0, 120)); setSearchPage(1); setResult(null); setPending(true); });
+    // Once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try { if (search.trim()) tabStorage()?.setItem(SEARCH_KEY, search); else tabStorage()?.removeItem(SEARCH_KEY); } catch { /* optional */ }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Scroll position and the last opened row, restored when the view is shown again.
+  const lastOpened = useRef<string | null>(null);
+  useEffect(() => {
+    const store = tabStorage();
+    const memory = readListMemory(store, memoryKey);
+    lastOpened.current = memory?.lastId ?? null;
+    if (memory && window.scrollY < 1 && !postParam) {
+      const frame = requestAnimationFrame(() => {
+        window.scrollTo(0, memory.scrollY);
+        showRow(memory.lastId);
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    // Per view; the open post is handled by the effects below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoryKey]);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const save = () => writeListMemory(tabStorage(), memoryKey, { scrollY: window.scrollY, lastId: lastOpened.current });
+    const onScroll = () => { clearTimeout(timer); timer = setTimeout(save, 150); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(timer); save(); };
+  }, [memoryKey]);
+  const previousPost = useRef<string | null>(postParam);
+  useEffect(() => {
+    if (postParam) {
+      lastOpened.current = postParam;
+      writeListMemory(tabStorage(), memoryKey, { scrollY: window.scrollY, lastId: postParam });
+    } else if (previousPost.current) {
+      // The panel closed after J/K moved on: make sure the row you were on is in view.
+      showRow(previousPost.current);
+    }
+    previousPost.current = postParam;
+  }, [postParam, memoryKey]);
+
   // `/` jumps to search, unless the user is typing somewhere or a dialog (the post panel) is open.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -177,7 +247,7 @@ export function LibraryBacklogExplorer({ initial, filters, canEdit = false, pest
     if (next.sort === 'sheet') query.delete('sort'); else query.set('sort', next.sort);
     if (next.dir === 'asc') query.delete('dir'); else query.set('dir', next.dir);
     const q = query.toString();
-    guard(() => router.push(q ? `${pathname}?${q}` : pathname, { scroll: false }));
+    guard(() => router[nextHistoryMode()](q ? `${pathname}?${q}` : pathname, { scroll: false }));
   };
   return <section aria-label="Browse Content Library" className="space-y-3">
     <div className="flex flex-wrap items-center gap-3">

@@ -37,15 +37,28 @@ type QaResponse = { ok: true; proposal: QaProposal } | { ok: false; code: string
 
 type Run = { kind: 'idle' } | { kind: 'loading' } | { kind: 'cancelled' } | { kind: 'error'; code: ErrorCode } | { kind: 'done' };
 
-export function QaPanel({ libraryId, text, canEdit, onApply }: { libraryId: string; text: string; canEdit: boolean; onApply: (next: string) => void }) {
+/** A result produced elsewhere (the one-click AI check); a new `nonce` replaces what the panel shows. */
+export type QaSeed = { proposal: QaProposal; nonce: number };
+
+export function QaPanel({ libraryId, text, canEdit, onApply, seed = null }: { libraryId: string; text: string; canEdit: boolean; onApply: (next: string) => void; seed?: QaSeed | null }) {
   const headingId = useId();
   const [run, setRun] = useState<Run>({ kind: 'idle' });
   const [proposal, setProposal] = useState<QaProposal | null>(null);
   const [summary, setSummary] = useState('');
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [notice, setNotice] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
+  const [seedNonce, setSeedNonce] = useState(0);
   const controller = useRef<AbortController | null>(null);
   const seq = useRef(0);
+  if (seed && seed.nonce !== seedNonce) {
+    // Adopt the one-click check's result (state adjusted during render, no effect needed).
+    setSeedNonce(seed.nonce);
+    setProposal(seed.proposal);
+    setSummary(seed.proposal.summary);
+    setDismissed(new Set());
+    setNotice(null);
+    setRun({ kind: 'done' });
+  }
   const currentHash = useMemo(() => fingerprint(text), [text]);
   const stale = proposal !== null && proposal.draftHash !== currentHash;
 

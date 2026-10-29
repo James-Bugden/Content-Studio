@@ -7,7 +7,7 @@ import { InlineResult } from '../inline-result';
 import { HookPanel } from './hook-panel';
 import { initialEditorText, PostEditor, type EditorSnapshot, type PostEditorHandle } from './post-editor';
 import { AiAssist } from './ai-assist';
-import { QaPanel } from './qa-panel';
+import { QaPanel, type QaSeed } from './qa-panel';
 import { ReviewActions } from '../review/review-actions';
 import { LibraryPestoField } from '../backlog/library-pesto-field';
 import { HookChoice } from './hook-choice';
@@ -51,6 +51,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
   const [aiOpen, setAiOpen] = useState(true);
   const editorHandle = useRef<PostEditorHandle>(null);
   const [pendingHook, setPendingHook] = useState<string | null>(null);
+  const [qaSeed, setQaSeed] = useState<QaSeed | null>(null);
   const aiRef = useRef<HTMLDivElement>(null);
   const [snapshot, setSnapshot] = useState<EditorSnapshot>({
     dirty: false,
@@ -133,6 +134,7 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
           <PostEditor key={editorKey} externalRevision={reviewRevision} handleRef={editorHandle} onPendingHookChange={setPendingHook} onHookSaved={(hook) => setModel((m) => ({ ...m, sheet: { ...m.sheet, hook } }))}
             assist={<AiAssist libraryId={model.libraryId} text={text} canEdit={canEdit} decided={model.visual.trim() !== '' && model.visual !== 'Undecided'} dirty={snapshot.dirty} revision={snapshot.sheetRevision}
               onUseHook={(hook) => editorHandle.current?.applyHook(hook)}
+              onQaResult={(proposal) => setQaSeed((s) => ({ proposal, nonce: (s?.nonce ?? 0) + 1 }))}
               onDecided={(decision, revision) => { editorHandle.current?.setRevision(revision); setModel((m) => ({ ...m, visual: decision })); }} />}
             model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={() => { void refreshSavedMetadata(); if (onSaved) onSaved(); else if (focusMode) router.refresh(); }} onSaveFailed={onSaveFailed} autoFocus={focusMode}
             selection={model.contentProvider === 'db' ? selection : undefined}
@@ -196,8 +198,8 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
           if (focusMode) onSaved?.();
         }}
       />
-      {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={(next) => editorHandle.current?.replaceText(next)} /></div></details>
-        : <QaPanel libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={(next) => editorHandle.current?.replaceText(next)} />}
+      {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">English check</summary><div className="mt-3"><QaPanel seed={qaSeed} libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={(next) => editorHandle.current?.replaceText(next)} /></div></details>
+        : <QaPanel seed={qaSeed} libraryId={model.libraryId} text={text} canEdit={canEdit} onApply={(next) => editorHandle.current?.replaceText(next)} />}
       {focusMode ? <details className="rounded-lg border border-line bg-card p-3"><summary className="cursor-pointer font-medium">Hook review</summary><div className="mt-3">{hookPanel()}</div></details> : hookPanel()}
       </div>
       {snapshot.mismatch ? <MismatchNotice contentStore={contentStore} sheetDraft={model.sheet.draft} canEdit={canEdit} onUseSheetVersion={() => editorHandle.current?.replaceText(model.sheet.draft)} /> : null}

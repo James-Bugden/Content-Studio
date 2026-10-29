@@ -4,6 +4,7 @@ import { startTransition } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), params: new URLSearchParams() }));
+vi.mock('@/lib/client/url-state', () => ({ nextHistoryMode: () => 'push' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: nav.push, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
   usePathname: () => '/review',

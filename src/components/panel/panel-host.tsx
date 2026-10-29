@@ -10,6 +10,7 @@ import { panelHref } from './open-panel-link';
 import { BacklogPostPanel } from './backlog-post-panel';
 import { SlotPanel } from './slot-panel';
 import { useBacklogNavigation } from '../backlog/backlog-navigation';
+import { classifyShortcut, enabledButton, listPostIds, neighbour } from './shortcuts';
 import { isTypingTarget } from '../keyboard';
 import { buttonClass } from '../button-styles';
 import { LIBRARY_BACKLOG_PAGE_SIZE } from '@/domain/library-backlog';
@@ -169,40 +170,51 @@ export function PanelHost({ readOnly = false }: { readOnly?: boolean }) {
     advanceAfterSave.current = null;
   }
 
+  /** J/K on Next up and Review: follow the post links in page order (#247). */
+  function moveInList(direction: -1 | 1): boolean {
+    const target = post ? neighbour(listPostIds(), post, direction) : null;
+    if (!target) return false;
+    guard(() => router.replace(panelHref(pathname, params, { post: target }), { scroll: false }));
+    return true;
+  }
+
   /**
-   * Review shortcuts (CS-043, CS-047). Cmd/Ctrl+S saves the open draft from anywhere in
+   * Review shortcuts (CS-043, CS-047, #247). Cmd/Ctrl+S saves the open draft from anywhere in
    * the panel; J/K and the arrow keys follow the Backlog's current sort and
-   * filters through the same guarded Previous/Next, but never while typing.
+   * filters through the same guarded Previous/Next (or the post links in page order on
+   * Next up and Review), but never while typing.
    * Escape is the dialog's own cancel, which already runs the guarded close.
-   * Cmd/Ctrl+Enter is Save and next, and Alt+↓/↑ move posts, both of which also
+   * Cmd/Ctrl+Enter is Save and next, Cmd/Ctrl+Shift+Enter presses Approve and queue
+   * only while that button is enabled, and Alt+↓/↑ move posts, all of which also
    * work from inside the copy so a bulk pass never needs the mouse.
    */
   function onPanelKeyDown(event: React.KeyboardEvent<HTMLDialogElement>) {
     const target = event.target instanceof Element ? event.target : null;
     if (target && target.closest('dialog') !== ref.current) return;
-    if (post && pathname === '/backlog' && (event.metaKey || event.ctrlKey) && !event.altKey && event.key === 'Enter') {
+    const action = classifyShortcut(event, isTypingTarget(event.target));
+    if (!action) return;
+    const onBacklog = pathname === '/backlog';
+    if (action === 'approve-and-queue') {
+      if (!post) return;
       event.preventDefault();
-      saveAndNext();
+      enabledButton(ref.current, 'button[data-shortcut="approve-and-queue"]')?.click();
       return;
     }
-    if (post && pathname === '/backlog' && event.altKey && !event.metaKey && !event.ctrlKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+    if (action === 'save-and-next') {
+      if (post && onBacklog) { event.preventDefault(); saveAndNext(); }
+      return;
+    }
+    if (action === 'save-draft') {
       event.preventDefault();
-      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      enabledButton(ref.current, 'button[data-shortcut="save-draft"]')?.click();
+      return;
+    }
+    if (!post) return;
+    const direction = action === 'next' ? 1 : -1;
+    if (onBacklog) {
+      event.preventDefault();
       if (direction === 1 ? hasNext : hasPrevious) moveTo(direction);
-      return;
-    }
-    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 's') {
-      event.preventDefault();
-      const save = ref.current?.querySelector<HTMLButtonElement>('button[data-shortcut="save-draft"]');
-      if (save && !save.disabled) save.click();
-      return;
-    }
-    if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) return;
-    if (!post || pathname !== '/backlog') return;
-    const direction = event.key === 'j' || event.key === 'J' || event.key === 'ArrowDown' ? 1 : event.key === 'k' || event.key === 'K' || event.key === 'ArrowUp' ? -1 : 0;
-    if (!direction) return;
-    event.preventDefault();
-    if (direction === 1 ? hasNext : hasPrevious) moveTo(direction);
+    } else if (moveInList(direction)) event.preventDefault();
   }
 
   return (
