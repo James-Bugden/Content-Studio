@@ -5,8 +5,9 @@ import type { AiGateway, AiResult, AiTask, AiTaskName } from '@/application/port
 import type { EnglishQaInput } from '@/application/english-qa';
 import type { HookInput } from '@/application/hooks';
 import type { ZhInput } from '@/application/zh-tw';
-import { fakeEnglishQa, fakeHooks, fakeImageNeed, fakeZhTw } from './fake-generators';
+import { fakeEnglishQa, fakeHooks, fakeImageNeed, fakeImageOptions, fakeZhTw } from './fake-generators';
 import type { ImageNeedInput } from '@/application/image-need';
+import type { ImageLayout } from '@/domain/image-options';
 import { AiCancelled, runTask, type ModelCaller } from './pipeline';
 import type { AiUsageService } from '@/application/ai-usage';
 
@@ -61,8 +62,16 @@ export class FakeAiGateway implements AiGateway {
   private generate(name: AiTaskName, input: unknown): unknown {
     switch (name) {
       case 'image_check':
-        return { needsImage: !(input as { draft: string }).draft.includes('[text-only]'), reason: 'A short diagram makes the steps easier to follow.' };
+        return (() => {
+          const draft = (input as { draft: string }).draft;
+          const needsImage = !draft.includes('[text-only]');
+          return { needsImage, reason: 'A short diagram makes the steps easier to follow.', options: needsImage ? fakeImageOptions(draft) : [] };
+        })();
       case 'ascii_sketch':
+        if (typeof input === 'object' && input && 'shown' in input) {
+          const more = input as { draft: string; shown: { layout: ImageLayout }[]; max: number };
+          return { options: fakeImageOptions(more.draft, { exclude: more.shown.map(s => s.layout), max: more.max }) };
+        }
         return { title: 'Make the next step clear', blocks: ['Name the task', 'Show the evidence', 'Choose the next step'], grammar: 'flow', altText: 'Three steps connect the task to evidence and a next step.' };
       case 'image_render':
         return { format: 'E03', title: 'Make the next step clear', fields: { steps: ['Name the task', 'Show the evidence', 'Choose the next step'] }, alt_text: 'Three steps connect the task to evidence and a next step.', platform: (input as { platform: string }).platform, language: 'en' };

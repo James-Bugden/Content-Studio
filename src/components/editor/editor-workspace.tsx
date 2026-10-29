@@ -135,7 +135,8 @@ export function EditorWorkspace({ model: initialModel, canEdit, ns, focusMode = 
             assist={<AiAssist libraryId={model.libraryId} text={text} canEdit={canEdit} decided={model.visual.trim() !== '' && model.visual !== 'Undecided'} dirty={snapshot.dirty} revision={snapshot.sheetRevision}
               onUseHook={(hook) => editorHandle.current?.applyHook(hook)}
               onQaResult={(proposal) => setQaSeed((s) => ({ proposal, nonce: (s?.nonce ?? 0) + 1 }))}
-              onDecided={(decision, revision) => { editorHandle.current?.setRevision(revision); setModel((m) => ({ ...m, visual: decision })); }} />}
+              onDecided={(decision, revision) => { editorHandle.current?.setRevision(revision); setModel((m) => ({ ...m, visual: decision })); }}
+              onRevision={(revision) => editorHandle.current?.setRevision(revision)} />}
             model={model} canEdit={canEdit} ns={ns} value={text} onValueChange={setText} onSnapshot={onSnapshot} onSaved={() => { void refreshSavedMetadata(); if (onSaved) onSaved(); else if (focusMode) router.refresh(); }} onSaveFailed={onSaveFailed} autoFocus={focusMode}
             selection={model.contentProvider === 'db' ? selection : undefined}
             onSelectionChange={setSelection}

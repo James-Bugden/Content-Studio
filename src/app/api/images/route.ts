@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   try {
     const actor = await requireMutation(request);
     const body = await request.text();
-    if (body.length > 8000) throw new AppError('VALIDATION_FAILED');
+    if (body.length > 40_000) throw new AppError('VALIDATION_FAILED');
     let raw: unknown;
     try { raw = JSON.parse(body); } catch { throw new AppError('VALIDATION_FAILED'); }
     const parsed = imageActionSchema.safeParse(raw);

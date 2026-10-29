@@ -16,6 +16,8 @@ import type { VisualDecision } from './visual';
 export type VisualFields = {
   /** Database-only ASCII plan. Never added to the legacy Sheet schema. */
   sketch?: string;
+  /** Database-only ranked sketch options from the image check (#248). */
+  sketchOptions?: import('./image-options').ImageOption[];
   source: VisualDecision;
   imageStatus: EnumParse<ImageStatus>;
   brief: string;
