@@ -16,7 +16,7 @@ export function ShortcutsHelp() {
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== '?' || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
+      if ((event.key !== '?' && !(event.key === '/' && event.shiftKey)) || event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return;
       if (isTypingTarget(event.target)) return;
       event.preventDefault();
       setOpen(true);

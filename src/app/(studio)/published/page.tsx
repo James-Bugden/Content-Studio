@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { today } from '@/application/schedule';
 import { ErrorState, FilterBar, GuardedLink, PageHeader, StateView } from '@/components';
+import { isTestMode } from '@/replies/lib/server/test-mode';
 import { PublishedAutoSync } from '@/components/published/published-auto-sync';
 import { PublishedCard } from '@/components/published/published-card';
 import { METRIC_KEYS, publishedDate, publishedSummary, type PlatformSummary, type PublishedSummary } from '@/domain/analytics';
@@ -157,7 +158,8 @@ export default async function PublishedPage({ searchParams }: { searchParams: Pr
           ]}
         />
 
-        {actor.role === 'owner' && rows.length > 0 ? (
+        {/* Browser journeys drive syncs by hand and count them, so visiting must not mutate the doubles. */}
+        {actor.role === 'owner' && rows.length > 0 && !isTestMode() ? (
           <PublishedAutoSync rows={rows.map((r) => ({ contentId: r.contentId, revision: r.revision, draftId: r.draftId, status: r.typefullyStatus, finalSyncAt: r.finalSync.at, analyticsSyncAt: r.analyticsSync.at }))} />
         ) : null}
 
