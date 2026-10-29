@@ -4,29 +4,32 @@ import { useEffect, useRef, useState } from 'react';
 import type { ErrorCode } from '@/domain/errors';
 import { fingerprint } from '@/domain/hash';
 import type { HookAlternative } from '@/domain/hook-frameworks';
+import type { QaProposal } from '@/domain/proposals';
 import { newOperationId, postJson } from '@/lib/client/api';
 import { buttonClass } from '../button-styles';
-import { AiErrorView, asErrorCode } from './ai-error';
+import { AiErrorView } from './ai-error';
+import { AI_PART_LABEL, collapseFailures, runCombinedAiCheck, type AiPart, type ImageVerdict, type PartResult } from './combined-ai-check';
 
 /**
- * One-click AI check for a single post (#242), above the text on the left.
+ * One-click AI check for a single post (#242, #247), above the text on the left.
  *
- * Runs two advisory calls on the exact text in the box: does the post need an
- * image, and three hook options. The image verdict is written through the guarded
- * Visual Studio decision (only while the post has no decision yet and the text was
- * not edited meanwhile); hooks are only offered. Both calls go through the AI
- * gateway, so they count against the monthly cap and stop when it is reached.
+ * Runs three advisory calls in parallel on the exact text in the box: the English
+ * check, three hook options and the image need. The image verdict is written
+ * through the guarded Visual Studio decision (only while the post has no decision
+ * yet and the text was not edited meanwhile); the English findings are handed to
+ * the English check panel and hooks are only offered. All calls go through the AI
+ * gateway, so each counts against the monthly cap and stops when it is reached.
  */
-type Verdict = { verdict: 'needs_image' | 'no_image'; reason: string };
+type Verdict = ImageVerdict;
 type Recorded = { kind: 'idle' } | { kind: 'saved'; label: string } | { kind: 'skipped' } | { kind: 'failed' };
 type Phase = { kind: 'idle' } | { kind: 'running' } | { kind: 'cancelled' } | { kind: 'done' };
-type Failure = { what: string; code: ErrorCode };
+type Failure = { part: AiPart; code: ErrorCode };
 
-type ImageResponse = ({ ok: true } & Verdict) | { ok: false; code: string };
-type HookResponse = { ok: true; proposal: { alternatives: HookAlternative[] } } | { ok: false; code: string };
 type DecideResponse = { ok: true; item: { revision: string } } | { ok: false; code: string };
 
-export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, onUseHook, onDecided }: {
+const PARTS: AiPart[] = ['qa', 'hooks', 'image'];
+
+export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, onUseHook, onDecided, onQaResult }: {
   libraryId: string;
   text: string;
   canEdit: boolean;
@@ -38,9 +41,13 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
   onUseHook: (hook: string) => void;
   /** The decision was written; the editor carries on from the new revision. */
   onDecided: (decision: 'Text only' | 'Original graphic', revision: string) => void;
+  /** The English check finished; the English check panel shows its findings. */
+  onQaResult?: (proposal: QaProposal) => void;
 }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [pending, setPending] = useState<AiPart[]>([]);
   const [image, setImage] = useState<Verdict | null>(null);
+  const [qa, setQa] = useState<QaProposal | null>(null);
   const [recorded, setRecorded] = useState<Recorded>({ kind: 'idle' });
   const [hooks, setHooks] = useState<HookAlternative[]>([]);
   const [failures, setFailures] = useState<Failure[]>([]);
@@ -54,27 +61,23 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
     const ctrl = new AbortController();
     controller.current = ctrl;
     const draft = text;
-    const draftHash = fingerprint(draft);
     setPhase({ kind: 'running' });
-    setImage(null); setHooks([]); setFailures([]); setRecorded({ kind: 'idle' });
+    setPending(PARTS);
+    setImage(null); setHooks([]); setQa(null); setFailures([]); setRecorded({ kind: 'idle' });
+    const failed: Failure[] = [];
+    const recordings: Promise<void>[] = [];
+    const onPart = (r: PartResult) => {
+      setPending((p) => p.filter((x) => x !== r.part));
+      if (!r.ok) { failed.push({ part: r.part, code: r.code }); return; }
+      if (r.part === 'qa') { setQa(r.proposal); onQaResult?.(r.proposal); }
+      else if (r.part === 'hooks') setHooks(r.alternatives);
+      else { setImage(r.image); recordings.push(record(r.image.verdict, draft, ctrl.signal).catch(() => {})); }
+    };
     try {
-      const base = `/api/library/${encodeURIComponent(libraryId)}`;
-      const [img, hk] = await Promise.all([
-        postJson<ImageResponse>(`${base}/image-need`, { draft, draftHash }, ctrl.signal),
-        postJson<HookResponse>(`${base}/hooks`, { draft, draftHash }, ctrl.signal),
-      ]);
+      await runCombinedAiCheck({ libraryId, draft, draftHash: fingerprint(draft), signal: ctrl.signal, onPart });
+      await Promise.all(recordings);
       if (ctrl.signal.aborted) return;
-      const problems: Failure[] = [];
-      const imageBody = img.body as ImageResponse;
-      const hookBody = hk.body as HookResponse;
-      if (imageBody.ok) {
-        setImage({ verdict: imageBody.verdict, reason: imageBody.reason });
-        await record(imageBody.verdict, draft, ctrl.signal);
-      } else problems.push({ what: 'Image check', code: img.status === 401 ? 'AUTH_REQUIRED' : asErrorCode(imageBody.code) });
-      if (hookBody.ok) setHooks(hookBody.proposal.alternatives.slice(0, 3));
-      else problems.push({ what: 'Hook suggestions', code: hk.status === 401 ? 'AUTH_REQUIRED' : asErrorCode(hookBody.code) });
-      // The spend cap stops both calls at once; say so once.
-      setFailures(problems.some((p) => p.code === 'AI_LIMIT_REACHED') ? problems.filter((p) => p.code === 'AI_LIMIT_REACHED').slice(0, 1) : problems);
+      setFailures(collapseFailures(failed));
       setPhase({ kind: 'done' });
     } catch {
       if (!ctrl.signal.aborted) setPhase({ kind: 'cancelled' });
@@ -100,6 +103,7 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
 
   function cancel() {
     controller.current?.abort();
+    setPending([]);
     setPhase({ kind: 'cancelled' });
   }
 
@@ -115,8 +119,10 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
           </button>
         )
       ) : null}
-      {running ? <p role="status" className="inline-flex items-center gap-2 text-sm"><span aria-hidden="true" className="size-3 rounded-full border-2 border-ink border-t-transparent motion-safe:animate-spin" />Checking image and writing hooks…</p> : null}
+      {running ? <p role="status" className="inline-flex items-center gap-2 text-sm"><span aria-hidden="true" className="size-3 rounded-full border-2 border-ink border-t-transparent motion-safe:animate-spin" />Checking {pending.map((p) => AI_PART_LABEL[p].toLowerCase()).join(', ') || 'results'}…</p> : null}
       {phase.kind === 'cancelled' ? <p role="status" className="text-sm">Cancelled.</p> : null}
+
+      {qa ? <QaChips proposal={qa} stale={qa.draftHash !== fingerprint(text)} /> : null}
 
       {image ? (
         <p role="status" className="min-w-0 text-sm" data-image-verdict={image.verdict}>
@@ -142,7 +148,22 @@ export function AiAssist({ libraryId, text, canEdit, decided, dirty, revision, o
         </ol>
       ) : null}
 
-      {failures.map((f) => <div key={f.what} className="w-full"><AiErrorView code={f.code} what={f.what} onRetry={canEdit ? () => void run() : undefined} /></div>)}
+      {failures.map((f) => <div key={f.part} className="w-full"><AiErrorView code={f.code} what={AI_PART_LABEL[f.part]} onRetry={canEdit ? () => void run() : undefined} /></div>)}
     </div>
+  );
+}
+
+/** English check result as chips; the findings themselves are in the English check panel. */
+function QaChips({ proposal, stale }: { proposal: QaProposal; stale: boolean }) {
+  const count = (s: 'must' | 'should' | 'consider') => proposal.findings.filter((f) => f.severity === s).length;
+  const chips = ([['must', 'must fix'], ['should', 'should fix'], ['consider', 'to consider']] as const).filter(([s]) => count(s) > 0);
+  return (
+    <p role="status" className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm" data-qa-chips>
+      <strong>English</strong>
+      {chips.length === 0 ? <span className="rounded-sm border border-line px-1.5 text-xs font-semibold">No issues</span>
+        : chips.map(([s, label]) => <span key={s} className={`rounded-sm border px-1.5 text-xs font-semibold ${s === 'must' ? 'border-block text-block' : 'border-line'}`}>{count(s)} {label}</span>)}
+      {chips.length > 0 ? <span className="text-ink-soft">Details in English check.</span> : null}
+      {stale ? <span className="text-ink-soft">Out of date: the text changed.</span> : null}
+    </p>
   );
 }

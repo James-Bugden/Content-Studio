@@ -23,7 +23,15 @@ const alt = (text: string, total = 8) => ({
   scores: { specificity: 2, tension: 2, audienceFit: 2, credibility: 1, valuePromise: 1 },
 });
 
-describe('AiAssist (#242)', () => {
+const qaProposal = {
+  id: 'qa-1', draftHash: 'x', summary: 'Two small things.',
+  findings: [
+    { id: 'f1', category: 'spelling', severity: 'must', original: 'teh', replacement: 'the', explanation: 'Typo.', start: 0, end: 3 },
+    { id: 'f2', category: 'clarity', severity: 'consider', original: 'a', replacement: null, explanation: 'Vague.', start: 4, end: 5 },
+  ],
+};
+
+describe('AiAssist (#242, #247)', () => {
   const props = { libraryId: 'SYN-L001', text: 'Synthetic draft', canEdit: true, decided: false, dirty: false, revision: 'rev-1' };
 
   function route(overrides: Record<string, () => unknown> = {}) {
@@ -34,6 +42,7 @@ describe('AiAssist (#242)', () => {
       const key = Object.keys(overrides).find((k) => url.endsWith(k));
       if (key) return Response.json(overrides[key]!());
       if (url.endsWith('/image-need')) return Response.json({ ok: true, verdict: 'no_image', reason: 'The point lands as plain text.', draftHash: 'x', meta: {} });
+      if (url.endsWith('/qa')) return Response.json({ ok: true, proposal: qaProposal });
       if (url.endsWith('/hooks')) return Response.json({ ok: true, proposal: { alternatives: [alt('Hook one'), alt('Hook two'), alt('Hook three')] } });
       if (url.endsWith('/visual')) return Response.json({ ok: true, item: { revision: 'rev-2' }, replayed: false });
       throw new Error(`unexpected ${url}`);
@@ -50,7 +59,7 @@ describe('AiAssist (#242)', () => {
     expect(screen.getByText('No image needed')).toBeTruthy();
     expect(screen.getByText(/The point lands as plain text\./)).toBeTruthy();
     expect(screen.getByText(/Recorded as Text only/)).toBeTruthy();
-    expect(calls.map((c) => c.url.split('/').pop()).sort()).toEqual(['hooks', 'image-need', 'visual']);
+    expect(calls.map((c) => c.url.split('/').pop()).sort()).toEqual(['hooks', 'image-need', 'qa', 'visual']);
     expect(calls.find((c) => c.url.endsWith('/visual'))!.body).toMatchObject({ action: 'decide', decision: 'text_only', expectedRevision: 'rev-1', libraryId: 'SYN-L001' });
     expect(onDecided).toHaveBeenCalledWith('Text only', 'rev-2');
     const options = within(screen.getByRole('list', { name: 'Hook options' })).getAllByRole('listitem');
@@ -79,18 +88,46 @@ describe('AiAssist (#242)', () => {
     expect(screen.getByText(/Save the draft to record it/)).toBeTruthy();
   });
 
-  it('shows the monthly limit once when the cap stops both calls', async () => {
-    route({ '/image-need': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }), '/hooks': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }) });
+  it('shows the monthly limit once when the cap stops every call', async () => {
+    route({ '/image-need': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }), '/hooks': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }), '/qa': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }) });
     render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={vi.fn()} />);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
     expect(screen.getAllByText('Monthly AI limit reached')).toHaveLength(1);
+  });
+
+  it('shows the English check as chips and hands the proposal to the English panel', async () => {
+    route();
+    const onQaResult = vi.fn();
+    render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={vi.fn()} onQaResult={onQaResult} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
+    const chips = document.querySelector('[data-qa-chips]')!;
+    expect(chips.textContent).toContain('1 must fix');
+    expect(chips.textContent).toContain('1 to consider');
+    expect(onQaResult).toHaveBeenCalledWith(expect.objectContaining({ id: 'qa-1' }));
+  });
+
+  it('keeps the other parts when one part fails', async () => {
+    route({ '/qa': () => ({ ok: false, code: 'PROVIDER_UNAVAILABLE' }) });
+    render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={vi.fn()} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
+    expect(screen.getByText(/English check did not finish/)).toBeTruthy();
+    expect(screen.getByText('No image needed')).toBeTruthy();
+    expect(within(screen.getByRole('list', { name: 'Hook options' })).getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  it('shows the cap refusal once and still shows parts that finished', async () => {
+    route({ '/qa': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }), '/hooks': () => ({ ok: false, code: 'AI_LIMIT_REACHED' }) });
+    render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={vi.fn()} />);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
+    expect(screen.getAllByText('Monthly AI limit reached')).toHaveLength(1);
+    expect(screen.getByText('No image needed')).toBeTruthy();
   });
 
   it('shows progress while running and offers no button to a read-only viewer', async () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
     render(<AiAssist {...props} onUseHook={vi.fn()} onDecided={vi.fn()} />);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Check with AI/ })); });
-    expect(screen.getByText(/Checking image and writing hooks/)).toBeTruthy();
+    expect(screen.getByText(/Checking english check, hook suggestions, image check/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
     cleanup();
     render(<AiAssist {...props} canEdit={false} onUseHook={vi.fn()} onDecided={vi.fn()} />);

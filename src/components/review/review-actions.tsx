@@ -73,7 +73,7 @@ export function ReviewActions({ libraryId, reviewStatus, blockers, sheetRevision
       ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {!approved ? <>
-          <button type="button" className={buttonClass('approve', 'sm')} disabled={busy !== null || dirty || blocking.length > 0} onClick={() => void run('approve_and_queue')}>
+          <button type="button" data-shortcut="approve-and-queue" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter" title="Approve and queue (Ctrl or Cmd + Shift + Enter)" className={buttonClass('approve', 'sm')} disabled={busy !== null || dirty || blocking.length > 0} onClick={() => void run('approve_and_queue')}>
             {busy === 'approve_and_queue' ? 'Approving…' : 'Approve and queue'}
           </button>
           <button type="button" className={buttonClass('secondary', 'sm')} disabled={busy !== null || dirty || blocking.length > 0} onClick={() => void run('approve')}>

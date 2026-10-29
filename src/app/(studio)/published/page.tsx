@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getServices } from '@/application/container';
 import { today } from '@/application/schedule';
 import { ErrorState, FilterBar, GuardedLink, PageHeader, StateView } from '@/components';
+import { PublishedAutoSync } from '@/components/published/published-auto-sync';
 import { PublishedCard } from '@/components/published/published-card';
 import { METRIC_KEYS, publishedDate, publishedSummary, type PlatformSummary, type PublishedSummary } from '@/domain/analytics';
 import { PLATFORMS, type Platform } from '@/domain/enums';
@@ -155,6 +156,10 @@ export default async function PublishedPage({ searchParams }: { searchParams: Pr
             { key: 'range', label: 'Published', options: Object.entries(RANGE_LABEL).map(([value, label]) => ({ value, label })) },
           ]}
         />
+
+        {actor.role === 'owner' && rows.length > 0 ? (
+          <PublishedAutoSync rows={rows.map((r) => ({ contentId: r.contentId, revision: r.revision, draftId: r.draftId, status: r.typefullyStatus, finalSyncAt: r.finalSync.at, analyticsSyncAt: r.analyticsSync.at }))} />
+        ) : null}
 
         <section aria-labelledby="totals-h" className="flex flex-col gap-3">
           <h2 id="totals-h" className="text-lg font-semibold">

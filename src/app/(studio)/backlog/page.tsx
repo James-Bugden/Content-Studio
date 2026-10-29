@@ -9,11 +9,10 @@ import { StaleBacklogBanner } from '@/components/backlog/stale-backlog-banner';
 import { PanelHost } from '@/components/panel/panel-host';
 import { FilterBar } from '@/components/filter-bar';
 import { SortDirectionToggle } from '@/components/backlog/sort-direction-toggle';
-import { PLATFORMS, type Platform } from '@/domain/enums';
+import { parseBacklogUrl } from '@/domain/backlog-url';
 import { isAppError, type ErrorCode } from '@/domain/errors';
 import { backlogListRow, libraryBacklogTotals, libraryBacklogView } from '@/domain/library-backlog';
 import { BacklogTotalsStrip } from '@/components/backlog/backlog-totals';
-import { BACKLOG_DIRECTIONS, BACKLOG_GROUPS, BACKLOG_SORTS, type BacklogDirection, type BacklogGroup, type BacklogSort } from '@/domain/library-backlog';
 import { backlogReadiness } from '@/application/backlog-readiness';
 import { readBacklogSources } from '@/application/backlog-sources';
 import { requireActor } from '@/lib/auth';
@@ -33,22 +32,6 @@ export const dynamic = 'force-dynamic';
 
 type Params = Record<string, string | string[] | undefined>;
 function one(params: Params, key: string): string | undefined { return typeof params[key] === 'string' ? params[key] : undefined; }
-function platform(params: Params): Platform | undefined {
-  const raw = one(params, 'platform');
-  return raw && (PLATFORMS as readonly string[]).includes(raw) ? raw as Platform : undefined;
-}
-function sort(params: Params): BacklogSort | undefined {
-  const raw = one(params, 'sort');
-  return raw && (BACKLOG_SORTS as readonly string[]).includes(raw) ? raw as BacklogSort : undefined;
-}
-function direction(params: Params): BacklogDirection | undefined {
-  const raw = one(params, 'dir');
-  return raw && (BACKLOG_DIRECTIONS as readonly string[]).includes(raw) ? raw as BacklogDirection : undefined;
-}
-function grouping(params: Params): BacklogGroup | undefined {
-  const raw = one(params, 'group');
-  return raw && (BACKLOG_GROUPS as readonly string[]).includes(raw) ? raw as BacklogGroup : undefined;
-}
 function safeBacklogErrorCode(error: unknown): ErrorCode {
   return isAppError(error) ? error.code : 'UNKNOWN';
 }
@@ -62,7 +45,8 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
   }
   const retryHref = query.size ? `/backlog?${query}` : '/backlog';
-  const ideas = one(params, 'view') === 'ideas';
+  const urlState = parseBacklogUrl(params);
+  const ideas = urlState.view === 'ideas';
   if (!ideas) {
     let stale = false;
     let readAt = 0;
@@ -81,13 +65,12 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
       stale = true;
     }
     const readiness = backlogReadiness(library, queue, schedule);
-    const requestedPage = Number(one(params, 'page'));
     const filters = {
-      source: one(params, 'source'), platform: platform(params), pesto: one(params, 'pesto'),
-      status: one(params, 'status'), sort: sort(params), dir: direction(params), group: grouping(params),
+      source: urlState.source, platform: urlState.platform, pesto: urlState.pesto,
+      status: urlState.status, sort: urlState.sort, dir: urlState.dir, group: urlState.group,
     };
     const view = libraryBacklogView(library, {
-      ...filters, page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
+      ...filters, page: urlState.page,
     }, readiness);
     return (
       <>
@@ -119,7 +102,7 @@ export default async function BacklogPage({ searchParams }: { searchParams: Prom
     return <><PageHeader title="Backlog ideas" description="Ideas from the Content Queue Sheet, before they become posts." /><ErrorState code={safeBacklogErrorCode(error)} action={<a href={retryHref} className="inline-flex min-h-11 items-center font-semibold underline">Try again</a>} /></>;
   }
   const approvedRaw = one(params, 'approved');
-  const filters: BacklogFilters = { source: one(params, 'source'), platform: platform(params), approved: approvedRaw === 'yes' ? true : approvedRaw === 'no' ? false : undefined };
+  const filters: BacklogFilters = { source: urlState.source, platform: urlState.platform, approved: approvedRaw === 'yes' ? true : approvedRaw === 'no' ? false : undefined };
   const [groups, options] = await Promise.all([loadBacklogGroups(repo, filters, queue), loadBacklogOptions(repo, queue)]);
   const total = groups.reduce((sum, g) => sum + g.total, 0);
   return (

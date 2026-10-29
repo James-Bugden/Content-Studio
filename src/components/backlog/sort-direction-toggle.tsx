@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { buttonClass } from '../button-styles';
 import { useLeaveConfirmation } from '../leave-confirm';
+import { nextHistoryMode } from '@/lib/client/url-state';
 
 /**
  * Ascending/descending as one small toggle beside Sort (CS-050), replacing the
@@ -23,7 +24,7 @@ export function SortDirectionToggle() {
     else params.set('dir', 'desc');
     params.delete('page');
     const query = params.toString();
-    guard(() => router.push(`${pathname}${query ? `?${query}` : ''}`, { scroll: false }));
+    guard(() => router[nextHistoryMode()](`${pathname}${query ? `?${query}` : ''}`, { scroll: false }));
   }
 
   return (
